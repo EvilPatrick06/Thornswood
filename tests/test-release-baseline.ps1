@@ -358,12 +358,12 @@ try {
     $fake = Join-Path $T 'repo'
     # Fresh-Checkout.ps1 too: Publish-Update loads its freshness guard under
     # Stop since #3006, where before a tree without it walked past the guard.
-    foreach ($f in 'scripts\release\Publish-Update.ps1', 'scripts\deploy\Fresh-Checkout.ps1', 'scripts\release\Read-JsonFile.ps1', 'scripts\release\RecordShape.ps1', 'scripts\release\RepoPlugins.ps1', 'scripts\release\Ship-Rules.ps1', 'scripts\mods\LoadOrder.ps1',
+    foreach ($f in 'scripts\release\Publish-Update.ps1', 'scripts\deploy\Fresh-Checkout.ps1', 'scripts\release\Read-JsonFile.ps1', 'scripts\release\RecordShape.ps1', 'scripts\release\RepoPlugins.ps1', 'scripts\release\CollectionRevision.ps1', 'scripts\release\Ship-Rules.ps1', 'scripts\mods\LoadOrder.ps1',
                    'scripts\release\Feed-Store.ps1', 'scripts\release\Feed-Json.ps1', 'scripts\release\Release-Baseline.ps1', 'scripts\release\Release-Name.ps1', 'scripts\release\Source-Notice.ps1',
-                   'scripts\release\Dev-News.ps1', 'scripts\deploy\ServerContent.ps1',
+                   'scripts\release\Dev-News.ps1', 'scripts\deploy\ServerContent.ps1', 'scripts\deploy\LastPluginRecipe.ps1',
                    'scripts\release\Feed-News.ps1', 'scripts\release\Feed-Rules.ps1', 'scripts\release\Release-Manifest.ps1', 'scripts\release\Sign-OnGitHub.ps1', 'scripts\release\Assert-PublishSigned.ps1', 'scripts\release\ShippedBytes.ps1',
                    'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt',
-                   'scripts\release\Where.ps1', 'records\client-build.json', 'records\client-licences.json', 'records\client-licences', 'records\ui-gone.json',
+                   'scripts\release\Where.ps1', 'records\client-build.json', 'records\client-licences.json', 'records\client-licences', 'records\ui-gone.json', 'records\shipped-not-ours.json',
                    'scripts\mods\Generated.ps1', 'records\generated.json') {
         $to = Join-Path $fake $f
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $to) | Out-Null
@@ -388,18 +388,23 @@ try {
     Put (Join-Path $inst 'Profile\OwnGame\plugins.txt') "# This fixture enables no additional plugins.`r`n"
     Put (Join-Path $inst 'Profile\OwnGame\loadorder.txt') ''
     . (Join-Path $repo 'tests\fixtures\ui-front.ps1')
+    # The collection revision record, and a Vortex on it (#3597).
+    . (Join-Path $repo 'tests\fixtures\collection-revision.ps1')
+    $roaming = Join-Path $inst 'roaming'
+    $null = Install-CollectionRevisionFixture -From $repo -RepoCopy $fake -AppData $roaming
     Install-UiFrontFixture (Join-Path $inst 'Game')
     $rel6 = Join-Path $inst 'rel'
     function Publish([string[]]$extra) {
-        $oldA = $env:LOCALAPPDATA; $oldE = $ErrorActionPreference
+        $oldA = $env:LOCALAPPDATA; $oldR = $env:APPDATA; $oldE = $ErrorActionPreference
         $env:LOCALAPPDATA = Join-Path $inst 'appdata'
+        $env:APPDATA = $roaming
         $ErrorActionPreference = 'Continue'
         try {
             $argv = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $fake 'scripts\release\Publish-Update.ps1'),
                       '-Root', $inst, '-ReleaseDir', $rel6, '-DistRoot', (Join-Path $inst 'dist'), '-SiteDir', $site6,
                       '-NoUpload', '-NoPush', '-NoPause') + @($extra)
             $out = (& $Shell @argv 2>&1 | Out-String); $code = $LASTEXITCODE
-        } finally { $env:LOCALAPPDATA = $oldA; $ErrorActionPreference = $oldE }
+        } finally { $env:LOCALAPPDATA = $oldA; $env:APPDATA = $oldR; $ErrorActionPreference = $oldE }
         return [pscustomobject]@{ Code = $code; Out = $out }
     }
     # The child's own words when a case fails, so a failure says why.

@@ -129,6 +129,8 @@ try {
     Yes 'nothing differs: the check holds' (@(Get-ShipSkyUIFeedChange $g $record @()).Count -eq 0)
     Put (Join-Path $g 'Data\Platform\Plugins\chat.js') 'changed, and not SkyUI''s'
     Yes '  a change outside Scripts, Interface and the archives does not count' (@(Get-ShipSkyUIFeedChange $g $record @()).Count -eq 0)
+    Put (Join-Path $g 'Data\Interface\Translations\Thornswood-Content_ENGLISH.txt') 'a string table the check never opens'
+    Yes '  nor a file under Interface that is not a menu, such as a string table' (@(Get-ShipSkyUIFeedChange $g $record @()).Count -eq 0)
     Put (Join-Path $g 'Data\Scripts\ski_main.pex') 'another script'
     $c = @(Get-ShipSkyUIFeedChange $g $record @())
     Yes 'a changed script is named' (($c -join '|') -eq 'Data\Scripts\ski_main.pex')

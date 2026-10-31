@@ -9,8 +9,11 @@
   It listens on the named pipe \\.\pipe\thornswood-gate, which only the
   thornswood-deploy account (its forced command, Gate.ps1) and SYSTEM may
   open, and which is closed to every other machine. Each connection hands it
-  one line. It holds the line to verbs.json with GateRules.ps1, the copies
-  installed beside it, and never to anything the caller sent along, then:
+  one line. It holds the line to GateRules.ps1, the copy installed beside
+  it, and to main's own scripts/vps/gate/verbs.json once it has fetched main
+  (Patrick's A, 30 Oct 2026: a merged verb needs no install on the box, since
+  main's scripts already run as Administrator), and never to anything the
+  caller sent along, then:
 
     1. brings its own checkout, C:\Thornswood-Gate\repo, to the tip of
        main on GitHub, read with a key that may only read the repository
@@ -18,13 +21,17 @@
        name a branch, a commit or a file;
     2. runs the verb's script from that checkout with PowerShell 7, with the
        verb's fixed words and the parameters the line gave, each held to its
-       rule. The script reaches the box the way it does from One, as
+       rule. A live verb (verbs.json "build") runs only when that tip is
+       the exact commit the line named with -Build, which only ever holds
+       it to main's tip, never runs another commit. The script reaches the
+       box the way it does from One, as
        Administrator over ssh, here over loopback with the gate's own key
        (from="127.0.0.1", thornswood-gate), because the deploy scripts'
        box halves need administrator (the ops repo's DEPLOY-IDENTITIES.md,
        section 2a);
     3. sends every line the script prints back as it comes, the files of a
-       verb that writes some (Get-Logs), and its exit code.
+       verb that writes some (Get-Logs, Rebuild-ContentTables), and its exit
+       code.
 
   One verb at a time: the pipe takes one connection, and a second caller
   waits for it or is told the gate is busy. A run that outlives its verb's
@@ -56,6 +63,10 @@ $Utf8 = New-Object Text.UTF8Encoding($false)
 $env:GIT_SSH_COMMAND = ('"' + $Cfg.ssh + '" -F none -i "' + (Join-Path $Root 'keys\github_ed25519') + '" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="' + (Join-Path $Root 'keys\github_known_hosts') + '"').Replace('\', '/')
 $env:GIT_TERMINAL_PROMPT = '0'
 $env:THORNSWOOD_GATE = '1'
+# The GitHub CLI Install-Gate pinned, first on the verbs' PATH, for the Ship
+# verbs' signing (Ship-OnBox.ps1). It holds no sign in: a run that needs
+# GitHub brings its own short token.
+if ($Cfg.PSObject.Properties['gh'] -and $Cfg.gh) { $env:PATH = (Split-Path -Parent ([string]$Cfg.gh)) + ';' + $env:PATH }
 
 function Log([string]$m) {
     [IO.File]::AppendAllText((Join-Path $LogDir 'gate.log'), ((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') + ' ' + $m + "`r`n"), $Utf8)
@@ -180,7 +191,13 @@ function Update-Checkout {
     foreach ($step in @(
         @('-C', $Repo, 'fetch', '--quiet', '--depth', '1', '--no-tags', 'origin', '+refs/heads/main:refs/remotes/origin/main'),
         @('-C', $Repo, 'checkout', '--quiet', '--force', '--detach', 'refs/remotes/origin/main'),
-        @('-C', $Repo, 'clean', '-ffdxq'))) {
+        @('-C', $Repo, 'clean', '-ffdxq'),
+        # A checkout moves its submodules only when told to, so a fetched
+        # engine\skymp stayed at the pin before and every verb's freshness
+        # check refused the checkout once main moved the pin (31 Oct, d258e53e
+        # left behind by 50736fe6). This brings each fetched submodule to the
+        # commit main pins; one never fetched here stays unfetched.
+        @('-C', $Repo, 'submodule', 'update', '--checkout', '--force', '--depth', '1'))) {
         $c = Invoke-Child $git $step $Root 10
         if ($c -ne 0) { Send ('| git ' + $step[2] + ' ended ' + $c + ', so main could not be read'); return '' }
     }
@@ -212,16 +229,20 @@ function Invoke-Request($Pipe) {
     } else { $line = $null }
     if ($null -eq $line) { Send '@REFUSED the request was not one LINE.'; Send '@END 64'; Log 'REFUSED a request that was not one LINE'; return }
 
-    $req = Test-ThornswoodGateRequest -Line $line -Verbs (Read-ThornswoodGateVerbs (Join-Path $Root 'verbs.json'))
+    # The line's shape first, before git is asked anything; which verbs there
+    # are is main's verbs.json, read once main is fetched below.
     $shown = $line.Replace("`r", ' ').Replace("`n", ' ')
-    if (-not $req.Ok) { Send ('@REFUSED ' + $req.Why); Send '@END 64'; Log ('REFUSED [' + $shown + '] ' + $req.Why); return }
-    if ($req.Verb -eq 'ping') {
+    $words = @()
+    try { $words = Split-ThornswoodGateLine $line } catch { Send ('@REFUSED ' + $_.Exception.Message); Send '@END 64'; Log ('REFUSED [' + $shown + '] ' + $_.Exception.Message); return }
+    if (-not $words.Count) { $why = 'the line is empty: it names no verb. Nothing was run.'; Send ('@REFUSED ' + $why); Send '@END 64'; Log ('REFUSED [' + $shown + '] ' + $why); return }
+    if ($words[0] -ceq 'ping') {
+        if ($words.Count -gt 1) { $why = 'ping takes nothing after it. Nothing was run.'; Send ('@REFUSED ' + $why); Send '@END 64'; Log ('REFUSED [' + $shown + '] ' + $why); return }
         # It also reads main's tip with the deploy key, so a ping proves the
         # way to GitHub as well as the pipe.
         $tip = Invoke-Short ([string]$Cfg.git) @('ls-remote', ([string]$Cfg.remote), 'refs/heads/main')
         $main = if ($tip.Code -eq 0 -and ($tip.Out -join ' ') -match '([0-9a-f]{40})\s+refs/heads/main') { $Matches[1] } else { '' }
         if (-not $main) { Send ('| GATE BROKEN: GitHub did not answer with the deploy key: ' + (($tip.Out | Select-Object -Last 2) -join ' ')); Send '@END 66'; Log 'PING main unreadable'; return }
-        Send ('| GATE READY, installed from ' + $Cfg.commit + ', main at ' + $main + ', runs ' + ((@((Read-ThornswoodGateVerbs (Join-Path $Root 'verbs.json')).verbs.PSObject.Properties) | ForEach-Object { $_.Name }) -join ', '))
+        Send ('| GATE READY, installed from ' + $Cfg.commit + ', main at ' + $main + ', runs the verbs of main''s scripts/vps/gate/verbs.json')
         Send '@END 0'
         Log 'PING'
         return
@@ -237,6 +258,15 @@ function Invoke-Request($Pipe) {
     $commit = Update-Checkout
     if (-not $commit) { Send '@END 66'; Log ('END ' + $id + ' 66 main could not be read'); return }
     Send ('| main at ' + $commit)
+    # The verbs as main has them now, from the checkout just fetched, never
+    # from anything the caller sent.
+    $verbsAt = Join-Path $Repo 'scripts\vps\gate\verbs.json'
+    try { $req = Test-ThornswoodGateRequest -Line $line -Verbs (Read-ThornswoodGateVerbs $verbsAt) }
+    catch { $req = [pscustomobject]@{ Ok = $false; Why = ('main''s verbs.json could not be read: ' + $_.Exception.Message + ' Nothing was run.') } }
+    if (-not $req.Ok) { Send ('@REFUSED ' + $req.Why); Send '@END 64'; Log ('END ' + $id + ' 64 REFUSED [' + $shown + '] ' + $req.Why); return }
+    # A live verb runs only on the build it was named for (GateRules.ps1,
+    # Build): a merge that landed after Patrick gave his word is not that build.
+    if ($req.Build -and $req.Build -cne $commit) { Send ('@REFUSED main is at ' + $commit + ' now, not ' + $req.Build + ', the build this run was named for. Nothing was run.'); Send '@END 64'; Log ('END ' + $id + ' 64 main moved past the named build ' + $req.Build); return }
 
     $script = Join-Path $Repo ($req.Script.Replace('/', '\'))
     if (-not (Test-Path -LiteralPath $script)) { Send ('@REFUSED main has no ' + $req.Script + ' now. Nothing was run.'); Send '@END 64'; Log ('END ' + $id + ' 64 no script'); return }

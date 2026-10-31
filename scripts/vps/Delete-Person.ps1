@@ -104,16 +104,18 @@
   and takings in beds.json; the embassy and remnant rolls in embassy.json; a
   dungeon chest's reservation in dungeon-rewards-ledger.json; a faction or
   business book's members, chat and owner in books.json; a line or a hand
-  out on the trade ships' manifest in trade-cargo.json (#511); a line, a
-  hand out or a journey on the trade carts' manifest in trade-carts.json
-  (#3158); a guild
+  out on the trade ships' manifest in trade-cargo.json (#511); a market
+  stall they keep, and what is laid out on it, in market-stalls.json
+  (#3160); a line, a hand out or a journey on the trade carts' manifest in
+  trade-carts.json (#3158); a guild
   trader's supply waits, commission promises and a trade waiting on them in
   merchant-ledger.json (#2652). This script never
   edits those: what happens to a house or a post held by somebody who is gone
   is each register's own rule, and that rule is in the gamemode. So it counts
   them ("release" in what it prints) and, for every server that holds
   something of theirs, writes private\deleted-characters.json beside them:
-  their profile ids and the form ids of the characters it found there. The
+  their profile ids and the runtime form ids (#2870) of the characters it
+  found there. The
   game server's release block reads it at its start, lets go of every entry
   through the register's own code, logs counts only and deletes the list. A
   faction or business book they own is disbanded then, so the procedure says
@@ -383,6 +385,16 @@ const say = (s) => process.stdout.write(s + '\n');
 function stop(m) { say('STOP|' + m); process.exit(2); }
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+// One shape for a character's form id (#2870); game\form-id.js is the
+// original and tests\test-2870-form-id-shape.js keeps this copy the same.
+function formIdOf(desc) {
+  if (typeof desc !== 'string' || !/^[0-9a-f]{1,6}$/i.test(desc)) return 0;
+  var local = parseInt(desc, 16);
+  return local > 0 ? 0xff000000 + local : 0;
+}
+function isFormId(n) {
+  return Number.isSafeInteger(n) && n > 0xff000000 && n <= 0xffffffff;
+}
 
 // What is in a folder, [] when it is not there. Anything else stops.
 function names(dir) {
@@ -421,10 +433,16 @@ function want(f, kind) {
 }
 // A game server's list of deleted characters (the release block in
 // game\gamemode.js reads it), with these profiles and form ids merged in and
-// what was done cleared, so every part runs for the new ids too.
+// what was done cleared, so every part runs for the new ids too. Its actors
+// are runtime form ids (#2870); a list still holding local ids, the shape
+// from a build before #2870, is not read and never merged into: it waits for
+// a person (docs\GAMEMODE.md).
 function mergeList(lf, P, A) {
   if (!lf.missing && !(isObj(lf.value) && Array.isArray(lf.value.profiles))) {
     stop(lf.p + ' is not a list of deleted characters, so nothing was changed');
+  }
+  if (!lf.missing && lf.value.actors !== undefined && !(Array.isArray(lf.value.actors) && lf.value.actors.every(isFormId))) {
+    stop(lf.p + ' holds form ids in the old shape, from a build before #2870, and is not read; docs\\GAMEMODE.md says what to do. Nothing was changed');
   }
   const was = lf.missing ? {} : lf.value;
   const ids = (xs) => (Array.isArray(xs) ? xs : []).map(Number).filter((x) => Number.isSafeInteger(x) && x > 0);
@@ -529,7 +547,8 @@ function refs(v, P, id, A) {
   const hitActor = (k, x) => !!A && /^actor$/i.test(k) && typeof x === 'number' && A.has(x);
   // The merchant ledger keys a supply wait by [form id, profile, what], and a
   // commission promise (held, or cooling down) by [owner, job], its owner
-  // itself [form id, plugin, profile] (game\merchant-commission-state.js).
+  // itself [form id, plugin, profile] (game\merchant-commission-state.js);
+  // a character's form id there is its runtime form id (#2870).
   // A key that is not JSON names nobody.
   const inKey = (k, depth) => {
     if (typeof k !== 'string' || k[0] !== '[' || depth > 1) return false;
@@ -795,8 +814,9 @@ for (const person of people) {
             if (isObj(o) && Number(o.profileId) > 0 && hasP(o.profileId) && !unlinks.has(p)) {
               unlink(p, live && !bak ? g.writer : null);
               removed(T + ': characters' + (bak ? ' in copies an appearance reset kept' : w === 'world' && dir === forms ? '' : ' in ' + path.relative(R, dir)), 1);
-              // A character made in the world has a form id of its own, no plugin (FormDesc::ToString).
-              if (/^[0-9a-f]{1,8}$/i.test(String(o.formDesc || ''))) A.add(parseInt(o.formDesc, 16));
+              // A character made in the world has a formDesc of its local id alone, no plugin
+              // (FormDesc::ToString); the list keeps its runtime form id (#2870).
+              if (formIdOf(o.formDesc)) A.add(formIdOf(o.formDesc));
             }
           }
         }
@@ -848,7 +868,7 @@ for (const person of people) {
         left: the old copies in data.
       */
       const LIST = 'deleted-characters.json';
-      const RELEASED = /^(property|law|beds|farm-claims|embassy|books|dungeon-rewards-ledger|trade-cargo|trade-carts|merchant-ledger)\.json$/i;
+      const RELEASED = /^(property|law|beds|farm-claims|embassy|books|dungeon-rewards-ledger|trade-cargo|market-stalls|trade-carts|merchant-ledger)\.json$/i;
       handled.add(path.join(priv, LIST).toLowerCase());
       let theirs = 0;
       if (P.size) {

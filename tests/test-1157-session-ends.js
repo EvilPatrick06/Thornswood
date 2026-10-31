@@ -474,8 +474,8 @@ yes('the front takes session:end from the relay into update, with the sentence',
     /if \(what === 'session:end'\) \{\s*if \(!sessionEndAsked\) \{ sessionEndAsked = String\(a\[2\] \|\| /.test(front));
 yes('and ends only a connection that is up', /function sessionEnded\(sentence\) \{\s*let up = false;\s*try \{ up = !!sp\.mpClientPlugin\.isConnected\(\); \}/.test(front));
 yes('the page is given the sentence, and no place in line',
-    /if \(menuAgain\.ended\) \{ list\.ended = String\(menuAgain\.ended\); \} else \{ list\.away = menuAgain; \}/.test(front));
-yes('picking on the way back connects again through relogAs', /if \(menuAgain\) \{ relogAs\(id\); \}/.test(front));
+    /if \(menuAgain\.ended\) \{ list\.ended = String\(menuAgain\.ended\); \}\s*else if \(menuAgain\.switched\) \{[^]*?\}\);\s*\}\s*else \{ list\.away = menuAgain; \}/.test(front));
+yes('picking on the way back connects again through relogAs', /if \(menuAgain\) \{ pickedAgain\(id\); relogAs\(id\); \}/.test(front));
 
 // =================================================================== the menu
 function pageRun(list) {
@@ -526,7 +526,8 @@ function pageRun(list) {
 }
 
 {
-  const P = pageRun({ characters: [{ profileId: 4242, name: 'Bjorn', slot: 1 }], intro: false, ended: SENTENCE });
+  // The front writes an ended page's list itself, so it says front (#5140).
+  const P = pageRun({ characters: [{ profileId: 4242, name: 'Bjorn', slot: 1 }], intro: false, ended: SENTENCE, front: true });
   yes('the choice page runs with LIST.ended' + (P.threw ? ': ' + P.threw : ''), !P.threw);
   yes('the sentence is over the slots', !!P.ended && P.ended.textContent === SENTENCE && P.ended.style.display === 'block');
   yes('and the page says so to the front log',

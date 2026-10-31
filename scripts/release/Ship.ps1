@@ -379,7 +379,11 @@ function Get-SourceRepo([string]$repoDir) {
     } else {
         Write-Host '  git is not on the path, so the launcher''s draft is looked for on EvilPatrick06/Thornswood' -ForegroundColor Yellow
     }
-    if ($remote -and $remote -match 'github\.com[:/](.+?)(?:\.git)?\s*$') { return $Matches[1] }
+    # A URL's port is not part of owner/name: the deploy gate's checkout reads
+    # ssh://git@ssh.github.com:443/<owner>/<name>.git (Install-Gate.ps1), and
+    # on 31 Oct its main Ship asked gh for 443/EvilPatrick06/Thornswood, a
+    # repository on a host named 443 ("error connecting to 443").
+    if ($remote -and $remote -match 'github\.com(?::\d+(?=/))?[:/](.+?)(?:\.git)?\s*$') { return $Matches[1] }
     return 'EvilPatrick06/Thornswood'
 }
 
@@ -488,6 +492,77 @@ function Save-ReleaseAssets([string]$repo, $release, [string[]]$names, [string]$
     return ''
 }
 
+# FROM THE RUN THAT BUILT THEM, THEN THE DRAFT (#2841). GitHub lists a draft
+# release only to an account that can push. A Ship on One reads with Patrick's
+# own gh and sees the drafts; a Ship from the deploy gate reads with the box
+# admin App's token, Actions write and Contents read (ship-access.js, his pick
+# of 30 Oct), and the releases list it gets has no drafts in it. On 31 Oct the
+# gate's Ship-Main had release.yml build, sign and check v1.2.12 (run
+# 41196215137, all three files on the draft) and then stopped on "There is no
+# verified launcher for v1.2.12". release.yml keeps the same three files as its
+# run's artifact "release-files", which Actions read reaches, so they are taken
+# from the newest green run of main's release.yml titled for the tag, and from
+# the draft only when no such run still holds them all (a run before this, or
+# one past its 30 days). The checks that follow are the same either way.
+#
+# Downloads $names for $tag into $into. Returns @{ LookWhy; None; Why }:
+# LookWhy when GitHub could not be asked at all, None when neither a run nor a
+# draft holds them, Why when they were there and did not come down whole.
+function Save-ReleaseFiles([string]$repo, [string]$tag, [string[]]$names, [string]$into) {
+    New-Item -ItemType Directory -Force -Path $into | Out-Null
+    function Read-GhJson([string]$path) {
+        $ms = New-Object IO.MemoryStream
+        try {
+            $why = Invoke-GhToStream @('api', '-H', 'Accept: application/vnd.github+json', $path) $ms
+            $text = [Text.Encoding]::UTF8.GetString($ms.ToArray())
+        } finally { $ms.Dispose() }
+        if ($why) { return @{ Doc = $null; Why = $why } }
+        try { return @{ Doc = ($text | ConvertFrom-Json); Why = '' } }
+        catch { return @{ Doc = $null; Why = ('the answer did not read as JSON: ' + $_.Exception.Message) } }
+    }
+    $runs = Read-GhJson "repos/$repo/actions/workflows/release.yml/runs?branch=main&event=workflow_dispatch&status=success&per_page=50"
+    if ($runs.Why) { return @{ LookWhy = "gh could not list the release.yml runs of $repo ($($runs.Why))"; None = $false; Why = '' } }
+    $run = $null
+    foreach ($r in @($runs.Doc.workflow_runs | ForEach-Object { $_ })) {
+        if ($r -and [string]$r.display_title -ceq ('Release launcher ' + $tag) -and [string]$r.head_branch -ceq 'main' -and
+            ($null -eq $run -or [long]$r.id -gt [long]$run.id)) { $run = $r }
+    }
+    if ($null -ne $run) {
+        $arts = Read-GhJson "repos/$repo/actions/runs/$($run.id)/artifacts"
+        if ($arts.Why) { return @{ LookWhy = "gh could not list the files of release.yml run $($run.id) ($($arts.Why))"; None = $false; Why = '' } }
+        $art = $null
+        foreach ($a in @($arts.Doc.artifacts | ForEach-Object { $_ })) {
+            if ($a -and [string]$a.name -ceq 'release-files' -and -not $a.expired -and ($null -eq $art -or [long]$a.id -gt [long]$art.id)) { $art = $a }
+        }
+        if ($null -ne $art) {
+            $zip = Join-Path $into 'release-files.zip'
+            $dir = Join-Path $into 'release-files'
+            foreach ($p in $zip, $dir) { if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Recurse -Force } }
+            $fs = [IO.File]::Create($zip)
+            try { $why = Invoke-GhToStream @('api', "repos/$repo/actions/artifacts/$($art.id)/zip") $fs }
+            finally { $fs.Dispose() }
+            try {
+                if ($why) { return @{ LookWhy = ''; None = $false; Why = "could not download the files of release.yml run $($run.id) ($why)" } }
+                try { $null = Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force -ErrorAction Stop }
+                catch { return @{ LookWhy = ''; None = $false; Why = "the files of release.yml run $($run.id) did not open as a zip ($($_.Exception.Message))" } }
+                if (@($names | Where-Object { -not (Test-Path -LiteralPath (Join-Path $dir $_) -PathType Leaf) }).Count -eq 0) {
+                    foreach ($n in $names) { Copy-Item -LiteralPath (Join-Path $dir $n) -Destination (Join-Path $into $n) -Force }
+                    Write-Host ("  from release.yml run {0}, {1}" -f $run.id, [string]$run.html_url) -ForegroundColor DarkGray
+                    return @{ LookWhy = ''; None = $false; Why = '' }
+                }
+            } finally {
+                foreach ($p in $zip, $dir) { if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Recurse -Force -ErrorAction SilentlyContinue } }
+            }
+        }
+    }
+    $look = Find-ReleaseByTag $repo $tag
+    if ($look.Why) { return @{ LookWhy = $look.Why; None = $false; Why = '' } }
+    if (-not $look.Release) { return @{ LookWhy = ''; None = $true; Why = '' } }
+    $got = Save-ReleaseAssets $repo $look.Release $names $into
+    if ($got -match '^the release has no ') { return @{ LookWhy = ''; None = $true; Why = '' } }
+    return @{ LookWhy = ''; None = $false; Why = $got }
+}
+
 # Downloads Thornswood.exe and SHA256SUMS for tag v<version> into $into and
 # checks the exe against its line in SHA256SUMS. Returns '' when the verified
 # exe is sitting in $into, or a sentence saying why not, for the caller to Die
@@ -507,15 +582,13 @@ function Get-ReleaseLauncher([string]$repo, [string]$version, [string]$into) {
                "draft release, then run this same Ship again:`r`n" +
                "    git tag $tag`r`n" +
                "    git push origin $tag")
-    $look = Find-ReleaseByTag $repo $tag
-    if ($look.Why) {
-        return ("The launcher CI built for $tag could not be looked for: $($look.Why). This is GitHub or gh, not the release; " +
+    $look = Save-ReleaseFiles $repo $tag @('Thornswood.exe', 'SHA256SUMS') $into
+    if ($look.LookWhy) {
+        return ("The launcher CI built for $tag could not be looked for: $($look.LookWhy). This is GitHub or gh, not the release; " +
                 "check gh auth status and run this same Ship again. Nothing was published.")
     }
-    if (-not $look.Release) { return $notYet }
-    $got = Save-ReleaseAssets $repo $look.Release @('Thornswood.exe', 'SHA256SUMS') $into
-    if ($got -match '^the release has no ') { return $notYet }
-    if ($got) { return ("The launcher CI built for $tag is on $repo, but $got. Run this same Ship again. Nothing was published.") }
+    if ($look.None) { return $notYet }
+    if ($look.Why) { return ("The launcher CI built for $tag is on $repo, but $($look.Why). Run this same Ship again. Nothing was published.") }
     $exe = Join-Path $into 'Thornswood.exe'
     $sums = Join-Path $into 'SHA256SUMS'
     # SHA256SUMS is "<hash>  Thornswood.exe", the sha256sum shape, so the line
@@ -559,15 +632,13 @@ function Get-ReleaseStub([string]$repo, [string]$version, [string]$into) {
     }
     $none = ("The release for $tag on $repo has no setup program (setup-stub.exe), so -Package would build an installer " +
              "with nothing to run it. Nothing was published. " + $again)
-    $look = Find-ReleaseByTag $repo $tag
-    if ($look.Why) {
-        return ("The setup program CI built for $tag could not be looked for: $($look.Why). This is GitHub or gh, not the release; " +
+    $look = Save-ReleaseFiles $repo $tag @('setup-stub.exe', 'SHA256SUMS') $into
+    if ($look.LookWhy) {
+        return ("The setup program CI built for $tag could not be looked for: $($look.LookWhy). This is GitHub or gh, not the release; " +
                 "check gh auth status and run this same Ship again. Nothing was published.")
     }
-    if (-not $look.Release) { return $none }
-    $got = Save-ReleaseAssets $repo $look.Release @('setup-stub.exe', 'SHA256SUMS') $into
-    if ($got -match '^the release has no ') { return $none }
-    if ($got) { return ("The setup program CI built for $tag is on $repo, but $got. Run this same Ship again. Nothing was published.") }
+    if ($look.None) { return $none }
+    if ($look.Why) { return ("The setup program CI built for $tag is on $repo, but $($look.Why). Run this same Ship again. Nothing was published.") }
     $stub = Join-Path $into 'setup-stub.exe'
     $sums = Join-Path $into 'SHA256SUMS'
     $want = ''
@@ -763,7 +834,18 @@ function Test-LauncherUnchanged($published, [string]$inputs) {
 #   - main's feed cannot be read at all: it cannot tell, so it refuses, before
 #     anything is built.
 # $mainPub and $devPub are what Get-PublishedLauncher returns. Returns
-# MainEquivalent, Why (one line for the screen) and Refuse ('' or the reason).
+# MainEquivalent, MainsOwn, Why (one line for the screen) and Refuse ('' or
+# the reason).
+#
+# MainEquivalent says dev carries main's number. MainsOwn says more: main's
+# feed already offers this very launcher, so dev can take that exe as it is.
+# Only the case "main published $current from these same sources" is both.
+# "Main has not published $current yet" is MainEquivalent alone: the number is
+# main's, the launcher is not built yet. On 31 Oct the gate's Ship-Dev from
+# 556471fc read MainEquivalent as "take main's feed launcher", and dev release
+# 20261031-051138-dev went out naming launcher 1.2.12 (minLauncher 1.2.12)
+# with main's 1.2.11 exe (bb01775f) under it, so every dev launcher was told
+# it was too old and was offered itself.
 function Get-DevLauncherLine([bool]$aligned, [string]$current, [string]$inputs, $mainPub, $devPub) {
     function Cmp([string]$a, [string]$b) {
         $x = @(); $y = @()
@@ -779,7 +861,7 @@ function Get-DevLauncherLine([bool]$aligned, [string]$current, [string]$inputs, 
     function SameSources($pub) {
         return ($null -ne $pub -and $pub.Inputs -and $inputs -and ([string]$pub.Inputs -eq $inputs))
     }
-    $out = [pscustomobject]@{ MainEquivalent = $false; Why = ''; Refuse = '' }
+    $out = [pscustomobject]@{ MainEquivalent = $false; MainsOwn = $false; Why = ''; Refuse = '' }
     if (-not $aligned) {
         $out.Why = 'not a clean checkout of origin/main, so the launcher takes a dev number'
         return $out
@@ -800,6 +882,7 @@ function Get-DevLauncherLine([bool]$aligned, [string]$current, [string]$inputs, 
     if ($c -eq 0) {
         if (SameSources $mainPub) {
             $out.MainEquivalent = $true
+            $out.MainsOwn = $true
             $out.Why = "this is the launcher main published as $current, so dev carries $current too"
         } else {
             $out.Why = ("main published $current from other launcher sources than these, so this launcher takes a dev number " +
@@ -1316,6 +1399,45 @@ if ($FromFeed) {
     }
 }
 
+# ------------------------------------------------------------ collection revision
+# The feed names records\collection-plugins.json's revision (#3597), and the
+# launcher holds Play for any install that is not on it. So what this release
+# is built from has to be on it too: this machine's Vortex, which the plugin
+# list, its order and the bodies are read from, or from the feed the last
+# release, whose plugin list goes forward. Publish-Update asks again before it
+# writes the number; asking here stops the Ship before the version moves.
+Head 'Collection revision'
+$revMoveFrom = 0
+if ($FromFeed) {
+    $revFeed = $null
+    try { $revFeed = Read-SiteFeed $Channel } catch { Die ('The ' + $Channel + ' feed could not be read, so which collection revision its last release carries is not known. Nothing was built or published: ' + $_.Exception.Message) }
+    $revBuilt = 0
+    if ($null -ne $revFeed -and $revFeed.PSObject.Properties['collectionRevision']) { [void][int]::TryParse([string]$revFeed.collectionRevision, [ref]$revBuilt) }
+    # A RELEASE FROM THE FEED MOVES THE REVISION UP TO THE RECORDED ONE
+    # (#4069), with the servers' order, game\data\last-plugin.json's, as its
+    # plugin list (Get-ShipFeedMoveRevision, CollectionRevision.ps1). The
+    # publish holds that list to the order the channel's server loads, and
+    # SkyUI's check below reads the revision's own files from the box's store.
+    $revMove = Get-ShipFeedMoveRevision -RepoDir $RepoDir -Built $revBuilt
+    if ($revMove) {
+        $revMoveFrom = $revBuilt
+        $revBuilt = $revMove
+        Say ("  the {0} feed's last release is on revision {1}; this release moves it to {2}, with game\data\last-plugin.json's order as its plugin list" -f $Channel, $revMoveFrom, $revMove) 'Yellow'
+    }
+    $revWhy = Get-ShipCollectionRevisionProblem -RepoDir $RepoDir -Built $revBuilt -Source "the $Channel feed's last release" -Remedy 'A release from the feed moves the revision only up to the recorded one, and only from a checkout with game\data\last-plugin.recipe and last-plugin.json. Nothing was built or published.'
+} else {
+    try { $revRead = & { . (Join-Path $Here '..\mods\LoadOrder.ps1'); [pscustomobject]@{ Built = (Get-ShipCollectionRevision $Root); Slug = (Get-CollectionSlug (Get-ShipCollectionUrl $Root)) } } }
+    catch { Die ($_.Exception.Message + ' Nothing was built or published.') }
+    $revBuilt = [int]$revRead.Built
+    $revWhy = Get-ShipCollectionRevisionProblem -RepoDir $RepoDir -Built $revBuilt -Slug $revRead.Slug -Source "this machine's Vortex" -Remedy 'Update the collection in Vortex''s Thornswood profile to the recorded revision, let it deploy, close Vortex, then Ship again. Nothing was built or published.'
+}
+if ($revWhy) { Die $revWhy }
+# And the record has to be the newest revision published on Nexus, so no
+# release is built on an old one (#4068).
+$newestWhy = Get-ShipNewestRevisionProblem -RepoDir $RepoDir
+if ($newestWhy) { Die $newestWhy }
+Say ("  collection revision {0}, the one records\collection-plugins.json names and the newest on Nexus" -f $revBuilt) 'Green'
+
 # ------------------------------------------------------------ version
 $updaterCs = Join-Path $Here '..\..\launcher\app\Updater.cs'
 if (-not (Test-Path $updaterCs)) { Die "Could not find $updaterCs" }
@@ -1359,6 +1481,7 @@ $LauncherInputs = Get-LauncherInputHash $RepoDir
 # launcher can be kept. Worked out from main's feed and the fingerprint, before
 # anything is built, and a case it cannot tell stops here (Get-DevLauncherLine).
 $MainEquivalent = $false
+$MainsOwnLauncher = $false
 $MainLauncher = $null
 $devLine = $null
 if ($Dev -and -not $ModsOnly) {
@@ -1366,6 +1489,26 @@ if ($Dev -and -not $ModsOnly) {
     $devLine = Get-DevLauncherLine $MainSourceAligned $current $LauncherInputs $MainLauncher (Get-PublishedLauncher $ReleaseDir 'dev')
     if ($devLine.Refuse) { Die $devLine.Refuse }
     $MainEquivalent = [bool]$devLine.MainEquivalent
+    $MainsOwnLauncher = [bool]$devLine.MainsOwn
+}
+
+# MAIN TAKES THE LAUNCHER DEV TRIED (#5156). Since #5100 a dev Ship from the
+# gate builds a changed launcher, and when main has not published that number
+# yet it carries main's number (Get-DevLauncherLine): release-tag.yml tags the
+# dev Ship's commit v<number> and release.yml builds and signs it there. A
+# later main Ship from the feed, from a newer commit of main that changed
+# nothing the launcher is built from, then asked release-tag.yml for the same
+# tag on its own commit, which a tag never moves to: on 31 Oct 2026 main from
+# 63eefdd7 stopped on "v1.2.15 is already commit 52ad5e1c", after dev
+# 20261031-155402-dev had put that very launcher out from 52ad5e1c. And a
+# build of its own would not be the launcher dev tried. So when the dev feed
+# offers this number, built from these same sources (its fingerprint is this
+# one), a main Ship from the feed takes that exe from the dev feed, held to
+# the dev feed's sha256 and to the signature, as dev takes main's own.
+$DevTriedLauncher = $null
+if (-not $Dev -and $FromFeed -and -not $ModsOnly -and $MainSourceAligned) {
+    $devPub = Get-PublishedLauncher (Get-FeedStoreDir 'dev') 'dev'
+    if ($devPub -and [string]$devPub.Version -eq $current -and (Test-LauncherUnchanged $devPub $LauncherInputs)) { $DevTriedLauncher = $devPub }
 }
 
 # What the channel's feed offers as its launcher, read here when a Ship asks
@@ -1549,8 +1692,11 @@ elseif ($Dev) {
     # A release from the feed asks release-tag.yml for the tag v<number>, and
     # a tag is never moved (#3312). One that stopped after asking left its
     # number tagged on its own commit, so a later one climbs past it rather
-    # than be refused.
-    if ($FromFeed -and -not $ModsOnly -and -not $MainEquivalent) {
+    # than be refused. Only main's own launcher, taken from main's feed, asks
+    # for no tag; main's number on a launcher not built yet does (MainsOwn,
+    # Get-DevLauncherLine), and a three part number tagged on another commit
+    # stops here rather than at release-tag.yml.
+    if ($FromFeed -and -not $ModsOnly -and -not $MainsOwnLauncher) {
         for ($k = 0; ; $k++) {
             $on = ''
             try { $on = Get-RemoteTagCommit $RepoDir ('v' + $target) }
@@ -1667,18 +1813,10 @@ if ($Package -and -not $Dev -and -not $DryRun) {
     }
     $ciStub = Join-Path $stubDir 'setup-stub.exe'
     Say ("  verified against SHA256SUMS, {0:n0} KB" -f ((Get-Item -LiteralPath $ciStub).Length / 1KB)) 'Green'
-    # From the feed the installer is built on GitHub, by installer.yml started
-    # on this tag (#3412), which a tag made before it merged does not have.
-    # Asked now, before anything is published, not after the release is out.
-    if ($FromFeed) {
-        . (Join-Path $Here 'Installer-OnGitHub.ps1')
-        $why = Get-InstallerWorkflowRefusal (Get-SourceRepo $RepoDir) ('v' + $target)
-        if ($why) {
-            Unbump 'the installer cannot be built on GitHub for this tag'
-            Die ($why + ' Nothing was published.')
-        }
-        Say ('  installer.yml is on v' + $target + ', so the installer is built and signed on GitHub after the release') 'Green'
-    }
+    # From the feed the installer is built on GitHub after the release, by
+    # installer.yml started on main (#3412; on main since 31 Oct, the header
+    # of installer.yml), which main always has.
+    if ($FromFeed) { Say '  the installer is built and signed on GitHub after the release (installer.yml on main)' 'Green' }
 }
 
 # ------------------------------------------------------------ animation and body files
@@ -1697,7 +1835,24 @@ if ($Package -and -not $Dev -and -not $DryRun) {
 $GameDir = Join-Path $Root 'Game'
 if (-not $FromFeed -and -not (Test-Path -LiteralPath (Join-Path $GameDir 'SkyrimSE.exe'))) { $GameDir = '' }
 Head 'Animation and body files'
-if ($FromFeed) {
+if ($FromFeed -and $revMoveFrom) {
+    # The collection moves, and its animation and body tools need the game
+    # itself, which is on no machine a release runs from (#4069). Every
+    # launcher builds them before Play and refuses Play when it cannot, and
+    # main moves only once dev has carried the revision.
+    if ($Channel -eq 'main') {
+        $carriedRev = 0
+        try { $feedOfDev = Read-SiteFeed 'dev'; if ($null -ne $feedOfDev -and $feedOfDev.PSObject.Properties['collectionRevision']) { [void][int]::TryParse([string]$feedOfDev.collectionRevision, [ref]$carriedRev) } }
+        catch { Unbump 'the dev feed could not be read'; Die ('The dev feed could not be read, so whether dev has carried revision ' + $revBuilt + ' is not known. Nothing was built or published: ' + $_.Exception.Message) }
+        if ($carriedRev -ne $revBuilt) {
+            Unbump 'dev has not carried the revision'
+            Die ('This release moves main to collection revision ' + $revBuilt + ', and the dev feed is on revision ' + $carriedRev + '. Whether the revision builds the animation and body files is asked on dev first, by every launcher before Play: Ship dev on it, then main. Nothing was built or published.')
+        }
+        Say ('  the dev feed already carries revision ' + $revBuilt + ', so dev''s launchers have built them on it') 'Green'
+    } else {
+        Say ('  revision ' + $revBuilt + ' is new here: every launcher builds them before Play and refuses Play when it cannot, which dev asks before main') 'Yellow'
+    }
+} elseif ($FromFeed) {
     # The collection is the last release's, unchanged; a Ship from One asks
     # this when the collection changes (#2754).
     Say '  the collection is the last release''s; a Ship from One asks whether it builds them when the collection changes' 'DarkGray'
@@ -1732,12 +1887,7 @@ if ($GameDir -and -not (Get-Command node -ErrorAction SilentlyContinue)) {
 
 # ------------------------------------------------------------ build
 if (-not $ModsOnly) {
-    # The exe's time going in, so a build that put nothing in place is told
-    # from one that did.
     $launchDir = Join-Path $Root 'Launcher'
-    $before = [datetime]::MinValue
-    $p = Get-LauncherExe $launchDir
-    if (Test-Path -LiteralPath $p) { $before = (Get-Item -LiteralPath $p).LastWriteTimeUtc }
 
     # The build and the install are two scripts since 24 September (To Do List
     # entry 243). The build compiles into a folder of its own, so csc never
@@ -1765,7 +1915,7 @@ if (-not $ModsOnly) {
             Die ($_.Exception.Message + ' Nothing was published.')
         }
         $hold = { param($p, $who) Get-SignedFileRefusal $p $who $RepoDir }
-        if ($MainEquivalent) {
+        if ($MainsOwnLauncher) {
             Head "Main's launcher, from main's feed"
             $why = Get-FeedLauncher $MainLauncher $buildOut $ciSigner $hold
             if ($why) {
@@ -1773,6 +1923,14 @@ if (-not $ModsOnly) {
                 Die $why
             }
             Say ("  $($MainLauncher.Version), sha256 and signature checked") 'Green'
+        } elseif ($DevTriedLauncher) {
+            Head 'The launcher dev tried, from the dev feed'
+            $why = Get-FeedLauncher $DevTriedLauncher $buildOut $ciSigner $hold
+            if ($why) {
+                Unbump 'the launcher dev tried could not be taken from its feed'
+                Die $why
+            }
+            Say ("  $($DevTriedLauncher.Version), built from these same sources, sha256 and signature checked") 'Green'
         } else {
             Head 'The launcher, built and signed on GitHub'
             $srcRepo = Get-SourceRepo $RepoDir
@@ -1862,9 +2020,20 @@ if (-not $ModsOnly) {
              '. Nothing was published. The errors are above.')
     }
 
+    # In place means the exe there is the one built or checked above, byte for
+    # byte. Until 31 Oct 2026 it meant "written after the one that was there",
+    # and a launcher taken from release.yml's run artifact (#2841) keeps the
+    # write time its zip gives it: the runner's UTC clock, read on the box as
+    # Mountain time, six hours ahead. So main 20261031-144725's 1.2.14 sat in
+    # main's ship root dated past every later write, and Ship-Main from
+    # eb6ab3f6 put the launcher dev tried there and stopped on "not in place"
+    # (#5156).
     $exe = Get-LauncherExe $launchDir
-    $inPlace = Test-Path -LiteralPath $exe
-    if ($inPlace) { $inPlace = ((Get-Item -LiteralPath $exe).LastWriteTimeUtc -gt $before) }
+    $meant = Join-Path $buildOut 'Thornswood.exe'
+    $inPlace = (Test-Path -LiteralPath $exe) -and (Test-Path -LiteralPath $meant)
+    if ($inPlace) {
+        $inPlace = ((Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $meant -Algorithm SHA256).Hash)
+    }
     if (-not $inPlace) {
         Unbump 'nothing was put in place'
         Die 'The launcher is not in place. Look at the errors above.'
@@ -2000,8 +2169,10 @@ Head 'The load order copies'
 $profileDir = Join-Path $Root 'Profile'
 if ($FromFeed) {
     # No Vortex here: the plugin list is the last release's, which the publish
-    # holds to the server's order on the box (#2754).
-    Say '  the last release''s plugin list, held to the server''s order when it is published' 'DarkGray'
+    # holds to the server's order on the box (#2754), or when the release
+    # moves the revision, the servers' order (#4069).
+    if ($revMoveFrom) { Say ("  revision {0}'s plugin list, game\data\last-plugin.json's order, held to the server's order when it is published" -f $revBuilt) 'DarkGray' }
+    else { Say '  the last release''s plugin list, held to the server''s order when it is published' 'DarkGray' }
 } else {
     try {
         $twProfile = Assert-VortexProfile 'Thornswood'
@@ -2072,7 +2243,57 @@ if ($LASTEXITCODE -ne 0) {
 # node is on the machine by now: Ship stopped before the build without it
 # (#1913).
 Head 'SkyUI menus'
-if ($FromFeed) {
+if ($FromFeed -and $revMoveFrom) {
+    # A RELEASE THAT MOVES THE REVISION FROM THE FEED (#4069) changes the
+    # archives the check reads, so the last release's answer does not carry
+    # over: the check runs here, on the revision's own files. The box's store
+    # of the recorded revision (scripts\deploy\CollectionStore.ps1, fetched
+    # from Nexus when it is not whole) holds SkyUI's script, the loose menus
+    # and the archives that hold either, each the layout's bytes. Ours go over
+    # them, as every launcher puts them over the collection, and the order is
+    # the plugin list this release carries.
+    $skyuiStore = $null
+    try {
+        $skyuiStore = & {
+            . (Join-Path $RepoDir 'scripts\deploy\CollectionStore.ps1')
+            $repoFull = (Get-Item -LiteralPath $RepoDir).FullName
+            Get-ThornswoodCollectionStore -RecordPath (Join-Path $repoFull 'records\collection-plugins.json') -Fetch { param($w, $h) Invoke-ThornswoodCollectionFetch -Work $w -Head $h -Repo $repoFull }.GetNewClosure() -Say { param($m) Write-Host $m -ForegroundColor DarkGray }
+        }
+    } catch {
+        Unbump 'the revision''s files for SkyUI''s check are not on the box'
+        Die ("SkyUI's menu check reads revision $revBuilt's own files, and the box could not hold them: " + $_.Exception.Message + ' Nothing was published.')
+    }
+    $skyuiWork = & (Join-Path $Here 'Get-ScratchDir.ps1') 'Thornswood-skyui-move'
+    if (Test-Path -LiteralPath $skyuiWork) { Remove-Item -LiteralPath $skyuiWork -Recurse -Force }
+    $skyuiData = Join-Path $skyuiWork 'Data'
+    New-Item -ItemType Directory -Force -Path $skyuiData | Out-Null
+    $storeData = Join-Path $skyuiStore.Menus 'Data'
+    if (Test-Path -LiteralPath $storeData) { Copy-Item -Path (Join-Path $storeData '*') -Destination $skyuiData -Recurse -Force }
+    $oursData = Join-Path $GameDir 'Data'
+    $oursFull = (Get-Item -LiteralPath $GameDir).FullName.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+    foreach ($f in @(Get-ChildItem -LiteralPath $oursData -Recurse -File -Force -ErrorAction SilentlyContinue)) {
+        $rel = $f.FullName.Substring($oursFull.Length).Replace([string][IO.Path]::DirectorySeparatorChar, '\')
+        if (-not (Test-ShipSkyUIInput $rel)) { continue }
+        $to = Join-Path $skyuiWork ($rel.Replace('\', [string][IO.Path]::DirectorySeparatorChar))
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $to) | Out-Null
+        Copy-Item -LiteralPath $f.FullName -Destination $to -Force
+    }
+    $skyuiPlugins = Join-Path $skyuiWork 'plugins.txt'
+    $skyuiOrder = @((Get-Content -LiteralPath (Join-Path $RepoDir 'game\data\last-plugin.json') -Raw | ConvertFrom-Json).loadOrder | ForEach-Object { "$_".Trim() } | Where-Object { $_ -and $_ -ine $ShipLastPlugin })
+    [IO.File]::WriteAllLines($skyuiPlugins, [string[]](@($skyuiOrder + $ShipLastPlugin) | ForEach-Object { '*' + $_ }))
+    $global:LASTEXITCODE = 0
+    & node (Join-Path $Here '..\mods\Check-SkyUIMenus.js') --data $skyuiData --plugins $skyuiPlugins --gone (@(Get-ShipDeleteAlways) -join ';') --quiet
+    $skyuiExit = $LASTEXITCODE
+    if ($skyuiExit -eq 2) {
+        Unbump 'SkyUI''s menus are not the version its script wants'
+        Die ("In revision $revBuilt, with our files over it, SkyUI's menus are not the version its script wants, so everybody would get the SkyUI error box on the way in. The lines above say which file wins and where it comes from. Nothing was published.")
+    }
+    if ($skyuiExit -ne 0) {
+        Unbump 'SkyUI''s menus could not all be read'
+        Die ("SkyUI's menus in revision $revBuilt could not all be read (Check-SkyUIMenus.js exit $skyuiExit), so whether everybody gets the SkyUI error box on the way in is not known. The UNREAD and FAIL lines above say which file. Nothing was published.")
+    }
+    Say ("  revision {0}'s SkyUI, with our files over it, passes: its check read the box's store of the revision" -f $revBuilt) 'Green'
+} elseif ($FromFeed) {
     # The collection's archives are not here, so the menus cannot be read
     # against them. What can be said is whether this release changes anything
     # the check reads (Ship-Rules.ps1, Get-ShipSkyUIFeedChange): when it does
@@ -2542,7 +2763,7 @@ elseif ($Package -and $FromFeed) {
     # publishes it. Not stopping the release when it fails, for the reason the
     # One path below gives.
     Head 'Rebuilding the installer on GitHub'
-    $pubArgs = @{ OutDir = $DistDir; Tag = ('v' + $target) }
+    $pubArgs = @{ OutDir = $DistDir }
     if ($AllowStaleCheckout) { $pubArgs['AllowStaleCheckout'] = $true }
     try { & (Join-Path $Here 'Publish-InstallerFromGitHub.ps1') @pubArgs }
     catch {

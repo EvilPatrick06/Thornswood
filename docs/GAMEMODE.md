@@ -93,7 +93,11 @@ working directory (`gamemode.js:logPath`). The gamemode reads `dataDir`
 `thornswoodAdmins` (`gamemode.js:cfg.thornswoodAdmins`), `thornswoodTradeShips`
 (`gamemode.js:settings.thornswoodTradeShips === true`, off unless it is true: the trade ships of
 issue #511, whose register is still read and counted while off; on, a port's crate opens the dock and staff
-keep the ports and routes from the Office page of K, issue #2700), `thornswoodTradeCarts`
+keep the ports and routes from the Office page of K, issue #2700; at a docked hold anybody may take what is aboard,
+written on the manifest as taken by their character and shown to staff, a hold at sea opens for nobody, and what nobody
+collects goes into that port's hold drop box under the recipient's name once the staff list's `uncollectedDays` have
+passed since it landed, 7 unless staff set it (`gamemode.js:function uncollectedNow`), freeing its line, issue #511),
+`thornswoodTradeCarts`
 (`gamemode.js:settings.thornswoodTradeCarts === false`, on unless it is false: the trade carts of issue #3158,
 a cart stop's crate opens the stop and staff keep the stops and roads from the Office page of K) and `loadOrder`
 (`gamemode.js:Array.isArray(doc.loadOrder)`). `Deploy-Gamemode.ps1` writes that file on every deploy
@@ -204,7 +208,8 @@ door reads from the site (`__thornswoodOffices`, read through `officeOf`,
 #2551): a Jarl gives their hold's Court, Steward and Guard on the Office
 page (`officeCmd`, which asks the site to set the role), and only a
 steward can `evict`. A hold's box is the drop box on its board
-(`dropboxCmd`), where rent (`rentDue`, `rentCmd`) is paid; board fees
+(`dropboxCmd`), where rent (`rentDue`, `rentCmd`) is paid and trade ship
+cargo nobody collected waits for a steward to hand out (`boxShipped`, #511); board fees
 (`takeGold`) are counted on the hold's ledger (`funds`). Notice boards come after them. Coin enters the world in one
 place, the starting purse (`purse`, `test-one-mint.js`), and otherwise
 moves by trade (`gold`). No container holds gold the world put there,
@@ -294,6 +299,31 @@ acts only on the profiles a list names, and a server on this machine does
 not start under `server-log.js` at all, so the writer marks `saves` done
 whenever the list it writes names no profile.
 
+Every one of these names a character by one shape of form id, the runtime
+id, `0xff000000 | local` (`game\form-id.js`, issue #2870): the list's
+`actors`, and in `merchant-ledger.json` (version 2, its `sha256` over the
+rest) the supply waits' keys and the commission owners. Nothing converts
+the old shape: in the alpha there is no compatibility code, carry-over or
+migration for any data (Patrick, 31 Oct). The gamemode, `server-log.js`,
+`Release-List.ps1` and `Delete-Person.ps1` refuse a list holding a local
+id and leave it as it is. The merchant code refuses a version 1 ledger, so
+on one the NPCs and merchants do not start (the log says `NPC server
+runtime failed to start`). On the deploy that carries #2870, do this on
+each server, with that game server stopped:
+
+1. Run `node scripts\ops\Verify-FormIdShape.js --server <folder>`. It
+   writes nothing, and prints what each register holds by shape.
+2. If it prints `merchants` `version` 1, replace that server's
+   `merchant-ledger.json` with what `node
+   scripts\ops\New-AlphaMerchantLedger.js --confirm-discard-alpha` prints.
+   This is the alpha reset: merchant stock and purses start fresh, and
+   nothing of the old ledger is carried over.
+3. If it prints `list` `actors` `local` above 0, the release list is not
+   converted and not deleted. It waits for a person, because it may hold
+   deletion requests the privacy page promises to finish: until then the
+   gamemode lets nothing on it go and `Delete-Person.ps1` will not add to
+   it.
+
 ## Generated tables
 
 Never hand edit these. Each script writes its json in `game\data` and then
@@ -308,7 +338,7 @@ because each reads the one before.
 | `WARMTH` | `Build-WarmthTable.js` | `warmth.json` | `Build-WarmthTable.js:install` |
 | `FOODS` | `Build-FoodTable.js` | `food.json` | `Build-FoodTable.js:install` |
 | `RACES` | `Build-RaceTable.js` | `races.json` | `Build-RaceTable.js:install` |
-| `STAFF_DATA` | `Build-StaffData.js` (#2873): the staff files the gamemode reads at run time, carried because the server's copy has no `game\data` beside it | `furniture.json`, `property-word.json`, `thalmor-patrols.json` | `Build-StaffData.js:const LINE` |
+| `STAFF_DATA` | `Build-StaffData.js` (#2873): the staff files the gamemode reads at run time, carried because the server's copy has no `game\data` beside it | `furniture.json`, `merchant-traders.json` (first steps' Cook, #5137), `property-word.json`, `thalmor-patrols.json` | `Build-StaffData.js:const LINE` |
 | `ORES_BY_BASE` | `Build-OreTable.ps1` | `ores.json` | `Build-OreTable.ps1:// ==== end ORES_BY_BASE ====` |
 | `HARVESTS_BY_BASE`, `FISH_BY_BASE`, `GAME_BY_BASE`, `CROPS_BY_BASE` | `Build-HarvestTable.ps1` | `harvests.json` | `Build-HarvestTable.ps1:All four installs work on the text of gamemode.js` |
 | `HUNTS_BY_BASE` | `Build-HuntTable.ps1` | `hunts.json` | `Build-HuntTable.ps1:// ==== end HUNTS_BY_BASE ====` |

@@ -392,9 +392,9 @@ Yes 'Sync: Transfer reports as it writes' ((Body $sync 'static void Transfer(') 
 Yes 'Sync: packs after a record without its files are planned as downloads' ($sync -match 'PlayProgress\.Plan\("Updating", count, "updates"\)')
 
 $su = Read-Text (Join-Path $AppDir 'ShellUpdate.cs')
-# Since #2627 RunUpdate() hands on to RunUpdate(after), which Fix calls
-# with what to do once the update is in, and that one does the work.
-$run = Body $su 'static void RunUpdate(Action after)'
+# Since #2627 RunUpdate(after) does the work; Fix and, since #3201, Install
+# now call it with what to do once the update is in or has failed.
+$run = Body $su 'static void RunUpdate(Action<bool> after)'
 Yes 'RunUpdate opens the button with one download per pack' ($run -match 'PlayProgress\.Begin\("Updating", downloads\)')
 $stages = Read-Text (Join-Path $AppDir 'UpdateStages.cs')
 Yes 'the update''s download: the self-update is its own phase' ((Body $stages 'public static Fetched FetchUpdate(') -match 'PlayProgress\.Plan\("Updating the launcher", 1, "updates"\)')

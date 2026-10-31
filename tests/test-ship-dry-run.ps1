@@ -51,6 +51,11 @@
     L  the same folder with a check that passes runs to the end, so J and K
        stop on node and on the check, not on the folder; and a mismatch
        (exit 2) still refuses (#960)
+    N  this machine's Vortex a collection revision behind
+       records\collection-plugins.json, or unable to say: refused before the
+       version moves, nothing published (#3597)
+    O  Nexus on a newer revision than the record, or not answering: refused
+       before the version moves, nothing published (#4068)
 
   R is there so D and V prove something: the same stand-ins, on a real Ship,
   do write down the installer going to the site, the feed and baseline going to
@@ -283,7 +288,7 @@ try {
     Copy-Item -LiteralPath $ShipPath -Destination (Join-Path $repo 'scripts\release\Ship.ps1') -Force
     # The real files Ship dot-sources, beside it, so it runs as it does for real.
     $realRel = Split-Path -Parent $ShipPath
-    foreach ($n in 'Ship-Rules.ps1', 'ShippedBytes.ps1', 'Assert-PublishSigned.ps1', 'Feed-Store.ps1', 'Feed-Json.ps1', 'Release-Name.ps1', 'Note-Rules.ps1', 'Where.ps1', 'Get-ScratchDir.ps1', 'Read-JsonFile.ps1', 'RecordShape.ps1', 'RepoPlugins.ps1', 'Note-Repeats.ps1', 'Feed-News.ps1', 'Release-Baseline.ps1', 'Feed-Rules.ps1') {
+    foreach ($n in 'Ship-Rules.ps1', 'ShippedBytes.ps1', 'Assert-PublishSigned.ps1', 'Feed-Store.ps1', 'Feed-Json.ps1', 'Release-Name.ps1', 'Note-Rules.ps1', 'Where.ps1', 'Get-ScratchDir.ps1', 'Read-JsonFile.ps1', 'RecordShape.ps1', 'RepoPlugins.ps1', 'CollectionRevision.ps1', 'Note-Repeats.ps1', 'Feed-News.ps1', 'Release-Baseline.ps1', 'Feed-Rules.ps1') {
         Copy-Item -LiteralPath (Join-Path $realRel $n) -Destination (Join-Path $repo ('scripts\release\' + $n)) -Force
     }
     Copy-Item -LiteralPath (Join-Path $realRel '..\..\layout.json') -Destination (Join-Path $repo 'layout.json') -Force
@@ -320,6 +325,21 @@ function Get-PublishSignRefusal { param([string]$Path, [string]$ExpectedSigner) 
     [IO.File]::WriteAllText((Join-Path $repo 'scripts\mods\LoadOrder.ps1'), @'
 function Assert-VortexProfile([string]$Name = 'Thornswood') { return (Join-Path $env:LOCALAPPDATA 'Vortex-Thornswood') }
 function Get-LoadOrderCopyDiffs([hashtable]$Copies) { return @() }
+function Get-CollectionSlug([string]$Url) { return '7essxf' }
+function Get-CollectionRevision([string]$Slug) { if ($env:TS_DRY_COLLECTION_REVISION) { return [int]$env:TS_DRY_COLLECTION_REVISION }; return 0 }
+'@)
+    # The collection revision record Ship holds this machine's Vortex to
+    # (#3597); the stand-in Vortex above is on it unless a case says not.
+    Copy-Item -LiteralPath (Join-Path $realRel '..\..\records\collection-plugins.json') -Destination (Join-Path $repo 'records\collection-plugins.json') -Force
+    $env:TS_DRY_COLLECTION_REVISION = [string](([IO.File]::ReadAllText((Join-Path $repo 'records\collection-plugins.json')) -replace '^\uFEFF', '') | ConvertFrom-Json).revision
+    # What Nexus says is the newest published revision (#4068), without asking
+    # it: the record's, unless a case says otherwise; 'none' is a Nexus that
+    # does not answer.
+    [IO.File]::WriteAllText((Join-Path $repo 'scripts\release\NexusPublished.ps1'), @'
+param([string]$Slug, [string]$Game)
+if ($env:TS_DRY_NEXUS_PUBLISHED -eq 'none') { throw 'the stand-in Nexus did not answer' }
+if ($env:TS_DRY_NEXUS_PUBLISHED) { return [int]$env:TS_DRY_NEXUS_PUBLISHED }
+return [int]$env:TS_DRY_COLLECTION_REVISION
 '@)
     $updaterCs = Join-Path $repo 'launcher\app\Updater.cs'
     [IO.File]::WriteAllText($updaterCs, "        public const string Version = `"1.1.93`";`r`n")
@@ -352,12 +372,18 @@ function Get-LoadOrderCopyDiffs([hashtable]$Copies) { return @() }
         (Get-Item -LiteralPath $exe).LastWriteTimeUtc = [DateTime]::UtcNow.AddHours(-1)
     }
 
-    Stub 'Build-Launcher' '[string]$Root, [string]$OutDir, [switch]$NoPause' ''
+    # The build writes its exe into -OutDir and the install copies that one
+    # into the root, as the real ones do: Ship reads back that the exe in the
+    # root is the one in -OutDir by its sha256 (#5156).
+    Stub 'Build-Launcher' '[string]$Root, [string]$OutDir, [switch]$NoPause' @'
+[void](New-Item -ItemType Directory -Force -Path $OutDir)
+[IO.File]::WriteAllText((Join-Path $OutDir 'Thornswood.exe'), 'the launcher this run built')
+'@
     # Makes the Launcher folder when there is none, as the real one does: a
     # ship root Update-ShipRoot.ps1 made has none (G2, #2662).
     Stub 'Install-Launcher' '[string]$Root, [string]$From, [switch]$NoPause' @'
 [void](New-Item -ItemType Directory -Force -Path (Join-Path $Root 'Launcher'))
-[IO.File]::WriteAllText((Join-Path $Root 'Launcher\Thornswood.exe'), 'the launcher this run built')
+Copy-Item -LiteralPath (Join-Path $From 'Thornswood.exe') -Destination (Join-Path $Root 'Launcher\Thornswood.exe') -Force
 '@
     Stub 'Go' '[switch]$SkipServer, [string]$Game, [switch]$Vortex' ''
     Stub 'Build-Front' '[string]$Fork, [string]$Commit, [string]$Out, [switch]$Record' ''
@@ -448,8 +474,10 @@ if (-not $NoPublish) { & (Join-Path $PSScriptRoot 'Publish-Installer.ps1') -OutD
     # (id 21), setup-stub.exe (id 22, since a main Ship with -Package takes the
     # one CI built, issue #932) and SHA256SUMS (id 23), and each asset with its
     # bytes. It computes the hashes itself, so the download always verifies and
-    # the test proves the path runs, not that a particular byte matches. Every
-    # other gh call still only logs.
+    # the test proves the path runs, not that a particular byte matches. Since
+    # #2841 Ship first asks for the green release.yml runs of the tag, whose
+    # artifact it would take; the stand-in has none, as for a tag built before
+    # then, so the draft is read as before. Every other gh call still only logs.
     $ghDl = Join-Path $bin 'gh-download.ps1'
     [IO.File]::WriteAllText($ghDl, @'
 $utf8 = New-Object Text.UTF8Encoding($false)
@@ -461,7 +489,9 @@ $sums = $utf8.GetBytes(((@(@('Thornswood.exe', $exe), @('setup-stub.exe', $stub)
     (($sha.ComputeHash([byte[]]$_[1]) | ForEach-Object { $_.ToString('x2') }) -join '') + '  ' + $_[0] }) -join "`n") + "`n")
 $files = @{ 21 = $exe; 22 = $stub; 23 = $sums }
 $target = [string]$args[$args.Count - 1]
-if ($target -match '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$') {
+if ($target -match '^repos/[^/]+/[^/]+/actions/workflows/release\.yml/runs\?') {
+    Out-Bytes ($utf8.GetBytes('{"total_count":0,"workflow_runs":[]}'))
+} elseif ($target -match '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$') {
     $list = @()
     if ($Matches[1] -eq '1') {
         $assets = @(@(21, 'Thornswood.exe'), @(22, 'setup-stub.exe'), @(23, 'SHA256SUMS') | ForEach-Object { [ordered]@{ id = $_[0]; name = $_[1]; size = $files[$_[0]].Length } })
@@ -831,6 +861,34 @@ if ($target -match '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$') {
         $env:TS_NODE_EXIT = $oldNodeExit
         Remove-Item -LiteralPath $nodeStandIn -Force -ErrorAction SilentlyContinue
     }
+
+    # ---- N: this machine's Vortex behind the collection's record (#3597) ---------------
+    # Both feeds said revision 2, One's Vortex, while the record and Nexus were
+    # on 5, so a launcher on 2 was let in. A Ship from a Vortex a revision behind
+    # stops before the version moves, naming both, and publishes nothing.
+    $recRev = [int]$env:TS_DRY_COLLECTION_REVISION
+    $env:TS_DRY_COLLECTION_REVISION = [string]($recRev - 1)
+    try {
+        $nb = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-DryRun', '-Root', $rootDev, '-DistRoot', $dist, '-NoPause')
+        Yes ("N a Ship from a Vortex a revision behind the record is refused (exit {0})" -f $nb.Code) ($nb.Code -ne 0 -and $nb.Out -match ('collection is on revision ' + $recRev) -and $nb.Out -match ('Vortex is on revision ' + ($recRev - 1)))
+        Yes '  and nothing was built or published' ((Called $nb 'Publish-Update').Count -eq 0 -and $nb.Out -match 'Nothing was built or published')
+        Yes '  and Updater.cs is on the version it had' ((Read-Version $updaterCs) -eq '1.1.93')
+        $env:TS_DRY_COLLECTION_REVISION = '0'
+        $nu = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-DryRun', '-Root', $rootDev, '-DistRoot', $dist, '-NoPause')
+        Yes ("N a Ship from a Vortex that cannot say its revision is refused, never guessed (exit {0})" -f $nu.Code) ($nu.Code -ne 0 -and $nu.Out -match 'does not say which collection revision' -and (Called $nu 'Publish-Update').Count -eq 0)
+
+        # ---- O: the record behind the newest revision on Nexus (#4068) ------------------
+        # Vortex and the record agree, and Nexus has published the next one:
+        # a release built now would be on an old revision, so it stops.
+        $env:TS_DRY_COLLECTION_REVISION = [string]$recRev
+        $env:TS_DRY_NEXUS_PUBLISHED = [string]($recRev + 1)
+        $no = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-DryRun', '-Root', $rootDev, '-DistRoot', $dist, '-NoPause')
+        Yes ("O a Ship while Nexus has a newer revision than the record is refused (exit {0})" -f $no.Code) ($no.Code -ne 0 -and $no.Out -match ('Collection revision ' + ($recRev + 1) + ' is published on Nexus') -and $no.Out -match ('still on ' + $recRev))
+        Yes '  and nothing was built or published, and Updater.cs did not move' ((Called $no 'Publish-Update').Count -eq 0 -and (Read-Version $updaterCs) -eq '1.1.93')
+        $env:TS_DRY_NEXUS_PUBLISHED = 'none'
+        $nn = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-DryRun', '-Root', $rootDev, '-DistRoot', $dist, '-NoPause')
+        Yes ("O a Ship while Nexus does not answer is refused, never taken as current (exit {0})" -f $nn.Code) ($nn.Code -ne 0 -and $nn.Out -match 'Nexus did not say which revision' -and (Called $nn 'Publish-Update').Count -eq 0)
+    } finally { $env:TS_DRY_COLLECTION_REVISION = [string]$recRev; $env:TS_DRY_NEXUS_PUBLISHED = '' }
 }
 finally {
     $env:PATH = $oldPath

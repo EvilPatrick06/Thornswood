@@ -349,6 +349,7 @@ const WRITERS = {
   'property/boxLeave': [1, 'takes a stack off the pack into the drop box record, and refuses gold, which goes in through takeGold (#2298); it never adds'],
   'trade ships/packTake': [1, 'the dock\'s load (#2700) and a cart stop\'s (#3158, the same function through __thornswoodCargoHands): a stack off the pack onto a trade ship\'s or cart\'s manifest, coin refused before the pack is read; it only takes away (test-2700-trade-ship-dock.js, test-3158-trade-carts.js)'],
   'trade ships/packGive': [1, 'the dock\'s hand out (#2700) and a cart\'s collect, take back and raid (#3158, the same function through __thornswoodCargoHands): only a piece the manifest begin() hands back, or the piece a refused load just took, each first debited off a pack, so never coin (trade-cargo refuses base 0xF aboard) and never more than was loaded (test-2700-trade-ship-dock.js, test-3158-trade-carts.js)'],
+  'market stalls/writePack': [1, 'the market stalls (#3160): packTake lays a stack out of the keeper\'s pack and refuses coin; packPay takes a price out of the buyer\'s pack; packGive puts in only what the stall book hands back, a piece laid out (the book refuses coin on a stall), or the very pieces packPay just took, to the keeper or back to the buyer when the sale cannot finish. No count grows (test-3160-market-stalls.js)'],
   'property/boxTake': [1, 'hands back a thing out of the drop box record, which holds only what boxLeave took off a pack; gold comes out through payOut, never more than the row holds, and the row goes down by the same (#2298, test-2298-dropbox.js)']
 };
 
@@ -734,7 +735,27 @@ function goldDescriptors(text) {
       !!setTable && Object.keys(setTable).every(function (k) {
         return setTable[k].inputs.every(function (i) { return goldDescriptors('"' + i[0] + '"').gold.length === 0 || i[2] === 0; });
       }));
-  const outside = noDungeon && cut(noDungeon, '// ==== RECIPES_SET_IN_GAME, generated ====', '// ==== end RECIPES_SET_IN_GAME ====');
+  /*
+    AND THE RECIPES MOVED IN EACH GAME (#3120). RECIPES_MOVED_IN_GAME names a
+    moved recipe's inputs as its mod's record asks them, so the eyepatch moved
+    to the loom names its one gold coin there. Its counts are also set in each
+    game, where that coin goes to 0, and recipeMovedInGame leaves a recipe set
+    in game to recipeSetInGame. So gold may stand in that block only as an
+    input of a recipe RECIPES_SET_IN_GAME takes it to 0 in.
+  */
+  const movedInGame = lift('// ==== RECIPES_MOVED_IN_GAME, generated ====', '// ==== end RECIPES_MOVED_IN_GAME ====') || '';
+  const movedRows = (/var RECIPES_MOVED_IN_GAME = (\{.*\});/.exec(movedInGame) || [])[1];
+  let movedTable = null;
+  try { movedTable = JSON.parse(movedRows); } catch (e) { movedTable = null; }
+  yes('a recipe moved in each game names gold only where the recipes set in each game take it to 0',
+      !!movedTable && !!setTable && Object.keys(movedTable).every(function (k) {
+        return movedTable[k].inputs.every(function (i) {
+          if (goldDescriptors('"' + i[0] + '"').gold.length === 0) { return true; }
+          return !!setTable[k] && setTable[k].inputs.some(function (s) { return s[0] === i[0] && s[1] === i[1] && s[2] === 0; });
+        });
+      }));
+  const noSet = noDungeon && cut(noDungeon, '// ==== RECIPES_SET_IN_GAME, generated ====', '// ==== end RECIPES_SET_IN_GAME ====');
+  const outside = noSet && cut(noSet, '// ==== RECIPES_MOVED_IN_GAME, generated ====', '// ==== end RECIPES_MOVED_IN_GAME ====');
   const dungeon=lift('// ==== thornswood dungeon loot ====','// ==== end thornswood dungeon loot ====');
   const dungeonGold=goldDescriptors(dungeon || '');
   yes('the checked dungeon reward names exactly one gold descriptor as GOLD_DESC',
@@ -772,11 +793,27 @@ function goldDescriptors(text) {
       writes nothing.
     */
     const names = bodyOf('property/itemName') || '';
-    const inNames = function (name) { return (names.match(new RegExp('\\b' + name + '\\b', 'g')) || []).length; };
-    yes('ITEM_NAMES and ADMIN_ITEMS are read by the /give index, and by the drop box only for a name',
+    /*
+      And the hold economy's names (#3164): recordNames reads the two tables
+      to name a counted record on staff's page, the same one way round as the
+      drop box, and hands nothing out. And a market stall's Find (#3160): the
+      names a goods price can ask for, so the buyer pays with something out of
+      their own pack. It hands back names and records, coin left out, never a
+      thing, and writes nothing.
+    */
+    const counted = bodyOf('hold economy/recordNames') || '';
+    const stallFind = bodyOf('market stalls/find') || '';
+    const inNames = function (name) {
+      const re = new RegExp('\\b' + name + '\\b', 'g');
+      return (names.match(re) || []).length + (counted.match(re) || []).length +
+        (stallFind.match(re) || []).length;
+    };
+    yes('ITEM_NAMES and ADMIN_ITEMS are read by the /give index, and by the drop box, the hold economy and a stall\'s Find only for a name',
         refs('ITEM_NAMES') === (build.match(/\bITEM_NAMES\b/g) || []).length + inNames('ITEM_NAMES') &&
         refs('ADMIN_ITEMS') === (build.match(/\bADMIN_ITEMS\b/g) || []).length + inNames('ADMIN_ITEMS') &&
-        refs('ADMIN_ITEMS') > 0 && !!names && !/\bmp\.set\(|\baddItem\(|\bpayOut\(/.test(names));
+        refs('ADMIN_ITEMS') > 0 && !!names && !!counted && !!stallFind &&
+        !/\bmp\.set\(|\baddItem\(|\bpayOut\(/.test(names) && !/\bmp\.set\(|\baddItem\(|\bpayOut\(/.test(counted) &&
+        !/\bmp\.set\(|\baddItem\(|\bpayOut\(|\bpackGive\(|\bwritePack\(/.test(stallFind) && /BOOK\.isCoin\(base\)/.test(stallFind));
     yes('ADMIN_ACTORS is read by the /spawn index and nothing else',
         refs('ADMIN_ACTORS') > 0 && refs('ADMIN_ACTORS') === (beasts.match(/\bADMIN_ACTORS\b/g) || []).length);
     yes('and /give and /spawn still refuse anybody who is not a playtester',
@@ -818,7 +855,8 @@ function goldDescriptors(text) {
     'row.out': 'Grand Chef\'s second batch, the output of a Cook row of RECIPES_BY_ID (#1398), and section 5 says no recipe makes gold',
     'KEY_INGOT': 'puts back the iron ingot a key at a forge took a line before, when the key could not be handed over (#1637); an iron ingot, not a coin',
     'NEEDS.waterItems.full': 'a bottle of water for the empty bottle a well took a line before, a constant of the needs block (#1382); Glacier Water, not a coin',
-    'NEEDS.waterItems.empty': 'puts back the empty bottle a well took, when the water could not be handed over (#1382); not a coin'
+    'NEEDS.waterItems.empty': 'puts back the empty bottle a well took, when the water could not be handed over (#1382); not a coin',
+    'CUFFS_DESC': 'one pair of Prisoner\'s Cuffs (10e039:Skyrim.esm, clothing), a constant of the cuffs block (#2573): issued to a guard with none at most once a day, or moved from guard to prisoner and back, never gold'
   };
   const re = /\baddItem\(\s*[^,()]+,\s*([^,]+?),/g;
   const unknown = [];

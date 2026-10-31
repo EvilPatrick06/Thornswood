@@ -102,7 +102,7 @@ $expect = @($parts | Where-Object { $_ -ne 'merchants' -and $_ -ne 'saves' })
 Yes ('S5 the wipe marks done every part but the merchants'' and the saves (' + ($WipeDone -join ', ') + ')') (
     $WipeDone.Count -eq $expect.Count -and @($expect | Where-Object { $WipeDone -notcontains $_ }).Count -eq 0)
 $registers = @{ farms = @('farm-claims.json'); property = @('property.json', 'law.json', 'beds.json'); embassy = @('embassy.json')
-                dungeon = @('dungeon-rewards-ledger.json'); cargo = @('trade-cargo.json'); carts = @('trade-carts.json')
+                dungeon = @('dungeon-rewards-ledger.json'); cargo = @('trade-cargo.json'); stalls = @('market-stalls.json'); carts = @('trade-carts.json')
                 books = @('books.json', 'last-left.json') }
 $all = $true
 foreach ($p in $WipeDone) {
@@ -205,8 +205,8 @@ function Ids($a) { return ((@($a) | ForEach-Object { [long]$_ }) -join ',') }
 function Server([string]$name, [string]$settings) {
     $root = Join-Path $T $name
     Put (Join-Path $root 'server-settings.json') $settings
-    Put (Join-Path $root 'world\changeForms\0.json') ('{"formDesc":"ff000a01","profileId":5001,"appearanceDump":{"name":"A"}}')
-    Put (Join-Path $root 'world\changeForms\1.json') ('{"formDesc":"ff000a02","profileId":5002}')
+    Put (Join-Path $root 'world\changeForms\0.json') ('{"formDesc":"a01","profileId":5001,"appearanceDump":{"name":"A"}}')
+    Put (Join-Path $root 'world\changeForms\1.json') ('{"formDesc":"a02","profileId":5002}')
     # Not a character made in the world (a plugin in its desc), and a world object: neither is named.
     Put (Join-Path $root 'world\changeForms\2.json') ('{"formDesc":"a01:Skyrim.esm","profileId":5003}')
     Put (Join-Path $root 'world\changeForms\13164_JKs Whiterun.esp.json') ('{"formDesc":"13164:JKs Whiterun.esp"}')

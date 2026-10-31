@@ -67,6 +67,15 @@ Body page on K already show, so it is an exception, like the ones above.
 The help in the game, the launcher's Help and the line under the needs
 bars on Settings in the game name it.
 
+Reporting a problem to the developers is the one help line with a
+button. Decided by Patrick on 21 Oct (#3155): testers get both a
+Discord button and a button in the game that file an issue on the board
+with where they are and the logs of that game. In the game it is Report
+a problem at the end of Getting help on the help panel (F7): a box, then
+Send. In the Discord it is the Report a problem post pinned in
+#test-findings. `/stuck`, `/helpme` and `/report`, which reach staff,
+stay commands with no button, as above.
+
 A panel or a key may send the server the same line a command used to
 be. The look prompt already sends `/trade` and the id of the person
 under the crosshair. Nobody is told to type that line, and help text
@@ -132,7 +141,9 @@ is not built.
 
 [Temperature and weather](systems/temperature.md). One meter, 0 to 100,
 comfort at 50. Place, wind, sky, night, height, fire, water and clothing.
-A season changes the odds of the sky. Winter is not all snow.
+A season changes the odds of the sky. Winter is not all snow. Winter
+cools a quarter faster under the sky, and a harvest gives a quarter
+more in summer and a quarter less in winter.
 
 [Injury](systems/injury.md). Cuts, breaks, burns, bites, and going down
 before a death. Lasting harm is part of this, not a separate switch.
@@ -246,6 +257,11 @@ not a recipe and not a mint.
 
 [Property](systems/property.md). A claim at the door, a deed, locks, keys,
 rent, and what a home is for.
+
+[Market stalls](systems/stalls.md). The stalls already in the towns'
+markets, claimed like a building for nothing. The keeper lays out goods
+at their own price, in gold or in goods, and a stall sells only while
+its keeper is standing at it.
 
 [Gold](systems/gold.md). 40 gold once for a person. A guild trader
 starts with 250, once. A scene quest creates the gold written on it,

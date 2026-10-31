@@ -306,8 +306,8 @@ try {
         Yes 'I3 and the launcher running from that root' (($launcher.Count -eq 1) -and ($launcher[0].Root -eq $root3))
         Yes 'I4 and both before the new exe went in (the old 3 byte one was still there)' (($game.Count -eq 1) -and ($game[0].Dir -eq '3') -and ($launcher.Count -eq 1) -and ($launcher[0].Dir -eq '3'))
         $same = (Get-FileHash -LiteralPath $staleExe).Hash -eq (Get-FileHash -LiteralPath (Join-Path $stage 'Thornswood.exe')).Hash
-        Yes 'I5 the exe in the root is the one the build made' $same
-        Yes 'I6 and it is newer than the one it replaced, which is what Ship checks' ((Get-Item -LiteralPath $staleExe).LastWriteTimeUtc -gt $staleTime)
+        Yes 'I5 the exe in the root is the one the build made, byte for byte, which is what Ship checks (#5156)' $same
+        Yes 'I6 and it is newer than the one it replaced' ((Get-Item -LiteralPath $staleExe).LastWriteTimeUtc -gt $staleTime)
         $hash = (Get-FileHash -LiteralPath (Join-Path $Here 'launcher\app.ico') -Algorithm SHA256).Hash.Substring(0, 8).ToLower()
         Yes "I9 the icon file named after the artwork is there (icon-$hash.ico)" (Test-Path -LiteralPath (Join-Path $l3 "icon-$hash.ico"))
         Yes 'I10 and an old one is cleared away' (-not (Test-Path -LiteralPath (Join-Path $l3 'icon-00000000.ico')))

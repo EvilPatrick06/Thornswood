@@ -198,6 +198,9 @@ function boot() {
     BENCH_BY_BASE: { [FORGE_BASE]: '88105:Skyrim.esm' },
     idOf: idOf, takeItem: takeItem, addItem: addItem,
     unfitToMake: function () { return ''; },
+    // The hammer a key is cut with (#3162): the smith here holds one.
+    // test-3162-bench-tools holds the refusal and the wear.
+    toolGate: function () { return null; }, wearTool: function () { return null; },
     notify: function (a, line) { told.push({ a: a, line: line }); },
     say: function (a, line) { told.push({ a: a, line: line }); },
     guard: function (n, f) { return f; },

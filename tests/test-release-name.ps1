@@ -119,6 +119,23 @@ try {
     $glob = $trig.Groups[1].Value
     Yes '  and no release tag matches it, so a Ship never starts a launcher build' (-not ($m -like $glob) -and -not ($d -like $glob))
 
+    # ---- 1a. the team's clock, whatever the machine's (31 Oct) -----------------------
+    # A GitHub runner keeps UTC and One and the box keep Mountain time, so a
+    # note shipped from a runner said a time six hours late and sat out of
+    # order on the News tab. Ids and note dates are minted on Mountain time.
+    Write-Host ''; Write-Host "the team's clock"
+    $mdt = Get-TeamNow ([datetime]::new(2026, 10, 31, 21, 56, 0, [DateTimeKind]::Utc))
+    Yes ("21:56 UTC on 31 Oct is 3:56 PM, summer time ({0})" -f $mdt.ToString('h:mm tt', [Globalization.CultureInfo]::InvariantCulture)) ($mdt -eq [datetime]::new(2026, 10, 31, 15, 56, 0))
+    $mst = Get-TeamNow ([datetime]::new(2026, 11, 2, 18, 0, 0, [DateTimeKind]::Utc))
+    Yes ("  18:00 UTC on 2 Nov is 11:00 AM, standard time ({0})" -f $mst.ToString('h:mm tt', [Globalization.CultureInfo]::InvariantCulture)) ($mst -eq [datetime]::new(2026, 11, 2, 11, 0, 0))
+    $pu = [IO.File]::ReadAllText((Join-Path $repo 'scripts\release\Publish-Update.ps1'))
+    $rb = [IO.File]::ReadAllText((Join-Path $repo 'scripts\release\Rollback-Feed.ps1'))
+    Yes '  a note Publish-Update or Rollback-Feed writes is dated by it, not by the machine' (
+        $pu -match "date\s+=\s+\(Get-TeamNow\)\.ToString\('M-d-yyyy h:mm tt'" -and $rb -match "date = \(Get-TeamNow\)\.ToString\('M-d-yyyy h:mm tt'" -and
+        $pu -notmatch "date\s+=\s+\(Get-Date\)" -and $rb -notmatch "date = \(Get-Date\)")
+    Yes '  and a release id is minted on it unless a time is given' ((Get-Command New-ReleaseId).ScriptBlock.Ast.Body.ParamBlock -eq $null -and
+        ((Get-Command New-ReleaseId).ScriptBlock.Ast.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'Now' }).DefaultValue.Extent.Text -eq '(Get-TeamNow)')
+
     # ---- 1b. a new id is never one the feed has (#1057) ------------------------------
     Write-Host ''; Write-Host 'a new release id'
     $at = [datetime]::new(2026, 9, 28, 23, 48, 12)
@@ -192,7 +209,7 @@ try {
         $fake = Join-Path $Scratch 'repo'
         New-Item -ItemType Directory -Force -Path $fake | Out-Null
         Copy-Item -LiteralPath (Join-Path $repo 'scripts') -Destination $fake -Recurse -Force
-        foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json', 'records\ui-gone.json', 'records\client-build.json', 'records\client-licences.json', 'records\client-licences') {
+        foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json', 'records\ui-gone.json', 'records\shipped-not-ours.json', 'records\client-build.json', 'records\client-licences.json', 'records\client-licences') {
             $from = Join-Path $repo $f
             if (Test-Path -LiteralPath $from) {
                 New-Item -ItemType Directory -Force -Path (Split-Path -Parent (Join-Path $fake $f)) | Out-Null
@@ -233,6 +250,10 @@ try {
         Put (Join-Path $inst 'Profile\OwnGame\loadorder.txt') "ours.esp`r`n"
         . (Join-Path $repo 'tests\fixtures\ui-front.ps1')
         Install-UiFrontFixture (Join-Path $inst 'Game')
+        # The collection revision record, and a Vortex on it (#3597).
+        . (Join-Path $repo 'tests\fixtures\collection-revision.ps1')
+        $roaming = Join-Path $inst 'roaming'
+        $null = Install-CollectionRevisionFixture -From $repo -RepoCopy $fake -AppData $roaming
         $node = Get-Command node -ErrorAction SilentlyContinue
         Yes 'node is on PATH, for the stand-in game server' ($null -ne $node)
         if ($null -eq $node) { Done }
@@ -275,8 +296,9 @@ try {
         Put (Join-Path $site 'feed\published.json') '{"Data\\Platform\\UI\\thornswood-ours.esp":"5:0000000000000000000000000000000000000000000000000000000000000000"}'
         $Shell = (Get-Process -Id $PID).Path
         function Publish([string[]]$extra) {
-            $oldA = $env:LOCALAPPDATA; $oldE = $ErrorActionPreference
+            $oldA = $env:LOCALAPPDATA; $oldR = $env:APPDATA; $oldE = $ErrorActionPreference
             $env:LOCALAPPDATA = Join-Path $inst 'appdata'
+            $env:APPDATA = $roaming
             $ErrorActionPreference = 'Continue'
             try {
                 $pu = Join-Path $fake 'scripts\release\Publish-Update.ps1'
@@ -290,7 +312,7 @@ try {
                 $cmd = "`$global:ThornswoodPublishedRelease = ''; `$rc = 1; try { & $(Q $pu) $argText; `$rc = `$LASTEXITCODE } " +
                        "finally { 'PUBLISHED=[' + `$global:ThornswoodPublishedRelease + ']' }; exit `$rc"
                 $out = (& $Shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command $cmd 2>&1 | Out-String); $code = $LASTEXITCODE
-            } finally { $env:LOCALAPPDATA = $oldA; $ErrorActionPreference = $oldE }
+            } finally { $env:LOCALAPPDATA = $oldA; $env:APPDATA = $oldR; $ErrorActionPreference = $oldE }
             $said = [regex]::Match($out, 'PUBLISHED=\[([^\]]*)\]')
             return [pscustomobject]@{ Code = $code; Out = $out; Published = $(if ($said.Success) { $said.Groups[1].Value } else { '?' }) }
         }

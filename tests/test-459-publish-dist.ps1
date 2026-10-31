@@ -42,6 +42,9 @@
   Everything it writes is in its own temp folder. Nothing connects anywhere.
 #>
 $env:THORNSWOOD_HARNESS = '1'
+# The fork's artifacts alone: tests\test-3047-ci-engine-build.ps1, section 7,
+# holds the package path (#5152) with a stand-in registry.
+$env:THORNSWOOD_ENGINE_REGISTRY = 'none'
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot

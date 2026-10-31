@@ -136,8 +136,9 @@ function Find-DevNoteRelease($tags, [string]$date) {
 # note proves its own: its sourceCommit, or when it has none (written before
 # that field existed, or by a release built with uncommitted files), the dev
 # release it came with (Find-DevNoteRelease), and for a release built with
-# uncommitted files, a later clean one (Is-Settled). Headline changes
-# therefore cannot leave completed work marked Dev-only.
+# uncommitted files, a later clean one (Is-Settled). A note below one whose
+# own commit main has is settled by it. Headline changes therefore cannot
+# leave completed work marked Dev-only.
 function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
     if ($null -eq $mainDoc) { return }
     $mainRelease = $mainDoc.PSObject.Properties['release']
@@ -288,11 +289,83 @@ function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
     # No proof is not proof of the opposite. A note whose release this clone
     # has no tag for, or whose release was built with uncommitted files and
     # is not settled yet, keeps the mark it was last given.
+    #
+    # A sourceCommit this clone does not hold proves nothing either, and is
+    # judged the same way, by its release's tag. The #3684 history rewrite of
+    # 31 Oct 2026 gave every commit on main a new id and moved the release
+    # tags with them, but the notes already in the dev feed kept the old ids.
+    # Each read as a commit main lacked, so after main 20261031-144725, which
+    # carried all of them, 12 of the 17 notes stayed DEV (#5133).
+    #
+    # Held means in this clone's history: reachable from a branch, a
+    # remote-tracking branch or a tag, not only somewhere in its object
+    # store. The gate's checkout on the box was made before the
+    # rewrite and fetched main one commit deep on every run, so it still
+    # keeps the old main tips as loose objects that no ref reaches. Read as
+    # held, each went to Holds, which found no history shared with main, and
+    # the first dev Ship with the rule above (20261031-155402-dev) still left
+    # 13 of 18 marked. Asked of git twice for every note: which of the ids
+    # are commits here, and which of those no branch or tag reaches.
     $devTags = $null
     $marked = 0
+    $named = @(@($news) | ForEach-Object { Get-DevNewsVal $_ 'sourceCommit' } | Where-Object { $_ -match '^[0-9a-f]{40}$' } | Select-Object -Unique)
+    $held = New-Object 'System.Collections.Generic.HashSet[string]'
+    if ($named.Count) {
+        $hadCode = Test-Path -LiteralPath 'variable:global:LASTEXITCODE'
+        $was = if ($hadCode) { $global:LASTEXITCODE } else { 0 }
+        try {
+            $g = Invoke-ReleaseGit $sourceRepo (@('log', '--no-walk=unsorted', '--ignore-missing', '--format=%H') + $named)
+            $here = @(if ($g.Code -eq 0) { @($g.Lines) | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ } })
+            if ($here.Count) {
+                $u = Invoke-ReleaseGit $sourceRepo (@('rev-list') + $here + @('--not', '--branches', '--remotes', '--tags'))
+                if ($u.Code -eq 0) {
+                    $loose = New-Object 'System.Collections.Generic.HashSet[string]'
+                    foreach ($l in @($u.Lines)) { [void]$loose.Add(([string]$l).Trim()) }
+                    foreach ($c in $here) { if (-not $loose.Contains($c)) { [void]$held.Add($c) } }
+                }
+            }
+        }
+        finally {
+            if ($hadCode) { $global:LASTEXITCODE = $was }
+            else { Remove-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue }
+        }
+    }
+    # Newest first, as every feed keeps its notes (Publish-Update puts each new
+    # one on top). The first note whose own commit main has, and whose dev
+    # release was built from that commit with nothing uncommitted, settles
+    # every note below it: the dev build was built whole from that commit, so
+    # whatever an older dev release carried is either in that commit, which
+    # main has, or no longer in the dev build at all. Either way "dev has it
+    # and main does not" is false, which is Is-Settled's reasoning (#2401,
+    # option B) with the release that settles it named by its own note.
+    #
+    # Clean is read from the release tags at that commit, every one of them
+    # clean and at least one there, never from the note: the 12 Oct dev feed
+    # carried sourceCommit on notes of releases built with uncommitted files
+    # (20261003-192349-dev among them), and a clone with no tags proves
+    # nothing, so there the old notes keep their marks as before.
+    #
+    # Until 31 Oct an older note with no proof of its own kept its mark for
+    # good. Measured on the dev feed that day against main 20261031-144725
+    # (90026c6c), with the old ids judged by their tags as above: "Loading
+    # screens show the painting" (22 Oct 2:42 PM) and "Loading screen test
+    # returns" (5:51 PM) stayed DEV, though the test was taken off dev at
+    # 9:23 PM and main has the commit of every dev build up to 31 Oct 2:30 PM.
+    # No release tag's span holds either note's time, so nothing else could
+    # clear them. Settled by a commit, never by a date: a note's date and a
+    # tag's time can be on different clocks (Get-TeamNow in Release-Name.ps1).
+    $settled = $false
     foreach ($n in @($news)) {
         $commit = Get-DevNewsVal $n 'sourceCommit'
-        if ($commit) { $published = Is-Published $commit }
+        if ($settled) { $published = $true }
+        elseif ($commit -and $held.Contains($commit)) {
+            $published = Is-Published $commit
+            if ($published) {
+                if ($null -eq $devTags) { $devTags = @(Get-DevReleaseTags $sourceRepo) }
+                $at = @($devTags | Where-Object { $_.Commit -eq $commit })
+                $settled = ($at.Count -gt 0 -and @($at | Where-Object { -not $_.Clean }).Count -eq 0)
+            }
+        }
         else {
             if ($null -eq $devTags) { $devTags = @(Get-DevReleaseTags $sourceRepo) }
             $rel = Find-DevNoteRelease $devTags (Get-DevNewsVal $n 'date')

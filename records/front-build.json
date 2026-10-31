@@ -1,7 +1,7 @@
 {
-  "forkCommit": "20bb0b88f8d77e5835d9ec8f7a874ff79a51acc0",
-  "builtUtc": "2026-10-30T07:11:41Z",
-  "builtWith": "node v22.22.0, yarn@1.22.22",
+  "forkCommit": "50736fe6183409b640218ac131742d16d738d550",
+  "builtUtc": "2026-10-31T22:13:58Z",
+  "builtWith": "node v22.23.4, yarn@1.22.22",
   "files": {
     "02687b2110d1a50a6b4e194282ab8deb.svg": {
       "sha256": "e893ef375c3883a3a8d74fa17a6f811eca196aa88d3f2ade70ae317ab60f46e0",
@@ -75,6 +75,10 @@
       "sha256": "0e5f20d5e2541384290c5955d4b03fe5f4e1e0fe9af6b15eef3f107c40f322a6",
       "bytes": 2008
     },
+    "4b2950a2781132b82147.ttf": {
+      "sha256": "4b4b24aa6f799aa73cdcd5b6fa840cbcbbb38b81fa9fa82c25126a4530c1ba44",
+      "bytes": 320800
+    },
     "4c9effcbaeeb2d8ca70ae680ac1e3b9a.wav": {
       "sha256": "7f620d14a6f4239058ea79ff1b9a434231c19b6aa16ae2282c303c5a36ab9bd9",
       "bytes": 45578
@@ -118,10 +122,6 @@
     "82a1dedf858eef6413fa5857c679ed6c.svg": {
       "sha256": "4a7f48da191073fcc6d7a2f4a156415add88251ab9ba50fa30b1b7072d57a83d",
       "bytes": 323
-    },
-    "855bfaf67c57745958d3.ttf": {
-      "sha256": "6f1fa487d1a00791774f4d452259672c96e1fb8039e6a50c2c2323498505f4e7",
-      "bytes": 74128
     },
     "870d99e8a8e3d8373ffd53a6e5c0eac0.svg": {
       "sha256": "7fd52ee5a4b98bfe193847e4643f4fb2b76a46eb927027e89a6948cf818ff403",
@@ -188,8 +188,8 @@
       "bytes": 409
     },
     "build.js": {
-      "sha256": "d35838544dd8c65704db86171f46d7ef7b788ec61ba6f2e0da0535db1ddc91ae",
-      "bytes": 2448900
+      "sha256": "a67a1a146f104891d879d360c06d40e7c9051aac859bd6fd4d207f432be4416f",
+      "bytes": 2444820
     },
     "c1aa44800eaab2708600c244af65efb4.mp3": {
       "sha256": "3b3dcbffd4803b38658b3f9015f79f9af75272d71ed8544e79cacd4a1819a090",
@@ -218,10 +218,6 @@
     "d1cb9c6658b71034a8d29a436970b65a.svg": {
       "sha256": "d60b734e30c98ca85f53f36e016154baea944fc51c2b967193a471e43d664ffb",
       "bytes": 1534
-    },
-    "d213051bb6f28a25fb26.ttf": {
-      "sha256": "a9acf3c0f5fad1abe94f9d54bdf03ca4435e5b497d7c273501ebc200acb44bd2",
-      "bytes": 1112
     },
     "dc3cbd21104d40477da6.ttf": {
       "sha256": "86577cb32f8abe3673db53ca0f4221e6856751a4f6730c867e00f720f8bb1fc5",

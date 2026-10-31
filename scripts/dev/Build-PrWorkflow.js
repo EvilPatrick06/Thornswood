@@ -1,12 +1,10 @@
 #!/usr/bin/env node
 // scripts/dev/Build-PrWorkflow.js
 //
-// #1306 (Patrick, 11 Oct 2026, option C; fallback added 12 Oct 2026): a pull
-// request builds on GitHub's hosted windows-latest runner first, and on the
-// VPS only as the fallback, for this repository's own branches. The
-// isolation check (#2161) judges a whole workflow file, so the pull request
-// build is its own file, .github/workflows/build-pr.yml, and build.yml keeps
-// a push to main and a manual run on the VPS.
+// #1306 (Patrick, 11 Oct 2026, option C): a pull request builds on GitHub's
+// hosted windows-latest runner, in a file of its own,
+// .github/workflows/build-pr.yml, and build.yml keeps a push to main and a
+// manual run. The VPS fallback both had went at the flip (#4983).
 //
 // build-pr.yml is GENERATED from build.yml so the two can never test
 // different things. Edit build.yml, then run:
@@ -38,7 +36,15 @@ function build(src) {
   body = swap(body, 'name: Build check\n', 'name: Build check (pull requests)\n', 'its name');
   const on = /\non:\n(?:  .*\n|    .*\n)+?(?=permissions:)/.exec(body);
   if (!on || on[0].indexOf('  push:') < 0) { fail('build.yml no longer has its push and manual triggers'); }
-  body = body.replace(on[0], '\non:\n  pull_request:\n');
+  /*
+    A PIN PULL REQUEST'S OWN RUN (#5148). engine-pin.yml pushes the rolling
+    engine pin branch with the run's own token, and GitHub starts no
+    pull_request run for a push made with that token. A manual run is the one
+    event that token may start, so engine-pin.yml starts this workflow on the
+    branch after each push, and its checks land on the pull request's head.
+    A manual run needs write access, which a push already needs.
+  */
+  body = body.replace(on[0], '\non:\n  pull_request:\n  workflow_dispatch:\n');
   body = swap(body, 'group: build-${{ github.ref }}', 'group: build-pr-${{ github.ref }}', 'its concurrency group');
   /*
     A PULL REQUEST'S NEWER PUSH CANCELS ITS OLDER RUN (#3874). Main's builds
@@ -50,66 +56,68 @@ function build(src) {
   if (!conc) { fail('build.yml no longer has cancel-in-progress: false in its concurrency'); }
   body = body.replace(conc[0], conc[1] + '  cancel-in-progress: true\n');
   /*
-    THE VPS FALLBACK STAYS, FOR THIS REPOSITORY'S OWN BRANCHES ONLY (Patrick,
-    12 Oct 2026, changing the pull request half of the 11 Oct #2161 call: the
-    VPS backs up everything, pull request builds included). A pull request
-    still builds on GitHub's hosted runner first. When that job does not
-    succeed (a billing or quota stop fails it before any step runs), the
-    fallback builds it on the box. A pull request from a fork never reaches
-    the box: the fallback's condition names this repository as the head. The
-    hosted job's failure stays standing as its own red check.
-    ONLY WHILE PRIVATE (#3685, Patrick's A of 26 Oct 2026). Once the
-    repository is public the fallback never runs, GitHub's runners are free,
-    and no VPS runner is registered to it: a fork's pull request runs its own
-    copy of this file, so that condition alone could not keep it off the box.
-  */
-  /*
     NO "tested" JOB ON A PULL REQUEST (#3182). build.yml's first job asks
     whether a pull request build already passed main's tree; a pull request
-    is what makes that note, so its build has no such job and the two
-    launcher jobs need only each other. Its VPS fallback, tested-vps, sits
-    between it and the build's fallback and goes with it.
+    is what makes that note, so its build has no such job and the launcher
+    job needs nothing.
   */
-  const tested = /\n  # ALREADY TESTED \(#3182[\s\S]*?\n  tested:\n[\s\S]*?\n\n(?=  # WHERE IT RUNS)/.exec(body);
-  if (!tested) { fail('build.yml no longer has its "tested" job before the fallback'); }
+  const tested = /\n  # ALREADY TESTED \(#3182[\s\S]*?\n  tested:\n[\s\S]*?\n\n(?=  # )/.exec(body);
+  if (!tested) { fail('build.yml no longer has its "tested" job before the gate and launcher jobs'); }
   body = body.replace(tested[0], '\n');
-  body = swap(body, '    needs: [tested, tested-vps, launcher]\n', '    needs: launcher\n', 'the fallback\'s needs');
-  body = swap(body, "    if: ${{ !cancelled() && github.event.repository.private && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && needs.launcher.result", "    if: ${{ !cancelled() && github.event.repository.private && needs.launcher.result", 'the fallback\'s tested condition');
-  body = swap(body, "    needs: [tested, tested-vps]\n    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && (!github.event.repository.private || (vars.BUILD_RUNNER", "    if: ${{ (!github.event.repository.private || (vars.BUILD_RUNNER", 'the hosted job\'s tested condition');
+  // The gate's shares and the launcher job both wait for it in build.yml.
+  const waits = "    needs: tested\n    if: ${{ !cancelled() && needs.tested.outputs.run == '' }}\n";
+  if (body.split(waits).length !== 3) { fail('build.yml no longer has the tested condition on exactly the gate and launcher jobs'); }
+  body = body.split(waits).join('');
   if (/needs\.tested|needs: \[?tested|^  tested:/m.test(code(body))) { fail('the pull request build still names the tested job'); }
   /*
-    A PULL REQUEST'S FALLBACK MAY ALSO LAND ON ONE (#3860, Patrick, 26 Oct
-    2026). Its build needs nothing of the box, so it asks for the pull
-    request build label alone, which records/pr-build-runners.json gives
-    box runner 2 and One's off-box ones. Main's build keeps thornswood-vps
-    and the build label: only the box traces the gate, and a main build is
-    what leaves the map the next pull requests measure from (#3114, #3874).
-    Box runner 1 does not carry the pull request label, so main's build never
-    waits behind pull requests for it (#4010, Patrick's A, 27 Oct 2026).
+    THE ONE CHECK MAIN'S PROTECTION REQUIRES (#3683, Patrick's A on
+    q-3683-required-check, 27 Oct 2026). Main's ruleset names "Build check
+    result", not "Launcher builds", because GitHub counts a skipped required
+    check as passed. While the box built there were two builds and either
+    could be skipped; since #4983 there is one, and this passes only when it
+    succeeded, so a skipped or cancelled build still cannot merge. Since
+    31 Oct 2026 the gate runs in shares beside it, in the job "gate", and
+    this needs both: a matrix job's result is success only when every share
+    succeeded.
+
+    It runs on GitHub's ubuntu-latest: it is a pull request's job, and a
+    fork's pull request brings its own copy of this file.
   */
-  if (code(body).split('    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]\n').length !== 2) { fail('build.yml no longer has exactly one build-runner job, the fallback'); }
-  body = swap(body, '    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]\n', '    runs-on: [self-hosted, Windows, thornswood-pr-build]\n', 'the fallback\'s runner labels');
-  const jobs = body.indexOf('\njobs:\n');
-  const vps = body.indexOf('\n  launcher-vps:\n');
-  const dflt = body.indexOf('\n  # The default:');
-  if (jobs < 0 || vps < 0 || dflt < vps) { fail('build.yml no longer has the launcher-vps fallback job before the default job'); }
-  const IF = "    if: ${{ !cancelled() && github.event.repository.private && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}\n";
-  const SAME = "    if: ${{ !cancelled() && github.event.repository.private && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' && github.event.pull_request.head.repo.full_name == github.repository }}\n";
-  const job = body.slice(vps, dflt);
-  if (job.indexOf(IF) < 0) { fail('the fallback job no longer has its condition'); }
-  body = body.slice(0, vps) + job.replace(IF, SAME) + body.slice(dflt);
-  if (code(body).split('runs-on: [self-hosted').length - 1 !== 1) { fail('the VPS label is in more than the fallback job'); }
+  if (/\n  result:\n/.test(body)) { fail('build.yml already has a job named result'); }
+  body = body.replace(/\n*$/, '\n') + [
+    '',
+    '  # The one check main\'s ruleset requires (#3683): passes only when the',
+    '  # build and every share of the gate above succeeded. Written by',
+    '  # Build-PrWorkflow.js, which says why.',
+    '  result:',
+    '    name: Build check result',
+    '    needs: [launcher, gate]',
+    '    if: ${{ !cancelled() }}',
+    '    runs-on: ubuntu-latest',
+    '    timeout-minutes: 5',
+    '    steps:',
+    '      - name: The launcher build and the gate passed',
+    '        env:',
+    '          BUILD: ${{ needs.launcher.result }}',
+    '          GATE: ${{ needs.gate.result }}',
+    '        run: |',
+    '          echo "Launcher builds: $BUILD"',
+    '          echo "Gate harnesses, every share: $GATE"',
+    '          if [ "$BUILD" = success ] && [ "$GATE" = success ]; then exit 0; fi',
+    '          echo "::error::the launcher build or a share of the gate did not pass, so this pull request may not merge"',
+    '          exit 1',
+    '',
+  ].join('\n');
+  if (/self-hosted/.test(code(body))) { fail('a job asks for a runner of our own'); }
   if (code(body).indexOf('always()') >= 0) { fail('a job uses always(), which a newer run cannot cancel'); }
-  if (code(body).split('head.repo.full_name == github.repository').length - 1 !== 1) { fail('the fallback lost its same-repository condition'); }
   const head =
     '# GENERATED from build.yml by scripts/dev/Build-PrWorkflow.js. Do not edit:\n' +
     '# change build.yml and run  node scripts/dev/Build-PrWorkflow.js\n' +
     '#\n' +
     '# Every pull request runs the same checks as build.yml, on GitHub\'s hosted\n' +
-    '# windows-latest runner first (#1306). If that job does not succeed, the VPS\n' +
-    '# fallback builds it, for a branch of this repository only, never a fork\n' +
-    '# (Patrick, 12 Oct 2026). No secrets, no live folders: every scratch path is\n' +
-    '# under RUNNER_TEMP. The hosted job keeps the name "Launcher builds".\n';
+    '# windows-latest runner (#1306, #4983). No secrets, no live folders: every\n' +
+    '# scratch path is under RUNNER_TEMP. The job keeps the name "Launcher builds",\n' +
+    '# and the gate runs beside it in shares, "Gate harnesses (n of 5)".\n';
 
   return head + body;
 }

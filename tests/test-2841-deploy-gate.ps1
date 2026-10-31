@@ -32,7 +32,9 @@
        there; the ops repository's tests\test-box-workflows.ps1 holds its
        shape.
     9. The seal (scripts\ops\Sealed.ps1) opens with its own key only, and a changed byte
-       is refused; the box half uses the signed ssh.exe by full path.
+       is refused; it comes back through the run's log as TWSEAL-LOG lines,
+       held to their count and sha256 (a stand-in gh serves the log); the
+       box half uses the signed ssh.exe by full path.
   Nothing connects anywhere and nothing outside the temp folder is touched.
 #>
 [CmdletBinding()]
@@ -91,10 +93,101 @@ Yes 'Read-LauncherStarts takes -Days, a number, and nothing else' ((Words 'Read-
     (Words 'Read-LauncherStarts -Days week') -eq 'REFUSED' -and (Words 'Read-LauncherStarts -Folder x') -eq 'REFUSED')
 # Publish-Server through the gate is the dev server's, from the box's store,
 # and nothing else (#4987): main stays with a Main run Patrick approves.
-Yes 'Publish-Server is held to -Channel dev -FromStore' ((Words 'Publish-Server') -eq '-Channel|dev|-FromStore|-NoPause' -and
-    (Words 'Publish-Server -RequirePass on -Wait 300') -eq '-Channel|dev|-FromStore|-NoPause|-RequirePass|on|-Wait|300')
+Yes 'Publish-Server is held to -Channel dev' ((Words 'Publish-Server') -eq '-Channel|dev' -and
+    (Words 'Publish-Server -RequirePass on -Wait 300') -eq '-Channel|dev|-RequirePass|on|-Wait|300' -and
+    $verbs.verbs.'Publish-Server'.script -eq 'scripts/release/Publish-ServerOnBox.ps1')
 Yes '  and a caller cannot name main, a build, a zip or a fresh world' ((Words 'Publish-Server -Channel main') -eq 'REFUSED' -and
     (Words 'Publish-Server -ServerBuild x') -eq 'REFUSED' -and (Words 'Publish-Server -Zip x') -eq 'REFUSED' -and (Words 'Publish-Server -FreshWorld') -eq 'REFUSED')
+# The live verbs (Patrick, 30 Oct 2026: Ships and deploys run from the
+# cloud, never One): each names the exact build of main it is for with
+# -Build, which the broker holds to main's tip and never hands the script.
+$sha = 'a' * 40
+foreach ($live in 'Deploy-Server', 'Publish-Server-Main') { Yes "$live is a live verb, held to a build" ($verbs.verbs.$live.build -eq $true) }
+Yes 'a live verb without -Build is refused, and says why' ((Words 'Deploy-Server -GamemodeOnly') -eq 'REFUSED' -and
+    (Test-ThornswoodGateRequest -Line 'Deploy-Server -GamemodeOnly' -Verbs $verbs).Why -match 'exact build')
+$req = Test-ThornswoodGateRequest -Line ("Deploy-Server -GamemodeOnly -Build $sha -Mode restart") -Verbs $verbs
+Yes '  and with it, the build is the gate''s and never the script''s' ($req.Ok -and $req.Build -eq $sha -and ($req.Args -join '|') -eq '-GamemodeOnly|-Mode|restart')
+Yes '  -Build is a full lower case commit, given once' ((Words "Deploy-Server -FromStore -Build abc123") -eq 'REFUSED' -and (Words ("Deploy-Server -FromStore -Build " + ('A' * 40))) -eq 'REFUSED' -and
+    (Words "Deploy-Server -FromStore -Build $sha -Build $sha") -eq 'REFUSED' -and (Words 'Deploy-Server -FromStore -Build') -eq 'REFUSED')
+Yes '  a verb that is not live takes no -Build' ((Words "Deploy-DevGamemode -Build $sha") -eq 'REFUSED' -and (Test-ThornswoodGateRequest -Line 'Deploy-DevGamemode' -Verbs $verbs).Build -eq '')
+Yes 'Publish-Server-Main is held to -Channel main' ((Words "Publish-Server-Main -Build $sha -RequirePass on") -eq '-Channel|main|-RequirePass|on' -and
+    $verbs.verbs.'Publish-Server-Main'.script -eq 'scripts/release/Publish-ServerOnBox.ps1' -and
+    (Words "Publish-Server-Main -Build $sha -Channel dev") -eq 'REFUSED' -and (Words "Publish-Server-Main -Build $sha -ServerBuild x") -eq 'REFUSED')
+$pubBox = Text 'scripts/release/Publish-ServerOnBox.ps1'
+# A pin move's first publish (31 Oct 2026, 09a4b398): the store lacked the
+# new build, and only One's plain publish sent it there.
+Yes '  Publish-ServerOnBox.ps1 fetches CI''s engine build with the App''s token and sends its zip to the store before publishing from it' (
+    $pubBox.Contains("& (Join-Path `$Here 'Get-EngineArtifact.ps1') -NoPause") -and $pubBox.Contains("`$pub['FromStore'] = `$true") -and $pubBox.Contains("`$pub['ServerBuild'] = `$ciZip") -and
+    $pubBox.Contains('$env:GH_TOKEN = $token') -and $pubBox.Contains('finally { Remove-Item -LiteralPath Env:\GH_TOKEN') -and
+    $pubBox.IndexOf('Get-EngineArtifact.ps1') -lt $pubBox.IndexOf("& (Join-Path `$Here 'Publish-Server.ps1') @pub"))
+Yes '  and -PutBack and -TaskOnly go without a fetch or -FromStore, which Publish-Server.ps1 refuses with them' ($pubBox.Contains('if (-not $PutBack -and -not $TaskOnly) {') -and
+    (Text 'scripts/release/Publish-Server.ps1').Contains('if ($FromStore -and ($PutBack -or $TaskOnly))'))
+Yes '  both box scripts mint the token through ShipAccess.ps1' ($pubBox.Contains('Get-ThornswoodShipAccess -Repo $repo -AdminState $AdminState') -and
+    (Text 'scripts/release/Ship-OnBox.ps1').Contains('Get-ThornswoodShipAccess -Repo $repo -AdminState $AdminState'))
+Yes 'Deploy-Server takes no host, folder, build folder or role list' ((Words "Deploy-Server -Build $sha -Vps x") -eq 'REFUSED' -and (Words "Deploy-Server -Build $sha -Root C:/x") -eq 'REFUSED' -and
+    (Words "Deploy-Server -Build $sha -Dist x") -eq 'REFUSED' -and (Words "Deploy-Server -Build $sha -Devs 1") -eq 'REFUSED')
+# Content rebuilds through the gate (Patrick's card, 30 Oct 2026): main's
+# whole chain against a server's plugins, its files back through -Out.
+Yes 'Rebuild-ContentTables takes -Server dev or main, and names its out parameter' ((Words 'Rebuild-ContentTables') -eq '' -and (Words 'Rebuild-ContentTables -Server main') -eq '-Server|main' -and
+    (Words 'Rebuild-ContentTables -Server live') -eq 'REFUSED' -and (Test-ThornswoodGateRequest -Line 'Rebuild-ContentTables' -Verbs $verbs).Out -eq '-Out')
+Yes '  and cannot name a branch, a tool or a build' ((Words "Rebuild-ContentTables -Build $sha") -eq 'REFUSED' -and (Words 'Rebuild-ContentTables -Script x') -eq 'REFUSED' -and (Words 'Rebuild-ContentTables -Branch x') -eq 'REFUSED')
+$rebuild = Text 'scripts/mods/Rebuild-OnBox.ps1'
+# A pull request's data, never its code (Patrick's B on the #4835 card).
+Yes '  a pull request by number and its full head commit' ((Words "Rebuild-ContentTables -Pull 4835 -Head $sha") -eq "-Pull|4835|-Head|$sha" -and
+    (Words 'Rebuild-ContentTables -Pull 0') -eq 'REFUSED' -and (Words 'Rebuild-ContentTables -Head abc') -eq 'REFUSED' -and (Words 'Rebuild-ContentTables -Pull x') -eq 'REFUSED')
+Yes '  it takes only the listed data files from the pull request, held to its head, and commits them for Run-OnBox.ps1' (
+    $rebuild.Contains("`$DataFromPull = @('game/content/Thornswood-Content.esp', 'records/recipe-owners.json')") -and
+    $rebuild.Contains("'checkout', `$Head, '--', `$p") -and $rebuild.Contains('if ($at -cne $Head)') -and $rebuild.Contains("'commit', '--quiet', '--allow-empty'") -and
+    $rebuild.IndexOf("'commit', '--quiet'") -lt $rebuild.IndexOf("Run-OnBox.ps1')"))
+Yes '  and no file of the list is a script' (@([regex]::Match($rebuild, '\$DataFromPull = @\(([^)]*)\)').Groups[1].Value -split ',' | Where-Object { $_ -match '\.(ps1|psm1|py|js|cmd|bat|exe|dll)''' }).Count -eq 0)
+Yes '  it runs the chain by Run-OnBox.ps1, its words quoted so none is read as a parameter' ($rebuild.Contains("'scripts/mods/Rebuild-ContentTables.ps1' '-Data' '{data}' '-PluginsTxt' '{plugins}' -Server `$Server -Out `$Out"))
+Yes '  and Run-OnBox.ps1 copies what came back into -Out as well as the checkout' ((Text 'scripts/mods/Run-OnBox.ps1').Contains('foreach ($into in @($repo, $Out | Where-Object { $_ }))'))
+# The Ship verbs (Patrick's A, 30 Oct 2026: the box admin App mints the
+# token a Ship from the feed signs with, and the whole Ship runs on the box).
+Yes 'Ship-Dev is a dev Ship from the feed, its note as a title and detail lines' ((Words 'Ship-Dev -Title "Market stalls take your prices" -Detail "Claim a stall"') -eq '-Channel|dev|-Title|Market stalls take your prices|-Detail|Claim a stall' -and
+    (Words 'Ship-Dev -Title x -Detail y -ModsOnly') -eq '-Channel|dev|-Title|x|-Detail|y|-ModsOnly' -and
+    (Words 'Ship-Dev -Channel main -Title x -Detail y') -eq 'REFUSED' -and (Words 'Ship-Dev -Title x -Detail y -Root C:/x') -eq 'REFUSED' -and (Words 'Ship-Dev -Title x -Detail y -Package') -eq 'REFUSED')
+Yes 'Ship-Dev takes -Detail2 and -Detail3, whose names end in digits (#5144)' ((Words 'Ship-Dev -Title x -Detail y -Detail2 z -Detail3 w') -eq '-Channel|dev|-Title|x|-Detail|y|-Detail2|z|-Detail3|w' -and (Words 'Ship-Dev -Title x -2Detail y') -eq 'REFUSED')
+Yes 'Ship-Main is held to a build and to -Channel main' ($verbs.verbs.'Ship-Main'.build -eq $true -and (Words 'Ship-Main -Title x -Detail y') -eq 'REFUSED' -and
+    (Words "Ship-Main -Build $sha -Title x -Detail y -ModsOnly") -eq '-Channel|main|-Title|x|-Detail|y|-ModsOnly' -and (Words "Ship-Main -Build $sha -Title x -Detail y -MoveServer") -eq 'REFUSED')
+$shipBox = Text 'scripts/release/Ship-OnBox.ps1'
+Yes '  Ship-OnBox.ps1 runs Ship.ps1 from the feed, keeping the launcher only when asked, with the token in GH_TOKEN alone and gone after' (
+    $shipBox.Contains("`$ship = @{ Notes = `$notes; FromFeed = `$true; NoPause = `$true }") -and $shipBox.Contains("if (`$Channel -eq 'dev') { `$ship['Channel'] = 'dev' }") -and
+    $shipBox.Contains("if (`$ModsOnly) { `$ship['ModsOnly'] = `$true }") -and -not $shipBox.Contains("elseif (`$ModsOnly)") -and
+    $shipBox.Contains('$env:GH_TOKEN = $token') -and $shipBox.Contains('finally { Remove-Item -LiteralPath Env:\GH_TOKEN'))
+Yes '  a main Ship goes from the branch main at the fetched origin/main' ($shipBox.Contains("checkout --quiet -B main refs/remotes/origin/main"))
+# The DEV marks and the shipped issues read main's history and the release
+# tags, which the gate's one-commit checkout has not got (#5133).
+Yes '  a Ship deepens the gate''s checkout to main''s history and tags before it runs, and keeps origin/main at the commit the gate read' (
+    $shipBox.Contains("'fetch', '--quiet', '--unshallow', '--tags', 'origin', '+refs/heads/main:refs/remotes/origin/main'") -and
+    $shipBox.Contains("'fetch', '--quiet', '--tags', 'origin', '+refs/heads/main:refs/remotes/origin/main'") -and
+    $shipBox.Contains('update-ref refs/remotes/origin/main $head') -and
+    $shipBox.IndexOf('--unshallow') -gt $shipBox.IndexOf('checkout --quiet -B main') -and
+    $shipBox.IndexOf('--unshallow') -lt $shipBox.IndexOf("& (Join-Path `$Here 'Ship.ps1') @ship"))
+# The dev world started over for a load order change (#3649: a light plugin
+# going out renumbers the ones after it): dev only, with nothing a caller
+# can add, and the wipe's own -Yes because the gate has no console.
+Yes 'Wipe-Dev wipes the dev server alone and takes nothing' ((Words 'Wipe-Dev') -eq '-Server|dev|-Yes|-NoPause' -and (Words 'Wipe-Dev -Server main') -eq 'REFUSED' -and
+    (Words 'Wipe-Dev -Vps 1.2.3.4') -eq 'REFUSED' -and -not $verbs.verbs.'Wipe-Dev'.build -and $verbs.verbs.'Wipe-Dev'.script -eq 'scripts/ops/Wipe-Saves.ps1')
+Yes '  and no verb wipes main or every server' (@($verbs.verbs.PSObject.Properties | Where-Object { $_.Value.script -eq 'scripts/ops/Wipe-Saves.ps1' -and (@($_.Value.fixed) -join ' ') -ne '-Server dev -Yes -NoPause' }).Count -eq 0)
+# The installer for the site (#5109): no parameter at all, the token the
+# Ship's, and the publish from the branch main.
+Yes 'Publish-Installer takes nothing, and is not a live verb' ((Words 'Publish-Installer') -eq '' -and (Words 'Publish-Installer -OutDir C:/x') -eq 'REFUSED' -and
+    (Words 'Publish-Installer -AllowStaleCheckout') -eq 'REFUSED' -and (Words 'Publish-Installer -WaitSeconds 10') -eq 'REFUSED' -and -not $verbs.verbs.'Publish-Installer'.build -and
+    $verbs.verbs.'Publish-Installer'.script -eq 'scripts/release/Publish-InstallerOnBox.ps1')
+$instBox = Text 'scripts/release/Publish-InstallerOnBox.ps1'
+Yes '  Publish-InstallerOnBox.ps1 runs Publish-InstallerFromGitHub.ps1 with the App''s token in GH_TOKEN alone and gone after, from the branch main' (
+    $instBox.Contains('Get-ThornswoodShipAccess -Repo $repo -AdminState $AdminState') -and $instBox.Contains("& (Join-Path `$Here 'Publish-InstallerFromGitHub.ps1') -WaitSeconds `$WaitSeconds") -and
+    $instBox.Contains('$env:GH_TOKEN = $token') -and $instBox.Contains('finally { Remove-Item -LiteralPath Env:\GH_TOKEN') -and
+    $instBox.Contains('checkout --quiet -B main refs/remotes/origin/main') -and
+    $instBox.IndexOf('checkout --quiet -B main') -lt $instBox.IndexOf('Get-ThornswoodShipAccess -Repo') -and -not $instBox.Contains('AllowStaleCheckout'))
+Yes '  and its wait for installer.yml fits inside the verb''s timeout' ([int]([regex]::Match($instBox, '\[int\]\$WaitSeconds = (\d+)').Groups[1].Value) -lt 60 * [int]$verbs.verbs.'Publish-Installer'.timeoutMinutes)
+$gt = Text 'scripts/vps/admin/ship-access.js'
+Yes '  the token is the App''s, for the fork and Thornswood only, Actions write and Contents read and nothing more' (
+    $gt.Contains("const REPOS = ['skymp', 'Thornswood'];") -and $gt.Contains("const PERMISSIONS = { actions: 'write', contents: 'read' };") -and $gt.Contains('{ repositories: REPOS, permissions: PERMISSIONS }'))
+$ig = Text 'scripts/deploy/Install-Gate.ps1'
+Yes 'Install-Gate pins the GitHub CLI by version and SHA-256 and refuses one that does not match' ($ig -match "\`$GhVersion = '\d+\.\d+\.\d+'" -and $ig -match "\`$GhSha = '[0-9A-F]{64}'" -and
+    $ig.Contains('if (`$got -ne ''$GhSha'')') -and $ig.Contains('gh = `$gh;'))
 $refused = @(
     @('', 'an empty line'),
     @('Remove-Item C:\', 'a verb that is not on the list'),
@@ -254,11 +347,65 @@ try {
         if (($said -join ';') -ne ($want -join ';')) { $said | Write-Host }
     } finally { Remove-Item -LiteralPath $pipeProbe -Force -ErrorAction SilentlyContinue }
 }
+Yes 'the broker puts the pinned GitHub CLI first on the verbs'' PATH' ($brokerCode.Contains("`$env:PATH = (Split-Path -Parent ([string]`$Cfg.gh)) + ';' + `$env:PATH"))
+# Patrick's A, 30 Oct 2026: the verbs are main's own verbs.json, read from
+# the checkout the broker has just fetched, so a merged verb needs no install.
+# The line's shape is still checked before git is asked anything.
+$shaped = $brokerCode.IndexOf('Split-ThornswoodGateLine $line')
 $tested = $brokerCode.IndexOf('Test-ThornswoodGateRequest -Line $line')
-Yes 'every line goes through the rules before anything runs' ($tested -gt 0 -and $tested -lt $brokerCode.IndexOf('$commit = Update-Checkout') -and $tested -lt $brokerCode.IndexOf('Invoke-Child ([string]$Cfg.pwsh)'))
-Yes '  and the rules are the installed verbs.json, not anything sent' ($brokerCode.Contains("Read-ThornswoodGateVerbs (Join-Path `$Root 'verbs.json')"))
+Yes 'a line''s shape is checked before git is asked anything' ($shaped -gt 0 -and $shaped -lt $brokerCode.IndexOf('$commit = Update-Checkout'))
+Yes 'every line goes through the rules after the fetch and before anything runs' ($tested -gt $brokerCode.IndexOf('$commit = Update-Checkout') -and $tested -lt $brokerCode.IndexOf('Invoke-Child ([string]$Cfg.pwsh)'))
+Yes '  and the rules are main''s verbs.json in the fetched checkout, never anything sent or installed' ($brokerCode.Contains("`$verbsAt = Join-Path `$Repo 'scripts\vps\gate\verbs.json'") -and
+    $brokerCode.Contains('Read-ThornswoodGateVerbs $verbsAt') -and -not $brokerCode.Contains("Read-ThornswoodGateVerbs (Join-Path `$Root 'verbs.json')"))
+Yes '  and the installer no longer puts a verbs.json beside the broker, and takes an old one away' (
+    (Text 'scripts/deploy/Install-Gate.ps1') -notmatch "\$Files = @\([^)]*verbs\.json" -and (Text 'scripts/deploy/Install-Gate.ps1').Contains('Remove-Item -LiteralPath (Join-Path `$root ''verbs.json'') -Force'))
 Yes 'what runs is the tip of main: fetched into origin/main and checked out from it' (
     $brokerCode.Contains("'+refs/heads/main:refs/remotes/origin/main'") -and $brokerCode.Contains("'--detach', 'refs/remotes/origin/main'") -and $brokerCode.Contains("'clean', '-ffdxq'"))
+Yes '  and each fetched submodule is brought to main''s pin after the checkout, never left at the old one' (
+    $brokerCode.Contains("'submodule', 'update', '--checkout', '--force', '--depth', '1'") -and -not $brokerCode.Contains("'submodule', 'update', '--init'") -and
+    $brokerCode.IndexOf("'submodule', 'update'") -gt $brokerCode.IndexOf("'--detach', 'refs/remotes/origin/main'"))
+# The same steps, run with git on a checkout whose submodule main moved
+# (31 Oct: the gate's engine\skymp stayed at d258e53e when main pinned
+# 50736fe6, and every verb's freshness check refused the checkout).
+$gitExe = (Get-Command git -ErrorAction SilentlyContinue)
+if (-not $gitExe) { Write-Host 'SKIP: the submodule move needs git' -ForegroundColor Yellow } else {
+    $sm = Join-Path ([IO.Path]::GetTempPath()) ('tw-2841-sub-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+    New-Item -ItemType Directory -Path $sm -Force | Out-Null
+    function SmGit([string]$dir) { $a = @('-c', 'protocol.file.allow=always', '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'init.defaultBranch=main', '-C', $dir) + $args; $o = & git @a 2>&1; return [pscustomobject]@{ Code = $LASTEXITCODE; Out = @($o | ForEach-Object { [string]$_ }) } }
+    try {
+        $fork = Join-Path $sm 'fork'; $up = Join-Path $sm 'up'
+        New-Item -ItemType Directory -Path $fork, $up -Force | Out-Null
+        [void](SmGit $fork init -q); [void](SmGit $fork config uploadpack.allowAnySHA1InWant true)
+        Set-Content -LiteralPath (Join-Path $fork 'a.txt') -Value 'one'; [void](SmGit $fork add -A); [void](SmGit $fork commit -qm one)
+        $pinA = ((SmGit $fork rev-parse HEAD).Out -join '').Trim()
+        [void](SmGit $up init -q); [void](SmGit $up submodule add -q $fork engine/skymp); [void](SmGit $up commit -qm pinA)
+        $gate = Join-Path $sm 'gate'
+        [void](SmGit $sm clone -q --depth 1 --no-tags --branch main ('file://' + $up.Replace('\', '/')) $gate)
+        [void](SmGit $gate submodule update --init --depth 1)
+        Set-Content -LiteralPath (Join-Path $fork 'a.txt') -Value 'two'; [void](SmGit $fork commit -qam two)
+        $pinB = ((SmGit $fork rev-parse HEAD).Out -join '').Trim()
+        [void](SmGit (Join-Path $up 'engine/skymp') fetch -q origin); [void](SmGit (Join-Path $up 'engine/skymp') checkout -q $pinB)
+        [void](SmGit $up add engine/skymp); [void](SmGit $up commit -qm pinB)
+        $steps = @(
+            @('fetch', '--quiet', '--depth', '1', '--no-tags', 'origin', '+refs/heads/main:refs/remotes/origin/main'),
+            @('checkout', '--quiet', '--force', '--detach', 'refs/remotes/origin/main'),
+            @('clean', '-ffdxq'))
+        foreach ($st in $steps) { [void](SmGit $gate @st) }
+        $before = ((SmGit (Join-Path $gate 'engine/skymp') rev-parse HEAD).Out -join '').Trim()
+        Yes '  (without the move, the submodule stays at the old pin, as the gate''s did)' ($before -eq $pinA -and $pinA -ne $pinB)
+        $r = SmGit $gate submodule update --checkout --force --depth 1
+        $after = ((SmGit (Join-Path $gate 'engine/skymp') rev-parse HEAD).Out -join '').Trim()
+        $status = (SmGit $gate status --porcelain).Out -join ' '
+        Yes '  the move takes the fetched submodule to the new pin, and leaves no change behind' ($r.Code -eq 0 -and $after -eq $pinB -and -not $status.Trim())
+        $bare = Join-Path $sm 'gate2'
+        [void](SmGit $sm clone -q --depth 1 --no-tags --branch main ('file://' + $up.Replace('\', '/')) $bare)
+        $r2 = SmGit $bare submodule update --checkout --force --depth 1
+        Yes '  and a submodule never fetched stays unfetched' ($r2.Code -eq 0 -and -not (Test-Path -LiteralPath (Join-Path $bare 'engine/skymp/a.txt')))
+    } finally { Remove-Item -LiteralPath $sm -Recurse -Force -ErrorAction SilentlyContinue }
+}
+Yes 'a live verb runs only when main is at the build it named, checked after the fetch' ($brokerCode.Contains('if ($req.Build -and $req.Build -cne $commit)') -and
+    $brokerCode.IndexOf('if ($req.Build -and $req.Build -cne $commit)') -gt $brokerCode.IndexOf('$commit = Update-Checkout') -and
+    $brokerCode.IndexOf('if ($req.Build -and $req.Build -cne $commit)') -lt $brokerCode.IndexOf('Invoke-Child ([string]$Cfg.pwsh)'))
 Yes 'the script is the verb''s from verbs.json, under the checkout' ($brokerCode.Contains('Join-Path $Repo ($req.Script.Replace(''/'', ''\'')'))
 Yes 'the program starts with no shell, and nothing on its input' ($brokerCode.Contains('$si.UseShellExecute = $false') -and $brokerCode.Contains('$p.StandardInput.Close()') -and $brokerCode -notmatch 'Invoke-Expression|\biex\b|cmd(\.exe)? /c')
 Yes 'a run past its time is ended with everything it started' ($brokerCode.Contains('taskkill.exe" @(''/T'', ''/F'', ''/PID'''))
@@ -328,6 +475,35 @@ Yes 'a deploy key goes into the gate account''s authorized_keys, and stops witho
 Yes 'its proof needs a refused command and GATE READY' ($grant.Contains("@('echo THORNSWOOD_OK', 'ping')") -and $grant.Contains("'^\| GATE READY'") -and $grant.Contains('($NoticesOnly -or $Deploy) -and @($proof | Where-Object { $_ -match ''THORNSWOOD_OK'' }).Count'))
 Yes 'it goes into DESK_KEY_B64 of a main-only environment' ($grant.Contains("if (`$Deploy) { 'DESK_KEY_B64' }") -and $grant.Contains('gh secret set $SecretName --env $ToEnvironment'))
 
+# ShipAccess.ps1 against a stand-in ship-access.js, run by the real node.
+if (Get-Command node -ErrorAction SilentlyContinue) {
+    . (Join-Path $Repo 'scripts/vps/admin/ShipAccess.ps1')
+    $fake = Join-Path ([IO.Path]::GetTempPath()) ('tw-2841-access-' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path ([IO.Path]::Combine($fake, 'scripts', 'vps', 'admin')) -Force | Out-Null
+    [IO.File]::WriteAllText([IO.Path]::Combine($fake, 'scripts', 'vps', 'admin', 'ship-access.js'), @'
+const c = process.env.TW_FAKE_ACCESS;
+if (c === 'long') { process.stdout.write('ghs_' + 'A1.b-'.repeat(60) + '\n'); }
+else if (c === 'refused') { process.stderr.write('ship-access: GitHub gave the App no token (HTTP 403: no)\n'); process.exit(1); }
+else if (c === 'silent') { process.exit(3); }
+else if (c === 'nothing') { }
+'@)
+    function Try-Access([string]$case) {
+        $env:TW_FAKE_ACCESS = $case
+        try { return @{ Token = (Get-ThornswoodShipAccess -Repo $fake -AdminState $fake); Why = '' } }
+        catch { return @{ Token = $null; Why = $_.Exception.Message } }
+        finally { Remove-Item -LiteralPath Env:\TW_FAKE_ACCESS -ErrorAction SilentlyContinue }
+    }
+    $r = Try-Access 'long'
+    Yes 'ShipAccess.ps1 takes the token by the stream it comes on, whatever its shape' ($r.Token -eq ('ghs_' + ('A1.b-' * 60)))
+    $r = Try-Access 'refused'
+    Yes '  a refusal throws with the exit code and what ship-access.js said' (-not $r.Token -and $r.Why -match '^ship-access\.js ended 1: ship-access: GitHub gave the App no token')
+    $r = Try-Access 'silent'
+    Yes '  an exit with nothing said throws saying so' ($r.Why -eq 'ship-access.js ended 3 and said nothing')
+    $r = Try-Access 'nothing'
+    Yes '  and an exit 0 with no token throws saying how many lines came' ($r.Why -match '^ship-access\.js ended 0 but printed 0 line')
+    Remove-Item -LiteralPath $fake -Recurse -Force -ErrorAction SilentlyContinue
+} else { Write-Host 'SKIP  ShipAccess.ps1 against a stand-in: there is no node here' }
+
 # ---- 8. box-run.yml, in the ops repository (#4013) ---------------------------
 Yes 'box-run.yml is not in this repository, which has no VPS runner once public' (-not (Test-Path -LiteralPath ([IO.Path]::Combine($Repo, '.github', 'workflows', 'box-run.yml'))))
 $br = Text 'scripts/vps/Box-Run.ps1'
@@ -347,6 +523,52 @@ Yes '  another key does not open it' $threw
 $bent = [byte[]]$sealed.Clone(); $bent[$bent.Length - 3] = $bent[$bent.Length - 3] -bxor 1
 $threw = $false; try { [void](Unprotect-ThornswoodSealed $bent ([Convert]::ToBase64String($rsa.ExportPkcs8PrivateKey()))) } catch { $threw = $true }
 Yes '  and a changed byte is refused' $threw
+# Through the run's log, with a stand-in gh serving one job and its log.
+$tmp = Join-Path ([IO.Path]::GetTempPath()) ('tw-2841-seal-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+$sealedPath = Join-Path $tmp 'box-run.sealed'
+[IO.File]::WriteAllBytes($sealedPath, $sealed)
+$written = @(Write-ThornswoodSealedLog $sealedPath 6>&1 | ForEach-Object { "$_" })
+Yes 'the runner writes the sealed file into its log as TWSEAL-LOG lines of 2000 characters' ($written.Count -ge 3 -and @($written | Where-Object { $_ -notmatch '^TWSEAL-LOG ' }).Count -eq 0 -and $written[0].Length -eq ('TWSEAL-LOG 1 '.Length + 2000))
+Yes '  and ends them with the count and the sha256' ($written[-1] -match ('^TWSEAL-LOG END ' + ($written.Count - 1) + ' [0-9a-f]{64}$'))
+Yes '  and with no sealed file writes only TWSEAL-LOG NONE' ((@(Write-ThornswoodSealedLog (Join-Path $tmp 'none.sealed') 6>&1 | ForEach-Object { "$_" }) -join '|') -eq 'TWSEAL-LOG NONE')
+$script:fakeLog = @("$([char]0xFEFF)2026-10-31T04:00:00.0000000Z Current runner version: '2.338.0'", '2026-10-31T04:00:01.0000000Z | GATE Ship-Dev exit 0') + @($written | ForEach-Object { '2026-10-31T04:00:02.0000000Z ' + $_ })
+function gh {
+    $global:LASTEXITCODE = 0
+    if ("$args" -match '/runs/\d+/jobs') { return '7' }
+    if ("$args" -match '/jobs/7/logs') { return $script:fakeLog }
+    $global:LASTEXITCODE = 1; return 'HTTP 404'
+}
+$l = Read-ThornswoodSealedLog 'o/r' 1
+Yes 'the session reads the sealed bytes back from the log' ($l.Bytes -and [Convert]::ToBase64String($l.Bytes) -eq [Convert]::ToBase64String($sealed))
+$keyPath = Join-Path $tmp 'run.key'
+[IO.File]::WriteAllText($keyPath, [Convert]::ToBase64String($rsa.ExportPkcs8PrivateKey()))
+$saved = Join-Path $tmp 'save'
+New-Item -ItemType Directory -Path (Join-Path $saved 'files') -Force | Out-Null
+[IO.File]::WriteAllText((Join-Path $saved 'output.txt'), 'the verb said this')
+[IO.File]::WriteAllText((Join-Path (Join-Path $saved 'files') 'a.log'), 'a server log')
+[void](Save-ThornswoodSealed $saved ([Convert]::ToBase64String($rsa.ExportSubjectPublicKeyInfo())) $sealedPath)
+$written = @(Write-ThornswoodSealedLog $sealedPath 6>&1 | ForEach-Object { "$_" })
+$script:fakeLog = @($written | ForEach-Object { '2026-10-31T04:00:02.0000000Z ' + $_ })
+$into = Join-Path $tmp 'opened'
+$o = Open-ThornswoodSealedRun -Repo 'o/r' -Run 1 -Artifact 'box-run-sealed' -File 'box-run.sealed' -KeyPath $keyPath -Into $into -FromLog
+Yes '  and -FromLog opens it to the output and the files' ($o.Ok -and ([IO.File]::ReadAllText((Join-Path $into 'output.txt'))) -eq 'the verb said this' -and (Test-Path -LiteralPath (Join-Path (Join-Path $into 'files') 'a.log')))
+$script:fakeLog = @($written | Where-Object { $_ -notmatch '^TWSEAL-LOG 1 ' } | ForEach-Object { '2026-10-31T04:00:02.0000000Z ' + $_ })
+$l = Read-ThornswoodSealedLog 'o/r' 1
+Yes '  a part missing from the log is refused' (-not $l.Bytes -and $l.Why -match 'lacks 1')
+$script:fakeLog = @($written | ForEach-Object { '2026-10-31T04:00:02.0000000Z ' + $_ })
+$p1 = $script:fakeLog[0]; $at = $p1.Length - 5
+$script:fakeLog[0] = $p1.Substring(0, $at) + $(if ($p1[$at] -eq 'A') { 'B' } else { 'A' }) + $p1.Substring($at + 1)
+$l = Read-ThornswoodSealedLog 'o/r' 1
+Yes '  a changed part is refused by the sha256' (-not $l.Bytes -and $l.Why -match 'sha256')
+$script:fakeLog = @('2026-10-31T04:00:02.0000000Z TWSEAL-LOG NONE')
+$l = Read-ThornswoodSealedLog 'o/r' 1
+Yes '  and a run that wrote none says so' (-not $l.Bytes -and $l.Why -eq 'the run wrote no sealed output')
+Remove-Item -LiteralPath function:\gh
+Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+$br = Text 'scripts/vps/Box-Run.ps1'
+Yes 'Box-Run.ps1 reads its sealed output from the run''s log, not an artifact' ($br.Contains("-KeyPath `$keyPath -Into `$dir -FromLog"))
+
 $small = [Security.Cryptography.RSA]::Create(2048)
 $threw = $false; try { [void](Protect-ThornswoodSealed $plain ([Convert]::ToBase64String($small.ExportSubjectPublicKeyInfo()))) } catch { $threw = $true }
 Yes '  a recipient key under 3072 bits is refused' $threw

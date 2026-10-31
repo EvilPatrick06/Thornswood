@@ -26,6 +26,11 @@ const ROOT = path.join(__dirname, '..', '..');
 const recipes = JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 'recipes.json'), 'utf8'));
 const CUT_JSON = path.join(ROOT, 'docs', 'systems', 'cut-items.json');
 const cutFile = fs.existsSync(CUT_JSON) ? JSON.parse(fs.readFileSync(CUT_JSON, 'utf8')) : null;
+// Every row the rules left out of the cut file, so a row a plugin adds later
+// is told from one already decided (#4087). Its own file, because
+// merchant-role-tables.json pins cut-items.json's bytes and reads nothing here.
+const KEPT_JSON = path.join(ROOT, 'docs', 'systems', 'cut-kept.json');
+const keptFile = fs.existsSync(KEPT_JSON) ? JSON.parse(fs.readFileSync(KEPT_JSON, 'utf8')) : null;
 
 // Cut means the recipe build has applied a cut file to it: an owned row marked
 // out of the open book or onto a roll, or a refused row the cut file names.
@@ -464,6 +469,36 @@ Object.keys(smeltByName).forEach(function (name) {
 const outCuts = ALREADY_CUT ? cutFile.items.slice() :
   cuts.filter(function (item) { return item.disposition !== 'keep' && item.disposition !== 'cook'; });
 
+function itemOf(id, row, disposition, why) {
+  return {
+    id: id,
+    name: clean(row.name || row.editorId || ''),
+    plugin: clean(row.plugin || ''),
+    half: clean(row.half || ''),
+    owner: clean(row.owner || ''),
+    family: clean(row.family || ''),
+    rank: clean(row.rank || ''),
+    fires: row.fires === false ? false : true,
+    disposition: disposition,
+    why: why
+  };
+}
+
+// EVERY ROW IS DECIDED ONCE (#4087). cut-kept.json is every row of the table
+// the rules or a later decision left out of the cut file: in the open book, or
+// on a lock that is not a cut. A row in neither is new, a recipe a plugin
+// added since (Cheddar's Mashups, collection revision 5), and is sorted below.
+const keptIds = new Set();
+if (ALREADY_CUT) {
+  ((keptFile && keptFile.ids) || []).forEach(function (id) { keptIds.add(id); });
+} else {
+  const cutNow = {};
+  outCuts.forEach(function (item) { cutNow[item.id] = true; });
+  Object.keys(recipes.recipes || {}).concat(Object.keys(recipes.unowned || {})).forEach(function (id) {
+    if (!cutNow[id]) { keptIds.add(id); }
+  });
+}
+
 // A later cut the file does not hold yet, on a table that is already cut.
 let cutSinceAdded = 0;
 if (ALREADY_CUT) {
@@ -476,21 +511,123 @@ if (ALREADY_CUT) {
       console.log('CUT_SINCE names ' + id + ', which the recipe table does not have, so it is not added');
       return;
     }
-    outCuts.push({
-      id: id,
-      name: clean(row.name || row.editorId || ''),
-      plugin: clean(row.plugin || ''),
-      half: clean(row.half || ''),
-      owner: clean(row.owner || ''),
-      family: clean(row.family || ''),
-      rank: clean(row.rank || ''),
-      fires: row.fires === false ? false : true,
-      disposition: 'cut',
-      why: CUT_SINCE[id]
-    });
+    outCuts.push(itemOf(id, row, 'cut', CUT_SINCE[id]));
+    keptIds.delete(id);
     cutSinceAdded++;
     console.log('cut since the first pass, added: ' + id + ' ' + clean(row.name));
   });
+}
+// NEW ROWS, on a table that is already cut (#4087). Until 30 October nothing
+// sorted them: collection revision 5 brought Cheddar's Mashups' 96 tempering
+// rows and Wamsu Bone Armor, whose recipe asks for Dragon Bone, into the open
+// book, the K panel's guide counted the tempers the server never fires, and
+// Build-MerchantRoleTables.py stopped on Dragon Bone entering a public source.
+// A new row is sorted by the rules about what cannot be had here, and only
+// those:
+//   a temper on the grindstone or the armour table (repair is a kit),
+//   a recipe that asks for something this file cuts, so nobody could make it,
+//   a dragon, Daedric or Aetherium piece by its name,
+//   Thalmor and Empire gear, which only their rolls make,
+//   a Riekling piece, which stays only if it is one of the kept set,
+//   a staff whose spell is not in the college book.
+// The first pass's other rules thin the book to one piece per material and
+// type. A plugin is added for what it adds (#2265, Cheddar's Mashups, "more
+// outfit and armor variety"), so those do not run on its rows: they stay in
+// the open book, and the recipe build gives them owners.
+let newCut = 0;
+if (ALREADY_CUT) {
+  const inFile = {};
+  outCuts.forEach(function (item) { inFile[item.id] = true; });
+  const ownedRows = recipes.recipes || {};
+  const openRows = recipes.unowned || {};
+  const fresh = Object.keys(ownedRows).concat(Object.keys(openRows)).filter(function (id) {
+    return !inFile[id] && !keptIds.has(id);
+  }).sort();
+  if (fresh.length && !keptFile) {
+    console.log('STOP. There is no docs/systems/cut-kept.json, so the ' + fresh.length + ' row(s) of the recipe table outside the cut file');
+    console.log('cannot be told apart: kept by the rules, or added by a plugin since. Nothing was written.');
+    process.exit(1);
+  }
+  // What this file takes away: the output of every reference in it, unless a
+  // row that stays in the open book makes it too. The same reading as
+  // Build-MerchantRoleTables.py's, which refuses a public recipe that asks
+  // for one.
+  const everyRow = Object.assign({}, recipes.refused || {}, openRows, ownedRows);
+  const madeOpenly = {};
+  Object.keys(ownedRows).forEach(function (id) {
+    const row = ownedRows[id];
+    if (!inFile[id] && keptIds.has(id) && row.fires === true && row.book !== 'cut' && !row.roll) { madeOpenly[row.out] = true; }
+  });
+  Object.keys(openRows).forEach(function (id) {
+    const row = openRows[id];
+    if (!inFile[id] && keptIds.has(id) && (row.benchName === 'CraftingSmelter' || row.benchName === 'CraftingTanningRack')) { madeOpenly[row.out] = true; }
+  });
+  const gone = {};
+  outCuts.forEach(function (item) {
+    const row = everyRow[item.id];
+    const out = row ? row.out : item.id;
+    if (!madeOpenly[out]) { gone[out] = true; }
+  });
+  function cutInput(row) {
+    const inputs = row.inputItems || [];
+    for (let i = 0; i < inputs.length; i++) {
+      if (gone[inputs[i].item]) { return inputs[i]; }
+    }
+    return null;
+  }
+  function sortNew(id, row, isOwned) {
+    const name = row.name || '';
+    if (!isOwned) {
+      if (isDragon(name) || isDaedra(name)) { return ['cut', 'Dragon or Daedric material. Not smelted. Not found and not made.']; }
+      return null;
+    }
+    if (row.fires === false) {
+      const bench = String(row.benchName || '');
+      if (bench.indexOf('SharpeningWheel') !== -1 || bench.indexOf('ArmorTable') !== -1) {
+        return ['cut', 'Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event.'];
+      }
+      return null;
+    }
+    const input = cutInput(row);
+    if (input) {
+      return ['cut', 'Asks for ' + clean(input.name || input.item) + ', which this file cuts, so nobody could make it. Not found and not made. The reference stays here so it can come back for an event.'];
+    }
+    if (isDragon(name) || isDaedra(name)) {
+      return ['cut', 'Dragon, Daedric, or Aetherium. Not found and not made. The reference stays here so it can come back for an event.'];
+    }
+    if (isThalmor(name)) {
+      return ['thalmor', 'Thalmor or Justiciar. Not found in the world. Only someone on the remnant roll may craft it.'];
+    }
+    if (isImperial(name)) {
+      return ['embassy', 'Empire gear. Not found in Skyrim. Only the embassy roll may craft it.'];
+    }
+    if (isRiekling(name) || row.race === 'riekling') {
+      if (RIEKLING_KEEP.has(name)) { return null; }
+      return ['cut', 'Extra Riekling copy of someone else\'s gear, or a spare piece. Not found and not made.'];
+    }
+    if (row.half === 'Bladebinder') {
+      const spell = spellEditor(row);
+      if (!inBook(spell)) {
+        return ['cut', 'Staff whose spell is not in the college book' + (spell ? ' (' + spell + ')' : '') + '. Not found and not made.'];
+      }
+    }
+    return null;
+  }
+  fresh.forEach(function (id) {
+    const isOwned = Object.prototype.hasOwnProperty.call(ownedRows, id);
+    const row = isOwned ? ownedRows[id] : openRows[id];
+    const said = sortNew(id, row, isOwned);
+    if (said) {
+      outCuts.push(itemOf(id, row, said[0], said[1]));
+      newCut++;
+      console.log('new row, ' + said[0] + ': ' + id + ' ' + clean(row.name || row.editorId || ''));
+    } else {
+      keptIds.add(id);
+    }
+  });
+  if (fresh.length) {
+    console.log(fresh.length + ' new row(s) sorted: ' + newCut + ' into this file, ' + (fresh.length - newCut) + ' left as they are');
+  }
 }
 outCuts.sort(function (a, b) {
   if (a.disposition !== b.disposition) { return a.disposition < b.disposition ? -1 : 1; }
@@ -512,6 +649,9 @@ const byDisp = countBy(outCuts, 'disposition');
 const keptCraft = kept.filter(function (item) { return item.disposition === 'keep'; });
 // The rows the first pass left in the open book, less any cut since. On a table
 // that is already cut that is the file's number, less what CUT_SINCE adds now.
+// A new row left in the book goes in cut-kept.json and moves no count here, so
+// cut-items.json, whose bytes merchant-role-tables.json pins, changes only
+// when something is cut.
 const keptCount = ALREADY_CUT ? cutFile.counts.kept - cutSinceAdded : keptCraft.length;
 
 let md = '';
@@ -532,6 +672,9 @@ md += 'Rows this pass left in the open book, or on a lock that is not a cut: ' +
 md += 'The rules below sorted the recipe table once, before anything was cut. The recipe build ';
 md += '(`scripts/dev/Build-RecipeTable.ps1`) reads [cut-items.json](cut-items.json), so the table it writes is already cut, ';
 md += 'and `scripts/dev/Write-CutItems.js` run on that table writes this page from the list it has instead of sorting the table again.\n\n';
+md += 'A row a plugin adds later, which is in neither this list nor [cut-kept.json](cut-kept.json), is sorted once, by the rules about what cannot be had here and by no others: ';
+md += 'a temper, a recipe that asks for something this file cuts, a dragon, Daedric or Aetherium piece, Thalmor and Empire gear, a Riekling piece outside the kept set, and a staff whose spell is not in the college book. ';
+md += 'A plugin is added for what it adds, so its other rows stay in the open book, and the recipe build gives them owners.\n\n';
 md += '## Rules that built the lists\n\n';
 md += 'One suit per material. Where a material has a heavy set and a light set, both stay. ';
 md += 'A suit is body, head, hands, and feet. Shields are fewer than suits: one shield named Shield, not the buckler and not the painted variants.\n\n';
@@ -590,14 +733,24 @@ const json = {
   rieklingKept: Array.from(RIEKLING_KEEP),
   items: outCuts
 };
+const keptJson = {
+  builtFrom: 'game/data/recipes.json',
+  note: 'Every recipe the cut rules left out of cut-items.json: in the open book, or on a lock that is not a cut. A row of the recipe table in neither file is one a plugin added since, and scripts/dev/Write-CutItems.js sorts it once (#4087).',
+  ids: Array.from(keptIds).sort()
+};
 
 // Both are written with LF, the ending .gitattributes gives them on every
 // checkout (#3029), so a run that changes nothing writes the same bytes.
 const dir = path.join(ROOT, 'docs', 'systems');
 fs.writeFileSync(path.join(dir, 'cut-items.md'), md, 'utf8');
 fs.writeFileSync(path.join(dir, 'cut-items.json'), JSON.stringify(json, null, 2) + '\n', 'utf8');
+// Written once there is something in it, so a table from before #4087 with no
+// row outside the cut file writes back only the two files it always had.
+if (keptFile || keptJson.ids.length) {
+  fs.writeFileSync(KEPT_JSON, JSON.stringify(keptJson, null, 2) + '\n', 'utf8');
+}
 if (ALREADY_CUT) {
   console.log('the recipe table is already cut, so the list is the one docs/systems/cut-items.json has');
 }
 console.log('cut', byDisp.cut || 0, 'embassy', byDisp.embassy || 0, 'thalmor', byDisp.thalmor || 0, 'kept', keptCount);
-console.log('wrote docs/systems/cut-items.md and cut-items.json');
+console.log('wrote docs/systems/cut-items.md and cut-items.json' + (keptFile || keptJson.ids.length ? ', and cut-kept.json' : ''));

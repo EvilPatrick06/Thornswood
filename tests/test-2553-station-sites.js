@@ -158,8 +158,7 @@ const other = built.filter((r) => !(rec[r.name.toLowerCase()] && rec[r.name.toLo
   rec[r.name.toLowerCase()].size === r.size));
 yes('B2 every one is the collection\'s own bytes, revision ' + record.revision +
     (other.length ? ' (not: ' + other.slice(0, 4).map((r) => r.name).join(', ') + '; rebuild the table)' : ''), other.length === 0);
-function placements(file) {
-  const b = fs.readFileSync(file);
+function placements(b) {
   let n = 0;
   (function walk(p, end) {
     while (p + 24 <= end) {
@@ -174,18 +173,21 @@ function placements(file) {
 }
 // Thornswood-Last.esp places nothing new: its only placed references are the
 // three town gates it overrides where they stand, without their lock (#2484),
-// the floor items it switches off (#3077, each one initially disabled:
-// tests/test-3077-floor-items.js P1) and the hold-only plants and ores it
-// switches off outside their hold (#3150, tests/test-3150-hold-only.js P1).
-// None is a station, so the table need not read them.
+// and the floor items it switches off (#3077, each one initially disabled:
+// tests/test-3077-floor-items.js P1). Neither is a station, so the table need
+// not read them. No repository holds the plugin since #2791 step 3, so this
+// reads it made from its recipe out of the game's plugins
+// (tests/last-plugin-made.js), and prints SKIP without the game.
+const lastMade = require('./last-plugin-made.js').made();
 const lastCounts = JSON.parse(fs.readFileSync(LAST, 'utf8')).counts || {};
 const lastGates = lastCounts.gatesUnlocked;
-yes('B3 Thornswood-Last.esp places only the town gates it unlocks (' + lastGates + '), the floor items it switches off (' +
-    lastCounts.floorItemsOff + ') and the hold-only plants and ores it switches off (' + lastCounts.holdOnlyOff +
-    '), and Thornswood-WoodworkerTrail.esp nothing, so the table need not read them',
-    lastGates === 3 && placements(path.join(ROOT, 'game', 'content', 'Thornswood-Last.esp')) ===
-      lastGates + (lastCounts.floorItemsOff || 0) + (lastCounts.holdOnlyOff || 0) &&
-    placements(path.join(ROOT, 'game', 'content', 'Thornswood-WoodworkerTrail.esp')) === 0);
+if (lastMade.buf) {
+  yes('B3 Thornswood-Last.esp places only the town gates it unlocks (' + lastGates + ') and the floor items it switches off (' +
+      lastCounts.floorItemsOff + '), so the table need not read it',
+      lastGates === 3 && placements(lastMade.buf) === lastGates + (lastCounts.floorItemsOff || 0));
+} else {
+  console.log('SKIP  B3: ' + lastMade.why);
+}
 
 // ---------------------------------------------------------------- P
 const doc = fs.existsSync(DOC) ? fs.readFileSync(DOC, 'utf8') : '';

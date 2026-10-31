@@ -238,8 +238,15 @@ const heldByServer = ((manifest.floorItems || {}).heldByServer || []).concat((ma
 yes('F2 HELD_BY_SERVER is the manifest\'s floor items, cut actors and hold-only plants and ores (#3150) held by ' +
     'the server (' + heldByServer.length + ')',
     Array.isArray(box.F) && JSON.stringify(box.F) === JSON.stringify(heldByServer));
-yes('F3 Thornswood-Last.esp has no never-copied plugin as a master',
-    (manifest.masters || []).every(function (m) { return !never.some(function (r) { return r.plugin.toLowerCase() === m.toLowerCase(); }); }));
+// A never-copied plugin is a master only when its row copies its perk
+// recipes (perkRecipesCopied, Patrick's A on q-4826-ia-perk-recipes) and the
+// manifest counts those copies.
+yes('F3 Thornswood-Last.esp has a never-copied plugin as a master only for the perk recipes its row lets it copy',
+    (manifest.masters || []).every(function (m) {
+      const row = never.filter(function (r) { return r.plugin.toLowerCase() === m.toLowerCase(); })[0];
+      return !row || (row.perkRecipesCopied === true &&
+        (((manifest.perks || {}).copiedFromNeverCopied || {})[row.plugin] || 0) > 0);
+    }));
 {
   const fs2 = server();
   const ctx = { F: ['7ad7:Hothtrooper44_ArmorCompilation.esp', '7ad8:Hothtrooper44_ArmorCompilation.esp'] };

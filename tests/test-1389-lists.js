@@ -181,6 +181,7 @@ function world(state, opts) {
   };
   const fn = new Function('globalThis', 'mp', 'log', 'notify', 'say', 'setTimeout', 'creditWork', 'raceGate',
     'idOf', 'addItem', 'wovenMark', 'RANK_LADDER', 'NO_PROFESSION_AT_A_BENCH', 'BENCH_BY_BASE', 'RECIPES_BY_ID',
+    'toolGate', 'wearTool', 'toolFor', 'benchToolKey',
     parts.join('\n') + '\n' + listsSrc +
     '\nreturn { recipelessCraft: recipelessCraft, listAnswer: listAnswer, wovenOutput: wovenOutput,' +
     ' enchantSlots: enchantSlots, handEnchantSlots: handEnchantSlots, enchantSlotsScript: enchantSlotsScript,' +
@@ -201,7 +202,10 @@ function world(state, opts) {
       return true;
     },
     function () { return 0; },
-    ['novice', 'advanced', 'expert', 'master'], noProfM ? noProfM[1] : '', {}, {}, 0);
+    ['novice', 'advanced', 'expert', 'master'], noProfM ? noProfM[1] : '', {}, {},
+    // The trade's tool is held (#3162); tests/test-3162-bench-tools.js asks the refusal.
+    function () { return null; }, function () { return null; }, function () { return { name: 'tool' }; },
+    function () { return ''; });
   return { api: api, said: said, logs: logs, credited: credited, props: props, added: added, timers: timers,
            inventory: function () { return inventory; }, setInventory: function (v) { inventory = v; } };
 }

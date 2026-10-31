@@ -26,10 +26,8 @@
 # THE TOKEN. None. The run's own token is given no permissions, and the
 # report comes in through the environment, never pasted into the script.
 #
-# WHERE IT RUNS. On GitHub's Windows runner once the repository is public
-# (#4013), where the box's runners are not registered; on any VPS runner only
-# while it is private, the way #3792 gates the others. A few seconds either
-# way. It checks nothing out and runs no action, so there is nothing in it to
+# WHERE IT RUNS. On GitHub's Windows runner (#4013, #4983), in a few
+# seconds. It checks nothing out and runs no action, so there is nothing in it to
 # pin.
 name: Clone report
 run-name: Clone report from ${{ github.actor }}
@@ -44,12 +42,10 @@ permissions: {}
 jobs:
   report:
     name: Hand the report back
-    # Main only (#3550): while the repository is private runner 3 signs
-    # release launchers and takes any job that asks for thornswood-vps alone,
-    # so a job on that label never runs a branch's code. Report-Clone.ps1
-    # starts it on main; a start on a branch skips it.
+    # Main only (#3550): Report-Clone.ps1 starts it on main; a start on a
+    # branch skips it, so only main's code runs with this job's token.
     if: github.ref == 'refs/heads/main'
-    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
+    runs-on: windows-latest
     # One small decode. Past this it is stuck, not slow.
     timeout-minutes: 5
     steps:

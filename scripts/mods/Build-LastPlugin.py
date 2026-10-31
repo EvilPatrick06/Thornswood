@@ -137,22 +137,48 @@ WHAT IT PUTS IN THE PLUGIN
      does not carry is added, one it carries is changed, one of another type
      stops the build, and so does a script the quest does not have.
 
-  8. The hold-only plants and ores (Patrick, 22 Oct 2026, page answer A on
-     #3150: each hold has 2 to 3 hold-only plants, ores or animals, which
-     grow only in their own hold). The policy's holdOnly names each by its
-     produce and its hold; every base of game/data/harvests.json or
-     game/data/ores.json that gives that produce is hold-only. Every placed
-     reference of one standing anywhere but its hold is overridden initially
-     disabled, keeping its base and position, the way a floor item is (5),
-     and the ones in their hold stay. The hold is the NPC catalogue's rule
-     (scripts/dev/Build-CastTable.py, Cast.place): the location the
-     reference carries, then its cell's, then the ground under a world's
-     persistent cell, then the nearest ground within six cells that names a
-     place, with the policy's place holds (4) read in. A Thornswood
-     plugin's own placement outside its hold, and one a quest or trade
-     table draws from (SOURCE_TABLES), stop the build. Which ones was
-     measured by scripts/dev/Measure-HoldResources.py, and the policy says
-     what it found beside each.
+  8. The recipes game/data/recipes.json moved to their trade's bench
+     (movedFrom on a row, TRADE_BENCHES in scripts/dev/Build-RecipeTable.ps1,
+     #3120): each is the winning record with only its bench keyword (BNAM)
+     changed to the one the row is made at now, so the forge stops listing a
+     Tailor's fur hood and the loom lists it. Patrick, 21 October 2026: "make
+     sure if a bench has a recipoe that should be on adifferent bench it should
+     get moved". A winning record whose bench is not the one recipes.json says
+     its mod put it at stops the build. A re-costed recipe (6) that moves is
+     one record carrying both. A recipe of a plugin the policy never copies
+     from is not copied: it is listed in the RECIPES_MOVED_IN_GAME block this
+     writes into game/gamemode.js, and each person's game moves its own copy
+     of the record, the way RECIPES_SET_IN_GAME sets the re-costed counts.
+
+  9. Skyrim's own perks gate no recipe (#4826; Patrick, 22 Oct 2026, B: the
+     whole vanilla perk system goes, not only the recipe perk conditions).
+     Nobody here holds a vanilla perk: no perk menu opens and vanilla
+     progression is off (classes.md). So a recipe whose record tests one
+     (HasPerk, condition function 448) was hidden by the crafting menu from
+     everybody, whatever the server's craft gate allowed: 252 of the 276
+     rows hidden from somebody allowed to make them, measured 26 Oct 2026 on
+     four halves. Every winning recipe that tests a perk is the winning
+     record with only those conditions taken out (and the strings that
+     follow one, CIS1 and CIS2), so the server alone decides who makes what
+     (the craft gate, and the recipes it hides from each person). A recipe
+     of a plugin the policy never copies from is copied only when its row
+     says perkRecipesCopied (Immersive Armors: Patrick, 31 Oct 2026, A on
+     q-4826-ia-perk-recipes), and then the same way, with only its perk
+     tests taken out; its counts and bench stay its own here and are set in
+     each person's game as before (6, 8). The copy is made on each machine
+     from that machine's own copy of the plugin (#2791), so none of its
+     bytes are handed on. One of a plugin whose row does not say it keeps
+     its perks and is counted (perks.notCopied). Taking a perk test out
+     is counting it as passed, as nobody can hold the perk it asks for, so
+     a perk test joined to other conditions by OR makes its whole OR group
+     pass and the group comes off with it (Skyrim joins OR before AND: a OR
+     b AND c is (a OR b) AND c). Measured 31 Oct 2026 on the box: 1,935
+     recipes do this, and the twenty the table named are all tempering
+     recipes; with the group off, the server alone decides who may temper
+     what, as for everything else. A group with no perk
+     test, and the AND between groups, are left exactly as they were. A recipe
+     re-costed (6), moved (8) and freed of its perks is one record carrying
+     all three.
 
   A placed actor's or item's override needs the cell it stands in, and the worldspace
   for an exterior, so those are copied too, EXACTLY as the winning plugin has
@@ -205,10 +231,13 @@ WHAT IT READS
 
 WHAT IT WRITES
 
-  game/content/Thornswood-Last.esp; game/data/last-plugin.recipe, the
-  recipe each machine builds the plugin from out of its own plugins
-  (scripts/mods/last_recipe.py says what it holds and why, #2791), held to
-  make these exact bytes back on every build; and game/data/last-plugin.json, the
+  game/data/last-plugin.recipe, the recipe each machine makes the plugin
+  from out of its own plugins (scripts/mods/last_recipe.py says what it holds
+  and why, #2791), held to make these exact bytes back on every build; the
+  plugin itself into --out, by default Thornswood-Last.esp in --data, where
+  the game and the builders after this one read it, and never into the
+  repository (Patrick's A on #2791: Thornswood hands on only the recipe); and
+  game/data/last-plugin.json, the
   manifest: the plugin's sha256, the load order it was built against, every
   cut actor it switches off and every one it leaves and why, every quest it
   stops and every quest it keeps, and every place it gives a hold, with the
@@ -216,19 +245,27 @@ WHAT IT WRITES
   counted by type and by the plugin that won each, with the cells only they
   needed (#2791 reads those). tests/test-2468-last-plugin.js holds the two
   together on every build, without the game, tests/test-2551-place-holds.js
-  the place holds and tests/test-3077-floor-items.js the floor items.
+  the place holds and tests/test-3077-floor-items.js the floor items, each
+  reading the plugin's records where a machine has the game to make it from
+  (tests/last-plugin-made.js).
 
 HOW IT REACHES PEOPLE
 
-  From this repository, exactly the way Thornswood-Content.esp goes (Patrick,
-  12 October, #2486 B), never through the collection:
+  As its recipe, from this repository, never through the collection (#2486 B)
+  and never as the plugin (#2791, Patrick's A of 26 October 2026):
 
-    servers  Deploy-DevGamemode.ps1 -LoadOrder (and the full Deploy-Server.ps1
-             for live) sends game/content/Thornswood-Last.esp and puts it at
-             the end of the server's load order.
-    people   every Ship places it in the release's Data (Ensure-ShipRequiredData
-             in Ship-Rules.ps1), the pack carries it, and the pack's plugin
-             list enables it last, in the server's order.
+    servers  every deploy that puts it on a game server (Deploy-DevGamemode.ps1
+             -LoadOrder, Deploy-Server.ps1, Publish-Server.ps1) makes it on the
+             box from the recipe, the server's plugins and the box's string
+             tables (scripts/deploy/LastPluginOnBox.ps1, Make-LastPlugin.py),
+             into the deploy's stage, held to the manifest's sha256 before the
+             swap, and puts it at the end of the server's load order.
+    people   every Ship places the recipe in the release's Data as
+             Data/Thornswood-Last.recipe (Ensure-ShipRequiredData in
+             Ship-Rules.ps1), the pack carries it, the launcher makes the
+             plugin from it before Play (launcher/app/LastPlugin.cs), and the
+             pack's plugin list enables it last, in the server's order. No
+             pack, record or installer carries the plugin ($ShipMadeFromRecipe).
     order    the server has it first, then the Ship (#2308): a release that
              changes it is refused until the channel's server holds the same
              bytes.
@@ -247,11 +284,13 @@ Usage:
     python scripts/mods/Build-LastPlugin.py --verify
     python scripts/mods/Build-LastPlugin.py --data C:\\Thornswood\\Game\\Data
 
---check builds it in memory and says whether the committed plugin and manifest
-are those bytes. --verify reads the load order with the committed plugin at
-its end and checks, record by record, that no cut actor and no floor item is
-left able to show and no cut quest is left able to start, and lists the gate, door and arrival
-talk with what stops each. Exit 1 on any refusal.
+--check builds it in memory and says whether the committed recipe and manifest
+are what it builds (the recipe names the plugin's size and sha256, so it pins
+the plugin too). --verify makes the plugin from the committed recipe out of
+--data, reads the load order with it at its end and checks, record by record,
+that no cut actor and no floor item is left able to show and no cut quest is
+left able to start, and lists the gate, door and arrival talk with what stops
+each. Exit 1 on any refusal.
 """
 
 import argparse
@@ -280,10 +319,12 @@ CATALOGUE = os.path.join(ROOT, 'game', 'data', 'npc-population.json')
 POLICY = os.path.join(ROOT, 'game', 'data', 'last-plugin-policy.json')
 MANIFEST = os.path.join(ROOT, 'game', 'data', 'last-plugin.json')
 RECOST = os.path.join(ROOT, 'game', 'data', 'recost.json')
-OUT = os.path.join(ROOT, 'game', 'content', PLUGIN)
+RECIPES = os.path.join(ROOT, 'game', 'data', 'recipes.json')
+OWN_DIR = os.path.join(ROOT, 'game', 'content')
 RECIPE = os.path.join(ROOT, 'game', 'data', 'last-plugin.recipe')
 GAMEMODE = os.path.join(ROOT, 'game', 'gamemode.js')
 HELD_BLOCK = ('// ==== HELD_BY_SERVER, generated ====', '// ==== end HELD_BY_SERVER ====')
+MOVED_BLOCK = ('// ==== RECIPES_MOVED_IN_GAME, generated ====', '// ==== end RECIPES_MOVED_IN_GAME ====')
 
 COMPRESSED = 0x00040000
 DELETED = 0x20
@@ -300,6 +341,11 @@ NEVER_TRUE = struct.pack('<B3sfHHIIIIi', 4 << 5, b'\x00\x00\x00', 0.0, 47, 0,
                          0x0000000F, 0, 0, 0, -1)
 
 # The order Skyrim writes its top groups in.
+# Skyrim's HasPerk condition function (#4826), and the subrecords that
+# follow a condition and belong to it: its string parameters.
+HAS_PERK = 448
+CTDA_TRAILERS = (b'CIS1', b'CIS2')
+CTDA_OR = 0x01
 GROUP_ORDER = [b'COBJ', b'CELL', b'WRLD', b'QUST', b'LCTN']
 
 # The subrecords of a cell that come before its location (XLCN), in the
@@ -770,6 +816,14 @@ class Renumber(object):
             return fid
         return (self.masters.index(owner) << 24) | (fid & 0xFFFFFF)
 
+    def gid(self, g):
+        """A record named by (owning plugin, object id) rather than through a
+        source plugin's masters: a bench keyword a recipe is moved to."""
+        if self.masters is None:
+            self.named.add(g[0])
+            return g[1]
+        return (self.masters.index(g[0]) << 24) | g[1]
+
     def ctda(self, src, b, what):
         b = bytearray(b)
         # Use-global: the comparison value is a GLOBAL's form id.
@@ -1133,139 +1187,6 @@ def floor_scan(plugins, win, bases):
     return floor, parents
 
 
-# A hold-only plant or ore (#3150) is placed in a hold the way the NPC
-# catalogue places a person (scripts/dev/Build-CastTable.py, Cast.place): the
-# location the reference carries, the location of the cell it stands in, the
-# ground under it when it stands in a world's persistent cell, and last the
-# nearest ground within HOLD_NEAREST cells that names a place.
-HOLD_ONLY = 'hold-only '
-CELL_UNITS = 4096.0
-HOLD_NEAREST = 6
-# The nine holds. Solstheim is a hold location in the records but not one of
-# Skyrim's holds, so nothing grows only there.
-NINE_HOLDS = HOLD_LOCATIONS[:9]
-# The tables whose rows name a placed reference a quest or a trade draws from,
-# by its reference field. A hold-only switch-off that reaches one stops the
-# build, so the quest is decided rather than emptied.
-SOURCE_TABLES = ('merchant-scarce-harvest.json', 'merchant-scarce-geodes.json', 'merchant-scarce-fishing.json',
-                 'merchant-orchard.json')
-
-
-def hold_only_rows(policy):
-    """The policy's holdOnly resources checked against the plant and ore
-    tables: {base gid: row}, and the rows. A row names its produce, and every
-    base of game/data/harvests.json or game/data/ores.json that gives it is
-    hold-only."""
-    rules = policy.get('holdOnly') or {}
-    harvests = json.load(open(os.path.join(ROOT, 'game', 'data', 'harvests.json'), encoding='utf-8'))['harvests']
-    ores = json.load(open(os.path.join(ROOT, 'game', 'data', 'ores.json'), encoding='utf-8'))['ores']
-    by_base, rows, seen = {}, [], set()
-    for row in rules.get('resources', []):
-        if row['produce'] in seen:
-            raise SystemExit('STOP. the policy makes %s hold-only twice. Nothing was written.' % row['produce'])
-        seen.add(row['produce'])
-        if row['holdEdid'] not in NINE_HOLDS:
-            raise SystemExit('STOP. the policy keeps %s to %s, which is not one of the nine holds. '
-                             'Nothing was written.' % (row['name'], row['holdEdid']))
-        table, field = (harvests, 'produce') if row['kind'] == 'plant' else (ores, 'ore') \
-            if row['kind'] == 'ore' else (None, None)
-        if table is None:
-            raise SystemExit('STOP. the policy calls %s a %s; a hold-only resource is a plant or an ore. '
-                             'Nothing was written.' % (row['name'], row['kind']))
-        bases = sorted(b for b, r in table.items() if r[field] == row['produce'])
-        names = {table[b]['name'] for b in bases}
-        if not bases or names != {row['name']}:
-            raise SystemExit('STOP. the policy keeps %s (%s) to its hold, and the %s table gives it from %s. '
-                             'Nothing was written.' % (row['produce'], row['name'], row['kind'],
-                                                       ', '.join(sorted(names)) or 'nothing'))
-        for b in bases:
-            if ref_key(b) in by_base:
-                raise SystemExit('STOP. %s gives two hold-only resources. Nothing was written.' % b)
-            by_base[ref_key(b)] = row
-        rows.append(dict(row, bases=bases))
-    per = collections.Counter(r['holdEdid'] for r in rows)
-    if rows and any(not 2 <= per[h] <= 3 for h in NINE_HOLDS):
-        raise SystemExit('STOP. each hold keeps 2 to 3 hold-only resources (Patrick, 22 Oct 2026, #3150), '
-                         'and the policy gives %s. Nothing was written.'
-                         % ', '.join('%s %d' % (h, per[h]) for h in NINE_HOLDS))
-    return by_base, rows
-
-
-def quest_sources():
-    """Every placed reference a quest or trade table draws from, as gids."""
-    out = set()
-    for name in SOURCE_TABLES:
-        path = os.path.join(ROOT, 'game', 'data', name)
-        if os.path.isfile(path):
-            for row in json.load(open(path, encoding='utf-8')).get('sources', []):
-                out.add(ref_key(row['reference']))
-    return out
-
-
-def ref_holds(plugins, win, planned=None, rooms=None):
-    """A function giving the hold location's editor id a placed reference
-    stands in, or None. planned is {location: its new parent} and rooms
-    {cell gid: its new location gid}, the policy's place holds, read in place
-    of the records' own (#2551)."""
-    ground, named = {}, {}
-    for (tag, g), e in win.items():
-        if tag != b'CELL' or e.ctx[0] is None or e.ctx[3]:
-            continue
-        pairs = dict(subrecords(plugins[e.pi].data(e)))
-        if len(pairs.get(b'XCLC', b'')) < 8:
-            continue
-        square = (plugins[e.pi].gid(e.ctx[0]),) + struct.unpack_from('<ii', pairs[b'XCLC'], 0)
-        ground[square] = g
-        h = hold_of(plugins, win, form_field(plugins, e, b'XLCN'), planned)
-        if h:
-            named[square] = h
-
-    def cell_hold(cg):
-        if cg in (rooms or {}):
-            return hold_of(plugins, win, rooms[cg], planned)
-        ce = win.get((b'CELL', cg))
-        return hold_of(plugins, win, form_field(plugins, ce, b'XLCN'), planned) if ce is not None else None
-
-    def nearest(world, gx, gy):
-        for r in range(1, HOLD_NEAREST + 1):
-            best = None
-            for dx in range(-r, r + 1):
-                for dy in range(-r, r + 1):
-                    if max(abs(dx), abs(dy)) != r:
-                        continue
-                    h = named.get((world, gx + dx, gy + dy))
-                    if h and (best is None or (dx * dx + dy * dy, h) < best):
-                        best = (dx * dx + dy * dy, h)
-            if best:
-                return best[1]
-        return None
-
-    def place(e):
-        src = plugins[e.pi]
-        h = hold_of(plugins, win, form_field(plugins, e, b'XLCN'), planned)
-        if h:
-            return h
-        cg = src.gid(e.ctx[1])
-        h = cell_hold(cg)
-        if h:
-            return h
-        ce = win.get((b'CELL', cg))
-        if ce is None or ce.ctx[0] is None:
-            return None
-        d = dict(subrecords(src.data(e))).get(b'DATA', b'')
-        if len(d) < 8:
-            return None
-        x, y = struct.unpack_from('<ff', d, 0)
-        world, gx, gy = plugins[ce.pi].gid(ce.ctx[0]), int(x // CELL_UNITS), int(y // CELL_UNITS)
-        if ce.ctx[3]:
-            h = cell_hold(ground.get((world, gx, gy)))
-            if h:
-                return h
-        return nearest(world, gx, gy)
-
-    return place
-
-
 def build(data_dir):
     catalogue = json.load(open(CATALOGUE, encoding='utf-8'))
     policy = json.load(open(POLICY, encoding='utf-8'))
@@ -1388,8 +1309,12 @@ def build(data_dir):
     # Patrick allowed. Immersive Armors carries none (Patrick, 22 Oct 2026,
     # q-613-ia-recipes: the 6 floor items it places and their 5 cell and
     # world headers were never his to carry); those floor items are held off
-    # by the server (heldByServer below).
+    # by the server (heldByServer below). The one other thing copied out of
+    # such a plugin is its recipes that test a perk, with only those tests
+    # taken out, when its row says perkRecipesCopied (9; Patrick, 31 Oct
+    # 2026, A on q-4826-ia-perk-recipes).
     blocked = {row['plugin'].lower() for row in policy.get('notCopiedFrom', [])}
+    perks_off = perk_recipes_copied(policy)
     carried = {r.lower(): r for row in policy.get('notCopiedFrom', []) for r in row.get('carried', [])}
     used = set()
     below = {}
@@ -1426,19 +1351,9 @@ def build(data_dir):
 
     # 4. The floor items (#3077): every placed reference a person could pick
     # up, switched off like a cut actor. Left alone, the same way: one a later
-    # plugin deleted, and one already off with no enable parent. The
-    # hold-only plants and ores (8, #3150) are found in the same pass.
+    # plugin deleted, and one already off with no enable parent.
     bases = floor_bases(plugins, win, canon)
-    hold_bases, hold_rows = hold_only_rows(policy)
-    scan = dict(bases)
-    for g, row in hold_bases.items():
-        if g in bases:
-            raise SystemExit('STOP. %s is a floor item and a hold-only %s at once. Nothing was written.'
-                             % (desc_of(g, canon), row['kind']))
-        scan[g] = HOLD_ONLY + row['produce']
-    found, parents = floor_scan(plugins, win, scan)
-    hold_found = {g: v for g, v in found.items() if v[1].startswith(HOLD_ONLY)}
-    found = {g: v for g, v in found.items() if not v[1].startswith(HOLD_ONLY)}
+    found, parents = floor_scan(plugins, win, bases)
 
     def in_blocked_place(e):
         """Whether e stands in a cell or world a never-copied plugin wins."""
@@ -1450,38 +1365,6 @@ def build(data_dir):
                 return True
         return False
 
-    def sort_off(g, e, kind, off, rows, server):
-        """Where one placed reference to switch off goes: off (switched off
-        here, from the record that is copied), rows (deleted or already off,
-        left alone) or server (held off by the server)."""
-        src = plugins[e.pi]
-        tags = [t for t, _ in subrecords(src.data(e))]
-        if e.flags & DELETED:
-            rows['deleted'].append(desc_of(g, canon))
-        # Off already only with nothing that could switch it on: no enable
-        # parent and no script. A disabled item with a script is switched off
-        # here, without the script.
-        elif e.flags & DISABLED and b'XESP' not in tags and b'VMAD' not in tags:
-            rows['alreadyOff'].append(desc_of(g, canon))
-        elif in_blocked_place(e):
-            # It stands in a cell or world a never-copied plugin wins, so
-            # switching it off here would copy that plugin's record of the
-            # place, or undo its edit with the one below. The server holds
-            # it off instead.
-            server.append((g, kind))
-        elif src.name.lower() in blocked and not carries(b'REFR', g):
-            if under(e, b'REFR', g) is not None:
-                off.append((g, under(e, b'REFR', g), kind))
-            elif canon[g[0]].lower() in blocked:
-                # Its own, placed by it: nothing below to switch off, and its
-                # record is not copied. The server holds it off.
-                server.append((g, kind))
-            else:
-                raise SystemExit('STOP. %s wins %s %s and no plugin below it has it. Nothing was '
-                                 'written.' % (src.name, kind, desc_of(g, canon)))
-        else:
-            off.append((g, e, kind))
-
     floor, floor_rows, by_server = [], {'deleted': [], 'alreadyOff': []}, []
     for g in sorted(found, key=lambda g: (canon[g[0]].lower(), g[1])):
         e, kind = found[g]
@@ -1490,59 +1373,46 @@ def build(data_dir):
             raise SystemExit('STOP. %s puts %s on the floor (a %s). A Thornswood plugin\'s own floor item '
                              'is Patrick\'s to keep or take out (#3077), never switched off unasked. '
                              'Nothing was written.' % (src.name, desc_of(g, canon), kind))
-        sort_off(g, e, kind, floor, floor_rows, by_server)
-
-    # 8. The hold-only plants and ores (#3150). Patrick, 22 Oct 2026 (page
-    # answer A): each hold has 2 to 3 hold-only plants, ores or animals, which
-    # grow only in their own hold. Every placed one of them standing anywhere
-    # but its own hold is switched off the way a floor item is; the ones in
-    # their hold stay. A Thornswood plugin's own placement outside its hold,
-    # and one a quest or trade table draws from, stop the build, so each is
-    # decided rather than switched off unasked.
-    hold_planned = {ref_key(r['location']): ref_key(r['parent'])
-                    for r in (policy.get('placeHolds') or {}).get('locations', [])}
-    hold_rooms = {ref_key(r['cell']): ref_key(r['location'])
-                  for r in (policy.get('placeHolds') or {}).get('cells', [])}
-    hold_place = ref_holds(plugins, win, hold_planned, hold_rooms)
-    sources = quest_sources()
-    hold_off, hold_left, hold_server = [], {'deleted': [], 'alreadyOff': []}, []
-    hold_by_produce = {r['produce']: r for r in hold_rows}
-    hold_count = {r['produce']: collections.Counter() for r in hold_rows}
-    for g in sorted(hold_found, key=lambda g: (canon[g[0]].lower(), g[1])):
-        e, kind = hold_found[g]
-        src = plugins[e.pi]
-        row = hold_by_produce[kind[len(HOLD_ONLY):]]
-        where = hold_place(e)
-        if where == row['holdEdid']:
-            hold_count[row['produce']]['kept'] += 1
-            continue
-        if own_plugins.is_own(canon[g[0]]) or own_plugins.is_own(src.name):
-            raise SystemExit('STOP. %s places %s %s in %s, outside %s. A Thornswood plugin\'s own placement '
-                             'is Patrick\'s to keep or take out (#3150), never switched off unasked. '
-                             'Nothing was written.' % (src.name, row['name'], desc_of(g, canon), where or 'no hold',
-                                                       row['holdEdid']))
-        if g in sources:
-            raise SystemExit('STOP. %s %s stands in %s, outside %s, and a quest or trade table draws from it '
-                             '(game/data/%s). Decide it on #3150. Nothing was written.'
-                             % (row['name'], desc_of(g, canon), where or 'no hold', row['holdEdid'],
-                                ' or '.join(SOURCE_TABLES)))
-        hold_count[row['produce']]['outside'] += 1
-        sort_off(g, e, row['name'], hold_off, hold_left, hold_server)
+        tags = [t for t, _ in subrecords(src.data(e))]
+        if e.flags & DELETED:
+            floor_rows['deleted'].append(desc_of(g, canon))
+        # Off already only with nothing that could switch it on: no enable
+        # parent and no script. A disabled item with a script is switched off
+        # here, without the script.
+        elif e.flags & DISABLED and b'XESP' not in tags and b'VMAD' not in tags:
+            floor_rows['alreadyOff'].append(desc_of(g, canon))
+        elif in_blocked_place(e):
+            # It stands in a cell or world a never-copied plugin wins, so
+            # switching it off here would copy that plugin's record of the
+            # place, or undo its edit with the one below. The server holds
+            # it off instead.
+            by_server.append((g, kind))
+        elif src.name.lower() in blocked and not carries(b'REFR', g):
+            if under(e, b'REFR', g) is not None:
+                floor.append((g, under(e, b'REFR', g), kind))
+            elif canon[g[0]].lower() in blocked:
+                # Its own, placed by it: nothing below to switch off, and its
+                # record is not copied. The server holds it off.
+                by_server.append((g, kind))
+            else:
+                raise SystemExit('STOP. %s wins floor item %s and no plugin below it has it. Nothing was '
+                                 'written.' % (src.name, desc_of(g, canon)))
+        else:
+            floor.append((g, e, kind))
     # A reference whose enable parent is a floor item would go out with it, or
     # come on as it goes (the opposite flag). Neither is decided by this. Only
     # a floor item's followers count: a cut actor's go out with it, as they
     # have since #2468 (measured 21 Oct 2026: 30 references follow 11 cut
     # actors, and none follows a floor item). A follower that is switched off
     # here itself, a floor item or a cut actor, has no enable parent left.
-    # A hold-only plant or ore switched off counts the same way (#3150).
-    items_off = {g for g, _, _ in floor + hold_off}
+    items_off = {g for g, _, _ in floor}
     off_here = items_off | {plugins[e.pi].gid(e.fid) for e in actors}
     followers = sorted('%s follows %s' % (desc_of(g, canon), desc_of(p, canon))
                        for g, (e, p) in parents.items() if p in items_off and g not in off_here)
     if followers:
-        raise SystemExit('STOP. %d reference(s) have a floor item or a hold-only plant or ore as their enable '
-                         'parent, and switching it off would switch them too:\n  %s\nDecide them on #3077 or '
-                         '#3150. Nothing was written.' % (len(followers), '\n  '.join(followers[:40])))
+        raise SystemExit('STOP. %d reference(s) have a floor item as their enable parent, and switching '
+                         'the item off would switch them too:\n  %s\nDecide them on #3077. Nothing was written.'
+                         % (len(followers), '\n  '.join(followers[:40])))
 
     # The cells and worlds the actors, gates and floor items stand in, each
     # from its own winner.
@@ -1580,9 +1450,6 @@ def build(data_dir):
     # plugin copies from other authors (#2791), counted by who wins each.
     had = set(cells)
     floor_cells = {stand(e) for _, e, _ in floor} - had
-    # And the ones only the hold-only plants and ores need (#3150).
-    had = set(cells)
-    hold_only_cells = {stand(e) for _, e, _ in hold_off} - had
 
     # 5. The places given a hold (#2551). A room given a location is copied
     # like any other cell, with nothing placed under it unless an actor here
@@ -1591,10 +1458,17 @@ def build(data_dir):
     for g, (e, le, row) in hold_cells.items():
         cells[g] = e
     floor_cells -= set(hold_cells)
-    hold_only_cells -= set(hold_cells)
 
     # 5. The re-costed smith recipes (#613).
     recipes = recost_entries(json.load(open(RECOST, encoding='utf-8')), plugins, win)
+
+    # 8. The recipes moved to their trade's bench (#3120). One a never-copied
+    # plugin has, or wins, is moved in each person's game instead.
+    moves, moved_in_game = move_entries(json.load(open(RECIPES, encoding='utf-8')), plugins, win, canon,
+                                        blocked, carries)
+
+    # 9. The recipes freed of Skyrim's perks (#4826).
+    perk_recipes, perk_stats = perk_entries(plugins, win, canon, blocked, perks_off)
 
     # 6. Nothing is copied out of a plugin the policy never copies from
     # (notCopiedFrom, above) but what it carries; anything else it would
@@ -1664,8 +1538,7 @@ def build(data_dir):
             flags = (e.flags & ~(COMPRESSED | DELETED)) | DISABLED
             out['achr'].append((fid, flags, pack_subrecords(keep), e))
         # A floor item the same way: its base and its place, nothing else.
-        # A hold-only plant or ore outside its hold too (#3150).
-        for g, e, kind in floor + hold_off:
+        for g, e, kind in floor:
             src = plugins[e.pi]
             what = '%s REFR 0x%08X' % (src.name, e.fid)
             keep = []
@@ -1713,10 +1586,25 @@ def build(data_dir):
             pairs = set_properties(copy_record(src, e, rn, strings, what), row, what)
             out['qust'].append((rn.one(src, e.fid, what), e.flags & ~COMPRESSED,
                                 pack_subrecords(pairs), e))
+        # A recipe re-costed, moved and freed of its perks is one record
+        # carrying all three.
+        cobjs = collections.OrderedDict()
         for e, row in recipes:
+            cobjs.setdefault((e.pi, e.fid), [e, None, None, False])[1] = row
+        for e, kw, row in moves:
+            cobjs.setdefault((e.pi, e.fid), [e, None, None, False])[2] = kw
+        for e in perk_recipes:
+            cobjs.setdefault((e.pi, e.fid), [e, None, None, False])[3] = True
+        for e, cost, kw, perks in cobjs.values():
             src = plugins[e.pi]
             what = '%s COBJ 0x%08X' % (src.name, e.fid)
-            pairs = recount(copy_record(src, e, rn, strings, what), row)
+            pairs = copy_record(src, e, rn, strings, what)
+            if cost is not None:
+                pairs = recount(pairs, cost)
+            if kw is not None:
+                pairs = rebench(pairs, struct.pack('<I', rn.gid(kw)), what)
+            if perks:
+                pairs = without_perks(pairs, what)
             out['cobj'].append((rn.one(src, e.fid, what), e.flags & ~COMPRESSED,
                                 pack_subrecords(pairs), e))
         return out
@@ -1774,7 +1662,9 @@ def build(data_dir):
                    'modQuestsStopped': len(mod_stopped),
                    'questsKept': len(quests_kept), 'gatesUnlocked': len(gates),
                    'placeLocations': len(made['lctn']), 'placeRooms': len(hold_cells),
-                   'recipesRecosted': len(made['cobj']), 'questScriptProperties': len(qprops)},
+                   'recipesRecosted': len(recipes), 'recipesMoved': len(moves),
+                   'recipesMovedInGame': len(moved_in_game), 'questScriptProperties': len(qprops),
+                   'recipesPerksOff': len(perk_recipes)},
         'refs': {k: sorted(v, key=ref_key) for k, v in refs.items()},
         'gatesUnlocked': [desc_of(g, canon) for g in GATES],
         'quests': {'stopped': quests_cut, 'kept': quests_kept, 'modStopped': mod_stopped},
@@ -1791,6 +1681,17 @@ def build(data_dir):
         'recost': [{'recipe': row['recipe'], 'editorId': row['editorId'],
                     'inputs': [[i['item'], i['count'], i['to']] for i in row['inputs']]}
                    for _, row in recipes],
+        # The recipes moved to their trade's bench (#3120): from the bench
+        # their mod put them at to the one recipes.json makes them at, here,
+        # or in each person's game for a plugin never copied from.
+        'benchMoves': [{'recipe': row['recipe'], 'editorId': row['editorId'], 'from': row['movedFrom'],
+                        'to': row['bench']} for _, _, row in moves],
+        'benchMovesInGame': moved_in_game,
+        # The recipes freed of Skyrim's perks (#4826), counted rather than
+        # listed (there are thousands): how many recipes and conditions, by
+        # the plugin whose record each copy is, which perks were tested and
+        # how often, and the recipes a never-copied plugin keeps behind them.
+        'perks': perk_stats,
         # The floor items switched off (#3077), counted rather than listed
         # (there are tens of thousands); refsSha256 is the sha256 of every one,
         # 'object id:plugin' sorted and joined by newlines, which
@@ -1812,21 +1713,6 @@ def build(data_dir):
         },
     }
     manifest['counts']['floorItemsOff'] = len(floor)
-    # The hold-only plants and ores (#3150): each with how many of its
-    # placements stand in its hold and stay, and how many stand outside it,
-    # and every one switched off here, listed, with the ones left as they are
-    # and the ones the server holds off.
-    manifest['holdOnly'] = {
-        'resources': [{'produce': r['produce'], 'name': r['name'], 'kind': r['kind'], 'hold': r['holdEdid'],
-                       'bases': len(r['bases']), 'kept': hold_count[r['produce']]['kept'],
-                       'outside': hold_count[r['produce']]['outside']} for r in hold_rows],
-        'off': sorted(desc_of(g, canon) for g, _, _ in hold_off),
-        'deleted': sorted(hold_left['deleted']),
-        'alreadyOff': sorted(hold_left['alreadyOff']),
-        'heldByServer': sorted(desc_of(g, canon) for g, _ in hold_server),
-        'cellsAdded': len(hold_only_cells),
-    }
-    manifest['counts']['holdOnlyOff'] = len(hold_off)
     # The recipe each machine builds the plugin from (#2791): its bytes, how
     # many plugins and string tables it reads, and how much of the plugin
     # it writes as Thornswood's own (headers, renumbered form ids, the
@@ -1874,6 +1760,174 @@ def make_recipe(plugin, made, plugins):
     if again != plugin:
         raise SystemExit('STOP. the recipe does not make %s back byte for byte. Nothing was written.' % PLUGIN)
     return recipe, stats
+
+
+def is_perk_test(b):
+    """Whether a CTDA's bytes are a HasPerk test (#4826)."""
+    return len(b) >= 10 and struct.unpack_from('<H', b, 8)[0] == HAS_PERK
+
+
+def perk_tests(pairs):
+    """The indexes of the HasPerk conditions (#4826) among a record's
+    subrecords, and whether any of them is joined to another condition by
+    OR: its own OR flag, or the one of the condition before it."""
+    at, joined, prev_or = [], False, False
+    for i, (t, b) in enumerate(pairs):
+        if t != b'CTDA':
+            continue
+        is_or = len(b) > 0 and bool(b[0] & CTDA_OR)
+        if is_perk_test(b):
+            at.append(i)
+            if is_or or prev_or:
+                joined = True
+        prev_or = is_or
+    return at, joined
+
+
+def perk_drops(pairs):
+    """The indexes of the conditions that come off a recipe (#4826): every
+    OR group that holds a perk test, whole, since the test counts as passed
+    and so does the group. A group is a run of conditions each joined to the
+    next by its OR flag, ended by one without it (or by the last); a lone
+    condition is a group of one. Groups are joined to each other by AND, so
+    taking one out leaves the others meaning what they meant."""
+    groups, cur = [], []
+    for i, (t, b) in enumerate(pairs):
+        if t != b'CTDA':
+            continue
+        cur.append(i)
+        if not (len(b) > 0 and b[0] & CTDA_OR):
+            groups.append(cur)
+            cur = []
+    if cur:
+        groups.append(cur)
+    return [i for g in groups if any(is_perk_test(pairs[j][1]) for j in g) for i in g]
+
+
+def without_perks(pairs, what):
+    """The recipe with every OR group that holds a HasPerk condition taken
+    out (perk_drops), and the CIS1 and CIS2 that follow each of those
+    conditions, and nothing else."""
+    at = set(perk_drops(pairs))
+    if not at:
+        raise SystemExit('STOP. %s tests no perk. Nothing was written.' % what)
+    out, drop = [], False
+    for i, (t, b) in enumerate(pairs):
+        if i in at:
+            drop = True
+            continue
+        if drop and t in CTDA_TRAILERS:
+            continue
+        drop = False
+        out.append((t, b))
+    return out
+
+
+def perk_recipes_copied(policy):
+    """The never-copied plugins whose recipes that test a perk are copied all
+    the same, to take the tests out (perkRecipesCopied on the plugin's
+    notCopiedFrom row, #4826), lower case."""
+    return frozenset(row['plugin'].lower() for row in policy.get('notCopiedFrom', [])
+                     if row.get('perkRecipesCopied') is True)
+
+
+def perks_kept(src_name, gid, blocked, perks_off):
+    """Whether a winning recipe keeps its perk tests: it does when the plugin
+    that wins it, or the one that made it, is never copied from and its row
+    does not copy its perk recipes."""
+    return any(n in blocked and n not in perks_off for n in (src_name.lower(), gid[0]))
+
+
+def perk_entries(plugins, win, canon, blocked, perks_off=frozenset()):
+    """Every winning recipe that tests one of Skyrim's perks (#4826): the
+    entries copied here to take the tests out, and what the manifest says of
+    them. One a never-copied plugin has or wins keeps its tests and is only
+    counted, unless that plugin's row copies its perk recipes (perks_off).
+    A perk test joined by OR takes its whole OR group off (perk_drops),
+    counted under joinedGroups."""
+    here = []
+    joined_rows, joined_conditions = 0, 0
+    by_plugin, perks, not_copied = collections.Counter(), collections.Counter(), collections.Counter()
+    copied_anyway = collections.Counter()
+    conditions = 0
+    for (tag, gid), e in sorted(win.items()):
+        if tag != b'COBJ' or e.flags & DELETED:
+            continue
+        src = plugins[e.pi]
+        pairs = subrecords(src.data(e))
+        at, is_joined = perk_tests(pairs)
+        if not at:
+            continue
+        if perks_kept(src.name, gid, blocked, perks_off):
+            not_copied[src.name] += 1
+            continue
+        if is_joined:
+            joined_rows += 1
+            joined_conditions += len(perk_drops(pairs)) - len(at)
+        here.append(e)
+        by_plugin[src.name] += 1
+        for n in sorted({src.name.lower(), gid[0]} & blocked):
+            copied_anyway[canon.get(n, n)] += 1
+        conditions += len(at)
+        for i in at:
+            perks[desc_of(src.gid(struct.unpack_from('<I', pairs[i][1], 12)[0]), canon)] += 1
+    stats = {'recipes': len(here), 'conditions': conditions,
+             'joinedGroups': {'recipes': joined_rows, 'otherConditions': joined_conditions},
+             'byWinner': dict(sorted(by_plugin.items())),
+             'tested': dict(sorted(perks.items(), key=lambda kv: (-kv[1], kv[0]))),
+             'notCopied': dict(sorted(not_copied.items())),
+             'copiedFromNeverCopied': dict(sorted(copied_anyway.items()))}
+    return here, stats
+
+
+def move_entries(table, plugins, win, canon, blocked, carries):
+    """The rows recipes.json moved to their trade's bench (#3120), each
+    checked against its winning record: (winning entry, the keyword's
+    (plugin, object id), row) for every one copied here, and for every one a
+    never-copied plugin has or wins, what each person's game is handed
+    (RECIPES_MOVED_IN_GAME): its output, the bench it moves from and to, and
+    its inputs as the record asks them."""
+    here, in_game = [], []
+    for desc in sorted(table.get('recipes', {}), key=ref_key):
+        row = table['recipes'][desc]
+        if not row.get('movedFrom'):
+            continue
+        row = dict(row, recipe=desc)
+        e = win.get((b'COBJ', ref_key(desc)))
+        if e is None:
+            raise SystemExit('STOP. recipes.json moves %s %s and no plugin has it. Rebuild recipes.json. '
+                             'Nothing was written.' % (desc, row['editorId']))
+        src = plugins[e.pi]
+        pairs = subrecords(src.data(e))
+        got = dict(pairs)
+        edid = got.get(b'EDID', b'').rstrip(b'\x00').decode('latin1')
+        bnam = got.get(b'BNAM')
+        put = desc_of(src.gid(struct.unpack_from('<I', bnam, 0)[0]), canon) if bnam else ''
+        if edid != row['editorId'] or put.lower() != row['movedFrom'].lower():
+            raise SystemExit('STOP. %s in %s is not the recipe recipes.json moved (%s, at %s, and it is %s at %s). '
+                             'Rebuild recipes.json. Nothing was written.'
+                             % (desc, src.name, row['editorId'], row['movedFrom'], edid, put or 'no bench'))
+        kw = ref_key(row['bench'])
+        if kw[0] not in canon:
+            raise SystemExit('STOP. %s moves to %s, and %s is not in the load order. Nothing was written.'
+                             % (desc, row['bench'], row['bench'].split(':', 1)[1]))
+        g = src.gid(e.fid)
+        if (src.name.lower() in blocked or desc.split(':', 1)[1].lower() in blocked) and not carries(b'COBJ', g):
+            in_game.append({'recipe': desc, 'editorId': edid, 'name': row.get('name', ''),
+                            'out': desc_of(src.gid(struct.unpack_from('<I', got[b'CNAM'], 0)[0]), canon),
+                            'from': row['movedFrom'], 'to': row['bench'],
+                            'inputs': [[desc_of(src.gid(struct.unpack_from('<I', b, 0)[0]), canon),
+                                        struct.unpack_from('<i', b, 4)[0]] for t, b in pairs if t == b'CNTO']})
+        else:
+            here.append((e, kw, row))
+    return here, in_game
+
+
+def rebench(pairs, bnam, what):
+    """The recipe with its bench keyword (BNAM) set, and nothing else."""
+    if [t for t, _ in pairs].count(b'BNAM') != 1:
+        raise SystemExit('STOP. %s does not carry exactly one bench keyword. Nothing was written.' % what)
+    return [(t, bnam if t == b'BNAM' else b) for t, b in pairs]
 
 
 def recost_entries(table, plugins, win):
@@ -2135,7 +2189,9 @@ def verify(data_dir, plugin_bytes, manifest):
         return ['the plugin is not flagged light']
     plugins = plugins + [last]
     win = winners(plugins, {b'ACHR', b'REFR', b'QUST', b'LCTN', b'CELL', b'FLOR', b'COBJ'} | set(FLOOR_TYPES))
-    blocked = {row['plugin'].lower() for row in json.load(open(POLICY, encoding='utf-8')).get('notCopiedFrom', [])}
+    policy = json.load(open(POLICY, encoding='utf-8'))
+    blocked = {row['plugin'].lower() for row in policy.get('notCopiedFrom', [])}
+    perks_off = perk_recipes_copied(policy)
     fails = []
     # Every re-costed recipe (#613) wins here, asking the counts the manifest says.
     for row in manifest.get('recost', []):
@@ -2145,6 +2201,29 @@ def verify(data_dir, plugin_bytes, manifest):
                 for t, b in pairs if t == b'CNTO'] if e else []
         if e is None or e.pi != last.index or have != [(ref_key(i[0]), i[2]) for i in row['inputs'] if i[2]]:
             fails.append('recipe %s %s does not ask the re-costed counts' % (row['recipe'], row['editorId']))
+    # Every recipe moved to its trade's bench (#3120) wins here, at that bench.
+    for row in manifest.get('benchMoves', []):
+        e = win.get((b'COBJ', ref_key(row['recipe'])))
+        bnam = dict(subrecords(plugins[e.pi].data(e))).get(b'BNAM') if e else None
+        if e is None or e.pi != last.index or not bnam or \
+                plugins[e.pi].gid(struct.unpack_from('<I', bnam, 0)[0]) != ref_key(row['to']):
+            fails.append('recipe %s %s is not at %s' % (row['recipe'], row['editorId'], row['to']))
+    # No winning recipe tests a perk (#4826), but one a never-copied plugin
+    # has or wins whose perk recipes are not copied, which the manifest counts.
+    kept = 0
+    for (tag, gid), e in win.items():
+        if tag != b'COBJ' or e.flags & DELETED:
+            continue
+        at, _ = perk_tests(subrecords(plugins[e.pi].data(e)))
+        if not at:
+            continue
+        if perks_kept(plugins[e.pi].name, gid, blocked, perks_off):
+            kept += 1
+        else:
+            fails.append('recipe %s still tests a perk' % desc_of(gid, canon))
+    if 'perks' in manifest and kept != sum(manifest['perks']['notCopied'].values()):
+        fails.append('%d recipes of never-copied plugins test a perk, and the manifest says %d'
+                     % (kept, sum(manifest['perks']['notCopied'].values())))
     # Every script property the policy sets (#3101) is on the winning quest,
     # with the policy's value.
     for row in (json.load(open(POLICY, encoding='utf-8')).get('questScriptProperties') or {}).get('quests', []):
@@ -2230,38 +2309,9 @@ def verify(data_dir, plugin_bytes, manifest):
     if here != floor.get('off'):
         fails.append('%d floor items are off by this plugin, and the manifest says %s' % (here, floor.get('off')))
     mine = {g for g, (e, _) in found.items() if e.pi == last.index}
-    # No hold-only plant or ore (#3150) is left able to show outside its hold,
-    # and none in its hold is switched off here. The holds are read off the
-    # records in the load order with the plugin at its end, so the places it
-    # gives a hold count without the policy.
-    hold_bases, _ = hold_only_rows(json.load(open(POLICY, encoding='utf-8')))
-    hold_scan = {g: HOLD_ONLY + r['produce'] for g, r in hold_bases.items()}
-    hold_found, _ = floor_scan(plugins, win, hold_scan)
-    hold_place = ref_holds(plugins, win)
-    held_off = set((manifest.get('holdOnly') or {}).get('heldByServer') or [])
-    hold_here = 0
-    for g, (e, kind) in hold_found.items():
-        src = plugins[e.pi]
-        row = hold_bases[src.gid(struct.unpack('<I', dict(subrecords(src.data(e)))[b'NAME'])[0])]
-        tags = [t for t, _ in subrecords(src.data(e))]
-        off = bool(e.flags & DELETED) or (e.flags & DISABLED and b'XESP' not in tags and b'VMAD' not in tags)
-        if hold_place(e) == row['holdEdid']:
-            if e.pi == last.index:
-                fails.append('%s %s stands in %s and is switched off here' % (row['name'], desc_of(g, canon),
-                                                                                row['holdEdid']))
-            continue
-        hold_here += e.pi == last.index and off
-        if not off and desc_of(g, canon) not in held_off:
-            fails.append('%s %s is left able to show outside %s' % (row['name'], desc_of(g, canon), row['holdEdid']))
-        if e.pi == last.index:
-            mine.add(g)
-    if hold_here != len((manifest.get('holdOnly') or {}).get('off') or []):
-        fails.append('%d hold-only plants and ores are off by this plugin, and the manifest says %d'
-                     % (hold_here, len((manifest.get('holdOnly') or {}).get('off') or [])))
     for g, (e, p) in parents.items():
         if p in mine:
-            fails.append('%s has the floor item or hold-only placement %s as its enable parent'
-                         % (desc_of(g, canon), desc_of(p, canon)))
+            fails.append('%s has the floor item %s as its enable parent' % (desc_of(g, canon), desc_of(p, canon)))
     return fails
 
 
@@ -2282,12 +2332,20 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--data', default=os.environ.get('THORNSWOOD_DATA', DATA_DIR))
     ap.add_argument('--check', action='store_true', help='build in memory and compare; write nothing')
-    ap.add_argument('--verify', action='store_true', help='check the committed plugin in the load order')
+    ap.add_argument('--verify', action='store_true', help='check the plugin the committed recipe makes, in the load order')
+    ap.add_argument('--out', default='', help='where the plugin is written; Thornswood-Last.esp in --data when not given')
     args = ap.parse_args()
+    out = args.out or os.path.join(args.data, PLUGIN)
 
     if args.verify:
         manifest = json.load(open(MANIFEST, encoding='utf-8'))
-        fails = verify(args.data, open(OUT, 'rb').read(), manifest)
+        try:
+            made = last_recipe.make_from(open(RECIPE, 'rb').read(), [OWN_DIR, args.data])
+        except last_recipe.RecipeError as x:
+            print('STOP. %s could not be made from game/data/%s out of %s: %s.'
+                  % (PLUGIN, os.path.basename(RECIPE), args.data, x))
+            return 1
+        fails = verify(args.data, made, manifest)
         for f in fails[:40]:
             print('  FAIL  ' + f)
         if fails:
@@ -2300,9 +2358,8 @@ def main():
         print('  ok    %d locations and %d rooms are in the hold the policy gives them'
               % (c.get('placeLocations', 0), c.get('placeRooms', 0)))
         print('  ok    %d smith recipes ask the counts recost.json gives' % c.get('recipesRecosted', 0))
+        print('  ok    %d recipes are at their trade\'s bench (recipes.json, #3120)' % c.get('recipesMoved', 0))
         print('  ok    %d floor items are off and nothing can switch them on' % c.get('floorItemsOff', 0))
-        print('  ok    %d hold-only plants and ores are off outside their hold, and none in it'
-              % c.get('holdOnlyOff', 0))
         print('  ok    %d mod quests carry the script properties the policy sets'
               % c.get('questScriptProperties', 0))
         return 0
@@ -2324,6 +2381,8 @@ def main():
     for row in manifest['placeHolds']['rooms']:
         print('  %s (%s): no location -> %s, in %s' % (row['place'], row['edid'], row['location'], row['hold']))
     print('  %d smith recipes re-costed (recost.json, #613)' % c['recipesRecosted'])
+    print('  %d recipes moved to their trade\'s bench here, %d in each person\'s game (recipes.json, #3120)'
+          % (c['recipesMoved'], c['recipesMovedInGame']))
     for row in manifest['questScriptProperties']:
         print('  %s (%s, from %s): %s' % (row['quest'], row['edid'], row['winner'],
                                          ', '.join('%s %s' % (k, json.dumps(v)) for k, v in row['set'].items())))
@@ -2334,13 +2393,6 @@ def main():
     fl = manifest['floorItems']
     print('  %d floor items off (%s); left as they are: %d deleted by a plugin, %d already off'
           % (fl['off'], ', '.join('%d %s' % (n, k) for k, n in fl['byType'].items()), fl['deleted'], fl['alreadyOff']))
-    ho = manifest['holdOnly']
-    for row in ho['resources']:
-        print('  hold-only %s %s in %s: %d stay, %d outside it' % (row['kind'], row['name'], row['hold'],
-                                                                  row['kept'], row['outside']))
-    print('  %d hold-only plants and ores off; left as they are: %d deleted by a plugin, %d already off; '
-          '%d held off by the server; %d cells copied only for them'
-          % (len(ho['off']), len(ho['deleted']), len(ho['alreadyOff']), len(ho['heldByServer']), ho['cellsAdded']))
     print('  %d cells copied only for the floor items, by the plugin that wins each:' % fl['cellsAdded'])
     for name, n in sorted(fl['cellsAddedByWinner'].items(), key=lambda x: -x[1]):
         print('    %6d  %s%s' % (n, name, '' if name.lower() in committed else
@@ -2358,8 +2410,7 @@ def main():
           '%s of them Thornswood\'s own (%s inside records)'
           % (r['sources'], format(r['size'], ','), format(r['ownBytes'], ','), format(r['ownBytesInRecords'], ',')))
     if args.check:
-        a = same_or_say(OUT, plugin, 'game/content/' + PLUGIN)
-        a = same_or_say(RECIPE, recipe, 'game/data/' + os.path.basename(RECIPE)) and a
+        a = same_or_say(RECIPE, recipe, 'game/data/' + os.path.basename(RECIPE))
         # The manifest is compared as what it says, not as bytes.
         have = json.load(open(MANIFEST, encoding='utf-8')) if os.path.isfile(MANIFEST) else None
         b = have == json.loads(manifest_bytes(manifest).decode('utf-8'))
@@ -2369,40 +2420,63 @@ def main():
         c = held_block(manifest, gm) == gm
         print('  %s the HELD_BY_SERVER block %s' % (('ok   ', 'is what this builds') if c else
                                                           ('DIFFERS', 'is not what this builds')))
-        return 0 if a and b and c else 1
-    gm = held_block(manifest, io.open(GAMEMODE, encoding='utf-8', newline='').read())
-    with open(OUT, 'wb') as f:
+        d = moved_block(manifest, gm) == gm
+        print('  %s the RECIPES_MOVED_IN_GAME block %s' % (('ok   ', 'is what this builds') if d else
+                                                                 ('DIFFERS', 'is not what this builds')))
+        return 0 if a and b and c and d else 1
+    gm = moved_block(manifest, held_block(manifest, io.open(GAMEMODE, encoding='utf-8', newline='').read()))
+    with open(out + '.making', 'wb') as f:
         f.write(plugin)
+    os.replace(out + '.making', out)
     with open(RECIPE, 'wb') as f:
         f.write(recipe)
     with open(MANIFEST, 'wb') as f:
         f.write(manifest_bytes(manifest))
     with io.open(GAMEMODE, 'w', encoding='utf-8', newline='') as f:
         f.write(gm)
-    print('Wrote game/content/%s, game/data/%s, game/data/last-plugin.json and the HELD_BY_SERVER block (%d)'
-          % (PLUGIN, os.path.basename(RECIPE), len(manifest['floorItems']['heldByServer']) + len(manifest['refs']['heldByServer']) +
-             len((manifest.get('holdOnly') or {}).get('heldByServer', []))))
+    print('Wrote %s, game/data/%s, game/data/last-plugin.json, the HELD_BY_SERVER block (%d) and the '
+          'RECIPES_MOVED_IN_GAME block (%d)'
+          % (out, os.path.basename(RECIPE), len(manifest['floorItems']['heldByServer']) + len(manifest['refs']['heldByServer']),
+             len(manifest['benchMovesInGame'])))
     return 0
 
 
 def held_block(manifest, gamemode):
-    """game/gamemode.js with its HELD_BY_SERVER block: the floor items, cut
-    actors and hold-only plants and ores Thornswood-Last.esp cannot switch
-    off without copying a plugin it never copies from, which the server holds
-    off instead (#3077, #2454, #3150)."""
+    """game/gamemode.js with its HELD_BY_SERVER block: the floor items and cut
+    actors Thornswood-Last.esp cannot switch off without copying a plugin it
+    never copies from, which the server holds off instead (#3077, #2454)."""
     a, b = gamemode.find(HELD_BLOCK[0]), gamemode.find(HELD_BLOCK[1])
     if a < 0 or b < a:
         raise SystemExit('STOP. no HELD_BY_SERVER markers in game/gamemode.js. Nothing was written.')
     block = '\n'.join([
         HELD_BLOCK[0],
-        '// Generated by scripts\\mods\\Build-LastPlugin.py (game\\data\\last-plugin.json: floorItems.heldByServer,',
-        '// refs.heldByServer and holdOnly.heldByServer); do not hand edit. Placed by, or standing where, a plugin',
-        '// it never copies from.',
+        '// Generated by scripts\\mods\\Build-LastPlugin.py (game\\data\\last-plugin.json: floorItems.heldByServer',
+        '// and refs.heldByServer); do not hand edit. Placed by, or standing where, a plugin it never copies from.',
         'var HELD_BY_SERVER = %s;' % json.dumps(sorted(manifest['floorItems']['heldByServer'] +
-                                                     manifest['refs']['heldByServer'] +
-                                                     (manifest.get('holdOnly') or {}).get('heldByServer', []))),
+                                                     manifest['refs']['heldByServer'])),
         HELD_BLOCK[1]])
     return gamemode[:a] + block + gamemode[b + len(HELD_BLOCK[1]):]
+
+
+def moved_block(manifest, gamemode):
+    """game/gamemode.js with its RECIPES_MOVED_IN_GAME block: the recipes
+    moved to their trade's bench (#3120) that Thornswood-Last.esp cannot
+    carry without copying a plugin it never copies from, which each person's
+    game moves instead."""
+    a, b = gamemode.find(MOVED_BLOCK[0]), gamemode.find(MOVED_BLOCK[1])
+    if a < 0 or b < a:
+        raise SystemExit('STOP. no RECIPES_MOVED_IN_GAME markers in game/gamemode.js. Nothing was written.')
+    rows = {r['recipe']: {'name': r['name'], 'out': r['out'], 'from': r['from'], 'to': r['to'],
+                          'inputs': r['inputs']} for r in manifest['benchMovesInGame']}
+    block = '\n'.join([
+        MOVED_BLOCK[0],
+        '// Generated by scripts\\mods\\Build-LastPlugin.py from game\\data\\recipes.json; do not hand edit.',
+        '// The recipes moved to their trade\'s bench (#3120) of a plugin Thornswood-Last.esp never copies',
+        '// from, moved in each person\'s game instead: the bench keyword each moves from and to, and its',
+        '// inputs as [item, count] as the record asks them.',
+        'var RECIPES_MOVED_IN_GAME = %s;' % json.dumps(rows, sort_keys=True, ensure_ascii=False),
+        MOVED_BLOCK[1]])
+    return gamemode[:a] + block + gamemode[b + len(MOVED_BLOCK[1]):]
 
 
 if __name__ == '__main__':

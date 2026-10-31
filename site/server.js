@@ -580,9 +580,10 @@ const BOARDS = {
    The page now matches the doors behind it. The linked accounts are 'staff'
    since #1010, because that page is where staff ban, PK and write notes, and
    every staff role may. The other two stay 'admin': the play sessions and
-   the report inbox. */
+   the report inbox. The hold economy is 'staff' (#3164, Patrick, 22 Oct:
+   staff's hold economy view is a staff page on the hub). */
 const LEVEL = {
-  uploads: 'staff', linked: 'staff', sessions: 'admin', inbox: 'admin'
+  uploads: 'staff', linked: 'staff', sessions: 'admin', inbox: 'admin', economy: 'staff'
 };
 
 /* The public front lives at / and needs no password. The working area moved
@@ -1465,7 +1466,10 @@ function findPageVersion(sha) {
    alpha wording with <!-- alpha --> ... <!-- /alpha --> lines and its open
    wording with <!-- open --> ... <!-- /open -->, and only the one that
    applies is served. bot/content.py reads join.md through the same markers
-   for #start-here, so the site and the Discord cannot disagree. */
+   for #start-here, so the site and the Discord cannot disagree.
+   A page's <!-- engine-pin:<name> --> and <!-- /engine-pin:<name> --> lines
+   say where scripts/release/Write-EnginePinText.ps1 writes the engine pin
+   (#5148); they are for that script, so they are left out the same way. */
 function playRoles(play, open) {
   const list = Array.isArray(play) ? play.slice() : [];
   if (open === true && list.indexOf('Member') < 0) list.push('Member');
@@ -1477,7 +1481,8 @@ function forMode(md, open) {
   return String(md)
     .replace(new RegExp('^<!-- ' + drop + ' -->[ \\t]*\\r?\\n[\\s\\S]*?^<!-- /' + drop +
                         ' -->[ \\t]*(?:\\r?\\n|$)', 'gm'), '')
-    .replace(/^<!-- \/?(?:alpha|open) -->[ \t]*(?:\r?\n|$)/gm, '');
+    .replace(/^<!-- \/?(?:alpha|open) -->[ \t]*(?:\r?\n|$)/gm, '')
+    .replace(/^[ \t]*<!-- \/?engine-pin:[a-z]+ -->[ \t]*(?:\r?\n|$)/gm, '');
 }
 /* What somebody in the Discord without a play role is told, by the launcher's
    door, the join pass and the sign in page. In the alpha that is an
@@ -1502,7 +1507,8 @@ const PAGES = {
   '/uploads':     'uploads',
   '/linked':      'linked',
   '/sessions':    'sessions',
-  '/inbox':       'inbox'
+  '/inbox':       'inbox',
+  '/economy':     'economy'
 };
 
 /*
@@ -4320,6 +4326,73 @@ const ROSTER = path.join(DATA, 'roster.json');
 // passed on (#955). It is sent every five minutes; an hour covers a restart.
 const ROSTER_HELD_FRESH_MS = 60 * 60 * 1000;
 
+/*
+  WHAT EACH HOLD GATHERS, MAKES AND TRADES (#3164), for the hub's Hold economy
+  page. Each game server counts it (the hold economy block in
+  game\gamemode.js) and sends the whole of what it keeps every five minutes,
+  POST /api/economy with the door key; the dev server's door names the site
+  with /dev, so its count lands on /dev/api/economy. Kept per server and
+  replaced whole on each push, so this file holds what the game server holds
+  and never more, and days past ECONOMY_KEEP_DAYS go on every write and read.
+  A row is a day, a hold, a kind, an item and a count: nothing about anybody.
+*/
+const ECONOMY = path.join(DATA, 'economy.json');
+const ECONOMY_KINDS = ['gathered', 'crafted', 'bought', 'sold', 'hauled'];
+const ECONOMY_HOLDS = ['whiterun', 'solitude', 'riften', 'markarth', 'windhelm',
+                       'falkreath', 'morthal', 'dawnstar', 'winterhold', 'ravenrock', 'elsewhere'];
+const ECONOMY_KEEP_DAYS = 30;
+const ECONOMY_MOST = 1000000000;
+/* The box's own date, the day the game server counts a row on (same box). */
+function economyDay(t) {
+  const d = new Date(t);
+  const two = (n) => (n < 10 ? '0' : '') + n;
+  return d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate());
+}
+/* One server's count held to its shape: anything else is left out. */
+function cleanEconomy(o, now) {
+  const out = { at: 0, today: '', keepDays: ECONOMY_KEEP_DAYS, days: {}, names: {} };
+  if (!o || typeof o !== 'object') return out;
+  out.at = Number(o.at) > 0 ? Number(o.at) : 0;
+  out.today = /^\d{4}-\d{2}-\d{2}$/.test(String(o.today || '')) ? String(o.today) : '';
+  const cut = economyDay((Number(now) || Date.now()) - (ECONOMY_KEEP_DAYS - 1) * 86400000);
+  const days = (o.days && typeof o.days === 'object') ? o.days : {};
+  const names = (o.names && typeof o.names === 'object') ? o.names : {};
+  const has = (x, k) => Object.prototype.hasOwnProperty.call(x, k);
+  for (const day of Object.keys(days)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day < cut) continue;
+    const holds = days[day];
+    if (!holds || typeof holds !== 'object') continue;
+    for (const hold of Object.keys(holds)) {
+      if (ECONOMY_HOLDS.indexOf(hold) < 0) continue;
+      const kinds = holds[hold];
+      if (!kinds || typeof kinds !== 'object') continue;
+      for (const kind of ECONOMY_KINDS) {
+        const items = kinds[kind];
+        if (!items || typeof items !== 'object') continue;
+        for (const key of Object.keys(items)) {
+          const n = items[key];
+          if (!key || key.length > 120 || key === '__proto__' || !Number.isSafeInteger(n) || n <= 0) continue;
+          const row = ((out.days[day] = out.days[day] || {})[hold] = out.days[day][hold] || {});
+          (row[kind] = row[kind] || {})[key] = Math.min(n, ECONOMY_MOST);
+          const nm = has(names, key) && typeof names[key] === 'string' ? names[key].slice(0, 120) : '';
+          out.names[key] = nm || key;
+        }
+      }
+    }
+  }
+  return out;
+}
+/* Every server's count as kept now, aged on the way out as well as in. */
+function economyNow(now) {
+  const store = jsonFile(ECONOMY, { servers: {} });
+  const servers = (store && store.servers && typeof store.servers === 'object') ? store.servers : {};
+  const out = {};
+  for (const srv of ['main', 'dev']) {
+    if (servers[srv]) out[srv] = cleanEconomy(servers[srv], now);
+  }
+  return out;
+}
+
 /* How many character slots this person gets at the game's main menu. */
 function slotsFor(st) {
   if (!st) return 2;
@@ -4512,6 +4585,23 @@ function findSession(rows, key, who) {
 }
 
 /*
+  The session a launcher has open for this account on this server, newest
+  start first, or null (#3155). A problem reported from the game is tied to
+  it, so the issue on the board points at the logs the launcher sends for it
+  when the game closes. Open is no end yet; the game is running, so its
+  session has none. A session that never said its build counts for either.
+*/
+function openSessionOf(rows, who, channel) {
+  let best = null;
+  for (const r of rows) {
+    if (!r || String(r.who) !== String(who) || Number(r.end) > 0) continue;
+    if (r.channel && r.channel !== channel) continue;
+    if (!best || (Number(r.start) || 0) > (Number(best.start) || 0)) best = r;
+  }
+  return best;
+}
+
+/*
   A CRASH STAFF HAVE LOOKED AT (#2319, decided by Patrick on 12 Oct).
 
   A crash snapshot is every byte of the game's memory, 3.7 to 9.7 GB, and it
@@ -4612,10 +4702,15 @@ const SLOG_DAYS = 365;
    crash log from that session, if it crashed, and it goes second because it
    is the one that settles a crash with no message (entry 105).
    skyrim-platform.log is the tail of Skyrim Platform's own log, and it goes
-   last because it is the biggest and the noisiest. */
+   last because it is the biggest and the noisiest.
+
+   Every name here is named on the privacy page, with what it can hold, and
+   tests\test-session-logs.js fails when one is not (#3627). The retired
+   dresser's log is not taken: nothing writes it, so a copy left on a PC was
+   an old session's sent as this one's. */
 const SLOG_NAMES = [
   'launcher.log', 'crash.log', 'thornswood-front.log', 'thornswood-voice.log',
-  'thornswood-emotes.log', 'thornswood-input.log', 'thornswood-dress.log',
+  'thornswood-emotes.log', 'thornswood-input.log',
   'thornswood-loadorder.txt', 'thornswood-plugins-light.txt',
   'skyrim-platform.log'
 ];
@@ -7181,7 +7276,7 @@ async function handle(req, res) {
     try { o = JSON.parse(await body(req, 8000)) || {}; }
     catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
     const dev = route.indexOf('/dev/') === 0;
-    const kind = o.kind === 'report' ? 'report' : (o.kind === 'help' ? 'help' : '');
+    const kind = o.kind === 'report' ? 'report' : (o.kind === 'help' ? 'help' : (o.kind === 'problem' ? 'problem' : ''));
     const pid = Number(o.profileId) || 0;
     if (!kind || !(pid > 0)) return sendJson(res, 400, { error: 'no kind or no profile' });
     const key = 'game:' + (dev ? 'dev:' : '') + pid;
@@ -7190,12 +7285,22 @@ async function handle(req, res) {
     const name = String(o.name || '').trim().slice(0, 60) || 'Somebody';
     const about = String(o.about || '').trim().slice(0, 60);
     if (kind === 'report' && !about) return sendJson(res, 400, { error: 'a report names somebody' });
-    const said = String(o.said || '').trim().slice(0, 300);
+    const said = String(o.said || '').trim().slice(0, kind === 'problem' ? 1000 : 300);
+    if (kind === 'problem' && !said) return sendJson(res, 400, { error: 'a problem says what went wrong' });
     const cell = String(o.cell || '').slice(0, 120);
     const pos = (Array.isArray(o.pos) ? o.pos : []).slice(0, 3).map((n) => Math.round((Number(n) || 0) * 10) / 10);
     const aboutPid = Number(o.aboutProfileId) || 0;
+    // Report a problem (#3155): the account holding the profile, and the
+    // session its launcher has open, whose logs arrive when the game closes.
+    // The bot files it on the board from here.
+    let problem = null;
+    if (kind === 'problem') {
+      const acct = accountOf(pid);
+      const open = acct ? openSessionOf(sessionRows(), acct, dev ? 'dev' : 'main') : null;
+      problem = { discordId: acct, session: open ? String(open.session) : '', server: dev ? 'dev' : 'main' };
+    }
     const list = jsonFile(INBOX, []);
-    list.unshift({
+    list.unshift(Object.assign({
       id: 'i' + Date.now().toString(36) + crypto.randomBytes(2).toString('hex'),
       kind,
       title: kind === 'help' ? (said || 'Asked for help and said nothing more') : said,
@@ -7203,9 +7308,10 @@ async function handle(req, res) {
       aboutProfileId: kind === 'report' && aboutPid > 0 ? aboutPid : 0,
       detail: 'At ' + (cell || 'an unknown place') + (pos.length === 3 ? ', ' + pos.join(', ') : '') + '. ' +
         'Profile ' + pid + (kind === 'report' && aboutPid > 0 ? ', about profile ' + aboutPid : '') +
-        ': the game takes these numbers from the client, so they are a claim, not proof. ' +
-        (Number(o.staffTold) > 0 ? Number(o.staffTold) + ' of staff in the world were told in game.'
-                                 : 'Nobody from staff was in the world.'),
+        ': the game takes these numbers from the client, so they are a claim, not proof.' +
+        (kind === 'problem' ? ''
+          : ' ' + (Number(o.staffTold) > 0 ? Number(o.staffTold) + ' of staff in the world were told in game.'
+                                           : 'Nobody from staff was in the world.')),
       by: name,
       profileId: pid,
       cell,
@@ -7213,7 +7319,7 @@ async function handle(req, res) {
       at: Date.now(),
       state: 'new',
       from: dev ? 'in game on the dev server' : 'in game'
-    });
+    }, problem || {}));
     if (!putJson(INBOX, trimInbox(list))) {
       return sendJson(res, 500, { error: 'could not save' });
     }
@@ -8715,6 +8821,29 @@ async function handle(req, res) {
     return sendJson(res, 200, { ok: true, merged: n, total: Object.keys(store.who).length });
   }
 
+  /*
+    A game server's hold economy count (#3164), whole, with the door key, the
+    roster's way: the dev server's door names the site with /dev, so its count
+    comes in on /dev/api/economy and is kept apart from main's.
+  */
+  if ((route === '/api/economy' || route === '/dev/api/economy') && req.method === 'POST') {
+    if (!cfg.botKey) return sendJson(res, 404, { error: 'not set up' });
+    let o = {};
+    try { o = JSON.parse(await body(req, 4 * 1024 * 1024)) || {}; } catch (e) { passBodyFailure(e); }
+    if (!sameSecret(String(o.key || ''), String(cfg.botKey))) return sendJson(res, 401, { error: 'no' });
+    const srv = (String(o.server || '') === 'dev' || route.indexOf('/dev/') === 0) ? 'dev' : 'main';
+    const now = Date.now();
+    const kept = cleanEconomy(Object.assign({}, o, { at: now }), now);
+    const store = jsonFile(ECONOMY, { servers: {} });
+    const servers = (store && store.servers && typeof store.servers === 'object') ? store.servers : {};
+    servers[srv] = kept;
+    for (const other of Object.keys(servers)) {
+      if (other !== srv) servers[other] = cleanEconomy(servers[other], now);
+    }
+    if (!putJson(ECONOMY, { servers })) return sendJson(res, 500, { error: 'could not save' });
+    return sendJson(res, 200, { ok: true, server: srv, days: Object.keys(kept.days).length });
+  }
+
   if (p === '/api/play/roster' && req.method === 'POST') {
     let o = {};
     try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
@@ -9193,6 +9322,12 @@ async function handle(req, res) {
         sessions: w.admin ? sessionRows() : [],
         inbox: w.admin ? trimInbox(jsonFile(INBOX, []), Date.now()) : []
       });
+    }
+
+    /* The hub's Hold economy page (#3164): staff, the same as the page. */
+    if (p === '/api/economy' && req.method === 'GET') {
+      if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+      return sendJson(res, 200, { keepDays: ECONOMY_KEEP_DAYS, servers: economyNow(Date.now()) });
     }
 
     if (p === '/api/results' && req.method === 'PUT') {

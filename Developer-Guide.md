@@ -180,7 +180,7 @@ The words this guide uses. The long alphabetical list, with file names, is [docs
 | Creation Kit | Bethesda's tool for plugin records. A release does not ship the kit itself |
 | Node | The program that runs the website, the voice service, and `node tests\...` |
 | Bot | The Discord bot in the `bot` folder |
-| Launcher builds | The check on a pull request. Merge when it says pass |
+| Build check result | The check on a pull request: it passes only when Launcher builds and every share of the gate passed. Merge when it says pass |
 | Worktree | A second folder on this PC, checked out on its own branch |
 
 ## 1. First Time Setup
@@ -785,7 +785,7 @@ If the stop was a rebase rather than a merge, the last step is `git rebase --con
 
 #### Merge your own pull request
 
-Wait until the check named `Launcher builds` is green on the commit you are merging. Pending means it is still running. A red check means the branch is not ready. Fix it on the same branch and push again.
+Wait until the check named `Build check result` is green on the commit you are merging. It passes only when `Launcher builds` and the five `Gate harnesses (n of 5)` checks all passed. Pending means it is still running. A red check means the branch is not ready. Fix it on the same branch and push again.
 
 ```powershell
 gh pr checks
@@ -794,7 +794,7 @@ git switch main
 git pull
 ```
 
-When `Launcher builds` says pass, and you are confident in the change, merge it yourself. A merge gets no line in #staff-updates, and neither does the release that carries it. On the website the button is **Squash and merge**. GitHub deletes the branch after a squash merge. A green check is required. Merge a pull request you understand. Leave one you do not.
+When `Build check result` says pass, and you are confident in the change, merge it yourself. A merge gets no line in #staff-updates, and neither does the release that carries it. On the website the button is **Squash and merge**. GitHub deletes the branch after a squash merge. A green check is required. Merge a pull request you understand. Leave one you do not.
 
 What you run after the merge depends on what the pull request touched. A dev release is [section 3](#3-how-to-release-to-dev). A main release is [section 4](#4-how-to-release-to-main).
 
@@ -1372,10 +1372,11 @@ The short form of the rules. The same decisions, with the dates they were made, 
   GitHub. A hotfix leaves the dev feed alone. The fix also goes to main
   through its own pull request, or the next main release loses it. 1.1.93 was
   the first, built from 55ac6ef. A hotfix goes out on Patrick's word, the same as any live release, once
-  the fix's Launcher builds is green. Once it is live, its commit is kept as a tag, `live-<version>`,
+  the fix's Build check result is green. Once it is live, its commit is kept as a tag, `live-<version>`,
   and the branch is deleted, so no hotfix branch sits on GitHub: the next
   hotfix starts with `git checkout -b hotfix/<name> live-<version>` from the
-  tag of the release that is live. 1.1.94 is `live-1.1.94` (25 Sep).
+  tag of the release that is live. None is kept today: `live-1.1.94` (25 Sep)
+  shared no history with main and was deleted on 31 Oct (#4177).
 - Nobody pushes to main any more, Patrick included. Everything goes through a
   pull request. This replaces the 18 Sep decision that his own work went
   straight to main. GitHub refuses a push to main from write access. It does
@@ -1386,7 +1387,7 @@ The short form of the rules. The same decisions, with the dates they were made, 
   `enforce_admins` is **off**, there is no required check, required
   approving reviews is **0**, and the code owner review is **off**.
   Patrick, that day: "we don't need the required check/reviewer at all anymore for anyone as long as we give verbal agreement and the VPS check goes through". So the rule is ours, not a setting:
-  anybody on the team merges their own pull request once `Launcher builds`
+  anybody on the team merges their own pull request once `Build check result`
   (the build check, on the VPS) is green and they are confident in the
   change. A merge gets no line in #staff-updates (Patrick, 22 Oct: that
   channel is only for what staff must act on). Nobody waits for Patrick. What GitHub does hold write
@@ -1395,7 +1396,7 @@ The short form of the rules. The same decisions, with the dates they were made, 
   to the admin account while `enforce_admins` is off.
   Because nothing enforces the build check, it has to be kept by hand: on 25 Sep 35 pull
   requests were merged with their VPS build red and 18 with no build at all,
-  and main went red with them. Wait for `Launcher builds` to say pass before
+  and main went red with them. Wait for `Build check result` to say pass before
   merging, every time, including your own and including a Claude's. The last
   GitHub setting, "require branches to be up to date" with no check listed,
   was removed on 27 Sep at Patrick's word ("we use the VPS's build checker"),
@@ -1543,45 +1544,43 @@ The short form of the rules. The same decisions, with the dates they were made, 
   `.github/workflows/build.yml`. build-pr.yml is generated from build.yml:
   change build.yml, then run `node scripts/dev/Build-PrWorkflow.js`
   (`tests\test-1306-pr-workflow.js` fails while the two differ). It is one job
-  of named steps, and it builds only; nothing is published. It scans for
+  of named steps beside the gate's five shares, and it builds only; nothing is
+  published. It scans for
   secrets, parses every PowerShell script and game script, checks the
   writing rules (see Words), the ownership page (`tests\test-ownership.js`,
   issue #752), the names that must stay out, that the engine is one commit and
-  the high-risk records, runs the gate harnesses (every `tests\test-*.js` and
-  `tests\test-*.ps1` that `tests\gate-excluded.txt` does not name, side by side
-  through `scripts\dev\Nightly-Harnesses.ps1`, issues #3009 and #3114) and the
-  voice service's health harness, checks our plugins are clean, the launcher
+  the high-risk records, runs the voice service's health harness, checks our plugins are clean, the launcher
   window and its UI thread, that the Python names only what exists (ruff,
   issue #1343) and the count of silent catches, and builds the launcher with
   MSBuild from its project files, held to its sources
-  (`tests\test-498-msbuild.ps1`, issue #498).
-- The check has two names, and either one passing is the merge bar.
-  **Launcher builds** is the job on GitHub's hosted Windows runner, tried
-  first. **Launcher builds (VPS fallback)** runs the same steps on a build
-  runner on the VPS, when the hosted job did not succeed, when the repository
-  variable `BUILD_RUNNER` is `vps` (then Launcher builds shows skipped), or
-  when a manual run of build.yml asks for `runner: vps`. A pull request from a
-  fork never gets the fallback. While the month's hosted minutes are used up,
-  `BUILD_RUNNER` is `vps` and the fallback is the one that goes green. A push
+  (`tests\test-498-msbuild.ps1`, issue #498). Beside it, the job "gate" runs
+  the gate harnesses (every `tests\test-*.js` and `tests\test-*.ps1` that
+  `tests\gate-excluded.txt` does not name, side by side through
+  `scripts\dev\Nightly-Harnesses.ps1`, issues #3009 and #3114) in five shares
+  on five hosted runners at once, `Gate harnesses (1 of 5)` to `(5 of 5)`,
+  so a pull request's checks take under ten minutes.
+- The checks are **Launcher builds** and the five **Gate harnesses**, on
+  GitHub's hosted Windows runners, and on a pull request **Build check
+  result** passes only when all of them did (#3683).
+  The repository is public since 30 Oct 2026, so hosted minutes are free, and
+  nothing builds on the VPS any more: no fallback job and no `BUILD_RUNNER`
+  switch (#4983). A push
   to main whose tree a green pull request build already passed stops green at
   "Already tested in its pull request" instead of building again (#3182).
   Red means the branch would stop Ship at the build step; fix that, and merge
-  once one of the two is green and you are confident in the change; a merge
+  once it is green and you are confident in the change; a merge
   gets no line in #staff-updates. Nothing in GitHub's settings is required. Run the
   test harnesses your change touches yourself. All
   ~410 of them (tests/, bot, and voice), and a look for stray pull requests
-  and branches run every night on the VPS (.github/workflows/nightly.yml,
+  and branches run every night on GitHub's runner (.github/workflows/nightly.yml,
   03:00 Mountain); a failure there opens an issue on the board, "Nightly
   checks failed", and whoever broke it fixes it next. The harnesses run in
   shares, a job each on a runner of its own with 45 minutes of its own
   (`scripts\dev\Nightly-Harnesses.ps1`, #2357); a share that runs out of
-  time names the harnesses it did not get to, and the cure is another share. It runs on the VPS, on the runners
-  `.\scripts\deploy\Install-Runner.ps1` puts there (issue #437), because
-  GitHub's own runners were blocked on billing from 25 Sep. Several since
-  4 Oct, so checks run side by side: `-Number 2` and up puts each one after
-  the first beside it. `.\scripts\deploy\Install-Runner.ps1 -Status` (with
-  `-Number` for the others) says whether GitHub sees one, and `-Lock` locks
-  every runner's folder again without stopping a job.
+  time names the harnesses it did not get to, and the cure is another share. It
+  ran on the VPS from 25 Sep, when GitHub's own runners were blocked on
+  billing (issue #437), and runs on GitHub's runner since the repository went
+  public (#4013, #4983).
 - An edit to Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or
   Publish-Update.ps1 that blocks others' work gets a line in #dev-coordination first, from a Dev; every machine touches those.
 
@@ -1674,7 +1673,7 @@ The machine that runs `Ship.ps1` still has to sign the build. [Setting up a mach
 
 ### The content plugin goes to the server first
 
-The server gets the content plugin first, then the Ship. When `game\content\Thornswood-Content.esp` or `game\content\Thornswood-Last.esp` changed since the last dev release, put it on the dev server before you Ship. The Ship right after it carries the same change to the launcher and says it, so the deploy posts nothing (`-ShipFollows`) and the note goes to the Ship alone:
+The server gets the content plugin first, then the Ship. When `game\content\Thornswood-Content.esp` or `game\data\last-plugin.recipe` (the recipe Thornswood-Last.esp is made from, #2791) changed since the last dev release, put it on the dev server before you Ship. The Ship right after it carries the same change to the launcher and says it, so the deploy posts nothing (`-ShipFollows`) and the note goes to the Ship alone:
 
 ```powershell
 .\scripts\deploy\Deploy-DevGamemode.ps1 -LoadOrder -ShipFollows
@@ -1684,7 +1683,9 @@ The server gets the content plugin first, then the Ship. When `game\content\Thor
 
 Each post says only what is new on its channel (#3320, Patrick, 22 Oct). Ship and `Deploy-DevGamemode.ps1` refuse a note whose title or `- ` line the channel's News or its Discord channel has already had, and say where it was said. On 22 Oct a deploy and the Ship after it posted the same note twice, which is what `-ShipFollows` is for.
 
-`-LoadOrder` keeps the dev server's own load order and sends every plugin it names that the server does not hold at the same bytes: our two plugins from your checkout, the others from the collection. `Thornswood-Last.esp` is always the last plugin in that order: when the dev server's order does not end with it, `-LoadOrder` puts it there and sends the order (#2486). It needs no server build, so it runs from the fresh checkout the deploy asks for. `-Dist <a built dist\server folder>` also writes that build's load order over the dev one.
+`-LoadOrder` keeps the dev server's own load order and sends every plugin it names that the server does not hold at the same bytes: the content plugin from your checkout, the others from the collection. `Thornswood-Last.esp` is never sent: it copies other authors' records, so the deploy makes it on the box from your checkout's recipe, into the stage beside what it sent, and the stage check holds it to the sha256 `game\data\last-plugin.json` names (#2791, `scripts\deploy\LastPluginOnBox.ps1`). It is always the last plugin in that order: when the dev server's order does not end with it, `-LoadOrder` puts it there and sends the order (#2486). It needs no server build, so it runs from the fresh checkout the deploy asks for. `-Dist <a built dist\server folder>` also writes that build's load order over the dev one.
+
+When the engine pin moved as well, the server build goes first: `Deploy-DevGamemode.ps1` sends a gamemode only to a dev server that runs the build your commit records (#2076). `Publish-Server.ps1 -Channel dev -FromStore` keeps the running server's plugins, and when its `Thornswood-Last.esp` is not the one your recipe makes, it makes that one on the box the same way, from the plugins it sends and the server's own, and the installer takes it into the stage held to the same sha256. The deploy after it then finds the plugin already there.
 
 Ship asks the dev server which of our plugins it holds, by size and sha256. When this release would send clients another one, Ship stops before it publishes, posts or tells the server anything, and names the command above. On 11 Oct a dev Ship sent a new content plugin while the dev server still had the old one, and for eight minutes every dev client that updated held a plugin the server did not (#2308).
 
@@ -1734,7 +1735,7 @@ Ship already posts the note. These commands send nothing. They show what a secon
 
 ### What any developer may do
 
-Decided for the whole team: any developer may do every one of these, except the ones that change what is live. A main release, a hotfix and a live server or gamemode deploy go out only on Patrick's word, by whoever he names (Patrick, 30 Oct; How work moves). Confidence in the change, and a green `Launcher builds` check on the exact commit, are the gates for a merge. A dev release, a dev deploy, and a news post are the same people. Dev and Main each have one shared feed and one shared server, and the last Ship on a channel wins.
+Decided for the whole team: any developer may do every one of these, except the ones that change what is live. A main release, a hotfix and a live server or gamemode deploy go out only on Patrick's word, by whoever he names (Patrick, 30 Oct; How work moves). Confidence in the change, and a green `Build check result` check on the exact commit, are the gates for a merge. A dev release, a dev deploy, and a news post are the same people. Dev and Main each have one shared feed and one shared server, and the last Ship on a channel wins.
 
 The machine that runs `Ship.ps1` still has to sign the build. `records\signing\signing.json` has to be present and enabled, and the launcher tip has to be signed by the certificate the launcher already trusts. `.\scripts\release\Setup-ShipMachine.ps1` is how a machine gets there. Shipping from another machine, in First Time Setup, says which Azure sign-in can sign.
 
@@ -1782,13 +1783,13 @@ git pull
 
 ### The content plugin goes to the live server first
 
-When `game\content\Thornswood-Content.esp` or `game\content\Thornswood-Last.esp` changed since the last main release, the live server gets it before the Ship, from `main` after `git pull`:
+When `game\content\Thornswood-Content.esp` or `game\data\last-plugin.recipe` changed since the last main release, the live server gets it before the Ship, from `main` after `git pull`:
 
 ```powershell
 .\scripts\deploy\Deploy-Server.ps1 -GamemodeOnly
 ```
 
-It sends the committed gamemode and our two plugins whenever the live server's copy is not the same size and sha256. The first time the live load order has to gain `Thornswood-Last.esp` as its last plugin, `-GamemodeOnly` refuses, because it changes no setting; that release goes the full way, `Deploy-Gamemode.ps1` then `Deploy-Server.ps1`. A main Ship asks the live server the same question and stops, with nothing published, posted or told to a server, while the answer is another plugin.
+It sends the committed gamemode and the content plugin, and makes Thornswood-Last.esp on the box from the recipe, whenever the live server's copy is not the same size and sha256. The first time the live load order has to gain `Thornswood-Last.esp` as its last plugin, `-GamemodeOnly` refuses, because it changes no setting; that release goes the full way, `Deploy-Gamemode.ps1` then `Deploy-Server.ps1`. A main Ship asks the live server the same question and stops, with nothing published, posted or told to a server, while the answer is another plugin.
 
 ### Ship main
 
@@ -1940,7 +1941,7 @@ above still applies, Ship refuses a hotfix branch that is not on GitHub, and
 the dev feed is left alone. The fix also goes to main through its own pull
 request, or the next main release loses it. Once live, the hotfix's commit
 is tagged `live-<version>` and the branch deleted; the next hotfix starts
-from that tag (`git checkout -b hotfix/<name> live-1.1.94` today).
+from that tag (`git checkout -b hotfix/<name> live-<version>`).
 
 Everything else, and which one each change needs, is the list under "After a
 pull request is merged" below: `Deploy-Server.ps1` pushes a server
@@ -2904,7 +2905,7 @@ says **not enforced** where nothing checks it.
 | Discord bot token | `discord.botToken` in `C:\Thornswood-Docs\config.json` and `DISCORD_TOKEN` in `C:\Thornswood-Bot\bot.env.json`, the same token in both | Everything the bot may do in the Discord, and the site's reading of who holds which role, which is what decides who may play. | The application's owner resets it in the developer portal (Bot, Reset Token). Then `.\scripts\deploy\Rotate-BotToken.ps1`, one command: it asks at a prompt, writes both files or neither, restarts the bot and the site, and `-Check` afterwards says whether each file holds a token without showing it. `Install-Bot.ps1` and `Set-DiscordLogin.ps1` write it through the same writer, `scripts\vps\Write-BotToken.ps1`, so either one also updates both. Every backup made before the reset still holds the old token: the nightly ones in `C:\Thornswood-Backup` on the VPS and anything brought down to `local\backups` in the repository folder. |
 | #news webhook | `C:\Thornswood-Bot\webhooks\news.txt` on the VPS, read over ssh by every machine that ships (`Discord-Hook.ps1`); `bot\news-webhook.txt` on a machine only as the fallback when the VPS cannot be asked | Posting in #news as the bot, for anybody holding the URL. | Delete the webhook called Thornswood in #news (Edit Channel, Integrations, Webhooks), make a new one, and put its URL in that file. |
 | Dev updates webhook | `C:\Thornswood-Bot\webhooks\dev.txt` on the VPS, read the same way; `bot\dev-webhook.txt` only as the fallback | Posting in the dev updates channel as the bot, for anybody holding the URL. | Delete it in that channel's Integrations, Webhooks, make a new one, and give its URL to `Set-DevNews.ps1`, which checks it points at the dev channel before it saves anything. |
-| Watchdog alerts webhook | `C:\Thornswood-Watch\alerts-webhook.txt` on the VPS, readable by SYSTEM and Administrators only, and the `STAFF_WEBHOOK` secret of the outside watcher's public repository on GitHub (issue #2755) | Posting in #staff-updates, for anybody holding the URL. The watchdog uses it only when the bot is down or silent. | Delete it in #staff-updates' Integrations, Webhooks, make a new one there, and give its URL to `.\scripts\vps\Watch-Services.ps1 -SetWebhook`, which asks at a prompt, refuses a webhook in any other channel and posts a test message (the report it prints with no switch says where the one on the box posts), and put the same URL in the outside watcher's repository as the `STAFF_WEBHOOK` secret (Settings, Secrets and variables, Actions), then run its workflow by hand with "test" ticked, which refuses a webhook in any other channel and posts a test message (issues #448, #2755). |
+| Watchdog alerts webhook | `C:\Thornswood-Watch\alerts-webhook.txt` on the VPS, readable by SYSTEM and Administrators only, and the `STAFF_WEBHOOK` secret in this repository's `watch` environment, which `watch-outside.yml` posts through (issues #2755, #3690) | Posting in #staff-updates, for anybody holding the URL. The watchdog uses it only when the bot is down or silent. | Delete it in #staff-updates' Integrations, Webhooks, make a new one there, and give its URL to `.\scripts\vps\Watch-Services.ps1 -SetWebhook`, which asks at a prompt, refuses a webhook in any other channel and posts a test message (the report it prints with no switch says where the one on the box posts), and put the same URL in this repository as the `STAFF_WEBHOOK` secret of the `watch` environment (Settings, Environments, watch), then run the Watch outside workflow by hand with "test" ticked, which refuses a webhook in any other channel and posts a test message (issues #448, #2755). |
 | Voice join token key | `token-key.txt` in `C:\Thornswood-Voice` on the VPS. `C:\Thornswood-Voice-Dev` has its own, which dev voice makes itself; `vps-dev-instance.ps1` never copies live's (#1083) | Signs the token that says which profile a voice connection belongs to. Enforced: a connection that cannot prove itself with one is refused, and the service mints one only when the site says the Discord ticket owns that profile (#1303, #1315). Holding the key is being able to join voice as anybody. | The service makes it itself. Delete the file and run `Install-Voice.ps1 -Restart`; tokens already issued stop working, and the launcher's voice page and the game's chat each ask for a new one when they connect again (one token, one connection, two minutes: #1322). |
 | TURN relay key, not in use yet | `turn-key.txt` in `C:\Thornswood-Voice` on the VPS, put there by hand, and its own in `C:\Thornswood-Voice-Dev`, put there by hand too; `vps-dev-instance.ps1` never copies the live one (#1083). Neither is there yet: no relay has been stood up, so the service offers STUN only | Nothing yet. Once a relay is up, the voice service makes each browser a credential from it, and a credential lets whoever holds it send traffic through the relay until it expires. **Not enforced** as to who gets one: `/ice` answers anybody who asks. | Whoever runs the relay changes its shared secret there, puts the same value in `turn-key.txt`, and runs `Install-Voice.ps1 -Restart`. Credentials already handed out stop working at once. |
 | Backup passphrase | `C:\Thornswood-Backup\key.txt` on the VPS and `Documents\thornswood-backup-key.txt` on Patrick's machine, one copy in each on purpose | The nightly backups, which hold the site's `config.json`, `bot.env.json` and the live game server's `private` folder: every VPS secret above except the voice service's files. | `Install-Backup.ps1` sends the Documents copy up when the box has no `key.txt` (a new box, issue #454), makes one when neither has it, and copies it down when the Documents copy is missing. Keep the old one until the backups made with it have aged out. |

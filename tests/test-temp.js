@@ -200,7 +200,7 @@ if (block) {
       tested; this file has now made that mistake once and test-hud.js twice.
     */
     const from = FRONT.indexOf('const FIRE_BASES');
-    const to = FRONT.indexOf('let stuckKeys', from);
+    const to = FRONT.indexOf('   * Jump and sprint.', from);
     const where = (from >= 0 && to > from) ? FRONT.slice(from, to) : '';
     yes('the place block is findable in the plugin', !!where);
     const sends = (where.match(/kind = '([a-z]+)'/g) || [])

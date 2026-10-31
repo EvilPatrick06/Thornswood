@@ -41,14 +41,14 @@ A rank in a half you make things in also says what it just opened,
 counted the way the recipe book on K counts it: how many recipes sit at
 that rank, their kinds, and how many of them Skyrim lists at the bench
 (Patrick, 26 October 2026, #3149). The rest each carry a condition of
-their own, a perk or a spell or something to hold first:
+their own, a spell or something to hold first:
 
 > You are now an Advanced Platewright. 1 skill point to spend, on K.
 > Advanced Platewright work opens 57 more recipes to you: armoured
 > boots, gauntlets, helmets, body armour, shields and other armour and
 > clothing. Skyrim lists 2 of them at the bench. The other 55 each
-> carry a condition of their own, a perk or a spell or something you
-> have to be holding.
+> carry a condition of their own, a spell or something you have to be
+> holding.
 
 The count leaves out what your race may not make, as the book does. A
 half with nothing at the rank reached gets the rank line alone.
@@ -208,6 +208,44 @@ daggers, bows, and staves do not. The handle is novice
 does not move the rank. The plugin rows still omit it. The server
 already removes one when the craft goes through.
 
+A bench in a building you hold also draws from the chests in that
+building (#3159, Patrick, 22 Oct). While you are at it, the crafting
+menu lists what the chests hold beside what you carry, and a craft
+takes from your pack first and from the chests, nearest the bench
+first, for the rest. The charcoal and the handle come from the chests
+too when your pack has none. A guest, a partner with the master key
+and a bench outdoors get the pack alone. [Property](property.md) says
+which chests are yours.
+
+## The tool of each trade
+
+Each bench trade needs its own tool in the pack, 50 uses, like a
+gathering tool (Patrick, 22 Oct 2026,
+[#3162](https://github.com/EvilPatrick06/Thornswood/issues/3162)). It
+is handed at the moment the profession is picked.
+
+| Trade | Tool | Who makes the next one |
+| --- | --- | --- |
+| Smith | A hammer (Skyrim's own) | A smith, at a forge, from an iron ingot and a handle |
+| Tailor | A pair of shears | A smith, at a forge, from an iron ingot |
+| Cook | A wooden ladle (Skyrim's own) | A woodwright, at the woodworking bench, from firewood |
+| Alchemist | An alembic | A smith, at a forge, from two iron ingots |
+| Enchanter | A rune knife | A smith, at a forge, from an iron ingot and a leather strip |
+| Woodworker | The woodcutter's axe, the same one they chop with | A smith |
+
+The tool is the trade's, not the bench's: a recipe asks for the tool of
+the trade that owns it, so a smith making a tailor's novice row they
+were taught needs the shears. A recipe nobody owns asks for none. A
+bench opens only for somebody holding the tool of at least one recipe
+there they may make, and otherwise says which tool they need and who
+makes one. Every craft that goes through takes one use off it, brews
+and enchantments included, and a key cut at a forge takes one off the
+hammer. You are told when it is worn thin, and the 50th use breaks it.
+
+The hammer is the one thing at a forge that needs no hammer, so a smith
+whose hammer broke can always forge another. Every other tool is
+another trade's work, so the chain always ends at a smith.
+
 ## The book on K
 
 Press K. The recipe book has a column for your half, a column for the
@@ -288,7 +326,7 @@ name of the staff member who made it.
 
 The eight professions, the halves, the ladder with the count resetting,
 the sister half at novice, the bench table, the charcoal and the
-handle, and the recipe lists are in the server. Smelting is a smith's
+handle, each trade's tool, and the recipe lists are in the server. Smelting is a smith's
 and tanning is the Platewright's, as above, and neither is one of the
 two outside trades. A master takes someone on in the sister half or
 in an outside trade from the look prompt, and either of them ends it on
@@ -311,9 +349,8 @@ piece, which the engine's damage formula reads off the name (the fork
 has it since 26 October, and it waits on the next engine pin), the
 parts of a warrior's maneuvers the game
 has to do itself (see [Warrior](professions/warrior.md)), the repair
-kits on [Durability](durability.md), the check of which effect a
-brew or an enchantment carries (the engine does not pass it yet),
-and the vanilla perk
-lines that still hide some recipes in the crafting menu even when the
-server would allow them. Each profession
-page says which of those is its own.
+kits on [Durability](durability.md), and the check of which effect a
+brew or an enchantment carries (the engine does not pass it yet).
+Each profession page says which of those is its own. Skyrim's perk lines
+come off every recipe in Thornswood-Last.esp, Immersive Armors' included
+(#4826), so the crafting menu hides only what the server refuses.

@@ -99,8 +99,10 @@ const tick = (function () {
   const a = shellCs.indexOf('timer.Tick += delegate');
   return a < 0 ? '' : shellCs.slice(a, shellCs.indexOf('if (Checks.GameStillRunning())', a));
 })();
+// Other idle work may follow the Steam line before the return, such as the
+// look at Vortex for a finished collection update (#5136).
 yes('the two second tick redraws the rows when Steam\'s answer differs from what they say, while not playing',
-    /if \(!playing\)\s*\{\s*if \(Checks\.SteamStillRunning\(\) != steamShown\) DrawStatus\(\);\s*return;\s*\}/.test(tick));
+    /if \(!playing\)\s*\{\s*if \(Checks\.SteamStillRunning\(\) != steamShown\) DrawStatus\(\);[^{}]*?return;\s*\}/.test(tick));
 
 // ============================================== D. Checks
 const all = lift(checksCs, 'public static List<Check> All(Config cfg)');

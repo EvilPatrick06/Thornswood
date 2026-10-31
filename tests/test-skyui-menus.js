@@ -305,7 +305,12 @@ function shipStep(head) {
 }
 const step = at >= 0 ? shipStep("Head 'SkyUI menus'") : '';
 yes('Ship.ps1 has a SkyUI menus step', at > 0);
-yes('  read whole as the statement after its Head line, by PowerShell\'s parser', /^if \(\$FromFeed\) \{/.test(step) && /\}\s*$/.test(step));
+yes('  read whole as the statement after its Head line, by PowerShell\'s parser', /^if \(\$FromFeed( -and \$revMoveFrom)?\) \{/.test(step) && /\}\s*$/.test(step));
+// A release from the feed that moves the revision runs the same check on the
+// box's store of the revision, with our files over it (#4069).
+yes('  a move from the feed runs it too, on the revision\'s own files from the box\'s store',
+  /^if \(\$FromFeed -and \$revMoveFrom\) \{/.test(step) && /Check-SkyUIMenus\.js'\) --data \$skyuiData --plugins \$skyuiPlugins --gone \(@\(Get-ShipDeleteAlways\) -join ';'\)/.test(step) &&
+  /\$skyuiStore\.Menus/.test(step));
 yes('  it runs Check-SkyUIMenus.js on the game folder with the order Ship ships',
   /Check-SkyUIMenus\.js'\) --data \(Join-Path \$GameDir 'Data'\) --plugins \$skyuiPlugins/.test(step) && /Get-ShipLoadOrderDir/.test(step));
 yes('  it reads the paths every pack deletes as gone', /--gone \(@\(Get-ShipDeleteAlways\) -join ';'\)/.test(step));

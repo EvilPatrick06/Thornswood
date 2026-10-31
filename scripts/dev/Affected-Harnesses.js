@@ -92,7 +92,7 @@ function lower(p) { return p.toLowerCase(); }
 // ---- the gate's shape in the build workflows (#3874) ------------------------
 
 // What of the two build workflows a gate harness's run can depend on: the
-// top-level permissions, env and defaults, and the two build jobs, less
+// top-level permissions, env and defaults, and the build job, less
 // their name, needs and if, cut after the gate step (id: gate), all without
 // comments, blank lines or trailing spaces. The rest (the triggers, the
 // concurrency, the tested jobs, a job's condition, the steps after the gate)
@@ -102,7 +102,9 @@ function lower(p) { return p.toLowerCase(); }
 // request to the whole gate (611 harnesses) until a main build traced again.
 // A workflow that cannot be read this way (no gate step found) has no shape,
 // and a change to it runs the whole gate as before.
-const GATE_JOBS = ['launcher-vps', 'launcher'];
+// The box's fallback job, launcher-vps, went with #4983. The gate step left
+// the launcher job for a job of its own, "gate", run in shares, on 31 Oct 2026.
+const GATE_JOBS = ['gate'];
 const WORKFLOWS = ['.github/workflows/build.yml', '.github/workflows/build-pr.yml'];
 function gatePart(text) {
   const lines = String(text).split('\r\n').join('\n').split('\n').map(l => l.replace(/\s+$/, '')).filter(l => l && !/^\s*#/.test(l));

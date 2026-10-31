@@ -1,6 +1,6 @@
 # NPC population catalogue
 
-Generated from the winning records in the 103-plugin load order.
+Generated from the winning records in the 106-plugin load order.
 These are source policies and counts. Release proof is recorded separately.
 
 14,668 placements inspected; 4,883 retained; 9,785 excluded.

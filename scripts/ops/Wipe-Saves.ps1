@@ -64,6 +64,12 @@
                              The pieces are references in the world, so the
                              register goes aside with it, or a fresh world
                              would stand last world's furniture again.
+    private\market-stalls.json the market stalls (#3160): who keeps each
+                             stall and what is laid out on it. The goods came
+                             out of packs in the world set aside, so they go
+                             aside with it, every piece kept; left, the
+                             release list would end those stalls and put last
+                             world's goods in the fresh world's drop boxes.
 
   The first two were here from the start. property.json and farm-claims.json
   were added on 21 September: without them a fresh world would have come up
@@ -86,7 +92,7 @@
   writes) naming every character in the world it set aside, by form id only,
   since a profile keeps its id through a wipe and is never named. The parts
   whose registers were just set aside ($WipeDone: farms, property, embassy,
-  dungeon, cargo, carts, books) are marked done in it. 'saves', server-log.js's
+  dungeon, cargo, stalls, carts, books) are marked done in it. 'saves', server-log.js's
   part, is not among them, because mod-settings.json stays; it takes only
   what a profile holds, so Release-List marks it done when the list names
   no profile, which is so unless a deletion still waiting was carried over.
@@ -128,6 +134,12 @@
   to its next wipe:
 
     .\Wipe-Saves.ps1 -Server dev
+
+  The deploy gate runs that one as its Wipe-Dev verb (#3649), with -Yes and
+  -NoPause and nothing a caller can add, so a cloud session starts dev over
+  for a load order change without a key to the box:
+
+    pwsh scripts/vps/Box-Run.ps1 -Line 'Wipe-Dev'
 
   Read-Host reads the console rather than standard input, so a wipe run from a
   script or from an agent cannot answer the question however it is fed: it comes
@@ -182,7 +194,8 @@ $stamp = (Get-Date).ToString('yyyyMMdd-HHmm')
 # What a wipe moves aside, in each server folder: the header says why each one.
 $Moves = @('world', 'private\characters.json', 'private\property.json', 'private\furniture.json', 'private\farm-claims.json',
            'private\law.json', 'private\beds.json', 'private\embassy.json', 'private\books.json',
-           'private\last-left.json', 'private\take-limit.json', 'private\trade-cargo.json', 'private\trade-carts.json',
+           'private\last-left.json', 'private\take-limit.json', 'private\trade-cargo.json', 'private\market-stalls.json',
+           'private\trade-carts.json',
            'private\dungeon-rewards-ledger.json', 'private\dungeon-rewards-ledger.initialized',
            'private\deleted-characters.json')
 # The release parts (game\gamemode.js PARTS) whose registers are all in
@@ -190,7 +203,7 @@ $Moves = @('world', 'private\characters.json', 'private\property.json', 'private
 # list marks them done and only 'merchants', the ledger a wipe keeps, waits.
 # Not 'saves': mod-settings.json stays (Release-List.ps1 marks it done for a
 # list that names no profile, the only thing that part acts on).
-$WipeDone = @('farms', 'property', 'embassy', 'dungeon', 'cargo', 'carts', 'books')
+$WipeDone = @('farms', 'property', 'embassy', 'dungeon', 'cargo', 'stalls', 'carts', 'books')
 # Both lists go across as literals. A single quote inside either would end the
 # string early on the far side, so it is doubled first.
 function Lit($a) { return (($a | ForEach-Object { "'" + ($_ -replace "'", "''") + "'" }) -join ',') }

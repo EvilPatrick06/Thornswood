@@ -3,21 +3,24 @@
 
       pwsh -NoProfile -File .\tests\test-2486-last-ships.ps1
 
-  Thornswood-Last.esp (#2468) ships from this repository exactly the way
+  Thornswood-Last.esp (#2468) ships from this repository the way
   Thornswood-Content.esp does (Patrick, 12 Oct, #2486 B), never through the
   collection, and a release refuses a plugin built against other bytes than
-  its own load order.
+  its own load order. Since #2791 step 3 it ships as its recipe, from which
+  each machine makes the plugin: no release carries the plugin itself.
 
   What this proves, with no game, no box and no network:
-    1. Ship-Rules.ps1: the plugin is one of ours ($ShipOursFiles), the
-       release places it from game\content (Ensure-ShipRequiredData), the
-       list a pack carries enables it last, once (Add-ShipLastPluginLine,
-       plain for loadorder.txt), and Get-ShipLastPluginProblem passes the
-       bytes and order it was built against and refuses everything else:
-       another load order, other bytes of any plugin, the plugin not enabled
-       last, a plugin that is not the manifest's, and a collection
-       revision (records\collection-plugins.json) or a content plugin with
-       other bytes than the ones it was built against.
+    1. Ship-Rules.ps1: its recipe is one of ours ($ShipOursFiles) and the
+       plugin is never shipped nor listed as removed (Test-ShipMachine), the
+       release places the recipe from game\data as Data\Thornswood-Last.recipe
+       (Ensure-ShipRequiredData), the list a pack carries enables the plugin
+       last, once (Add-ShipLastPluginLine, plain for loadorder.txt), and
+       Get-ShipLastPluginProblem passes the bytes and order it was built
+       against and refuses everything else: another load order, other bytes
+       of any plugin, the plugin not enabled last, a recipe that makes
+       another plugin than the manifest's or is not the manifest's recipe,
+       and a collection revision (records\collection-plugins.json) or a
+       content plugin with other bytes than the ones it was built against.
     2. ServerContent.ps1: the box reads Thornswood-Last.esp's size and
        sha256 beside the content plugin's (its real far side text, run on a
        folder standing in for the server root), and a release that changes it
@@ -57,21 +60,36 @@ try {
     # ---- 1. Ship-Rules ---------------------------------------------------------------
     Write-Host 'Ship-Rules.ps1'
     . (Join-Path $repo 'scripts\release\Ship-Rules.ps1')
-    Yes 'Data\Thornswood-Last.esp is one of the files that are ours' (@($ShipOursFiles) -contains 'Data\Thornswood-Last.esp')
-    Yes '  and the rules call it ours' ((Test-ShipOurs 'Data\Thornswood-Last.esp') -and -not (Test-ShipNotOurs 'Data\Thornswood-Last.esp'))
+    Yes 'Data\Thornswood-Last.recipe is one of the files that are ours' (@($ShipOursFiles) -contains 'Data\Thornswood-Last.recipe')
+    Yes '  and Data\Thornswood-Last.esp is not: it is made from the recipe (#2791)' (@($ShipOursFiles) -notcontains 'Data\Thornswood-Last.esp')
+    Yes '  so the rules never ship it and never list it as removed' ((Test-ShipMadeFromRecipe 'Data\Thornswood-Last.esp') -and (Test-ShipMachine 'Data\Thornswood-Last.esp') -and -not (Test-ShipMachine 'Data\Thornswood-Last.recipe'))
 
+    # A recipe is TSLR, version 1, then the size and sha256 of the plugin it
+    # makes (scripts\mods\last_recipe.py); only that much is read here.
+    function Recipe([int64]$size, [string]$sha, [string]$rest) {
+        $b = New-Object System.Collections.Generic.List[byte]
+        $b.AddRange([byte[]][Text.Encoding]::ASCII.GetBytes('TSLR')); $b.Add(1)
+        $b.AddRange([BitConverter]::GetBytes([uint32]$size))
+        for ($i = 0; $i -lt 64; $i += 2) { $b.Add([Convert]::ToByte($sha.Substring($i, 2), 16)) }
+        $b.AddRange([byte[]][Text.Encoding]::ASCII.GetBytes($rest))
+        return ,$b.ToArray()
+    }
     $fake = Join-Path $Scratch 'repo'
     $game = Join-Path $Scratch 'game'
     Put (Join-Path $fake 'game\required-data\README.md') 'empty'
     Put (Join-Path $fake 'game\content\Thornswood-Content.esp') 'the content plugin'
-    Put (Join-Path $fake 'game\content\Thornswood-Last.esp') 'the last plugin'
+    $recipePath = Join-Path $fake 'game\data\last-plugin.recipe'
+    $lastSha = ('ab' * 32)
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $recipePath) | Out-Null
+    [IO.File]::WriteAllBytes($recipePath, (Recipe 15 $lastSha 'the steps'))
     New-Item -ItemType Directory -Force -Path (Join-Path $game 'Data') | Out-Null
-    Yes 'the checkout holds it, so the rules apply' (Test-ShipLastPluginHeld $fake)
+    Yes 'the checkout holds its recipe, so the rules apply' (Test-ShipLastPluginHeld $fake)
     Yes '  and a checkout without it is left as it was' (-not (Test-ShipLastPluginHeld (Join-Path $Scratch 'nothing')))
     $placed = @(Ensure-ShipRequiredData $game $fake)
-    Yes 'the release places it in Data from game\content, beside the content plugin' (
-        ($placed -contains 'Data\Thornswood-Last.esp') -and ($placed -contains 'Data\Thornswood-Content.esp') -and
-        ([IO.File]::ReadAllText((Join-Path $game 'Data\Thornswood-Last.esp')) -eq 'the last plugin'))
+    Yes 'the release places the recipe in Data from game\data, beside the content plugin, and not the plugin' (
+        ($placed -contains 'Data\Thornswood-Last.recipe') -and ($placed -contains 'Data\Thornswood-Content.esp') -and
+        ($placed -notcontains 'Data\Thornswood-Last.esp') -and
+        ((ShaFile (Join-Path $game 'Data\Thornswood-Last.recipe')) -eq (ShaFile $recipePath)))
     Yes '  and a second run, the same bytes there, places nothing' (@(Ensure-ShipRequiredData $game $fake).Count -eq 0)
 
     $src = Join-Path $Scratch 'plugins.txt'
@@ -101,8 +119,9 @@ try {
     }
     function Record($list) { Put (Join-Path $fake 'records\collection-plugins.json') ([ordered]@{ version = 1; collection = '7essxf'; revision = 9; plugins = $list } | ConvertTo-Json -Depth 5) }
     Record $recRows
-    $manifest = [ordered]@{ version = 1; plugin = [ordered]@{ name = 'Thornswood-Last.esp'; size = 15; sha256 = (ShaFile (Join-Path $fake 'game\content\Thornswood-Last.esp')) };
-                            loadOrder = $order; builtAgainst = $rows }
+    $manifest = [ordered]@{ version = 1; plugin = [ordered]@{ name = 'Thornswood-Last.esp'; size = 15; sha256 = $lastSha };
+                            loadOrder = $order; builtAgainst = $rows
+                            recipe = [ordered]@{ sha256 = (ShaFile $recipePath); size = (Get-Item -LiteralPath $recipePath).Length; sources = 3 } }
     Put (Join-Path $fake 'game\data\last-plugin.json') ($manifest | ConvertTo-Json -Depth 5)
     $enabled = @('A.esp', 'Thornswood-Content.esp', 'B.esp', 'Thornswood-Last.esp')
     $ok = Get-ShipLastPluginProblem $fake $enabled
@@ -126,10 +145,14 @@ try {
     Yes 'a content plugin changed since the build is refused' ($p -match 'another Thornswood-Content\.esp')
     Put (Join-Path $fake 'game\content\Thornswood-Content.esp') 'the content plugin'
     Yes '  and put back, it passes again' ((Get-ShipLastPluginProblem $fake $enabled) -eq '')
-    Put (Join-Path $fake 'game\content\Thornswood-Last.esp') 'the last plugin, edited'
+    [IO.File]::WriteAllBytes($recipePath, (Recipe 15 ('cd' * 32) 'the steps'))
     $p = Get-ShipLastPluginProblem $fake $enabled
-    Yes 'a plugin that is not the one the manifest describes is refused' ($p -match 'is not the plugin')
-    Put (Join-Path $fake 'game\content\Thornswood-Last.esp') 'the last plugin'
+    Yes 'a recipe that makes another plugin than the one the manifest describes is refused' ($p -match 'makes another Thornswood-Last\.esp')
+    [IO.File]::WriteAllBytes($recipePath, (Recipe 15 $lastSha 'other steps'))
+    $p = Get-ShipLastPluginProblem $fake $enabled
+    Yes '  and so is one that is not the recipe the manifest describes' ($p -match 'is not the recipe')
+    [IO.File]::WriteAllBytes($recipePath, (Recipe 15 $lastSha 'the steps'))
+    Yes '  and put back, it passes again' ((Get-ShipLastPluginProblem $fake $enabled) -eq '')
 
     # The Skyrim.ccc plugins load straight after the masters and no plugin
     # list names them; the server's order, and so the built one, has them
@@ -166,11 +189,11 @@ try {
     $cccRead = $pu.LastIndexOf("Join-Path `$GameDir 'Skyrim.ccc'", $bytes)
     Yes '  and is handed the Skyrim.ccc plugins in the release''s Data' ($pu.Contains('Get-ShipLastPluginProblem $RepoDir $lastEnabled $lastCcc') -and $cccRead -gt 0 -and $bytes - $cccRead -lt 600)
     $dd = [IO.File]::ReadAllText((Join-Path $repo 'scripts\deploy\Deploy-DevGamemode.ps1'))
-    Yes 'Deploy-DevGamemode -LoadOrder puts it last, and sends that order even without -Dist' ($dd.Contains('@($pluginNames | Where-Object { $_ -ine $lastName }) + $lastName') -and $dd.Contains('if ($Dist -or $orderMoved)'))
+    Yes 'Deploy-DevGamemode -LoadOrder puts it last, and sends that order even without -Dist' ($dd.Contains('@($pluginNames | Where-Object { $_ -ine $lastName }) + $lastName') -and $dd.Contains('if ($Dist -or $FromRecord -or $orderMoved)'))
     $ds = [IO.File]::ReadAllText((Join-Path $repo 'scripts\deploy\Deploy-Server.ps1'))
     Yes 'Deploy-Server -GamemodeOnly refuses a live order that does not end with it' ($ds -match 'live load order does not end with Thornswood-Last\.esp')
     $dg = [IO.File]::ReadAllText((Join-Path $repo 'scripts\deploy\Deploy-Gamemode.ps1'))
-    Yes 'Deploy-Gamemode builds an order that ends with it, read from the repository' ($dg.Contains('if ($lastHeld) { $keep = @($keep | Where-Object { $_ -ine $lastName }) + $lastName }') -and $dg.Contains('$lastRepo -replace'))
+    Yes 'Deploy-Gamemode builds an order that ends with it, its header read out of the recipe (#2791)' ($dg.Contains('$keep = @($keep | Where-Object { $_ -ine $lastName }) + $lastName') -and $dg.Contains('$info[$lastName] = Read-PluginHeaderBytes $lastHead $lastName') -and $dg.Contains('$lastHead = Get-ThornswoodLastRecipeHead'))
     Yes 'Deploy-Gamemode takes the places between full and light plugins from the order it was built against, and stops on any other' (
         $dg.Contains('$rs = Get-ThornswoodRecordedSequence ([string[]]$wanted) ([string[]]$lastOrder)') -and
         $dg.Contains('$so = Get-ThornswoodServerOrder $sequence') -and $dg.Contains('throw "$lastName was built against another load order"'))

@@ -78,8 +78,8 @@ yes("benchGate has no door for everybody", gm.indexOf("bench.anyone") < 0);
 yes("a bench with no rows and no halves is shut for everybody before the character is read",
   /if \(!\(Array\.isArray\(bench\.rows\) && bench\.rows\.length\) && !Object\.keys\(halves\)\.length\) \{\s*return 'There is nothing anybody can make here\.';/.test(gm) &&
   gm.indexOf("There is nothing anybody can make here.") < gm.indexOf("const C = globalThis.__thornswoodCharacter;", gm.indexOf("function benchGate(")));
-yes("benchGate asks craftAnswer of the bench's rows",
-  /if \(Array\.isArray\(bench\.rows\)\) \{[\s\S]{0,200}craftRow\(bench\.rows\[i\]\)[\s\S]{0,100}!craftAnswer\(actorId, row\)\.refusal\) \{ return null; \}/.test(gm));
+yes("benchGate asks craftAnswer of the bench's rows, and the row's trade tool (#3162)",
+  /if \(Array\.isArray\(bench\.rows\)\) \{[\s\S]{0,200}craftRow\(bench\.rows\[i\]\)[\s\S]{0,100}!craftAnswer\(actorId, row\)\.refusal && toolFree\(benchToolKey\(row\)\)\) \{ return null; \}/.test(gm));
 
 // The page's bench table: | Bench | Who |.
 const rows = {};

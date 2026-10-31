@@ -17,12 +17,13 @@
   which shares the chat's socket and can start listening after the room
   has already offered to it (3).
 
-  1. The service, over raw sockets. A socket that has stopped reading is
-     backed up with a heavy position feed, two people join (so its roster is
-     held, newest only), and the second sends it an offer and a candidate.
-     When it reads again, the roster naming the sender comes before both,
-     and the older roster never comes at all. So no socket is sent anything
-     from somebody before the roster that names them.
+  1. The service, over raw sockets. A socket is held backed (a probe in
+     the service holds every write to it, as a kernel with no room would,
+     #5090), two people join (so its roster is held, newest only), and the
+     second sends it an offer and a candidate. When it is let go, the
+     roster naming the sender comes before both, and the older roster
+     never comes at all. So no socket is sent anything from somebody before
+     the roster that names them.
 
   2. Two launcher pages. They join, negotiate, and then both microphones
      open in the same moment and each offers before it reads the other's
@@ -150,11 +151,70 @@ function listening(srv, port) {
     srv.on('exit', gone);
   });
 }
+/*
+  A socket that has stopped reading, made in the service's own process
+  (#5090). Part 1 is about what the service does while a socket is backed:
+  a write the kernel did not take. A socket left unread on loopback was not
+  that for long: the reader's kernel took more as its window grew, and on
+  GitHub's hosted Windows runner the service's own send buffer took a whole
+  tick a second or more after the feed stopped, so the checks measured each
+  runner's kernel. This probe, preloaded with -r, stands in for a kernel
+  with no room for one socket: told "hold <port>" on the service's stdin,
+  every write to the socket from that port is kept here, in order, and
+  answered false, and its writableLength counts what is kept. Told "let go
+  <port>", it writes what it kept, in order, and the socket drains. Nothing
+  else about the service changes. voice/test-backpressure.js measures what
+  real backpressure does to the service's memory.
+*/
+function hold() {
+  const net = require('net');
+  const write = net.Socket.prototype.write;
+  const held = new Map();
+  net.Socket.prototype.write = function (chunk) {
+    const h = held.get(this.remotePort);
+    if (!h || h.socket !== this) { return write.apply(this, arguments); }
+    const b = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    h.chunks.push(b);
+    h.bytes += b.length;
+    return false;
+  };
+  const sockets = new Map();
+  const server = net.Server.prototype.emit;
+  net.Server.prototype.emit = function (ev, s) {
+    if (ev === 'connection' && s) { sockets.set(s.remotePort, s); s.on('close', () => sockets.delete(s.remotePort)); }
+    return server.apply(this, arguments);
+  };
+  let line = '';
+  process.stdin.on('data', (d) => {
+    line += d;
+    let at;
+    while ((at = line.indexOf(String.fromCharCode(10))) >= 0) {
+      const words = line.slice(0, at).trim().split(' ');
+      line = line.slice(at + 1);
+      const port = Number(words[words.length - 1]);
+      const s = sockets.get(port);
+      if (words[0] === 'hold' && s) {
+        const h = { socket: s, chunks: [], bytes: 0 };
+        held.set(port, h);
+        Object.defineProperty(s, 'writableLength', { configurable: true, get: () => h.bytes });
+        process.stdout.write('[hold] holding ' + port + String.fromCharCode(10));
+      } else if (words[0] === 'let' && held.has(port)) {
+        const h = held.get(port);
+        held.delete(port);
+        delete s.writableLength;
+        for (const c of h.chunks) { write.call(s, c); }
+        process.stdout.write('[hold] let go ' + port + ' after ' + h.chunks.length + ' write(s)' + String.fromCharCode(10));
+        process.nextTick(() => s.emit('drain'));
+      }
+    }
+  });
+}
+fs.writeFileSync(path.join(dir, 'hold.js'), '(' + hold.toString() + ')();');
 let PORT = 0, BASE = '', srv = null, srvLog = '';
 async function start() {
   PORT = await freePort('127.0.0.1');
   BASE = 'http://127.0.0.1:' + PORT;
-  srv = spawn(process.execPath, ['voice-server.js'], {
+  srv = spawn(process.execPath, ['-r', path.join(dir, 'hold.js'), 'voice-server.js'], {
     cwd: dir,
     env: Object.assign({}, process.env, {
       THORNSWOOD_VOICE_PORT: String(PORT), THORNSWOOD_VOICE_BIND: '127.0.0.1',
@@ -169,8 +229,8 @@ async function health() { return (await fetch(BASE + '/health')).json(); }
 
 // ------------------------------------------------- raw sockets, for part 1 --
 const raw = [];
-/* The handshake by hand, so a socket can be left paused, which is a
-   machine that has stopped reading. */
+/* The handshake by hand, so what the service writes is read frame by frame
+   and nothing in between answers for it. */
 function openRaw(pid) {
   return new Promise((resolve, reject) => {
     const key = crypto.randomBytes(16).toString('base64');
@@ -621,45 +681,28 @@ function feed() {
 
 async function partOne() {
   console.log('1. the service, on a socket that has stopped reading:');
+  // Only somebody in the world holds a voice place and is sent the roster
+  // (#3570), so the one that stops reading stands among the walkers first.
+  await fetch(BASE + '/positions', { method: 'POST', body: JSON.stringify({ who: [
+    { profileId: 100000, pos: [12345, -2345, 1234], angleZ: 90, cell: '0x0001a26f', name: 'Walker 0' }] }) });
   const E = await openRaw(100000);
   const got = [];
   readRaw(E, (m) => got.push(m));
   sendRaw(E, { t: 'join', profileId: 100000, name: 'stops reading' });
-  await until(() => got.some((m) => m.t === 'peers'));
+  yes('it joins and has the room\'s roster', await until(() => got.some((m) => m.t === 'peers')));
   const eId = (got.find((m) => m.t === 'welcome') || {}).peer;
-  E.pause();
-  const before = got.length;
 
-  // Backed (#2144) is only "a write the kernel has not taken yet": one tick of
-  // 1500 rows is past the socket's high-water mark the moment it is written,
-  // so health says backed until the kernel takes it, even while the reader's
-  // kernel buffers still have room. Seen once is not enough. On the build
-  // runner the feed stopped on such a moment, the kernel then took the tick,
-  // drain cleared backed, and the joins were measured on a socket that was not
-  // backed. So the feed stops only once backed has held for a whole second
-  // with nothing being fed, which is a socket whose kernel buffers are full.
-  // voice/test-backpressure.js waits the same way (two probes in a row).
-  const t0 = Date.now();
-  const timeline = [];
-  let feeding = setInterval(feed, 200);
-  let backed = false;
-  while (!backed && Date.now() - t0 < 30000) {
-    await sleep(200);
-    if ((await health()).backed < 1) continue;
-    timeline.push('backed at ' + (Date.now() - t0) + ' ms');
-    clearInterval(feeding);
-    backed = true;
-    for (let k = 0; k < 5 && backed; k++) {
-      await sleep(200);
-      const hh = await health();
-      if (hh.backed < 1) { backed = false; timeline.push('drained at ' + (Date.now() - t0) + ' ms (queue was a tick in flight)'); }
-    }
-    if (!backed) feeding = setInterval(feed, 200);
-  }
-  clearInterval(feeding);
-  console.log('      the feed: ' + timeline.join(', ') + (backed ? ', held for 1 s with nothing fed' : ', never held'));
-  yes('a socket that does not read is backed up, so what follows is measured on one', backed);
-  if (!backed) { return; }
+  // From here the service's writes to it are held, as a kernel with no room
+  // holds them, and the next position tick to it is the write it is refused.
+  srv.stdin.write('hold ' + E.localPort + '\n');
+  yes('the probe holds every write to it', await until(() => srvLog.includes('[hold] holding ' + E.localPort)));
+  const before = got.length;
+  await feed();
+  let h0 = await health();
+  for (const t0 = Date.now(); h0.backed !== 1 && Date.now() - t0 < 5000; h0 = await health()) { await sleep(50); }
+  yes('a tick of the feed to it is refused, so it is backed (backed ' + h0.backed + ', ' + h0.largestQueueBytes + ' bytes waiting)',
+      h0.backed === 1 && h0.largestQueueBytes > 0);
+  if (h0.backed !== 1) { return; }
   const skipped0 = (await health()).skippedRosters;
 
   const N1 = await openRaw(100001);
@@ -677,29 +720,29 @@ async function partOne() {
   const n2Id = (n2.find((m) => m.t === 'welcome') || {}).peer;
   // skippedRosters moves only inside sendLatest while the socket is backed,
   // so it rising is the proof the second roster replaced the first on a
-  // backed socket. Whether health says backed at the instant after is not:
-  // backed is a write the kernel has not taken yet, and a reader that has
-  // stopped still has its kernel take more as the receive window grows (seen
-  // on GitHub's hosted Windows runner, 11 Oct: 0 to 1, backed 0 here, backed
-  // again 300 ms later). A drain there flushes the newest roster, which the
-  // order checks below still hold to, so asking for backed at this instant
-  // only measured the kernel's timing.
+  // backed socket.
   const h = await health();
   yes('two people join while it is backed, and the first roster is replaced unsent (skippedRosters ' +
-      skipped0 + ' to ' + h.skippedRosters + ', backed ' + h.backed + ' just after)', h.skippedRosters > skipped0);
+      skipped0 + ' to ' + h.skippedRosters + ', backed ' + h.backed + ' just after)', h.skippedRosters > skipped0 && h.backed === 1);
 
   // The newcomer offers to it at once, off its own roster, and sends a candidate.
   const theirs = n2.find((m) => m.t === 'peers');
   yes('the newcomer\'s roster names the backed socket, which is who it offers to',
       !!theirs && theirs.peers.some((p) => p.peer === eId));
+  // The roster it holds has to go out ahead of the offer (send). The
+  // service counts a held roster written ahead of a message where that
+  // happens, and a drain that sent it first is not counted.
+  const ahead0 = h.rostersAhead;
   sendRaw(N2, { t: 'sdp', to: eId, sdp: { type: 'offer', sdp: 'measured offer' } });
   sendRaw(N2, { t: 'ice', to: eId, candidate: { candidate: 'candidate:1 1 udp 1 192.0.2.9 50000 typ host', sdpMid: '0', sdpMLineIndex: 0 } });
-  await sleep(300);
-  yes('and it is still backed when they are relayed to it', (await health()).backed >= 1);
+  let hr = await health();
+  for (const t0 = Date.now(); hr.rostersAhead === ahead0 && Date.now() - t0 < 5000; hr = await health()) { await sleep(50); }
+  yes('and the roster it held goes out ahead of the offer relayed to it (rostersAhead ' + ahead0 + ' to ' +
+      hr.rostersAhead + ', backed ' + hr.backed + ' after)', hr.rostersAhead === ahead0 + 1 && hr.backed === 1);
 
-  E.resume();
+  srv.stdin.write('let go ' + E.localPort + '\n');
   const heard = await until(() => got.slice(before).some((m) => m.t === 'ice' && m.from === n2Id), 15000);
-  yes('when it reads again, the offer and the candidate reach it', heard);
+  yes('when it is let go, the offer and the candidate reach it', heard);
   const after = got.slice(before).filter((m) => m.t === 'peers' || m.t === 'sdp' || m.t === 'ice');
   const names = (m, id) => m.t === 'peers' && m.peers.some((p) => p.peer === id);
   const rosterAt = after.findIndex((m) => names(m, n2Id));

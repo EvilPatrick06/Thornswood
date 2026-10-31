@@ -1,12 +1,12 @@
 {
-  "why": "What GitHub's Actions settings, environments, secrets and variables for this repository are meant to be. scripts/deploy/Check-GitHubSettings.ps1 reads GitHub and names every difference (#3534); a change to a setting is a pull request to this file and the change on GitHub together. docs/RUNNER-ISOLATION.md in the ops repo, section 1, says why each is what it is; Developer-Guide.md section P and docs/OWNERSHIP.md in the ops repo say what each secret is. Names only, never a value. Since #4013 the box's workflows and their secrets are in the ops repository: CLOUDFLARE_TURNSTILE_TOKEN, the notices environment and the desk's DESK_KEY_B64 went there at the flip, and desk keeps NEXUS_API_KEY for nexus-run.yml, which runs here on GitHub's runner.",
+  "why": "What GitHub's Actions settings, environments, secrets and variables for this repository are meant to be. scripts/deploy/Check-GitHubSettings.ps1 reads GitHub and names every difference (#3534); a change to a setting is a pull request to this file and the change on GitHub together. docs/RUNNER-ISOLATION.md in the ops repo, section 1, says why each is what it is; Developer-Guide.md section P and docs/OWNERSHIP.md in the ops repo say what each secret is. Names only, never a value. Since #4013 the box's workflows and their secrets are in the ops repository: CLOUDFLARE_TURNSTILE_TOKEN, the notices environment and the desk's DESK_KEY_B64 went there at the flip, and desk keeps NEXUS_API_KEY for nexus-run.yml, which runs here on GitHub's runner. The outside watcher (watch-outside.yml) came here from its own public repository after the flip (#3690): its two secrets are in the watch environment, and WATCH_OUTSIDE switches it on.",
   "actions": {
     "enabled": true,
     "allowed_actions": "all"
   },
   "workflow_token": {
     "default_workflow_permissions": "read",
-    "can_approve_pull_request_reviews": false
+    "can_approve_pull_request_reviews": true
   },
   "sharing": {
     "access_level": "none"
@@ -20,7 +20,8 @@
   "variables": [
     "AZURE_SIGNING_CLIENT_ID",
     "AZURE_SIGNING_TENANT_ID",
-    "BUILD_RUNNER"
+    "BUILD_RUNNER",
+    "WATCH_OUTSIDE"
   ],
   "environments": {
     "board": {
@@ -46,6 +47,16 @@
         "branch main"
       ],
       "secrets": [],
+      "variables": []
+    },
+    "watch": {
+      "deploy_from": [
+        "branch main"
+      ],
+      "secrets": [
+        "RUNNER_TOKEN",
+        "STAFF_WEBHOOK"
+      ],
       "variables": []
     }
   }

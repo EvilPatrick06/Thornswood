@@ -609,11 +609,38 @@ $CONDITION_FUNCTIONS_THE_SERVER_HAS = @{
 # classes.md line 4: "Nothing you do raises a vanilla skill and no perk menu
 # opens when you sleep", and the page says vanilla progression being off is the
 # part already shipped. So no character on this server will ever hold a vanilla
-# perk. A recipe behind one is a recipe nobody can reach, whatever this table
-# says about who owns it, and the count of them per half is printed and written
-# into the json so that a half made entirely of them is visible rather than
-# reported as work.
+# perk. A recipe behind one was a recipe nobody could reach, whatever this
+# table said about who owns it.
+#
+# THE PERKS COME OFF (#4826; Patrick, 22 Oct 2026, B: the whole vanilla perk
+# system goes). scripts\mods\Build-LastPlugin.py takes every perk test out of
+# every winning recipe in Thornswood-Last.esp, so the crafting menu no longer
+# hides a row the server allows. This table reads the end state in one pass:
+# a perk test on a recipe the last plugin copies is not one of the row's
+# needs. A recipe of a plugin the last plugin never copies from
+# (notCopiedFrom in game\data\last-plugin-policy.json) keeps its perk tests,
+# and those rows are still counted as behind a perk, unless that plugin's row
+# says perkRecipesCopied: Immersive Armors' does (Patrick, 31 Oct 2026, A on
+# q-4826-ia-perk-recipes), so its perk tests come off like everybody's.
+# Thornswood-Last.esp's own copy of a recipe is never read for its
+# conditions: the ones below it are, the way its bench is (#3120), so the
+# table is the same whether the box's last plugin is from before this or
+# after. A perk test counts as passed, so one joined to other conditions by
+# OR makes its whole OR group pass, and none of that group is a need either,
+# the same OR groups Build-LastPlugin.py takes off (perk_drops there).
+#
+# Gourmet makes many dishes twice over, the plain recipe asking
+# MAG_FoodUpgradePerk03 == 0 and one that makes two portions asking it == 1.
+# Both are rows here already, each ranked by this table (the two-portion
+# dumplings are advanced Confectioner work), so with the perks off both list
+# and the rank decides who makes which, as for every other row.
 $CONDITION_VANILLA_PERK = 448
+$PERKS_OFF_IN_LAST_PLUGIN = $true
+$LAST_POLICY_FILE = Join-Path $PSScriptRoot '..\..\game\data\last-plugin-policy.json'
+$PERKS_KEPT_IN = @{}
+foreach ($row in @(([IO.File]::ReadAllText($LAST_POLICY_FILE) | ConvertFrom-Json).notCopiedFrom)) {
+    if ($row -and $row.plugin -and $row.perkRecipesCopied -ne $true) { $PERKS_KEPT_IN[([string]$row.plugin).ToLowerInvariant()] = $true }
+}
 
 # HOW A CONDITION IS READ OUT LOUD. The operator is the top three bits of the
 # CTDA's first byte, and these six are the enum in
@@ -1251,7 +1278,7 @@ $RUNGS_MUST_BE_STANDABLE = $true
 # a check quietly passing. Any half not named here that fails the check fails
 # the build, because a rung nobody can gather for is a rank that opens nothing.
 $HALVES_WITH_AN_UNSTANDABLE_RUNG = [ordered]@{
-    'Cook/Confectioner' = 'every one of its 28 rows wants a Sack of Flour and a pat of Butter, counted over the whole half on 21 September, and flour is made from Wheat, which harvests.json ranks advanced for a gatherer and for a farmer alike. So the cheapest thing a Confectioner can bake is advanced work to gather for and the novice rung cannot be stood on whatever rule ranks the half: by input cost all 28 land 20 advanced and 8 expert and none novice (28 September), and filling the empty novice rung (HOLE_FILL_MOVES_ONE_RUNG) only relabels eight of the advanced ones. This appeared the day the hop was followed and it was always true; before it, flour had no producer at all and every row read as costing nothing. It closes when somebody decides where a Confectioner''s flour comes from, which is the same decision HALVES_NOBODY_CAN_START is already waiting on for this half: all 28 rows are behind two vanilla perks nobody here will ever hold, so nothing is being opened to anybody at any rank yet.'
+    'Cook/Confectioner' = 'every one of its 28 rows wants a Sack of Flour and a pat of Butter, counted over the whole half on 21 September, and flour is made from Wheat, which harvests.json ranks advanced for a gatherer and for a farmer alike. So the cheapest thing a Confectioner can bake is advanced work to gather for and the novice rung cannot be stood on whatever rule ranks the half: by input cost all 28 land 20 advanced and 8 expert and none novice (28 September), and filling the empty novice rung (HOLE_FILL_MOVES_ONE_RUNG) only relabels eight of the advanced ones. This appeared the day the hop was followed and it was always true; before it, flour had no producer at all and every row read as costing nothing. It closes when somebody decides where a Confectioner''s flour comes from. The two vanilla perks every row carried come off in Thornswood-Last.esp since #4826, so the rows are open to whoever the server allows.'
     'Enchanter/Bladebinder' = 'all of its 161 rows but the Aetherial Staff want a Heart Stone, which is master mining (the miner page, issues #1380 and #1586, RANK_BY_ORE in Build-OreTable.ps1), so by input cost all 160 land on master. Patrick, 4 October (#1622): each college book staff at its spell''s rank, named in RECIPE_RANK. So the thirteen the Bladebinder page keeps sit novice 3, advanced 6 and expert 4, and the other 148, all cut, stay on master. The novice, advanced and expert rungs hold only staves whose stone nobody below master can dig, so a Bladebinder below master buys heart stones from a master miner. That is the decision, not a hole: the recipe says what the spell gate already says, because a staff is not made until its spell is on you and a Bladebinder unlocks a spell on K only at a rank at least the spell''s.'
 }
 
@@ -1330,7 +1357,6 @@ $BOOK_TEACHES_SPELL = 0x04
 $CONDITION_HAS_SPELL = 264
 
 $HALVES_NOBODY_CAN_START = [ordered]@{
-    'Cook/Confectioner'     = 'every one of its 28 recipes carries two vanilla perk conditions, function index 448: MAG_FoodUpgradePerk03 out of Gourmet.esp on all 28, and a second perk named for the recipe itself, MAG_RecipePerkSnowberryDumpling and its like, on all 28 as well. classes.md says no perk menu opens and vanilla progression is off, so nobody here will ever hold either. The server would wave the condition through, because the fork has no function for that index, but Skyrim''s own crafting menu evaluates it first and never lists the recipe, so onCraft is not even reached. The dessert keyword split is right and the half is real; what is missing is somebody deciding what a new Confectioner starts able to bake. Four of the 28 want an item on top of the perks.'
 }
 
 # WHEN A HALF IS THIN ENOUGH TO NAME OUT LOUD. A half with a handful of rows a
@@ -1902,47 +1928,38 @@ $BENCH_UNOWNED_PREFIX = 'BYOHBuildingInteriorPart'
 # This is a knob for a recipe whose owner is a decision rather than a reading.
 # Every entry needs the measured reason it cannot be derived, and a name in here
 # that the rules WOULD have settled is worth taking out again.
-$RECIPE_OWNER = [ordered]@{
-    'ThornswoodRecipeToolShovel' = @{ Owner = 'Smith'; Half = 'Edgewright'; Why = 'a shovel is a tool a smith forges, and it is here rather than derived because Shovel01 is a MISC: the forge settles ownership by the output being a WEAP, so the pickaxe and the axe are covered by that rule and the shovel is not. Patrick, 21 September: a broken tool is replaced by "a smith making them".' }
-    'ThornswoodRecipeKeyMold'    = @{ Owner = 'Smith'; Half = 'Edgewright'; Why = 'a key mold is a smith''s work and it is here for the same reason the shovel is: the output is a MISC, so the forge rule, which settles ownership by the output being a WEAP, cannot see it. Patrick, 23 September: "make a fucking mold item craftable dude this would solve alot".' }
-    'ThornswoodRecipeKey'        = @{ Owner = 'Smith'; Half = 'Edgewright'; Why = 'a key is cut by a smith off a stamped mold, and the mold is checked server side in mp.onCraft rather than as an input, because an input is taken by the engine and Patrick asked for the mold to be reusable: "it can be reused". Same MISC output as the mold, so the same reason it cannot be derived.' }
-    'ThornswoodRecipeWeaponKit'  = @{ Owner = 'Smith'; Half = 'Edgewright'; Why = 'the Weapon Kit is the Edgewright''s repair kit (docs/systems/durability.md), and the output is a MISC, so the forge rule, which settles ownership by the output being a WEAP, cannot see it. Patrick, 4 October: use a suggested recipe; this is the one picked (#1384).' }
-    'ThornswoodRecipeArmorKit'   = @{ Owner = 'Smith'; Half = 'Platewright'; Why = 'the Armor Kit is the Platewright''s repair kit (docs/systems/durability.md). A MISC at a forge, so the forge rule cannot see it, and it would not land on the Platewright if it could. Patrick, 4 October: use a suggested recipe; this is the one picked (#1384).' }
-    'ThornswoodRecipeSewingKit'  = @{ Owner = 'Tailor'; Half = 'Haberdasher'; Why = 'the Sewing Kit is the Haberdasher''s repair kit (docs/systems/durability.md). A MISC at the tanning rack, which is open furniture whose own rule hands a hide into leather to the Platewright, so nothing derived would give it to a tailor. Patrick, 4 October: use a suggested recipe; this is the one picked (#1384).' }
-    'ThornswoodRecipeBandage'    = @{ Owner = 'Tailor'; Half = 'Haberdasher'; Why = 'the bandage is a tailor''s work (docs/systems/injury.md, who treats what). Patrick, 4 October, on #1383: a Haberdasher novice recipe at the loom. A MISC, named here so its half is that answer and not a reading of the output.' }
-    'ThornswoodRecipeSplint'     = @{ Owner = 'Woodworker'; Half = 'Woodwright'; Why = 'the splint holds a break (docs/systems/injury.md). Patrick, 4 October, on #1383: a Woodwright novice recipe at the kiln. The kiln''s own rule gives its work to the Charburner, so it is named here.' }
-    'ThornswoodRecipePoultice'   = @{ Owner = 'Alchemist'; Half = 'Physicker'; Why = 'the poultice cuts the wound fever chance (docs/systems/injury.md). Patrick, 4 October, on #1383: a Physicker recipe at novice. A MISC at the alchemy lab Thornswood-Content.esp ships, a create-object bench, which nothing else names.' }
-    'ThornswoodRecipeRemedy'     = @{ Owner = 'Alchemist'; Half = 'Physicker'; Why = 'the physicker''s remedy closes a cut and clears one ordinary disease (docs/systems/injury.md, disease.md, physicker.md). Patrick, 4 October, on #1383: a Physicker recipe at advanced, which its blue mountain flower makes it. A MISC at the same alchemy lab.' }
-    # The fish trap (#1379). docs/systems/classes/fisher.md: "A woodwright makes
-    # them", the poles and the trap. The poles reach the Woodwright by the spear
-    # rule further down; the trap is a MISC with no pole in its name, so the
-    # forge rule leaves it to anybody unless it is named here.
-    'ThornswoodRecipeFishTrap'   = @{ Owner = 'Woodworker'; Half = 'Woodwright'; Why = 'the fish trap is a woodwright novice good, made with the poles (docs/systems/classes/fisher.md, issue #1379). A MISC at a forge with no pole in its name, so neither the forge rule nor the spear rule can see it.' }
-    # ONE SMELT ROW PER INGOT AND ONE ROW FOR LEATHER (#1391, #1400). Smelting an
-    # ingot is smith work and tanning a hide is the Platewright's
-    # (docs/systems/cut-items.md, "Smelting and tanning are not anybody's work").
-    # The duplicates are cut in docs/systems/cut-items.json, which CUT_FILE reads,
-    # and these are the rows that stay. They are named here because the smelter
-    # is open furniture in BENCH_OWNER and the tanning rack is no profession's
-    # bench, so no derived rule gives either to a half. All of them are novice
-    # in RECIPE_RANK, Platewright work that the sister half reaches at novice.
-    # Family is the recipe book's group for them, Ingots and Leather, because a
-    # MISC output names no kind of thing and would land in Other goods.
-    # Until 4 October they were put in recipes.json by hand after the build,
-    # so a rebuild handed every one of them back to anybody (issue #1622).
-    'RecipeIngotCorundum'        = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
-    'RecipeIngotEbony'           = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
-    'IMRIngotGlacialCrystal'     = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
-    'RecipeIngotGold'            = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
-    'RecipeIngotIron'            = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
-    'RecipeIngotOrichalcum'      = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
-    'RecipeIngotQuicksilver'     = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
-    'RecipeIngotMalachite'       = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
-    'RecipeIngotMoonstone'       = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
-    'RecipeIngotSilver'          = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
-    'RecipeIngotSteel'           = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
-    'RecipeLeatherDeerHide02'    = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Leather'; Why = 'The one row kept for this leather. Platewright work, as the smith page says. Not anybody''s.' }
-    'RecipeLeatherStrips'        = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Leather'; Why = 'The one row kept for this leather. Platewright work, as the smith page says. Not anybody''s.' }
+# The entries are in records\recipe-owners.json, under "owner", each with its
+# Owner, Half, an optional Family and its Why. They are data and not code so
+# that a recipe change is the content plugin and that file and nothing else:
+# the box's Rebuild-ContentTables then rebuilds a pull request's tables with
+# main's own builders, taking only those two files from it (Patrick, 30 Oct
+# 2026, B on the report page, #3470).
+#
+# What the groups in the file are:
+#
+# The fish trap (#1379). docs/systems/classes/fisher.md: "A woodwright makes
+# them", the poles and the trap. The poles reach the Woodwright by the spear
+# rule further down; the trap is a MISC with no pole in its name, so the
+# forge rule leaves it to anybody unless it is named here.
+# ONE SMELT ROW PER INGOT AND ONE ROW FOR LEATHER (#1391, #1400). Smelting an
+# ingot is smith work and tanning a hide is the Platewright's
+# (docs/systems/cut-items.md, "Smelting and tanning are not anybody's work").
+# The duplicates are cut in docs/systems/cut-items.json, which CUT_FILE reads,
+# and these are the rows that stay. They are named here because the smelter
+# is open furniture in BENCH_OWNER and the tanning rack is no profession's
+# bench, so no derived rule gives either to a half. All of them are novice
+# in RECIPE_RANK, Platewright work that the sister half reaches at novice.
+# Family is the recipe book's group for them, Ingots and Leather, because a
+# MISC output names no kind of thing and would land in Other goods.
+# Until 4 October they were put in recipes.json by hand after the build,
+# so a rebuild handed every one of them back to anybody (issue #1622).
+$RECIPE_NAMES_FILE = Join-Path $PSScriptRoot '..\..\records\recipe-owners.json'
+$RECIPE_NAMES = [IO.File]::ReadAllText($RECIPE_NAMES_FILE) | ConvertFrom-Json
+$RECIPE_OWNER = [ordered]@{}
+foreach ($nameEntry in $RECIPE_NAMES.owner.PSObject.Properties) {
+    $knob = @{}
+    foreach ($field in $nameEntry.Value.PSObject.Properties) { $knob[$field.Name] = [string]$field.Value }
+    $RECIPE_OWNER[$nameEntry.Name] = $knob
 }
 
 # NAMED RECIPES WHOSE RANK IS A DECISION RATHER THAN A READING.
@@ -1970,60 +1987,33 @@ $RECIPE_OWNER = [ordered]@{
 # THIS IS THE LAST RESORT AND IT IS CHECKED. A named rank is applied after every
 # automatic rule and BEFORE the empty-rung and standable checks, so it cannot be
 # used to write a ladder with a hole in it.
-$RECIPE_RANK = [ordered]@{
-    'ThornswoodRecipeCharcoalTier1' = @{ Rank = 'novice';   Why = 'the first of the four charcoal grades, a novice charburner''s, as the charburner page ranks it.' }
-    'ThornswoodRecipeCharcoalTier2' = @{ Rank = 'advanced'; Why = 'the second charcoal grade, an advanced charburner''s.' }
-    'ThornswoodRecipeCharcoalTier3' = @{ Rank = 'expert';   Why = 'the third charcoal grade, an expert charburner''s.' }
-    'ThornswoodRecipeCharcoalTier4' = @{ Rank = 'master';   Why = 'coke, the last charcoal grade, a master charburner''s alone.' }
-    # The poles and the trap, as docs/systems/classes/fisher.md ranks them under
-    # "The poles and the trap" (issue #1379). Input cost puts the fine pole on
-    # advanced and the master pole on expert, because a steel ingot and a
-    # refined moonstone are their dearest makings; the page ranks a pole by the
-    # water it fishes, so the rank is a decision and not a reading.
-    'ThornswoodRecipePoleCrude'     = @{ Rank = 'novice';   Why = 'the crude pole, novice on the fisher page.' }
-    'ThornswoodRecipePoleFine'      = @{ Rank = 'expert';   Why = 'the fine pole, expert on the fisher page: it fishes novice through expert water.' }
-    'ThornswoodRecipePoleMaster'    = @{ Rank = 'master';   Why = 'the master pole, master on the fisher page: it fishes all of it.' }
-    'ThornswoodRecipeFishTrap'      = @{ Rank = 'novice';   Why = 'the fish trap, a woodwright novice good on the fisher page.' }
-    # THE COLLEGE BOOK STAVES, each at its spell's rank. Patrick, 4 October,
-    # answering issue #1622: "B, each college book staff at its spell's rank".
-    # Heart stone is master mining (the miner page, #1380, #1586), so input
-    # cost puts every staff on master. A staff is not made until its spell is
-    # on you, and a Bladebinder unlocks a spell only at a rank at least the
-    # spell's (the Bladebinder page, Staff spells), so the recipe says what the
-    # spell gate already says. These are the thirteen the Bladebinder page
-    # keeps; the other 147 and the Aetherial Staff are cut and stay where input
-    # cost puts them. The rank is the spell's in the college book, the mage
-    # school pages and STAFF_SPELLS, and tests\test-1622-recipe-generator.js
-    # holds each line to it. A Bladebinder below master buys the stones from a
-    # master miner, which HALVES_WITH_AN_UNSTANDABLE_RUNG says for this half.
-    'DLC2RecipeStaffFlames'         = @{ Rank = 'novice';   Why = 'Staff of Flames, at the rank of Flames in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffFrostbite'      = @{ Rank = 'novice';   Why = 'Staff of Frostbite, at the rank of Frostbite in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffSparks'         = @{ Rank = 'novice';   Why = 'Staff of Sparks, at the rank of Sparks in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffFirebolt'       = @{ Rank = 'advanced'; Why = 'Staff of Firebolts, at the rank of Firebolt in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffIceSpike'       = @{ Rank = 'advanced'; Why = 'Staff of Ice Spikes, at the rank of Ice Spike in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffLightningBolt'  = @{ Rank = 'advanced'; Why = 'Staff of Lightning Bolts, at the rank of Lightning Bolt in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffIceStorm'       = @{ Rank = 'advanced'; Why = 'Staff of Ice Storms, at the rank of Ice Storm in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffSoulTrap'       = @{ Rank = 'advanced'; Why = 'Staff of Soul Trapping, at the rank of Soul Trap in the college book (conjuration). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffTurnUndead'     = @{ Rank = 'advanced'; Why = 'Staff of Turning, at the rank of Turn Undead in the college book (restoration). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffTurnGreaterUndead' = @{ Rank = 'expert';   Why = 'Grand Staff of Turning, at the rank of Turn Greater Undead in the college book (restoration). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffIcySpear'       = @{ Rank = 'expert';   Why = 'Staff of Icy Spear, at the rank of Icy Spear in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffIncinerate'     = @{ Rank = 'expert';   Why = 'Staff of Incineration, at the rank of Incinerate in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffThunderbolt'    = @{ Rank = 'expert';   Why = 'Staff of Thunderbolts, at the rank of Thunderbolt in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    # The kept smelt and tan rows named in RECIPE_OWNER (#1391, #1400): novice
-    # smith work, whatever the ore costs to dig.
-    'RecipeIngotCorundum'           = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
-    'RecipeIngotEbony'              = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
-    'IMRIngotGlacialCrystal'        = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
-    'RecipeIngotGold'               = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
-    'RecipeIngotIron'               = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
-    'RecipeIngotOrichalcum'         = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
-    'RecipeIngotQuicksilver'        = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
-    'RecipeIngotMalachite'          = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
-    'RecipeIngotMoonstone'          = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
-    'RecipeIngotSilver'             = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
-    'RecipeIngotSteel'              = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
-    'RecipeLeatherDeerHide02'       = @{ Rank = 'novice';   Why = 'the one row kept for this leather, Platewright work at novice (#1391, #1400).' }
-    'RecipeLeatherStrips'           = @{ Rank = 'novice';   Why = 'the one row kept for this leather, Platewright work at novice (#1391, #1400).' }
+# The entries are in records\recipe-owners.json, under "rank", each with its
+# Rank and its Why, for the reason above. What the groups in the file are:
+#
+# The poles and the trap, as docs/systems/classes/fisher.md ranks them under
+# "The poles and the trap" (issue #1379). Input cost puts the fine pole on
+# advanced and the master pole on expert, because a steel ingot and a
+# refined moonstone are their dearest makings; the page ranks a pole by the
+# water it fishes, so the rank is a decision and not a reading.
+# THE COLLEGE BOOK STAVES, each at its spell's rank. Patrick, 4 October,
+# answering issue #1622: "B, each college book staff at its spell's rank".
+# Heart stone is master mining (the miner page, #1380, #1586), so input
+# cost puts every staff on master. A staff is not made until its spell is
+# on you, and a Bladebinder unlocks a spell only at a rank at least the
+# spell's (the Bladebinder page, Staff spells), so the recipe says what the
+# spell gate already says. These are the thirteen the Bladebinder page
+# keeps; the other 147 and the Aetherial Staff are cut and stay where input
+# cost puts them. The rank is the spell's in the college book, the mage
+# school pages and STAFF_SPELLS, and tests\test-1622-recipe-generator.js
+# holds each line to it. A Bladebinder below master buys the stones from a
+# master miner, which HALVES_WITH_AN_UNSTANDABLE_RUNG says for this half.
+# The kept smelt and tan rows named in RECIPE_OWNER (#1391, #1400): novice
+# smith work, whatever the ore costs to dig.
+$RECIPE_RANK = [ordered]@{}
+foreach ($nameEntry in $RECIPE_NAMES.rank.PSObject.Properties) {
+    $knob = @{}
+    foreach ($field in $nameEntry.Value.PSObject.Properties) { $knob[$field.Name] = [string]$field.Value }
+    $RECIPE_RANK[$nameEntry.Name] = $knob
 }
 
 $BENCH_OWNER = [ordered]@{
@@ -2045,6 +2035,61 @@ $BENCH_OWNER = [ordered]@{
     'DLC2StaffEnchanter'      = @{ Owner = 'Enchanter';  Half = 'Bladebinder'; Why = 'the Dragonborn staff enchanter. Every one of its recipes outputs a staff, and a staff is a weapon, so it is the Bladebinder''s by the same rule that gives him swords.' }
     'CraftingSmelter'         = @{ Owner = '';           Why = 'a smelter makes ingots, which are stock rather than a finished good. Both halves of the Smith need them, and a Miner who could not smelt his own ore would have nothing to sell. Left open to everybody on purpose.' }
 }
+
+# THE BENCHES EACH TRADE WORKS AT, AND WHERE A ROW AT ANY OTHER IS MOVED (#3120).
+#
+# Patrick, 21 October, in the #3080 thread: "fix the benches so only the
+# correct people can do things and they have the correct recpipes for eah
+# cbnech", and "make sure if a bench has a recipoe that should be on adifferent
+# bench it should get moved". A bench opens for somebody craftAnswer allows one
+# of its rows (Build-BenchTable.py, #3080), so who a bench opens for follows
+# from which rows sit at it. Measured 26 October on recipes.json: 51 Tailor
+# rows people can make sat at the forge (Immersive Armors' fur hoods, capes,
+# robes and unarmoured mage sets, three Riekling clothes), and 9 Woodwright
+# rows (two arrows, the Falmer bow, the flute, the lute, the drum and the
+# Riekling spears), so the forge opened for every Tailor and every Woodwright.
+#
+# The owner is read off the output, wherever the mod put the recipe, and that
+# does not change. What changes is the bench: a row whose owner does not work
+# at the bench its mod put it at goes to that trade's Home bench. Benches is
+# every bench the trade works at; Only narrows one of them to the families of
+# work done there (a Smith at the tanning rack tans, and makes no armour there).
+#
+# Only rows somebody can make are moved: a row that fires and is not cut. A
+# row nobody makes opens no bench, and a cut row put back for an event is moved
+# on the build that puts it back. A row the server never sees (a temper at the
+# sharpening wheel or the armour table) opens no bench either.
+#
+# The rows nobody owns are not moved: a row nobody owns is made by whoever the
+# bench opens for, which is Patrick's answer on 22 October (A on the report
+# page): rings, necklaces and circlets are Smith work at the forge, either
+# half, and the rest of the unowned rows go to the trade of the bench they sit
+# at. With the Tailor and Woodwright rows off the forge, the forge opens for
+# Smiths alone, and that is the answer.
+#
+# Where the row is made now goes in bench and benchName, so every reader of
+# recipes.json (the bench gate, the fuel table, the re-cost, the merchant
+# tables) reads the bench the row is made at. movedFrom and movedFromName say
+# where its mod put it. scripts/mods/Build-LastPlugin.py carries each move in
+# Thornswood-Last.esp, or, for a plugin it never copies from, hands it to each
+# person's game (RECIPES_MOVED_IN_GAME).
+$TRADE_BENCHES = [ordered]@{
+    'Smith'      = @{ Home = 'CraftingSmithingForge'
+                      Benches = @('CraftingSmithingForge', 'CraftingSmithingSkyforge', 'CraftingSmelter', 'CraftingSmithingArmorTable',
+                                  'CraftingSmithingSharpeningWheel', 'DLC1LD_CraftingForgeAetherium', 'CraftingTanningRack')
+                      Only = @{ 'CraftingTanningRack' = @('Leather') } }
+    'Tailor'     = @{ Home = 'MCE_CraftingLoom'; Benches = @('MCE_CraftingLoom', 'CraftingTanningRack') }
+    'Woodworker' = @{ Home = 'ThornswoodCraftingWoodworking'
+                      Benches = @('ThornswoodCraftingWoodworking', 'ThornswoodCraftingCharcoalKiln', 'DLC1CraftingDawnguard') }
+    'Enchanter'  = @{ Home = 'DLC2StaffEnchanter'; Benches = @('DLC2StaffEnchanter', 'DLC1LD_CraftingForgeAetherium') }
+    'Cook'       = @{ Home = 'CraftingCookpot'; Benches = @('CraftingCookpot', 'BYOHCraftingOven', 'isGrainMill') }
+    'Alchemist'  = @{ Home = 'ThornswoodCraftingAlchemy'; Benches = @('ThornswoodCraftingAlchemy') }
+}
+
+# The plugin Build-LastPlugin.py writes. Its BNAM is never read as where a mod
+# put a recipe: it is where this table moved it, so reading it back would take
+# every move off on the next build (#3120).
+$LAST_PLUGIN = 'Thornswood-Last.esp'
 
 if (-not $Out) { $Out = Join-Path $PSScriptRoot '..\..\game\data\recipes.json' }
 
@@ -3034,6 +3079,10 @@ foreach ($pl in $order) {
                         if ($hasCnam -and $cnam -ne 0) { $outDesc = DescOf ([uint32]$cnam) $masters $pl }
                         $benchDesc = ''
                         if ($hasBnam -and $bnam -ne 0) { $benchDesc = DescOf ([uint32]$bnam) $masters $pl }
+                        # Thornswood-Last.esp's BNAM is a move this table made
+                        # ($TRADE_BENCHES), so the bench stays the one the
+                        # plugin before it named (#3120).
+                        if ($pl -eq $LAST_PLUGIN -and $recipes.Contains($desc)) { $benchDesc = $recipes[$desc].BenchDesc }
                         # The inputs, as descs, resolved here where the master
                         # list of the plugin that carried the record is still
                         # in hand. The same two lines the output and the bench
@@ -3046,6 +3095,16 @@ foreach ($pl in $order) {
                                 Count = $c.Count
                             })
                         }
+                        # Thornswood-Last.esp's copy has its perk tests
+                        # taken out (#4826), so the conditions stay the ones
+                        # the plugin before it carried, read with that
+                        # plugin's masters.
+                        $condList = $conds.ToArray(); $condMasters = $masters; $condIn = $pl
+                        if ($pl -eq $LAST_PLUGIN -and $recipes.Contains($desc)) {
+                            $condList = $recipes[$desc].Conditions
+                            $condMasters = $recipes[$desc].CondMasters
+                            $condIn = $recipes[$desc].CondIn
+                        }
                         $recipes[$desc] = [pscustomobject]@{
                             Desc = $desc; Edid = $edid; SeenIn = $pl
                             Plugin = $desc.Split(':')[1]
@@ -3053,7 +3112,8 @@ foreach ($pl in $order) {
                             OutDesc = $outDesc; BenchDesc = $benchDesc
                             Count = $nam1; Inputs = $inputs; Coct = $coct
                             InputList = $inList.ToArray()
-                            Conditions = $conds.ToArray(); Masters = $masters
+                            Conditions = $condList; Masters = $masters
+                            CondMasters = $condMasters; CondIn = $condIn
                         }
                         $here++
                         if (-not $perPluginRecipes.ContainsKey($pl)) { $perPluginRecipes[$pl] = 0 }
@@ -3335,6 +3395,51 @@ function ConditionRead($cond, $masters, [string]$plugin) {
     }
 }
 
+# Whether Thornswood-Last.esp takes this recipe's perk tests out (#4826): yes,
+# unless the record or the plugin that carries it below the last plugin is
+# one the last plugin never copies from and does not copy the perk recipes of.
+function PerksComeOff($r) {
+    if (-not $PERKS_OFF_IN_LAST_PLUGIN) { return $false }
+    if ($PERKS_KEPT_IN.ContainsKey(([string]$r.Plugin).ToLowerInvariant())) { return $false }
+    if ($PERKS_KEPT_IN.ContainsKey(([string]$r.CondIn).ToLowerInvariant())) { return $false }
+    return $true
+}
+
+# How many perk tests a recipe carries, and Joined when one is joined to
+# another condition by OR (its own OR flag, or the one of the condition
+# before it).
+function PerkTestsOf($r) {
+    $n = 0; $joined = $false; $prevOr = $false
+    foreach ($c in $r.Conditions) {
+        if ($c.Func -eq $CONDITION_VANILLA_PERK) {
+            $n++
+            if ($c.Or -or $prevOr) { $joined = $true }
+        }
+        $prevOr = [bool]$c.Or
+    }
+    return [pscustomobject]@{ Count = $n; Joined = $joined }
+}
+
+# The positions in a recipe's conditions that come off with its perks
+# (#4826): every OR group holding a perk test, whole, as perk_drops in
+# Build-LastPlugin.py takes them. A group is a run of conditions each joined
+# to the next by OR, ended by one that is not; groups are joined by AND.
+function PerkDropsOf($r) {
+    $drop = @{}
+    $group = New-Object 'System.Collections.Generic.List[int]'
+    $hasPerk = $false
+    $conds = @($r.Conditions)
+    for ($i = 0; $i -lt $conds.Count; $i++) {
+        $group.Add($i)
+        if ($conds[$i].Func -eq $CONDITION_VANILLA_PERK) { $hasPerk = $true }
+        if (-not $conds[$i].Or -or $i -eq $conds.Count - 1) {
+            if ($hasPerk) { foreach ($j in $group) { $drop[$j] = $true } }
+            $group.Clear(); $hasPerk = $false
+        }
+    }
+    return $drop
+}
+
 # Can a new character get past every condition on a row. No condition at all
 # is the plain yes. Under TOMES_TEACH_STAFF_SPELLS a HasSpell whose spell a
 # tome teaches is also a yes, because the tome is how the spell is learned.
@@ -3372,6 +3477,21 @@ $unresolvedOut = New-Object 'System.Collections.Generic.List[string]'
 $namelessOut = @{}
 $outTypeCount = @{}
 $script:lightRows = 0
+
+# The perks come off (#4826): the count of what comes off, and of the
+# recipes whose perk test takes an OR group off with it.
+$perkRows = 0; $perkConds = 0; $perkKeptRows = 0; $perkJoinedRows = 0; $perkGroupConds = 0
+foreach ($desc in $recipes.Keys) {
+    $r = $recipes[$desc]
+    $pt = PerkTestsOf $r
+    if ($pt.Count -eq 0) { continue }
+    if (-not (PerksComeOff $r)) { $perkKeptRows++; continue }
+    $perkRows++; $perkConds += $pt.Count
+    if ($pt.Joined) { $perkJoinedRows++; $perkGroupConds += (PerkDropsOf $r).Count - $pt.Count }
+}
+if ($PERKS_OFF_IN_LAST_PLUGIN) {
+    Ok ("{0} perk test(s) on {1} recipe(s) come off in Thornswood-Last.esp, {2} of them joined by OR, which take {3} other condition(s) of their OR groups off with them; {4} recipe(s) of a plugin it never copies from keep theirs" -f $perkConds, $perkRows, $perkJoinedRows, $perkGroupConds, $perkKeptRows)
+}
 
 foreach ($desc in $recipes.Keys) {
     $r = $recipes[$desc]
@@ -3659,8 +3779,13 @@ foreach ($desc in $recipes.Keys) {
     # recipes nobody on this server can reach" printed the same number until
     # these were read.
     $needs = New-Object 'System.Collections.Generic.List[object]'
+    $perksOff = PerksComeOff $r
+    $perkDrops = if ($perksOff) { PerkDropsOf $r } else { @{} }
+    $ci = 0
     foreach ($c in $r.Conditions) {
-        $needs.Add((ConditionRead $c $r.Masters $r.SeenIn))
+        $at = $ci; $ci++
+        if ($perkDrops.ContainsKey($at)) { continue }
+        $needs.Add((ConditionRead $c $r.CondMasters $r.CondIn))
     }
     $behindPerk = $false
     $serverChecks = 0
@@ -5272,6 +5397,61 @@ if (-not (Test-Path -LiteralPath $CUT_FILE)) {
     }
 }
 
+# --------------------------------------------------- the rows that move -
+#
+# See $TRADE_BENCHES. After the cut file, because only a row somebody can make
+# is moved, and after every rank and count, so a move changes no ladder.
+
+Write-Host ''
+Write-Host 'the rows at a bench their trade does not work at' -ForegroundColor Cyan
+$kwByName = @{}
+foreach ($kd in $kwName.Keys) {
+    $kn = [string]$kwName[$kd]
+    if ($kwByName.ContainsKey($kn) -and $kwByName[$kn] -ne $kd) {
+        $kwByName[$kn] = ''
+    } else {
+        $kwByName[$kn] = $kd
+    }
+}
+foreach ($trade in $TRADE_BENCHES.Keys) {
+    $homeBench = [string]$TRADE_BENCHES[$trade].Home
+    if (-not $kwByName.ContainsKey($homeBench)) {
+        Bad ("the {0}'s home bench {1} is no keyword in this load order" -f $trade, $homeBench)
+    } elseif (-not $kwByName[$homeBench]) {
+        Bad ("more than one keyword in this load order is called {0}, so the {1}'s home bench cannot be named" -f $homeBench, $trade)
+    }
+}
+$movedCount = @{}
+foreach ($desc in $owned.Keys) {
+    $r = $owned[$desc]
+    if (-not $r.Fires) { continue }
+    if ($r.PSObject.Properties['Book'] -and $r.Book -eq 'cut') { continue }
+    if (-not $TRADE_BENCHES.Contains($r.Owner)) {
+        Bad ("{0} ({1}) is owned by {2}, which names no benches in TRADE_BENCHES" -f $r.Edid, $desc, $r.Owner)
+        continue
+    }
+    $tb = $TRADE_BENCHES[$r.Owner]
+    $works = $tb.Benches -contains $r.BenchName
+    if ($works -and $tb.ContainsKey('Only') -and $tb.Only.ContainsKey($r.BenchName)) {
+        $works = $tb.Only[$r.BenchName] -contains $r.Family
+    }
+    if ($works) { continue }
+    $homeBench = [string]$tb.Home
+    if (-not $kwByName[$homeBench]) { continue }
+    $r | Add-Member -NotePropertyName MovedFrom -NotePropertyValue $r.BenchDesc -Force
+    $r | Add-Member -NotePropertyName MovedFromName -NotePropertyValue $r.BenchName -Force
+    $r.BenchDesc = $kwByName[$homeBench]
+    $r.BenchName = $homeBench
+    $mk = $r.MovedFromName + ' -> ' + $homeBench + ' (' + $r.Owner + ')'
+    if (-not $movedCount.ContainsKey($mk)) { $movedCount[$mk] = 0 }
+    $movedCount[$mk] = $movedCount[$mk] + 1
+}
+if ($movedCount.Count -eq 0) {
+    Ok 'every row somebody can make is at a bench its trade works at'
+} else {
+    foreach ($mk in ($movedCount.Keys | Sort-Object)) { Ok ("{0,4} moved: {1}" -f $movedCount[$mk], $mk) }
+}
+
 # ------------------------------------------------------------- the writing -
 
 Write-Host ''
@@ -5312,6 +5492,7 @@ $doc.Add('  "family": ' + (JsonStr 'what kind of thing the row makes, which is h
 $doc.Add('  "sisterHalf": ' + (JsonStr 'classes.md gives you the novice work of the other half of your own profession for nothing, and no further than novice. The gate can answer that because every row carries a rank.') + ',')
 $doc.Add('  "needs": ' + (JsonStr 'the recipe''s own conditions, read out of its CTDA subrecords. An empty list means anybody standing at the bench can make it. serverSees false means the fork has no function for that condition and the server answers True, so the only thing enforcing it is the crafting menu on the machine in front of the person, which hides the recipe rather than refusing it.') + ',')
 $doc.Add('  "default": ' + (JsonStr 'a recipe id this table does not carry is one nobody owns, and anybody may make it') + ',')
+$doc.Add('  "movedFrom": ' + (JsonStr 'on a row its mod put at a bench its trade does not work at (TRADE_BENCHES, #3120): the bench keyword the mod put it at, and movedFromName its editor id. bench and benchName are where it is made now, its trade''s home bench. scripts\mods\Build-LastPlugin.py carries the move in Thornswood-Last.esp, or hands it to each person''s game for a plugin it never copies from.') + ',')
 $doc.Add('  "fires": ' + (JsonStr 'false means the server is never asked about this recipe. CraftService::RecipeItemsMatch throws out the armour table (adb78) and the sharpening wheel (88108) before it considers anything, so tempering never reaches onCraft.') + ',')
 $doc.Add('  "count": ' + ($owned.Count + $unowned.Count + $refusedRows.Count) + ',')
 $doc.Add('  "owned": ' + $owned.Count + ',')
@@ -5470,6 +5651,7 @@ foreach ($desc in $owned.Keys) {
              ', "type": ' + (JsonStr $r.OutType) + ', "makes": ' + $r.Count +
              ', "inputs": ' + $r.Inputs + ', "inputItems": ' + (InputsJson $r) + ', "worth": ' + $r.Value +
              ', "bench": ' + (JsonStr $r.BenchDesc) + ', "benchName": ' + (JsonStr $r.BenchName) +
+             $(if ($r.PSObject.Properties['MovedFrom']) { ', "movedFrom": ' + (JsonStr $r.MovedFrom) + ', "movedFromName": ' + (JsonStr $r.MovedFromName) } else { '' }) +
              ', "owner": ' + (JsonStr $r.Owner) + ', "half": ' + (JsonStr $r.Half) +
              ', "race": ' + (JsonStr $r.Race) +
              ', "rank": ' + (JsonStr $r.Rank) +

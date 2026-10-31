@@ -8,15 +8,17 @@
   answer, 22 Oct 2026 (A): each hold has 2 to 3 hold-only plants, ores or
   animals (docs/DECIDED.md).
 
-  scripts/mods/Build-LastPlugin.py (step 8) switches every placed reference of
+  scripts/mods/Build-LastPlugin.py (step 10) switches every placed reference of
   a hold-only plant or ore off in game/content/Thornswood-Last.esp wherever it
   stands outside its hold, the way it switches off a floor item (#3077): no
   machine draws it and the server's reader never makes it. The ones in their
   hold stay. game/data/last-plugin-policy.json holdOnly names which, each with
   what scripts/dev/Measure-HoldResources.py measured.
 
-  Without the game this reads the committed policy, manifest, plugin and
-  gamemode and holds them together:
+  This reads the committed policy, manifest and gamemode, and the plugin made
+  from its recipe (tests/last-plugin-made.js: no repository holds the plugin
+  since #2791 step 3, so P prints SKIP without the game), and holds them
+  together:
 
     H  the policy names plants and ores only, each by a produce the plant or
        ore table gives under that name, each in one of the nine holds, none
@@ -39,7 +41,7 @@ const path = require('path');
 const zlib = require('zlib');
 const ROOT = path.join(__dirname, '..');
 const DATA = path.join(ROOT, 'game', 'data');
-const ESP = path.join(ROOT, 'game', 'content', 'Thornswood-Last.esp');
+const lastMade = require('./last-plugin-made.js').made();
 const COMPRESSED = 0x00040000, DISABLED = 0x800, DELETED = 0x20;
 const NINE = ['WhiterunHoldLocation', 'HaafingarHoldLocation', 'RiftHoldLocation', 'ReachHoldLocation',
   'EastmarchHoldLocation', 'FalkreathHoldLocation', 'HjaalmarchHoldLocation', 'PaleHoldLocation',
@@ -124,8 +126,8 @@ yes('H6 docs/DECIDED.md records the decision', /2 to 3 hold-only plants, ores or
 
 // ---------------------------------------------------------------- M
 const ho = manifest.holdOnly || null;
-yes('M1 the manifest has the hold-only plants and ores (rebuild the plugin: '
-    + 'pwsh scripts/mods/Run-OnBox.ps1 scripts/mods/Build-LastPlugin.py --data \'{data}\')', !!ho);
+yes('M1 the manifest has the hold-only plants and ores (rebuild the tables through the gate: '
+    + 'pwsh scripts/vps/Box-Run.ps1 -Line \'Rebuild-ContentTables -Pull <number> -Head <its full head commit>\')', !!ho);
 const made = ho ? ho.resources.map((r) => [r.produce, r.name, r.kind, r.hold].join('|')).sort() : [];
 const want = rows.map((r) => [r.produce, r.name, r.kind, r.holdEdid].join('|')).sort();
 yes('M2 it was built from this policy', JSON.stringify(made) === JSON.stringify(want));
@@ -139,16 +141,20 @@ yes('M4 what stands outside a hold is switched off here, left as a plugin has it
     manifest.counts.holdOnlyOff === ho.off.length);
 
 // ---------------------------------------------------------------- P
-const refs = refsOf(ESP, 'Thornswood-Last.esp');
-const all = new Set([].concat(...Object.values(basesOf).map((s) => [...s])));
-const wrong = ho ? ho.off.filter((d) => {
-  const r = refs.get(d);
-  return !r || !(r.flags & DISABLED) || (r.flags & DELETED) || (r.tags !== 'NAME,DATA' && r.tags !== 'EDID,NAME,DATA') ||
-    !all.has(lower(r.base));
-}) : ['no manifest'];
-yes('P1 every one it switches off is in the plugin, initially disabled, keeping only its base and place, ' +
-    'and is a hold-only plant or ore' + (wrong.length ? ' (not: ' + wrong.slice(0, 5).join(', ') + ')' : ''),
-    !wrong.length);
+if (lastMade.buf) {
+  const refs = refsOf(lastMade.path, 'Thornswood-Last.esp');
+  const all = new Set([].concat(...Object.values(basesOf).map((s) => [...s])));
+  const wrong = ho ? ho.off.filter((d) => {
+    const r = refs.get(d);
+    return !r || !(r.flags & DISABLED) || (r.flags & DELETED) || (r.tags !== 'NAME,DATA' && r.tags !== 'EDID,NAME,DATA') ||
+      !all.has(lower(r.base));
+  }) : ['no manifest'];
+  yes('P1 every one it switches off is in the plugin, initially disabled, keeping only its base and place, ' +
+      'and is a hold-only plant or ore' + (wrong.length ? ' (not: ' + wrong.slice(0, 5).join(', ') + ')' : ''),
+      !wrong.length);
+} else {
+  console.log('SKIP  P1: ' + lastMade.why);
+}
 
 // ---------------------------------------------------------------- D
 const page = (n) => fs.readFileSync(path.join(ROOT, 'docs', 'systems', 'classes', n), 'utf8').toLowerCase();

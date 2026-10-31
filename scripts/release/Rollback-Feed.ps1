@@ -614,7 +614,7 @@ $bullets = @($noteLines | Select-Object -Skip 1 | Where-Object { $_ -match '^[-*
 $body = (@($noteLines | Select-Object -Skip 1 | Where-Object { $_ -notmatch '^[-*]\s*\S' }) -join ' ').Trim()
 $details = @($bullets)
 if ($write.Count) { $details += ('{0:n0} file{1} to download, {2:n1} MB' -f $write.Count, $(if ($write.Count -eq 1) { '' } else { 's' }), ($writeBytes / 1MB)) }
-$entry = [pscustomobject][ordered]@{ date = (Get-Date).ToString('M-d-yyyy h:mm tt', [Globalization.CultureInfo]::InvariantCulture); title = $noteLines[0]
+$entry = [pscustomobject][ordered]@{ date = (Get-TeamNow).ToString('M-d-yyyy h:mm tt', [Globalization.CultureInfo]::InvariantCulture); title = $noteLines[0]
                                      body = $body; details = $details; channel = $(if ($Dev) { 'dev' } else { '' }) }
 # Every note the feed has, wherever it keeps them, and back the way the channel
 # keeps them: in "news", or once its minLauncher reads it, a news file sent to
