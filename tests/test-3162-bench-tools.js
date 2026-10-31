@@ -33,7 +33,7 @@ const ROOT = path.join(__dirname, '..');
 const CR = String.fromCharCode(13);
 const gm = fs.readFileSync(process.env.GM || path.join(ROOT, 'game', 'gamemode.js'), 'utf8').split(CR).join('');
 const addContent = fs.readFileSync(path.join(ROOT, 'scripts', 'mods', 'Add-ContentRecords.py'), 'utf8').split(CR).join('');
-const recipeTable = fs.readFileSync(path.join(ROOT, 'scripts', 'dev', 'Build-RecipeTable.ps1'), 'utf8').split(CR).join('');
+const recipeOwners = JSON.parse(fs.readFileSync(path.join(ROOT, 'records', 'recipe-owners.json'), 'utf8').replace(/^\uFEFF/, '')).owner || {};
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -87,6 +87,8 @@ const pieces = {
         'function wovenOutput(actorId, row)', 'function cookedOutput(actorId, row)',
         'function qualityTier(margin, roll)', 'function qualityRolled(row, baseId)',
         'function qualityMargin(actorId, row)', 'function qualityOutput(actorId, row, margin)',
+        // A dish named with its days left (#3163), after the other outputs.
+        'function spoilingOutput(actorId)',
         'function unfitToMake(actorId, workbenchId)', 'function rankWord(rank)', 'function aWord(name)',
         'function professionName(prof)', 'function craftAnswer(actorId, row)',
         'function toolFor(key)', 'function holdsTool(actorId, tool)', 'function toolStamps(actorId)',
@@ -147,10 +149,11 @@ function person(prof, half, rank) {
     yes('T5 the ' + TOOLS[k].name + ' has a recipe in Add-ContentRecords.py, at the ' +
         (makes[k][1] === 'FORGE_KEYWORD' ? 'forge' : 'woodworking bench'), re.test(addContent));
   });
-  yes('T6 Build-RecipeTable.ps1 names an owner for every tool\'s recipe (smith for four, woodworker for the ladle)',
-      ['Hammer', 'Shears', 'Alembic', 'RuneKnife'].every(function (e) {
-        return new RegExp("'ThornswoodRecipeTool" + e + "'\\s*=\\s*@\\{ Owner = 'Smith'; Half = 'Edgewright'").test(recipeTable);
-      }) && /'ThornswoodRecipeToolLadle'\s*=\s*@\{ Owner = 'Woodworker'; Half = 'Woodwright'/.test(recipeTable));
+  // The owners are data in records/recipe-owners.json, which Build-RecipeTable.ps1 reads (#3470).
+  const owns = function (e, owner, half) { const o = recipeOwners['ThornswoodRecipeTool' + e]; return !!o && o.Owner === owner && o.Half === half && !!o.Why; };
+  yes('T6 records/recipe-owners.json names an owner for every tool\'s recipe (smith for four, woodworker for the ladle)',
+      ['Hammer', 'Shears', 'Alembic', 'RuneKnife'].every(function (e) { return owns(e, 'Smith', 'Edgewright'); }) &&
+      owns('Ladle', 'Woodworker', 'Woodwright'));
 }
 
 // ---------------------------------------------------------------- the rig
