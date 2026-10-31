@@ -76,7 +76,8 @@
   there is one that passed.
 
   Keep it Windows PowerShell 5.1 and pwsh alike. It reads nothing over the
-  network itself: Get-EngineArtifact.ps1 hands it gh, the harness a stand-in.
+  network itself: Get-EngineArtifact.ps1 hands it gh and the registry's
+  HTTP (New-EnginePackageHttp), the harness stand-ins.
 #>
 
 . (Join-Path $PSScriptRoot '..\deploy\ServerArtifact.ps1')
@@ -122,6 +123,107 @@ function Get-EngineArtifactPin([string]$Repo) {
     $short = ([string](Get-EngineArtifactValue $c 'forkCommit')).ToLowerInvariant()
     if (-not $short -or -not $commit.StartsWith($short)) { throw "records\client-build.json names fork commit '$short' and records\server-build.json $commit, so the two records are not one engine. tests\test-one-engine.js says which is wrong." }
     return $commit
+}
+
+<#
+  THE FORK'S PACKAGE OF THE BUILD (#5152). Since fork #131 every push build
+  of thornswood/engine-changes is also kept as
+  ghcr.io/evilpatrick06/thornswood-engine:<commit>, the same folder as one
+  zip (the fork's misc\thornswood\Push-EnginePackage.ps1), kept until
+  somebody deletes it and read with no account. An artifact goes after 90
+  days, so until #5152 a pin older than that could not be shipped again, and
+  reverting a pin pull request did not bring its engine back. The package is
+  asked first; it is the first push build of the commit, the one engine.yml
+  recorded unless the fork's build was run again, and it is held to the
+  records exactly as an artifact is (WHAT IS HELD). One that is not the
+  records' build is passed over for the artifacts, and a commit built before
+  fork #131 has none.
+
+  $Http is called as  & $Http <url> <headers hashtable> <file>  and returns
+  the HTTP status as a number, with the body written to <file> when it is
+  200; a failure to reach the registry throws, and that is not "there is
+  none". New-EnginePackageHttp makes the real one; a harness passes its own.
+#>
+$EngineArtifactPackage = 'evilpatrick06/thornswood-engine'
+
+function New-EnginePackageHttp {
+    Add-Type -AssemblyName System.Net.Http
+    # Windows PowerShell 5.1 offers TLS 1.0 first unless told.
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    return {
+        param([string]$Url, [hashtable]$Headers, [string]$File)
+        # The blob is sent on to GitHub's storage, which is given no token:
+        # HttpClient drops Authorization when a request moves to another host.
+        $client = New-Object System.Net.Http.HttpClient
+        try {
+            $client.Timeout = [TimeSpan]::FromMinutes(10)
+            $req = New-Object System.Net.Http.HttpRequestMessage ([System.Net.Http.HttpMethod]::Get), $Url
+            foreach ($k in @($Headers.Keys)) { [void]$req.Headers.TryAddWithoutValidation([string]$k, [string]$Headers[$k]) }
+            $res = $client.SendAsync($req, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
+            $code = [int]$res.StatusCode
+            if ($code -eq 200) {
+                $out = [IO.File]::Create($File)
+                try { [void]$res.Content.CopyToAsync($out).GetAwaiter().GetResult() } finally { $out.Dispose() }
+            }
+            return $code
+        } finally { $client.Dispose() }
+    }.GetNewClosure()
+}
+
+# The package of $Commit, unpacked into $Into (which must not be there yet)
+# as gh run download leaves an artifact: fork-build.json and build\. Returns
+# @{ State = found|none; Why; Run; Artifact }, Run and Artifact shaped as
+# Find-EngineArtifact's so Install-EngineArtifact names the package. With
+# -Look it only asks whether the package is there and unpacks nothing.
+# Anything the registry answers that is not the package of this commit
+# throws a sentence.
+function Get-EnginePackageBuild([string]$Commit, [string]$Registry, [scriptblock]$Http, [string]$Into, [switch]$Look) {
+    $Commit = $Commit.ToLowerInvariant()
+    $base = $Registry.TrimEnd('/')
+    $hostName = ([uri]$base).Host
+    $ref = "$hostName/$($EngineArtifactPackage):$Commit"
+    $tmp = Join-Path ([IO.Path]::GetTempPath()) ('engine-package-' + [Guid]::NewGuid().ToString('N'))
+    $null = New-Item -ItemType Directory -Force -Path $tmp
+    try {
+        $tf = Join-Path $tmp 'token.json'
+        $code = & $Http "$base/token?scope=repository:$($EngineArtifactPackage):pull&service=$hostName" @{} $tf
+        if ($code -ne 200) { throw "the registry at $base gave no pull token for $EngineArtifactPackage (HTTP $code)" }
+        $token = [string](([IO.File]::ReadAllText($tf) | ConvertFrom-Json).token)
+        $auth = @{ Authorization = "Bearer $token"; Accept = 'application/vnd.oci.image.manifest.v1+json' }
+        $mf = Join-Path $tmp 'manifest.json'
+        $code = & $Http "$base/v2/$EngineArtifactPackage/manifests/$Commit" $auth $mf
+        if ($code -eq 404) {
+            return [pscustomobject]@{ State = 'none'; Run = $null; Artifact = $null
+                Why = "the fork keeps no package ${ref}: it was built before the fork kept them (fork #131), or it was deleted" }
+        }
+        if ($code -ne 200) { throw "the registry answered $code for $ref" }
+        $m = [IO.File]::ReadAllText($mf) | ConvertFrom-Json
+        $ann = Get-EngineArtifactValue $m 'annotations'
+        if (([string](Get-EngineArtifactValue $ann 'org.opencontainers.image.revision')).ToLowerInvariant() -ne $Commit) { throw "$ref names another commit in its manifest" }
+        $layers = @(Get-EngineArtifactValue $m 'layers')
+        if ($layers.Count -ne 1 -or [string]$layers[0].mediaType -ne 'application/zip' -or [string]$layers[0].digest -notmatch '^sha256:([0-9a-f]{64})$') { throw "$ref is not one zip layer, as the fork's Push-EnginePackage.ps1 makes it" }
+        $sum = $Matches[1]
+        $buildSum = ([string](Get-EngineArtifactValue $ann 'org.thornswood.fork-build.sha256')).ToLowerInvariant()
+        $artifact = [pscustomobject]@{ name = $ref; id = 0; digest = [string]$layers[0].digest; size_in_bytes = [long]$layers[0].size }
+        if ($Look) { return [pscustomobject]@{ State = 'found'; Run = $null; Artifact = $artifact; Why = "the fork keeps the package $ref" } }
+
+        $zip = Join-Path $tmp 'build.zip'
+        $code = & $Http "$base/v2/$EngineArtifactPackage/blobs/sha256:$sum" @{ Authorization = "Bearer $token" } $zip
+        if ($code -ne 200) { throw "the registry answered $code for the build in $ref" }
+        if ((Get-Item -LiteralPath $zip).Length -ne [long]$layers[0].size -or (Get-EngineArtifactSha256 $zip) -ne $sum) { throw "the build fetched from $ref is not the zip its manifest names" }
+        if (Test-Path -LiteralPath $Into) { throw "$Into is there already" }
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [IO.Compression.ZipFile]::ExtractToDirectory($zip, $Into)
+        $fb = Join-Path $Into 'fork-build.json'
+        if (-not (Test-Path -LiteralPath $fb -PathType Leaf)) { throw "the build in $ref has no fork-build.json" }
+        if ($buildSum -and (Get-EngineArtifactSha256 $fb) -ne $buildSum) { throw "the fork-build.json in $ref is not the one its manifest names" }
+        $fm = [IO.File]::ReadAllText($fb) | ConvertFrom-Json
+        $run = [pscustomobject]@{ id = [long](Get-EngineArtifactValue $fm 'runId'); html_url = [string](Get-EngineArtifactValue $fm 'runUrl') }
+        return [pscustomobject]@{ State = 'found'; Run = $run; Artifact = $artifact
+            Why = ("the fork keeps the package {0}, its push build in run {1}" -f $ref, $run.id) }
+    } finally {
+        Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
 
 <#
