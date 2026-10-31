@@ -58,7 +58,8 @@ WHAT IT READS. game\\data\\doors.json for the buildings and their doors (the
 same table BUILDING_BY_DOOR and BUILDING_NAME are built from, and the build
 stops if the gamemode's buildings are not doors.json's), and the load order of
 game\\data\\last-plugin.json then Thornswood-Last.esp, last plugin wins, with the repository's own
-plugins from game\\content, the way Build-WoodworkingBenches.py reads it. The
+plugins from game\\content and Thornswood-Last.esp made in the Data folder from its
+recipe (#2791), the way Build-WoodworkingBenches.py reads it. The
 game folder has to hold the collection's own bytes
 (records\\collection-plugins.json).
 
@@ -447,7 +448,8 @@ def main():
         'builtBy': 'scripts/dev/Build-BuildingHolds.py',
         'issue': 2551,
         'readFrom': ('game/data/doors.json for the buildings and their doors; game/data/last-plugin.json loadOrder, '
-                     'then %s, last plugin wins; %s from game/content' % (', '.join(wb.AFTER), ', '.join(wb.OURS + wb.AFTER))),
+                     'then %s, last plugin wins; %s from game/content, %s made in the Data folder from its recipe'
+                     % (', '.join(wb.AFTER), ', '.join(wb.OURS), ', '.join(wb.AFTER))),
         'rule': ('A place is in a hold when its location (an exterior cell\'s XLCN, or its worldspace\'s when the cell '
                  'has none, or a room\'s XLCN) reaches that hold\'s location record through its parents. A building '
                  'takes the hold of the places its doors open onto (where the doors that lead into it stand); a room '

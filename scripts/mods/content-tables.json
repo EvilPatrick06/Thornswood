@@ -57,7 +57,7 @@
     "reads": ["game/data/recipes.json"], "writes": ["game/gamemode.js"] },
   { "tool": "scripts/mods/Build-LastPlugin.py", "data": "--data", "plugins": null,
     "reads": ["game/data/recipes.json", "game/data/recost.json"], "readsBack": ["game/data/npc-population.json"],
-    "writes": ["game/content/Thornswood-Last.esp", "game/data/last-plugin.recipe", "game/data/last-plugin.json", "game/gamemode.js"] },
+    "writes": ["game/data/last-plugin.recipe", "game/data/last-plugin.json", "game/gamemode.js"] },
   { "tool": "scripts/dev/Build-NpcPopulation.py", "data": "--data", "plugins": null,
     "reads": [], "writes": ["game/data/npc-population.json"],
     "writesOffChain": ["game/gamemode.js", "game/data/merchant-traders.json", "docs/HUNTING-SPOTS.csv", "docs/NPC-SPAWNS.csv",

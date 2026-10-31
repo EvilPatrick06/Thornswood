@@ -201,10 +201,13 @@ WHAT IT READS
 
 WHAT IT WRITES
 
-  game/content/Thornswood-Last.esp; game/data/last-plugin.recipe, the
-  recipe each machine builds the plugin from out of its own plugins
-  (scripts/mods/last_recipe.py says what it holds and why, #2791), held to
-  make these exact bytes back on every build; and game/data/last-plugin.json, the
+  game/data/last-plugin.recipe, the recipe each machine makes the plugin
+  from out of its own plugins (scripts/mods/last_recipe.py says what it holds
+  and why, #2791), held to make these exact bytes back on every build; the
+  plugin itself into --out, by default Thornswood-Last.esp in --data, where
+  the game and the builders after this one read it, and never into the
+  repository (Patrick's A on #2791: Thornswood hands on only the recipe); and
+  game/data/last-plugin.json, the
   manifest: the plugin's sha256, the load order it was built against, every
   cut actor it switches off and every one it leaves and why, every quest it
   stops and every quest it keeps, and every place it gives a hold, with the
@@ -212,19 +215,27 @@ WHAT IT WRITES
   counted by type and by the plugin that won each, with the cells only they
   needed (#2791 reads those). tests/test-2468-last-plugin.js holds the two
   together on every build, without the game, tests/test-2551-place-holds.js
-  the place holds and tests/test-3077-floor-items.js the floor items.
+  the place holds and tests/test-3077-floor-items.js the floor items, each
+  reading the plugin's records where a machine has the game to make it from
+  (tests/last-plugin-made.js).
 
 HOW IT REACHES PEOPLE
 
-  From this repository, exactly the way Thornswood-Content.esp goes (Patrick,
-  12 October, #2486 B), never through the collection:
+  As its recipe, from this repository, never through the collection (#2486 B)
+  and never as the plugin (#2791, Patrick's A of 26 October 2026):
 
-    servers  Deploy-DevGamemode.ps1 -LoadOrder (and the full Deploy-Server.ps1
-             for live) sends game/content/Thornswood-Last.esp and puts it at
-             the end of the server's load order.
-    people   every Ship places it in the release's Data (Ensure-ShipRequiredData
-             in Ship-Rules.ps1), the pack carries it, and the pack's plugin
-             list enables it last, in the server's order.
+    servers  every deploy that puts it on a game server (Deploy-DevGamemode.ps1
+             -LoadOrder, Deploy-Server.ps1, Publish-Server.ps1) makes it on the
+             box from the recipe, the server's plugins and the box's string
+             tables (scripts/deploy/LastPluginOnBox.ps1, Make-LastPlugin.py),
+             into the deploy's stage, held to the manifest's sha256 before the
+             swap, and puts it at the end of the server's load order.
+    people   every Ship places the recipe in the release's Data as
+             Data/Thornswood-Last.recipe (Ensure-ShipRequiredData in
+             Ship-Rules.ps1), the pack carries it, the launcher makes the
+             plugin from it before Play (launcher/app/LastPlugin.cs), and the
+             pack's plugin list enables it last, in the server's order. No
+             pack, record or installer carries the plugin ($ShipMadeFromRecipe).
     order    the server has it first, then the Ship (#2308): a release that
              changes it is refused until the channel's server holds the same
              bytes.
@@ -243,11 +254,13 @@ Usage:
     python scripts/mods/Build-LastPlugin.py --verify
     python scripts/mods/Build-LastPlugin.py --data C:\\Thornswood\\Game\\Data
 
---check builds it in memory and says whether the committed plugin and manifest
-are those bytes. --verify reads the load order with the committed plugin at
-its end and checks, record by record, that no cut actor and no floor item is
-left able to show and no cut quest is left able to start, and lists the gate, door and arrival
-talk with what stops each. Exit 1 on any refusal.
+--check builds it in memory and says whether the committed recipe and manifest
+are what it builds (the recipe names the plugin's size and sha256, so it pins
+the plugin too). --verify makes the plugin from the committed recipe out of
+--data, reads the load order with it at its end and checks, record by record,
+that no cut actor and no floor item is left able to show and no cut quest is
+left able to start, and lists the gate, door and arrival talk with what stops
+each. Exit 1 on any refusal.
 """
 
 import argparse
@@ -277,7 +290,7 @@ POLICY = os.path.join(ROOT, 'game', 'data', 'last-plugin-policy.json')
 MANIFEST = os.path.join(ROOT, 'game', 'data', 'last-plugin.json')
 RECOST = os.path.join(ROOT, 'game', 'data', 'recost.json')
 RECIPES = os.path.join(ROOT, 'game', 'data', 'recipes.json')
-OUT = os.path.join(ROOT, 'game', 'content', PLUGIN)
+OWN_DIR = os.path.join(ROOT, 'game', 'content')
 RECIPE = os.path.join(ROOT, 'game', 'data', 'last-plugin.recipe')
 GAMEMODE = os.path.join(ROOT, 'game', 'gamemode.js')
 HELD_BLOCK = ('// ==== HELD_BY_SERVER, generated ====', '// ==== end HELD_BY_SERVER ====')
@@ -2130,12 +2143,20 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--data', default=os.environ.get('THORNSWOOD_DATA', DATA_DIR))
     ap.add_argument('--check', action='store_true', help='build in memory and compare; write nothing')
-    ap.add_argument('--verify', action='store_true', help='check the committed plugin in the load order')
+    ap.add_argument('--verify', action='store_true', help='check the plugin the committed recipe makes, in the load order')
+    ap.add_argument('--out', default='', help='where the plugin is written; Thornswood-Last.esp in --data when not given')
     args = ap.parse_args()
+    out = args.out or os.path.join(args.data, PLUGIN)
 
     if args.verify:
         manifest = json.load(open(MANIFEST, encoding='utf-8'))
-        fails = verify(args.data, open(OUT, 'rb').read(), manifest)
+        try:
+            made = last_recipe.make_from(open(RECIPE, 'rb').read(), [OWN_DIR, args.data])
+        except last_recipe.RecipeError as x:
+            print('STOP. %s could not be made from game/data/%s out of %s: %s.'
+                  % (PLUGIN, os.path.basename(RECIPE), args.data, x))
+            return 1
+        fails = verify(args.data, made, manifest)
         for f in fails[:40]:
             print('  FAIL  ' + f)
         if fails:
@@ -2200,8 +2221,7 @@ def main():
           '%s of them Thornswood\'s own (%s inside records)'
           % (r['sources'], format(r['size'], ','), format(r['ownBytes'], ','), format(r['ownBytesInRecords'], ',')))
     if args.check:
-        a = same_or_say(OUT, plugin, 'game/content/' + PLUGIN)
-        a = same_or_say(RECIPE, recipe, 'game/data/' + os.path.basename(RECIPE)) and a
+        a = same_or_say(RECIPE, recipe, 'game/data/' + os.path.basename(RECIPE))
         # The manifest is compared as what it says, not as bytes.
         have = json.load(open(MANIFEST, encoding='utf-8')) if os.path.isfile(MANIFEST) else None
         b = have == json.loads(manifest_bytes(manifest).decode('utf-8'))
@@ -2216,17 +2236,18 @@ def main():
                                                                  ('DIFFERS', 'is not what this builds')))
         return 0 if a and b and c and d else 1
     gm = moved_block(manifest, held_block(manifest, io.open(GAMEMODE, encoding='utf-8', newline='').read()))
-    with open(OUT, 'wb') as f:
+    with open(out + '.making', 'wb') as f:
         f.write(plugin)
+    os.replace(out + '.making', out)
     with open(RECIPE, 'wb') as f:
         f.write(recipe)
     with open(MANIFEST, 'wb') as f:
         f.write(manifest_bytes(manifest))
     with io.open(GAMEMODE, 'w', encoding='utf-8', newline='') as f:
         f.write(gm)
-    print('Wrote game/content/%s, game/data/%s, game/data/last-plugin.json, the HELD_BY_SERVER block (%d) and the '
+    print('Wrote %s, game/data/%s, game/data/last-plugin.json, the HELD_BY_SERVER block (%d) and the '
           'RECIPES_MOVED_IN_GAME block (%d)'
-          % (PLUGIN, os.path.basename(RECIPE), len(manifest['floorItems']['heldByServer']) + len(manifest['refs']['heldByServer']),
+          % (out, os.path.basename(RECIPE), len(manifest['floorItems']['heldByServer']) + len(manifest['refs']['heldByServer']),
              len(manifest['benchMovesInGame'])))
     return 0
 
