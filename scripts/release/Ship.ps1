@@ -1492,6 +1492,25 @@ if ($Dev -and -not $ModsOnly) {
     $MainsOwnLauncher = [bool]$devLine.MainsOwn
 }
 
+# MAIN TAKES THE LAUNCHER DEV TRIED (#5156). Since #5100 a dev Ship from the
+# gate builds a changed launcher, and when main has not published that number
+# yet it carries main's number (Get-DevLauncherLine): release-tag.yml tags the
+# dev Ship's commit v<number> and release.yml builds and signs it there. A
+# later main Ship from the feed, from a newer commit of main that changed
+# nothing the launcher is built from, then asked release-tag.yml for the same
+# tag on its own commit, which a tag never moves to: on 31 Oct 2026 main from
+# 63eefdd7 stopped on "v1.2.15 is already commit 52ad5e1c", after dev
+# 20261031-155402-dev had put that very launcher out from 52ad5e1c. And a
+# build of its own would not be the launcher dev tried. So when the dev feed
+# offers this number, built from these same sources (its fingerprint is this
+# one), a main Ship from the feed takes that exe from the dev feed, held to
+# the dev feed's sha256 and to the signature, as dev takes main's own.
+$DevTriedLauncher = $null
+if (-not $Dev -and $FromFeed -and -not $ModsOnly -and $MainSourceAligned) {
+    $devPub = Get-PublishedLauncher (Get-FeedStoreDir 'dev') 'dev'
+    if ($devPub -and [string]$devPub.Version -eq $current -and (Test-LauncherUnchanged $devPub $LauncherInputs)) { $DevTriedLauncher = $devPub }
+}
+
 # What the channel's feed offers as its launcher, read here when a Ship asks
 # whether to keep it, and again for the installer below when it keeps it (#2661).
 $pubLauncher = $null
@@ -1909,6 +1928,14 @@ if (-not $ModsOnly) {
                 Die $why
             }
             Say ("  $($MainLauncher.Version), sha256 and signature checked") 'Green'
+        } elseif ($DevTriedLauncher) {
+            Head 'The launcher dev tried, from the dev feed'
+            $why = Get-FeedLauncher $DevTriedLauncher $buildOut $ciSigner $hold
+            if ($why) {
+                Unbump 'the launcher dev tried could not be taken from its feed'
+                Die $why
+            }
+            Say ("  $($DevTriedLauncher.Version), built from these same sources, sha256 and signature checked") 'Green'
         } else {
             Head 'The launcher, built and signed on GitHub'
             $srcRepo = Get-SourceRepo $RepoDir
