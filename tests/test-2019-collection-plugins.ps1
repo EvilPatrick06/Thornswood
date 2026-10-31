@@ -116,7 +116,9 @@ foreach ($d in @(
     $src = [IO.File]::ReadAllText((Join-Path $repo $d.File)).Replace("`r`n", "`n")
     $leaf = Split-Path -Leaf $d.File
     $loop = $src.IndexOf('$changed += (''{0}  {1:N0} -> {2:N0} bytes''')
-    $ask = $src.IndexOf('Assert-ThornswoodCollectionPlugins -RecordPath')
+    # The last ask, the full deploy's: -FromRecord's (#4069) asks earlier,
+    # of the plugins it takes from the store (test-4069-main-move.ps1).
+    $ask = $src.LastIndexOf('Assert-ThornswoodCollectionPlugins -RecordPath')
     $after = $src.IndexOf($d.Send, [Math]::Max($ask, 0))
     Yes "$leaf holds the plugins it sends to the collection's record" ($ask -gt 0 -and $src.Contains("records\collection-plugins.json") -and $src.Contains('-Files $sendPlugins'))
     Yes '  once it knows what it would send, and before it says or sends anything' ($loop -gt 0 -and $ask -gt $loop -and $after -gt $ask)
