@@ -208,7 +208,7 @@ Yes 'D6 the content chain''s Build-LastPlugin.py step writes the recipe and mani
 $pub = Read-Text 'scripts\release\Publish-Server.ps1'
 Yes 'D8 Publish-Server.ps1 -FromStore makes it on the box when the running server''s is not this recipe''s, and does not stop' ($pub -match [regex]::Escape('$script:LastMake = $lastWant') -and $pub -notmatch [regex]::Escape('the deploy makes it on the box first'))
 Yes '    from our plugins as the payload carries them, read before the server''s own' ($pub -match [regex]::Escape("-Reads @((`$lastBox.Run + '\reads'), `$VpsRoot.TrimEnd('\') + '\plugins') -Into (`$lastBox.Run + '\made') -Want `$script:LastMake"))
-Yes '    and hands the installer the plugin with the sha256 the box made' ($pub -match [regex]::Escape("-LastPlugin '") -and $pub -match [regex]::Escape("-LastSha256 ' + `$made.Sha"))
+Yes '    and hands the installer the plugin with the sha256 the box made' ($pub -match [regex]::Escape("-LastPlugin '") -and $pub -match [regex]::Escape("-LastSha256 `" + `$made.Sha"))
 Yes '    and lets its folder on the box go after the install, whatever the install did' ($pub -match [regex]::Escape('finally { if ($lastBox) { $null = Close-ThornswoodOnBoxFolder $lastBox } }'))
 $inst = Read-Text 'scripts\deploy\Install-ThornswoodServer.ps1'
 Yes 'D9 the installer takes -LastPlugin only with -FromStore' ($inst -match [regex]::Escape("if (`$LastPlugin -and -not `$FromStore) { Refuse"))
