@@ -192,7 +192,7 @@ function stopView(input) {
         canReturn: loaded && line.from === h.port
       };
     });
-    var used = Object.keys(h.lines).length;
+    var used = reg.ships.used(reg.state, id);
     var others = lines.filter(function (l) { return !l.shown; }).length;
     var mayDrive = !driving && hasLoaded(reg.state, id, me);
     carts.push({

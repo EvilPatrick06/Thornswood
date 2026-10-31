@@ -13,7 +13,7 @@
 
     window.thornswoodShip = { open, close, isOpen, setData }
     page -> plugin  'ship:ready' | 'ship:opened' | 'ship:closed'
-    page -> server  '/ship load|sail|collect|return|close ...' at a dock and
+    page -> server  '/ship load|sail|collect|return|take|close ...' at a dock and
                     '/ship draft|confirm|add|staff ...' for staff, through
                     window.thornswoodNet.say; nobody is told to type them
                     (Patrick, 4 Oct: no chat commands for what people do).
@@ -23,8 +23,9 @@
                     '/cart draft|confirm|add|bring|staff ...'.
 
   WHAT IT SHOWS IS WHAT THE SERVER SENT. The server decides who may load or
-  sail (the Trading Company's charter), which lines a person sees, and what a
-  staff draft would change. This page draws the rows it is given and never
+  sail (the Trading Company's charter), whose name a person sees on a line,
+  what they may collect, take back or take (#511), and what a staff draft
+  would change. This page draws the rows it is given and never
   works out who may do what. Nothing here moves a piece or a coin.
 */
 (function () {
@@ -140,6 +141,11 @@
     if (a === 'minutes') {
       var mm = count(el.getAttribute('data-count'));
       if (mm) { net(w + 'draft route ' + k + ' ' + mm); }
+      return;
+    }
+    if (a === 'days') {
+      var dd = count(ID + '-days');
+      if (dd) { net(w + 'draft days ' + dd); }
     }
   }
 
@@ -162,14 +168,13 @@
       (h.lines || []).forEach(function (l) {
         var cid = ID + '-c-' + hid + '-' + l.line;
         var out = '<span class="nm">' + esc(l.count) + ' ' + esc(l.item) + ', for ' + esc(l.forName) + '</span>';
-        if (l.canCollect || l.canReturn) {
+        var act = l.canCollect ? ['collect', 'Collect'] : (l.canReturn ? ['return', 'Take back'] : (l.canTake ? ['take', 'Take'] : null));
+        if (act) {
           out += '<input id="' + cid + '" type="number" min="1" max="' + esc(l.count) + '" step="1" value="' + esc(l.count) + '" aria-label="Count">';
-          out += btn(l.canCollect ? 'Collect' : 'Take back', 'data-act="' + (l.canCollect ? 'collect' : 'return') +
-            '" data-hold="' + hid + '" data-line="' + esc(l.line) + '" data-count="' + cid + '"');
+          out += btn(act[1], 'data-act="' + act[0] + '" data-hold="' + hid + '" data-line="' + esc(l.line) + '" data-count="' + cid + '"');
         }
         b += line(out);
       });
-      if (h.others) { b += '<p class="note">' + esc(h.others) + ' more line(s) aboard for other people.</p>'; }
       if (h.canLoad && (data.pack || []).length && (data.people || []).length) {
         b += line('<select id="' + ID + '-piece-' + hid + '" aria-label="What to load">' +
           options(data.pack, function (p) { return p.base + ':' + p.nth; }, function (p) { return p.name + ' (' + p.count + ')'; }) + '</select>' +
@@ -214,6 +219,17 @@
       b += line('<span class="nm">' + esc(r.from) + ' to ' + esc(r.to) + ', ' + esc(r.minutes) + ' ' + P.minutes +
         (isCart() ? '' : ', crew of ' + esc(r.crew)) + '</span>');
     });
+    if (!isCart() && inForce.days) {
+      b += line('<span class="nm">Cargo nobody collects goes to the hold\'s drop box after ' + esc(inForce.days) + ' days at the dock</span>');
+    }
+    var taken = data.taken || [];
+    if (taken.length) {
+      b += '<h3>Taken lately</h3>';
+      taken.forEach(function (t) {
+        b += line('<span class="nm">' + esc(t.count) + ' ' + esc(t.item) + ' from ' + esc(t.hold) + ', by ' + esc(t.by) +
+          (t.at ? ', ' + esc(new Date(t.at).toLocaleString()) : '') + '</span>');
+      });
+    }
     if (isCart()) {
       var road = data.onRoad || [];
       b += '<h3>On the road</h3>';
@@ -249,6 +265,11 @@
         btn('Set minutes', 'data-act="minutes" data-key="' + esc(r.from + ' ' + r.to) + '" data-count="' + cid + '"') +
         say('Remove', w + 'draft unroute ' + r.from + ' ' + r.to));
     });
+    if (!isCart()) {
+      b += line('<span class="nm">Days cargo waits at the dock before the drop box</span>' +
+        '<input id="' + ID + '-days" type="number" min="1" max="60" step="1" value="' + esc(draft.days || 7) + '" aria-label="Days">' +
+        btn('Set days', 'data-act="days"'));
+    }
     if (draft.ports.length > 1) {
       var keys = draft.ports.map(function (p) { return p.key; });
       b += line('<span class="nm">A new ' + esc(P.route) + '</span>' +
