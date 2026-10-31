@@ -1,9 +1,12 @@
 {
-  "about": "The rulesets and private vulnerability reporting of Thornswood and of the engine fork, EvilPatrick06/skymp (#3683, #3691). A change is a pull request to this file; once it merges, the Desk runs pwsh scripts/deploy/Set-BuildRunners.ps1 -RepoSettings (-Check first), which starts github-admin.yml in the private ops repository, and the box's admin service (scripts/vps/admin/admin.js, repo-settings) makes GitHub match it: each ruleset named here is made or put back by name, one GitHub has that this does not name stops the run and is never deleted, and reporting is switched as each entry says. A why is this file's own note and is never sent to GitHub.",
+  "about": "The rulesets, private vulnerability reporting and secret scanning of Thornswood and of the engine fork, EvilPatrick06/skymp (#3683, #3691). A change is a pull request to this file; once it merges, the Desk runs pwsh scripts/deploy/Set-BuildRunners.ps1 -RepoSettings (-Check first), which starts github-admin.yml in the private ops repository, and the box's admin service (scripts/vps/admin/admin.js, repo-settings) makes GitHub match it: each ruleset named here is made or put back by name, one GitHub has that this does not name stops the run and is never deleted, and reporting, secret scanning and push protection are switched as each entry says. A why is this file's own note and is never sent to GitHub.",
   "repositories": [
     {
       "repository": "EvilPatrick06/Thornswood",
-      "why": "No private_vulnerability_reporting here yet: GitHub offers it only on a public repository, so it is switched on in this file at the flip (#3721), when SECURITY.md's Security tab route opens too.",
+      "why": "Switched on at the flip (#3721, public since 30 Oct 2026, 6:23 PM): GitHub offers private vulnerability reporting, the route SECURITY.md names, only on a public repository, and secret scanning with push protection costs a public repository nothing (#3683).",
+      "private_vulnerability_reporting": true,
+      "secret_scanning": true,
+      "secret_scanning_push_protection": true,
       "rulesets": [
         {
           "name": "release tags",
@@ -19,9 +22,9 @@
         },
         {
           "name": "main",
-          "why": "Patrick's A on q-3721-main-protection, 26 Oct 2026: admins included, no force push or deletion, and the build check required: the one always-run Build check result job (q-3683-required-check A), since a skipped Launcher builds counts as passing. Disabled until #3684's history rewrite has had its force push and that job is on main.",
+          "why": "Patrick's A on q-3721-main-protection, 26 Oct 2026: admins included, no force push or deletion, and the build check required: the one always-run Build check result job (q-3683-required-check A), since a skipped Launcher builds counts as passing. Active since #3684's history rewrite had its force push (step 7, 31 Oct 2026) and that job runs on every pull request now the repository is public (first passed on #5066, 31 Oct 2026).",
           "target": "branch",
-          "enforcement": "disabled",
+          "enforcement": "active",
           "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
           "rules": [
             { "type": "deletion" },
@@ -35,6 +38,8 @@
     {
       "repository": "EvilPatrick06/skymp",
       "private_vulnerability_reporting": true,
+      "secret_scanning": true,
+      "secret_scanning_push_protection": true,
       "rulesets": [
         {
           "name": "thornswood/engine-changes: pull request, green build, no force push or deletion",

@@ -34,8 +34,9 @@
   everyone who can read the repository it runs in. So the run's log carries only the
   verb, main's commit and the exit code. Everything the verb printed and
   every file it wrote is sealed on the runner to a key made here for this
-  run alone (RSA-OAEP over an AES-GCM key) and uploaded as the run's
-  artifact. Only the private half, kept in this machine's scratch folder
+  run alone (RSA-OAEP over an AES-GCM key) and written into the run's log
+  as TWSEAL-LOG lines (scripts\ops\Sealed.ps1 says why the log and not an
+  artifact). Only the private half, kept in this machine's scratch folder
   (box-run\<run>.key, readable by this account only), opens it, and this
   prints the output and puts the files in box-run\<run>\.
 
@@ -184,7 +185,7 @@ if ($a.State -eq 'waiting' -or $a.State -eq 'unread') { Die ("run $Run has no an
 $keyPath = Join-Path $scratch "$Run.key"
 $dir = Join-Path $scratch "$Run"
 if (Test-Path -LiteralPath $keyPath) {
-    $o = Open-ThornswoodSealedRun -Repo $GitHubRepo -Run $Run -Artifact 'box-run-sealed' -File 'box-run.sealed' -KeyPath $keyPath -Into $dir
+    $o = Open-ThornswoodSealedRun -Repo $GitHubRepo -Run $Run -Artifact 'box-run-sealed' -File 'box-run.sealed' -KeyPath $keyPath -Into $dir -FromLog
     if ($o.Ok) {
         $txt = Join-Path $dir 'output.txt'
         if (Test-Path -LiteralPath $txt) { Get-Content -LiteralPath $txt | ForEach-Object { Write-Host $_ } }

@@ -31,6 +31,10 @@
        own records: a room or worldspace of those places is named with its
        hold, and one no hold covers is named without one
 
+  No repository holds the plugin since #2791 step 3, so P2 to P4 and L read
+  it made from its recipe out of the game's plugins (tests/last-plugin-made.js),
+  and print SKIP without the game; the rest still run.
+
   On a machine with the game (C:\Thornswood\Game\Data, or THORNSWOOD_DATA)
   the place name is also run over the whole load order, for every one of the
   17 buildings, with Thornswood-Last.esp and without it: before, no hold;
@@ -43,7 +47,7 @@ const zlib = require('zlib');
 const ROOT = path.join(__dirname, '..');
 const CR = String.fromCharCode(13);
 const read = (p) => fs.readFileSync(p, 'utf8').split(CR).join('').replace(/^\uFEFF/, '');
-const ESP = path.join(ROOT, 'game', 'content', 'Thornswood-Last.esp');
+const made = require('./last-plugin-made.js').made();
 const POLICY = JSON.parse(read(path.join(ROOT, 'game', 'data', 'last-plugin-policy.json')));
 const MANIFEST = JSON.parse(read(path.join(ROOT, 'game', 'data', 'last-plugin.json')));
 const TABLE = JSON.parse(read(path.join(ROOT, 'game', 'data', 'building-holds.json')));
@@ -189,7 +193,8 @@ function placeNamer(mp) {
 }
 
 // ---------------------------------------------------------------------- P
-const last = index(ESP, 'Thornswood-Last.esp');
+const last = made.buf ? index(made.path, 'Thornswood-Last.esp') : null;
+if (!last) { console.log('SKIP  P2, P3, P4, L: ' + made.why); }
 const rules = POLICY.placeHolds || {};
 const locs = rules.locations || [], rooms = rules.cells || [];
 yes('P1 the policy gives 8 locations and 3 rooms a hold', locs.length === 8 && rooms.length === 3);
@@ -201,11 +206,12 @@ function formAt(pl, f, type) {
   return pl.files[Math.min(v >>> 24, pl.files.length - 1)] + '|' + (v & 0xFFFFFF);
 }
 let pBad = [];
-for (const row of locs) {
-  const r = last.recs[keyOf(row.location)];
-  const f = r && r.tag === 'LCTN' ? fieldsOf(last, r) : null;
-  const edid = f ? Buffer.from(f.find((x) => x.type === 'EDID').data).toString('latin1').replace(/\0+$/, '') : '';
-  if (!f || edid !== row.edid || formAt(last, f, 'PNAM') !== keyOf(row.parent) || !HOLD_NAME[row.holdEdid]) { pBad.push(row.place); }
+if (last) {
+  for (const row of locs) {
+    const r = last.recs[keyOf(row.location)];
+    const f = r && r.tag === 'LCTN' ? fieldsOf(last, r) : null;
+    const edid = f ? Buffer.from(f.find((x) => x.type === 'EDID').data).toString('latin1').replace(/\0+$/, '') : '';
+    if (!f || edid !== row.edid || formAt(last, f, 'PNAM') !== keyOf(row.parent) || !HOLD_NAME[row.holdEdid]) { pBad.push(row.place); }
 }
 yes('P2 the plugin overrides each location with the policy\'s parent, a hold\'s location or a place on the list' +
     (pBad.length ? ' (not: ' + pBad.join(', ') + ')' : ''), pBad.length === 0);
@@ -218,6 +224,7 @@ for (const row of rooms) {
 yes('P3 and each room with its location' + (pBad.length ? ' (not: ' + pBad.join(', ') + ')' : ''), pBad.length === 0);
 const lctnCount = Object.keys(last.recs).filter((k) => last.recs[k].tag === 'LCTN').length;
 yes('P4 the plugin has no other location record (' + lctnCount + ')', lctnCount === locs.length);
+}
 const mp = MANIFEST.placeHolds || {};
 yes('P5 the manifest lists the same places, each location with the parent it had',
     JSON.stringify((mp.locations || []).map((r) => r.location)) === JSON.stringify(locs.map((r) => r.location)) &&
@@ -245,7 +252,7 @@ yes('B2 the 22 refused are exactly ' + Object.keys(STAY).join(', '),
 yes('B3 the table counts 828 measured of 850', TABLE.counts.measured === 828 && TABLE.counts.buildings === 850);
 
 // ---------------------------------------------------------------------- L
-if (code) {
+if (code && last) {
   // The hold locations as the masters have them, by their editor ids alone,
   // from the table's own record of where each is.
   const holds = {};
@@ -270,7 +277,7 @@ if (code) {
 
 // ------------------------------------------------- the whole load order, if here
 const data = process.env.THORNSWOOD_DATA || 'C:\\Thornswood\\Game\\Data';
-if (code && fs.existsSync(path.join(data, 'Skyrim.esm'))) {
+if (code && last && fs.existsSync(path.join(data, 'Skyrim.esm'))) {
   const order = MANIFEST.loadOrder;
   const missing = order.filter((n) => !(n.startsWith('Thornswood-') || fs.existsSync(path.join(data, n))));
   if (missing.length) {

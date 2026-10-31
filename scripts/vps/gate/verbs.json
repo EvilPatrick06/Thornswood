@@ -87,9 +87,9 @@
       }
     },
     "Publish-Server": {
-      "script": "scripts/release/Publish-Server.ps1",
+      "script": "scripts/release/Publish-ServerOnBox.ps1",
       "timeoutMinutes": 45,
-      "fixed": ["-Channel", "dev", "-FromStore", "-NoPause"],
+      "fixed": ["-Channel", "dev"],
       "params": {
         "RequirePass": "^(on|off)$",
         "Wait": "^[0-9]{1,4}$",
@@ -115,10 +115,10 @@
       }
     },
     "Publish-Server-Main": {
-      "script": "scripts/release/Publish-Server.ps1",
+      "script": "scripts/release/Publish-ServerOnBox.ps1",
       "timeoutMinutes": 45,
       "build": true,
-      "fixed": ["-Channel", "main", "-FromStore", "-NoPause"],
+      "fixed": ["-Channel", "main"],
       "params": {
         "RequirePass": "^(on|off)$",
         "Wait": "^[0-9]{1,4}$",
@@ -135,6 +135,30 @@
         "Server": "^(dev|main)$",
         "Pull": "^[1-9][0-9]{0,5}$",
         "Head": "^[0-9a-f]{40}$"
+      }
+    },
+    "Ship-Dev": {
+      "script": "scripts/release/Ship-OnBox.ps1",
+      "timeoutMinutes": 45,
+      "fixed": ["-Channel", "dev"],
+      "params": {
+        "Title": "text",
+        "Detail": "text",
+        "Detail2": "text",
+        "Detail3": "text"
+      }
+    },
+    "Ship-Main": {
+      "script": "scripts/release/Ship-OnBox.ps1",
+      "timeoutMinutes": 45,
+      "build": true,
+      "fixed": ["-Channel", "main"],
+      "params": {
+        "Title": "text",
+        "Detail": "text",
+        "Detail2": "text",
+        "Detail3": "text",
+        "ModsOnly": "switch"
       }
     }
   }

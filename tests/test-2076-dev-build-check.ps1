@@ -28,7 +28,7 @@ $old = ('a' * 64); $new = ('b' * 64)
 $put = 'scripts\release\Publish-Server.ps1 -Channel dev'
 $same = Get-ThornswoodBoxBuildProblem $new 'e31a579a7044ef094180f59a0d405607b95836e8' $new 'e31a579a7044ef094180f59a0d405607b95836e8' 'dev server' $put
 Yes 'the build the commit records: no problem' ($null -eq $same)
-$other = Get-ThornswoodBoxBuildProblem $old '3a32e961aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' $new 'e31a579a7044ef094180f59a0d405607b95836e8' 'dev server' $put
+$other = Get-ThornswoodBoxBuildProblem $old '0f54ad45aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' $new 'e31a579a7044ef094180f59a0d405607b95836e8' 'dev server' $put
 Yes 'another build: refused, naming both commits and how to put the right one on' (
   $other -and $other -match 'commit 0f54ad45' -and $other -match 'commit e31a579a' -and $other.Contains($put))
 $none = Get-ThornswoodBoxBuildProblem 'none' '' $new 'e31a579a' 'dev server' $put

@@ -10,7 +10,7 @@ A cut actor is never made on the server, and since #2468 it is meant never to
 be drawn in anybody's game either. Until then each person's game loaded every
 placed actor of a cell from the plugins, and the client's world cleaner
 removed the ones the server does not own one per frame, so a cut guard or
-filler stood there for a moment. `game/content/Thornswood-Last.esp` overrides
+filler stood there for a moment. `Thornswood-Last.esp` (made from `game/data/last-plugin.recipe`, #2791) overrides
 every cut placed actor initially disabled, with no enable parent, built by
 `scripts/mods/Build-LastPlugin.py` from this catalogue; the server's reader
 skips a disabled reference too (measured on 12 Oct with the built server
