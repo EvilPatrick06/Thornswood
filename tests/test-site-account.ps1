@@ -73,8 +73,8 @@
       after each. Not elevated, that part says SKIP.
 
   Writes only under its own temp folder and, when elevated, one scheduled
-  task whose action is cmd.exe /c exit. That task is never started and is
-  removed before this ends. Never connects to anything.
+  task whose program is a stand-in that is not there. That task is never
+  started and is removed before this ends. Never connects to anything.
 #>
 [CmdletBinding()]
 param([string]$RepoPath)
@@ -832,8 +832,8 @@ try {
     # everything from the settings to the read-back of the account are cut
     # from the script that goes up and run against one scratch task, through
     # every change of account a deploy makes, and the task is read back after
-    # each. Its action is cmd.exe /c exit. Nothing here starts it, and it is
-    # removed before this ends.
+    # each. Its program is a stand-in named for the deploy, which is not
+    # there. Nothing here starts it, and it is removed before this ends.
     $elevated = $false
     try {
         $elevated = (New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole(
@@ -871,14 +871,24 @@ try {
             $makeOrUpdate -notmatch 'Start-ScheduledTask' -and $makeOrUpdate -notmatch 'Stop-Process')
 
         # One deploy against the scratch task: the account block with the
-        # scratch folders and icacls standing in, an action that does nothing,
-        # then the real register-or-update and read-back, with Continue as the
-        # far end has it. Hands back what it said and the task as it is after.
+        # scratch folders and icacls standing in, then the real
+        # register-or-update and read-back, with Continue as the far end has
+        # it. Hands back what it said and the task as it is after.
+        #
+        # The program stands in for node, named for the deploy, so each one's
+        # action can be told from the last one's. When the site is on its own
+        # SID the part cut from the script builds the action again from it,
+        # to start through the owner launcher (#4077); the launcher stands in
+        # too, in the scratch folder rather than Program Files. Neither is run.
+        $launcherStandIn = Join-Path $tmp 'thornswood-owner-harness.exe'
+        function NodeOf([int]$n) { return (Join-Path $tmp ('node-{0}.exe' -f $n)) }
         function OnTask([string]$given, [int]$n) {
             $code = '$ErrorActionPreference = ''Continue''' + "`n" +
                     'function icacls { $script:icaclsCalls++; $global:LASTEXITCODE = 0 }' + "`n" +
+                    ('function Install-ThornswoodOwnerLaunch {{ return ''{0}'' }}' -f $launcherStandIn) + "`n" +
                     (AccountOf (Build $given $docs $scratchTask)) + "`n" +
-                    ('$a = New-ScheduledTaskAction -Execute ''cmd.exe'' -Argument ''/c exit {0}''' -f $n) + "`n" +
+                    ('$node = ''{0}''' -f (NodeOf $n)) + "`n" +
+                    '$a = New-ScheduledTaskAction -Execute $node -Argument ''server.js''' + "`n" +
                     $makeOrUpdate
             $script:icaclsCalls = 0
             # A cmdlet that fails in there can still end this script, because
@@ -892,7 +902,22 @@ try {
             return @{ said = ($ran.said -join "`n"); task = $task; p = $p }
         }
         function PrivsOf($p) { return ((@($p.RequiredPrivilege) | Where-Object { $_ }) -join ',') }
-        function ArgsOf($task) { if (-not $task) { return '' }; return [string](@($task.Actions)[0].Arguments) }
+        # The program the task runs, with the owner launcher taken off.
+        function ProgramOf($task) {
+            if (-not $task) { return '' }
+            try { return [string](Get-ThornswoodPlainAction @($task.Actions)[0]).Execute }
+            catch { return 'UNREADABLE: ' + $_.Exception.Message }
+        }
+        # True when the task starts through the owner launcher, with the SID
+        # the deploy said it owns as (its OWNER line).
+        function Launched($r) {
+            if (-not $r.task) { return $false }
+            $act = @($r.task.Actions)[0]
+            $m = [regex]::Match($r.said, '(?m)^OWNER (S-1-5-87-[0-9-]+)\s*$')
+            return [bool]($m.Success -and [string]$act.Execute -eq $launcherStandIn -and
+                ([string]$act.Arguments).StartsWith($m.Groups[1].Value + ' '))
+        }
+        function Direct($r) { return [bool]($r.task -and [string]@($r.task.Actions)[0].Execute -ne $launcherStandIn) }
         # The start-up trigger it was registered with, and the ten restarts.
         function Kept($task) {
             return [bool]($task -and @($task.Triggers | Where-Object { $_ }).Count -eq 1 -and $task.Settings.RestartCount -eq 10)
@@ -912,7 +937,8 @@ try {
                 Yes 'real task: no -RunAs and no task yet registers one' ($r.said -match 'scheduled task created' -and $null -ne $r.task)
                 Yes 'real task: on LOCAL SERVICE at Limited, SeChangeNotifyPrivilege only, token SID type Unrestricted (#2613)' (IsCut $r.p)
                 Yes 'real task: with its start-up trigger, ten restarts and the action it was given' (
-                    (Kept $r.task) -and (ArgsOf $r.task) -eq '/c exit 1')
+                    (Kept $r.task) -and (ProgramOf $r.task) -eq (NodeOf 1))
+                Yes 'real task: started through the owner launcher with its own SID (#4077)' (Launched $r)
                 Yes 'real task: and the read-back says LOCAL SERVICE' ($r.said -match 'task runs as LOCAL SERVICE, run level Limited')
 
                 # Put on SYSTEM first, so the next one moves it as a SYSTEM task on the box would be.
@@ -927,14 +953,14 @@ try {
                 }
                 Yes 'real task: it is now LOCAL SERVICE at Limited, SeChangeNotifyPrivilege only, token SID type Unrestricted' (IsCut $r.p)
                 Yes 'real task: the trigger and settings kept, and this deploy''s action on it' (
-                    (Kept $r.task) -and (ArgsOf $r.task) -eq '/c exit 2')
+                    (Kept $r.task) -and (ProgramOf $r.task) -eq (NodeOf 2) -and (Launched $r))
                 Yes 'real task: and the read-back says LOCAL SERVICE with the cut' (
                     $r.said -match 'task runs as LOCAL SERVICE, run level Limited' -and
                     $r.said -match 'task privileges: SeChangeNotifyPrivilege only, token SID type Unrestricted')
 
                 $r = OnTask '' 3
                 Yes 'real task: a deploy without -RunAs after that reads LOCAL SERVICE off the task and keeps it, cut' (
-                    $r.said -match 'keeps the account it has: LOCAL SERVICE' -and (IsCut $r.p) -and (ArgsOf $r.task) -eq '/c exit 3')
+                    $r.said -match 'keeps the account it has: LOCAL SERVICE' -and (IsCut $r.p) -and (ProgramOf $r.task) -eq (NodeOf 3) -and (Launched $r))
 
                 # The finding. Before the fix this said "scheduled task
                 # updated" and left the task on LOCAL SERVICE with the last
@@ -943,13 +969,14 @@ try {
                 Yes 'real task: -RunAs SYSTEM on the LOCAL SERVICE task updates it without an error' (
                     $r.said -match 'scheduled task updated' -and $r.said -notmatch 'COULD NOT UPDATE' -and $r.said -notmatch 'unexpected node')
                 Yes 'real task: -RunAs SYSTEM puts it back on SYSTEM at Highest, with no privilege list left over' (IsSystem $r.p)
-                Yes 'real task: with this deploy''s action on it, not the last one''s' ((Kept $r.task) -and (ArgsOf $r.task) -eq '/c exit 4')
+                Yes 'real task: with this deploy''s action on it, not the last one''s, and not through the launcher' (
+                    (Kept $r.task) -and (ProgramOf $r.task) -eq (NodeOf 4) -and (Direct $r))
                 Yes 'real task: and the read-back says SYSTEM' (
                     $r.said -match 'task runs as SYSTEM, run level Highest' -and $r.said -notmatch 'THE TASK RUNS AS')
 
                 $r = OnTask '' 5
                 Yes 'real task: and a deploy without -RunAs after that moves it back to LOCAL SERVICE, cut (#2613)' (
-                    $r.said -match 'it moves to LOCAL SERVICE' -and (IsCut $r.p) -and (ArgsOf $r.task) -eq '/c exit 5' -and
+                    $r.said -match 'it moves to LOCAL SERVICE' -and (IsCut $r.p) -and (ProgramOf $r.task) -eq (NodeOf 5) -and (Launched $r) -and
                     $r.said -notmatch 'COULD NOT UPDATE')
             }
             finally {
