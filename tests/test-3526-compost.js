@@ -92,6 +92,7 @@ function toolGate() { return null; }
 function wearTool() { return null; }
 function rankStep(actorId) { return actors[actorId].step || 0; }
 function creditWork() { return null; }
+function economyGathered() { }
 function mintedEntry(e) { return !!(e && e.minted); }
 function count(actorId, desc) {
   var id = idOf(desc), n = 0;
