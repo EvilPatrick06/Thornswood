@@ -692,10 +692,20 @@ async function partOne() {
   const theirs = n2.find((m) => m.t === 'peers');
   yes('the newcomer\'s roster names the backed socket, which is who it offers to',
       !!theirs && theirs.peers.some((p) => p.peer === eId));
+  // What matters is the socket's state when the service relays them: the
+  // roster it holds has to go out ahead of the offer (send). Whether health
+  // says backed a moment later is the kernel's timing again: on GitHub's
+  // hosted Windows runner, 31 Oct, it said 1 just after the joins and 0 300
+  // ms after the relay. So the service counts a held roster written ahead of
+  // a message, where it happens, and a drain that sent it first is not
+  // counted.
+  const ahead0 = h.rostersAhead;
   sendRaw(N2, { t: 'sdp', to: eId, sdp: { type: 'offer', sdp: 'measured offer' } });
   sendRaw(N2, { t: 'ice', to: eId, candidate: { candidate: 'candidate:1 1 udp 1 192.0.2.9 50000 typ host', sdpMid: '0', sdpMLineIndex: 0 } });
   await sleep(300);
-  yes('and it is still backed when they are relayed to it', (await health()).backed >= 1);
+  const hr = await health();
+  yes('and the roster it held goes out ahead of the offer relayed to it (rostersAhead ' + ahead0 + ' to ' +
+      hr.rostersAhead + ', backed ' + hr.backed + ' after)', hr.rostersAhead === ahead0 + 1);
 
   E.resume();
   const heard = await until(() => got.slice(before).some((m) => m.t === 'ice' && m.from === n2Id), 15000);
