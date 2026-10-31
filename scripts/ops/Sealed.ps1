@@ -12,8 +12,17 @@
   download its artifacts. A deploy's output, the servers' logs and what the
   Nexus scripts print are not for them. So the session makes a key for that
   run alone and sends only its public half; the runner seals the output to it
-  and uploads the sealed file; only the private half, which never leaves the
-  session's scratch folder, opens it.
+  and sends the sealed file back; only the private half, which never leaves
+  the session's scratch folder, opens it.
+
+  HOW IT COMES BACK. nexus-run.yml uploads it as the run's artifact.
+  box-run.yml, in the private ops repository, writes it into the job's own
+  log as TWSEAL-LOG lines (Write-ThornswoodSealedLog), and the session reads
+  them back from the log (Read-ThornswoodSealedLog): GitHub counts a private
+  repository's artifacts against the account's storage, and on 30 and 31 Oct
+  2026 that storage was full, so every gate run came back with only its exit
+  code. The seal is what keeps the output private, wherever it travels; a
+  log takes no storage of the account's.
 
   THE FORMAT. "TWSEAL1", the wrapped key's length (2 bytes, big end first),
   the AES key wrapped with RSA-OAEP-SHA256, the 12 byte nonce, the 16 byte
@@ -82,22 +91,82 @@ function Save-ThornswoodSealed([string]$Folder, [string]$RecipientB64, [string]$
     return @(Get-ChildItem -LiteralPath (Join-Path $Folder 'files') -Recurse -File -ErrorAction SilentlyContinue).Count
 }
 
-# The session's half: downloads artifact $Artifact of run $Run, opens its
+# The runner's half when the run's log carries it: the sealed file at $From
+# in base64 lines of 2000 characters, "TWSEAL-LOG <n> <part>", then
+# "TWSEAL-LOG END <parts> <sha256 of the sealed bytes>". Nothing else of the
+# output is ever written to the log.
+function Write-ThornswoodSealedLog([string]$From) {
+    if (-not (Test-Path -LiteralPath $From)) { Write-Host 'TWSEAL-LOG NONE'; return }
+    $bytes = [IO.File]::ReadAllBytes($From)
+    $b64 = [Convert]::ToBase64String($bytes)
+    $n = 0
+    for ($at = 0; $at -lt $b64.Length; $at += 2000) {
+        $n++
+        Write-Host ('TWSEAL-LOG ' + $n + ' ' + $b64.Substring($at, [Math]::Min(2000, $b64.Length - $at)))
+    }
+    $sha = ([BitConverter]::ToString([Security.Cryptography.SHA256]::HashData($bytes))).Replace('-', '').ToLowerInvariant()
+    Write-Host ('TWSEAL-LOG END ' + $n + ' ' + $sha)
+}
+
+# The session's half of that: the sealed bytes from the TWSEAL-LOG lines of
+# the logs of run $Run's jobs, held to the END line's count and sha256.
+# Returns @{ Bytes; Why }: Bytes is $null with Why saying what was missing.
+function Read-ThornswoodSealedLog([string]$Repo, [long]$Run) {
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    try {
+        $jobs = @(& gh api "repos/$Repo/actions/runs/$Run/jobs" --jq '.jobs[].id' 2>&1 | ForEach-Object { "$_" })
+        if ($LASTEXITCODE -ne 0) { return @{ Bytes = $null; Why = ('the run''s jobs could not be read: ' + ($jobs -join ' ')) } }
+        foreach ($job in $jobs) {
+            if ($job -notmatch '^[0-9]+$') { continue }
+            $log = @(& gh api "repos/$Repo/actions/jobs/$job/logs" 2>&1 | ForEach-Object { "$_" })
+            if ($LASTEXITCODE -ne 0) { return @{ Bytes = $null; Why = ('the log of job ' + $job + ' could not be read: ' + (($log | Select-Object -Last 1) -join '')) } }
+            $parts = @{}; $end = $null
+            foreach ($line in $log) {
+                # Each line of a job's log starts with its time.
+                $m = [regex]::Match($line, '^(?:\S+ )?TWSEAL-LOG (\d+|END|NONE)(?: (\S+))?(?: ([0-9a-f]{64}))?$')
+                if (-not $m.Success) { continue }
+                if ($m.Groups[1].Value -eq 'NONE') { return @{ Bytes = $null; Why = 'the run wrote no sealed output' } }
+                if ($m.Groups[1].Value -eq 'END') { $end = $m; continue }
+                $parts[[int]$m.Groups[1].Value] = $m.Groups[2].Value
+            }
+            if (-not $end) { continue }
+            $count = [int]$end.Groups[2].Value
+            $missing = @(1..[Math]::Max(1, $count) | Where-Object { -not $parts.ContainsKey($_) })
+            if ($count -lt 1 -or $missing.Count) { return @{ Bytes = $null; Why = ('the log names ' + $count + ' sealed part(s) and lacks ' + $missing.Count) } }
+            $bytes = [Convert]::FromBase64String((@(1..$count | ForEach-Object { $parts[$_] }) -join ''))
+            $sha = ([BitConverter]::ToString([Security.Cryptography.SHA256]::HashData($bytes))).Replace('-', '').ToLowerInvariant()
+            if ($sha -ne $end.Groups[3].Value) { return @{ Bytes = $null; Why = 'the sealed lines in the log do not hash to the sha256 the log names' } }
+            return @{ Bytes = $bytes; Why = '' }
+        }
+        return @{ Bytes = $null; Why = 'no job of the run has TWSEAL-LOG lines' }
+    }
+    finally { $ErrorActionPreference = $old }
+}
+
+# The session's half: downloads artifact $Artifact of run $Run (or, with
+# -FromLog, reads it from the run's log), opens its
 # $File with the key at $KeyPath into $Into (output.txt and files\). Returns
 # @{ Ok; Why }; Why says what gh said when there was nothing to open.
 function Open-ThornswoodSealedRun {
-    param([string]$Repo, [long]$Run, [string]$Artifact, [string]$File, [string]$KeyPath, [string]$Into)
+    param([string]$Repo, [long]$Run, [string]$Artifact, [string]$File, [string]$KeyPath, [string]$Into, [switch]$FromLog)
     $dl = $Into.TrimEnd('\', '/') + '.download'
     Remove-Item -LiteralPath $dl -Recurse -Force -ErrorAction SilentlyContinue
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $got = @(& gh run download $Run -R $Repo -n $Artifact -D $dl 2>&1 | ForEach-Object { "$_" })
-    $ErrorActionPreference = $old
-    $sealedFile = Join-Path $dl $File
-    if (-not (Test-Path -LiteralPath $sealedFile)) {
-        Remove-Item -LiteralPath $dl -Recurse -Force -ErrorAction SilentlyContinue
-        return @{ Ok = $false; Why = (($got | Select-Object -Last 1) -join '') }
+    if ($FromLog) {
+        $l = Read-ThornswoodSealedLog $Repo $Run
+        if (-not $l.Bytes) { return @{ Ok = $false; Why = $l.Why } }
+        $sealedBytes = $l.Bytes
+    } else {
+        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        $got = @(& gh run download $Run -R $Repo -n $Artifact -D $dl 2>&1 | ForEach-Object { "$_" })
+        $ErrorActionPreference = $old
+        $sealedFile = Join-Path $dl $File
+        if (-not (Test-Path -LiteralPath $sealedFile)) {
+            Remove-Item -LiteralPath $dl -Recurse -Force -ErrorAction SilentlyContinue
+            return @{ Ok = $false; Why = (($got | Select-Object -Last 1) -join '') }
+        }
+        $sealedBytes = [IO.File]::ReadAllBytes($sealedFile)
     }
-    $plain = Unprotect-ThornswoodSealed ([IO.File]::ReadAllBytes($sealedFile)) ([IO.File]::ReadAllText($KeyPath).Trim())
+    $plain = Unprotect-ThornswoodSealed $sealedBytes ([IO.File]::ReadAllText($KeyPath).Trim())
     Remove-Item -LiteralPath $Into -Recurse -Force -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Path $Into -Force | Out-Null
     $zip = Join-Path $Into 'out.zip'

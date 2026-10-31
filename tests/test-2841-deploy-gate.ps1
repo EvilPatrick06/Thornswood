@@ -32,7 +32,9 @@
        there; the ops repository's tests\test-box-workflows.ps1 holds its
        shape.
     9. The seal (scripts\ops\Sealed.ps1) opens with its own key only, and a changed byte
-       is refused; the box half uses the signed ssh.exe by full path.
+       is refused; it comes back through the run's log as TWSEAL-LOG lines,
+       held to their count and sha256 (a stand-in gh serves the log); the
+       box half uses the signed ssh.exe by full path.
   Nothing connects anywhere and nothing outside the temp folder is touched.
 #>
 [CmdletBinding()]
@@ -421,6 +423,52 @@ Yes '  another key does not open it' $threw
 $bent = [byte[]]$sealed.Clone(); $bent[$bent.Length - 3] = $bent[$bent.Length - 3] -bxor 1
 $threw = $false; try { [void](Unprotect-ThornswoodSealed $bent ([Convert]::ToBase64String($rsa.ExportPkcs8PrivateKey()))) } catch { $threw = $true }
 Yes '  and a changed byte is refused' $threw
+# Through the run's log, with a stand-in gh serving one job and its log.
+$tmp = Join-Path ([IO.Path]::GetTempPath()) ('tw-2841-seal-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+$sealedPath = Join-Path $tmp 'box-run.sealed'
+[IO.File]::WriteAllBytes($sealedPath, $sealed)
+$written = @(Write-ThornswoodSealedLog $sealedPath 6>&1 | ForEach-Object { "$_" })
+Yes 'the runner writes the sealed file into its log as TWSEAL-LOG lines of 2000 characters' ($written.Count -ge 3 -and @($written | Where-Object { $_ -notmatch '^TWSEAL-LOG ' }).Count -eq 0 -and $written[0].Length -eq ('TWSEAL-LOG 1 '.Length + 2000))
+Yes '  and ends them with the count and the sha256' ($written[-1] -match ('^TWSEAL-LOG END ' + ($written.Count - 1) + ' [0-9a-f]{64}$'))
+Yes '  and with no sealed file writes only TWSEAL-LOG NONE' ((@(Write-ThornswoodSealedLog (Join-Path $tmp 'none.sealed') 6>&1 | ForEach-Object { "$_" }) -join '|') -eq 'TWSEAL-LOG NONE')
+$script:fakeLog = @("$([char]0xFEFF)2026-10-31T04:00:00.0000000Z Current runner version: '2.338.0'", '2026-10-31T04:00:01.0000000Z | GATE Ship-Dev exit 0') + @($written | ForEach-Object { '2026-10-31T04:00:02.0000000Z ' + $_ })
+function gh {
+    $global:LASTEXITCODE = 0
+    if ("$args" -match '/runs/\d+/jobs') { return '7' }
+    if ("$args" -match '/jobs/7/logs') { return $script:fakeLog }
+    $global:LASTEXITCODE = 1; return 'HTTP 404'
+}
+$l = Read-ThornswoodSealedLog 'o/r' 1
+Yes 'the session reads the sealed bytes back from the log' ($l.Bytes -and [Convert]::ToBase64String($l.Bytes) -eq [Convert]::ToBase64String($sealed))
+$keyPath = Join-Path $tmp 'run.key'
+[IO.File]::WriteAllText($keyPath, [Convert]::ToBase64String($rsa.ExportPkcs8PrivateKey()))
+$saved = Join-Path $tmp 'save'
+New-Item -ItemType Directory -Path (Join-Path $saved 'files') -Force | Out-Null
+[IO.File]::WriteAllText((Join-Path $saved 'output.txt'), 'the verb said this')
+[IO.File]::WriteAllText((Join-Path (Join-Path $saved 'files') 'a.log'), 'a server log')
+[void](Save-ThornswoodSealed $saved ([Convert]::ToBase64String($rsa.ExportSubjectPublicKeyInfo())) $sealedPath)
+$written = @(Write-ThornswoodSealedLog $sealedPath 6>&1 | ForEach-Object { "$_" })
+$script:fakeLog = @($written | ForEach-Object { '2026-10-31T04:00:02.0000000Z ' + $_ })
+$into = Join-Path $tmp 'opened'
+$o = Open-ThornswoodSealedRun -Repo 'o/r' -Run 1 -Artifact 'box-run-sealed' -File 'box-run.sealed' -KeyPath $keyPath -Into $into -FromLog
+Yes '  and -FromLog opens it to the output and the files' ($o.Ok -and ([IO.File]::ReadAllText((Join-Path $into 'output.txt'))) -eq 'the verb said this' -and (Test-Path -LiteralPath (Join-Path (Join-Path $into 'files') 'a.log')))
+$script:fakeLog = @($written | Where-Object { $_ -notmatch '^TWSEAL-LOG 1 ' } | ForEach-Object { '2026-10-31T04:00:02.0000000Z ' + $_ })
+$l = Read-ThornswoodSealedLog 'o/r' 1
+Yes '  a part missing from the log is refused' (-not $l.Bytes -and $l.Why -match 'lacks 1')
+$script:fakeLog = @($written | ForEach-Object { '2026-10-31T04:00:02.0000000Z ' + $_ })
+$p1 = $script:fakeLog[0]; $at = $p1.Length - 5
+$script:fakeLog[0] = $p1.Substring(0, $at) + $(if ($p1[$at] -eq 'A') { 'B' } else { 'A' }) + $p1.Substring($at + 1)
+$l = Read-ThornswoodSealedLog 'o/r' 1
+Yes '  a changed part is refused by the sha256' (-not $l.Bytes -and $l.Why -match 'sha256')
+$script:fakeLog = @('2026-10-31T04:00:02.0000000Z TWSEAL-LOG NONE')
+$l = Read-ThornswoodSealedLog 'o/r' 1
+Yes '  and a run that wrote none says so' (-not $l.Bytes -and $l.Why -eq 'the run wrote no sealed output')
+Remove-Item -LiteralPath function:\gh
+Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+$br = Text 'scripts/vps/Box-Run.ps1'
+Yes 'Box-Run.ps1 reads its sealed output from the run''s log, not an artifact' ($br.Contains("-KeyPath `$keyPath -Into `$dir -FromLog"))
+
 $small = [Security.Cryptography.RSA]::Create(2048)
 $threw = $false; try { [void](Protect-ThornswoodSealed $plain ([Convert]::ToBase64String($small.ExportSubjectPublicKeyInfo()))) } catch { $threw = $true }
 Yes '  a recipient key under 3072 bits is refused' $threw
