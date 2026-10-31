@@ -148,8 +148,13 @@ function Invoke-WebRequest {
     if ($Method -eq 'POST' -and $p -eq 'git/refs') { return (A $s.postRef @{ ref = 'x' }) }
     if ($Method -eq 'GET' -and $p -match '^pulls\?state=open&per_page=100&head=') { return (A 200 @($s.from | ForEach-Object { @{ number = $_ } })) }
     if ($Method -eq 'GET' -and $p -match '^pulls\?state=open&per_page=100&base=') { return (A 200 @($s.onto | ForEach-Object { @{ number = $_ } })) }
-    if ($Method -eq 'DELETE' -and $p -match '^git/refs/heads/') { return (A $s.delete $null) }
-    if ($Method -eq 'DELETE' -and $p -match '^git/refs/tags/') { return (A $s.delete $null) }
+    # raced: the ref went between the read and the delete, so the delete
+    # answers 422 and a read after it 404. Without it a 422 leaves the ref,
+    # the way a ruleset's refusal does.
+    if ($Method -eq 'DELETE' -and $p -match '^git/refs/((heads|tags)/.+)$') {
+        if ($s.raced) { $s.refs.Remove([Uri]::UnescapeDataString($Matches[1])) }
+        return (A $s.delete $(if ($s.delete -eq 422 -and -not $s.raced) { @{ message = 'Repository rule violations found' } } else { $null }))
+    }
     if ($Method -eq 'GET' -and $p -match '^releases\?per_page=100&page=(\d+)$') {
         return (A 200 @(@($s.releases) | Select-Object -Skip ((([int]$Matches[1]) - 1) * 100) -First 100))
     }
@@ -168,7 +173,7 @@ function Invoke-WebRequest {
     return (A 500 @{ message = "the stand-in has no answer for $Method $p" })
 }
 function OnGitHub([hashtable]$envs, [hashtable]$state) {
-    $base = @{ compare = @{ $main = 'ahead' }; refs = @{}; tagObjects = @{}; postRef = 201; from = @(); onto = @(); delete = 204; releases = @(); assetCode = 200 }
+    $base = @{ compare = @{ $main = 'ahead' }; refs = @{}; tagObjects = @{}; postRef = 201; from = @(); onto = @(); delete = 204; raced = $false; releases = @(); assetCode = 200 }
     foreach ($k in $state.Keys) { $base[$k] = $state[$k] }
     $global:TSgh = $base
     $global:TScalls = @()
@@ -234,8 +239,10 @@ Yes '  its name escaped part by part, the slashes kept' ($w[0].Path -eq 'git/ref
 Yes '  after asking for open pull requests from it and onto it' (@($r.Calls | Where-Object { $_.Path -match 'head=owner%3Aclaude%2Fold-idea|head=owner:claude%2Fold-idea' }).Count -eq 1 -and @($r.Calls | Where-Object { $_.Path -match 'base=claude%2Fold-idea' }).Count -eq 1)
 $r = OnGitHub @{ REF_DELETE_BRANCH = $b } @{}
 Yes 'a branch already gone: GONE, exit 0, nothing deleted' ($r.Code -eq 0 -and $r.Out -match 'Set-Ref::GONE' -and @(Writes $r).Count -eq 0)
-$r = OnGitHub @{ REF_DELETE_BRANCH = $b } @{ refs = @{ "heads/$b" = @{ type = 'commit'; sha = $main } }; delete = 422 }
+$r = OnGitHub @{ REF_DELETE_BRANCH = $b } @{ refs = @{ "heads/$b" = @{ type = 'commit'; sha = $main } }; delete = 422; raced = $true }
 Yes 'a branch gone between the read and the delete: GONE, exit 0' ($r.Code -eq 0 -and $r.Out -match 'Set-Ref::GONE')
+$r = OnGitHub @{ REF_DELETE_BRANCH = $b } @{ refs = @{ "heads/$b" = @{ type = 'commit'; sha = $main } }; delete = 422 }
+Yes 'a branch delete a rule refuses (422, still there when read again): exit 1, with what GitHub said' ($r.Code -eq 1 -and $r.Out -notmatch 'Set-Ref::GONE' -and $r.Out -match 'did not delete' -and $r.Out -match 'Repository rule violations')
 $r = OnGitHub @{ REF_DELETE_BRANCH = $b } @{ refs = @{ "heads/$b" = @{ type = 'commit'; sha = $other } } }
 Yes 'a branch that moved on: stays, exit 1' ($r.Code -eq 1 -and $r.Out -match 'stays' -and @(Writes $r).Count -eq 0)
 $r = OnGitHub @{ REF_DELETE_BRANCH = $b } @{ refs = @{ "heads/$b" = @{ type = 'commit'; sha = $main } }; from = @(3300) }
@@ -261,6 +268,15 @@ $r = OnGitHub @{ REF_DELETE_TAG = 'live-1.1.94' } @{ refs = @{ 'tags/live-1.1.94
 Yes 'a lightweight tag on the commit given: DELETED' ($r.Code -eq 0 -and $r.Out -match 'Set-Ref::DELETED live-1\.1\.94')
 $r = OnGitHub @{ REF_DELETE_TAG = $dt } @{}
 Yes 'a tag already gone: GONE, exit 0, nothing deleted' ($r.Code -eq 0 -and $r.Out -match 'Set-Ref::GONE' -and @(Writes $r).Count -eq 0)
+# #4177, 31 Oct: the release tags ruleset (refs/tags/v*) refused the run's
+# delete of v1.1.47 with 422, and this said GONE with the tag still there.
+$s2 = $atTag.Clone(); $s2.refs = @{ "tags/$dt" = $atTag.refs["tags/$dt"] }; $s2.delete = 422
+$r = OnGitHub @{ REF_DELETE_TAG = $dt } $s2
+Yes 'a tag delete a rule refuses (422, still there when read again): exit 1, never GONE, with what GitHub said' ($r.Code -eq 1 -and $r.Out -notmatch 'Set-Ref::GONE' -and $r.Out -match 'did not delete' -and $r.Out -match 'Repository rule violations')
+Yes '  having read it again after the delete' (@($r.Calls | Where-Object { $_.Method -eq 'GET' -and $_.Path -eq "git/ref/tags/$dt" }).Count -eq 2)
+$s2 = $atTag.Clone(); $s2.refs = @{ "tags/$dt" = $atTag.refs["tags/$dt"] }; $s2.delete = 422; $s2.raced = $true
+$r = OnGitHub @{ REF_DELETE_TAG = $dt } $s2
+Yes 'a tag gone between the read and the delete: GONE, exit 0' ($r.Code -eq 0 -and $r.Out -match 'Set-Ref::GONE')
 $r = OnGitHub @{ REF_DELETE_TAG = $dt; REF_COMMIT = $other } $atTag
 Yes 'a tag on another commit than the one given: stays, exit 1' ($r.Code -eq 1 -and $r.Out -match 'so it stays' -and @(Writes $r).Count -eq 0)
 $many = @(1..100 | ForEach-Object { [pscustomobject]@{ id = $_; tag_name = "v0.0.$_"; draft = $false } }) + @([pscustomobject]@{ id = 397526532; tag_name = $dt; draft = $true })
