@@ -1822,12 +1822,12 @@ if ($FromFeed -and $revMoveFrom) {
     # launcher builds them before Play and refuses Play when it cannot, and
     # main moves only once dev has carried the revision.
     if ($Channel -eq 'main') {
-        $devRev = 0
-        try { $devFeed = Read-SiteFeed 'dev'; if ($null -ne $devFeed -and $devFeed.PSObject.Properties['collectionRevision']) { [void][int]::TryParse([string]$devFeed.collectionRevision, [ref]$devRev) } }
+        $carriedRev = 0
+        try { $feedOfDev = Read-SiteFeed 'dev'; if ($null -ne $feedOfDev -and $feedOfDev.PSObject.Properties['collectionRevision']) { [void][int]::TryParse([string]$feedOfDev.collectionRevision, [ref]$carriedRev) } }
         catch { Unbump 'the dev feed could not be read'; Die ('The dev feed could not be read, so whether dev has carried revision ' + $revBuilt + ' is not known. Nothing was built or published: ' + $_.Exception.Message) }
-        if ($devRev -ne $revBuilt) {
+        if ($carriedRev -ne $revBuilt) {
             Unbump 'dev has not carried the revision'
-            Die ('This release moves main to collection revision ' + $revBuilt + ', and the dev feed is on revision ' + $devRev + '. Whether the revision builds the animation and body files is asked on dev first, by every launcher before Play: Ship dev on it, then main. Nothing was built or published.')
+            Die ('This release moves main to collection revision ' + $revBuilt + ', and the dev feed is on revision ' + $carriedRev + '. Whether the revision builds the animation and body files is asked on dev first, by every launcher before Play: Ship dev on it, then main. Nothing was built or published.')
         }
         Say ('  the dev feed already carries revision ' + $revBuilt + ', so dev''s launchers have built them on it') 'Green'
     } else {

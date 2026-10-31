@@ -124,7 +124,7 @@ try {
     Yes '  with our files over it' ($sky.Contains('Test-ShipSkyUIInput $rel'))
     Yes '  in last-plugin.json''s order with Last on the end' ($sky.Contains("game\data\last-plugin.json") -and $sky.Contains('$skyuiOrder + $ShipLastPlugin'))
     Yes '  and a 2, or anything but 0, stops the release' ($sky.Contains('if ($skyuiExit -eq 2)') -and $sky.Contains('if ($skyuiExit -ne 0)'))
-    Yes 'main moves only once the dev feed carries the revision' ($ship -match "(?s)if \(\`$FromFeed -and \`$revMoveFrom\) \{.+if \(\`$Channel -eq 'main'\) \{.+Read-SiteFeed 'dev'.+if \(\`$devRev -ne \`$revBuilt\)")
+    Yes 'main moves only once the dev feed carries the revision' ($ship -match "(?s)if \(\`$FromFeed -and \`$revMoveFrom\) \{.+if \(\`$Channel -eq 'main'\) \{.+Read-SiteFeed 'dev'.+if \(\`$carriedRev -ne \`$revBuilt\)")
 
     # ---- 4. Publish-Update.ps1 ----------------------------------------------
     Write-Host ''; Write-Host 'Publish-Update.ps1'
