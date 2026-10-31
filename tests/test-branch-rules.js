@@ -239,13 +239,20 @@ docs.forEach(function (d) {
   yes(d.name + ' gives the command that reads the live settings', t.indexOf(PROTECTION) !== -1);
 
   // What stopped being true. Ship writes nothing to the source repository,
-  // nobody pushes straight to main, and nothing merges by itself because
-  // auto-merge is off on the repository.
+  // and nobody pushes straight to main.
   yes(d.name + ' does not say a Ship commits and pushes the source',
       !/commits and pushes the source|commits the source and push/i.test(t));
   yes(d.name + ' does not describe work going straight to main', !/(goes|going) straight to main/i.test(t));
-  yes(d.name + ' does not say a pull request merges itself', !/merges itself/i.test(t));
 });
+
+// #5182 (Patrick's A, 31 Oct 2026): auto-merge is on, and a pull request
+// merges once main's ruleset's required check is green. The guide says so,
+// gives the command, and no longer says auto-merge is off.
+const guideText = docs[0].text;
+yes('Developer-Guide.md says auto-merge is on (#5182)', /auto-merge is on/i.test(guideText));
+yes('Developer-Guide.md gives gh pr merge --auto --squash', guideText.indexOf('gh pr merge --auto --squash') !== -1);
+yes('Developer-Guide.md does not say auto-merge is off', !/auto-merge is off/i.test(guideText));
+yes('Developer-Guide.md says main\'s ruleset requires Build check result', /ruleset[^.]*requires[^.]*Build check result/.test(guideText));
 
 const sd = docs[0].text;
 // #3617. While enforce_admins is off, "GitHub refuses it" is true only for
@@ -315,14 +322,18 @@ if (!LIVE) {
   }
   yes('gh read the ruleset rules on main', Array.isArray(rs));
   if (Array.isArray(rs)) {
-    yes('live: no ruleset reaches main, so the admin account is held to nothing, as the documents say (GitHub says ' +
-        JSON.stringify(rs.map(function (r) { return r.type; })) + ')', rs.length === 0);
+    // Since 31 Oct 2026 (#3683) main's ruleset requires Build check result
+    // and holds the admin too; auto-merge (#5182) leans on it.
+    const required = rs.filter(function (r) { return r.type === 'required_status_checks'; })
+      .some(function (r) { return ((r.parameters && r.parameters.required_status_checks) || []).some(function (c) { return c.context === 'Build check result'; }); });
+    yes('live: main\'s ruleset requires Build check result (GitHub says ' +
+        JSON.stringify(rs.map(function (r) { return r.type; })) + ')', required);
   }
   let auto = null;
   try {
     auto = execSync('gh api repos/EvilPatrick06/Thornswood --jq .allow_auto_merge', { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] }).toString('utf8').trim();
   } catch (e) { }
-  yes('live: auto-merge is off, so nothing merges by itself (GitHub says ' + auto + ')', auto === 'false');
+  yes('live: auto-merge is on, as the guide says (#5182; GitHub says ' + auto + ')', auto === 'true');
 }
 
 console.log('');

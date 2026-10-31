@@ -62,7 +62,8 @@
 //      it alone where the record says nothing, switches secret scanning and
 //      push protection in one PATCH of only the keys that differ (push
 //      protection only with scanning, each true or false), switches
-//      immutable releases with PUT or DELETE as the record says, reads everything
+//      immutable releases with PUT or DELETE as the record says, switches
+//      auto-merge in one PATCH of that key alone (#5182), reads everything
 //      back, and a
 //      second run changes nothing; a ruleset the record does not name stops
 //      it and is never deleted; a repository the App is not installed on
@@ -291,6 +292,8 @@ yes('another repository stops, named', /names EvilPatrick06\/other, and the only
 yes('a repository named twice stops', /twice/.test(sstops({ repositories: [settings().repositories[1], settings().repositories[1]] })));
 yes('reporting that is not true or false stops', /true or false/.test(sstops({ repositories: [with_(settings().repositories[1], 'private_vulnerability_reporting', 'yes')] })));
 yes('immutable releases that is not true or false stops, named', /immutable_releases is true or false/.test(sstops({ repositories: [with_(settings().repositories[0], 'immutable_releases', 1)] })));
+yes('auto-merge that is not true or false stops, named (#5182)', /allow_auto_merge is true or false/.test(sstops({ repositories: [with_(settings().repositories[0], 'allow_auto_merge', 'on')] })) &&
+  sstops({ repositories: [with_(settings().repositories[0], 'allow_auto_merge', true)] }) === '');
 yes('secret scanning that is not true or false stops, named', /secret_scanning is true or false/.test(sstops({ repositories: [with_(settings().repositories[1], 'secret_scanning', 'on')] })));
 yes('push protection without secret scanning stops', /secret_scanning_push_protection is on only with secret_scanning on too/.test(sstops({ repositories: [with_(settings().repositories[1], 'secret_scanning_push_protection', true)] })) &&
   sstops({ repositories: [Object.assign({}, settings().repositories[1], { secret_scanning: true, secret_scanning_push_protection: true })] }) === '');
@@ -344,7 +347,7 @@ const gh = {
     runner(13, 'thornswood-vps-3', base.concat('thornswood-build', 'thornswood-sign')),
     runner(14, 'thornswood-vps-4', base),
   ],
-  repo: { full_name: 'EvilPatrick06/Thornswood', description: null, homepage: null, security_and_analysis: { secret_scanning: { status: 'disabled' }, secret_scanning_push_protection: { status: 'disabled' } } },
+  repo: { full_name: 'EvilPatrick06/Thornswood', description: null, homepage: null, allow_auto_merge: false, security_and_analysis: { secret_scanning: { status: 'disabled' }, secret_scanning_push_protection: { status: 'disabled' } } },
   topics: [],
   instToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
   readToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
@@ -798,6 +801,23 @@ function start(stateDir, ghPort) {
     r = await askRs();
     yes('push protection switched off on GitHub is switched on again, sending only that key', r.status === 200 && r.json.changed === 1 && scan(gh.repo) === 'enabled/enabled' &&
       JSON.stringify(patches()[0].body) === '{"security_and_analysis":{"secret_scanning_push_protection":{"status":"enabled"}}}' && has(/^EvilPatrick06\/Thornswood: push protection switched on$/));
+
+    // Auto-merge (Patrick's A on #5182, 31 Oct 2026).
+    gh.settingsRecord = settings();
+    gh.settingsRecord.repositories[0].allow_auto_merge = true;
+    gh.calls = [];
+    r = await askRs(true);
+    yes('a check says Thornswood\'s auto-merge would be switched on, and changes nothing (#5182)', r.status === 200 && r.json.differs === 1 && r.json.changed === 0 && patches().length === 0 &&
+      gh.repo.allow_auto_merge === false && has(/^EvilPatrick06\/Thornswood: auto-merge would be switched on$/));
+    gh.calls = [];
+    r = await askRs();
+    yes('a run switches it on in one PATCH of that key alone, with Thornswood\'s token, and reads it back', r.status === 200 && r.json.ok && r.json.changed === 1 && gh.repo.allow_auto_merge === true &&
+      patches().length === 1 && patches()[0].auth === 'Bearer ' + gh.aboutToken && JSON.stringify(patches()[0].body) === '{"allow_auto_merge":true}' &&
+      has(/^EvilPatrick06\/Thornswood: auto-merge switched on$/));
+    yes('  and the fork, whose entry does not name it, is not asked', !gh.calls.some(c => c.path === '/repos/' + S));
+    gh.calls = [];
+    r = await askRs();
+    yes('a second run changes nothing and says it is on', r.status === 200 && r.json.changed === 0 && patches().length === 0 && has(/^EvilPatrick06\/Thornswood: auto-merge is on, as the record says$/));
 
     // Immutable releases (Patrick, 26 Oct 2026, #3287).
     const immu = () => gh.calls.filter(c => c.path === '/repos/' + T + '/immutable-releases' && c.method !== 'GET');

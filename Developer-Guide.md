@@ -790,13 +790,13 @@ If the stop was a rebase rather than a merge, the last step is `git rebase --con
 Wait until the check named `Build check result` is green on the commit you are merging. It passes only when `Launcher builds` and the five `Gate harnesses (n of 5)` checks all passed. Pending means it is still running. A red check means the branch is not ready. Fix it on the same branch and push again.
 
 ```powershell
-gh pr checks
-gh pr merge --squash
+gh pr merge --auto --squash
+gh pr checks --watch
 git switch main
 git pull
 ```
 
-When `Build check result` says pass, and you are confident in the change, merge it yourself. A merge gets no line in #staff-updates, and neither does the release that carries it. On the website the button is **Squash and merge**. GitHub deletes the branch after a squash merge. A green check is required. Merge a pull request you understand. Leave one you do not.
+Auto-merge is on for the repository (#5182, Patrick's A on 31 Oct). Turn it on for your pull request as soon as it is open and you are confident in the change: GitHub squash-merges it by itself the moment `Build check result` is green, and main's ruleset refuses a merge past red for everybody. On the website the button is **Enable auto-merge**. A merge gets no line in #staff-updates, and neither does the release that carries it. GitHub deletes the branch after a squash merge. Turn auto-merge on only for a pull request you understand. Leave one you do not.
 
 What you run after the merge depends on what the pull request touched. A dev release is [section 3](#3-how-to-release-to-dev). A main release is [section 4](#4-how-to-release-to-main).
 
@@ -1396,13 +1396,19 @@ The short form of the rules. The same decisions, with the dates they were made, 
   access to on main: a change comes through a pull request (with no approval
   needed), and a force push or deleting main is refused. None of that applies
   to the admin account while `enforce_admins` is off.
-  Because nothing enforces the build check, it has to be kept by hand: on 25 Sep 35 pull
-  requests were merged with their VPS build red and 18 with no build at all,
-  and main went red with them. Wait for `Build check result` to say pass before
-  merging, every time, including your own and including a Claude's. The last
-  GitHub setting, "require branches to be up to date" with no check listed,
-  was removed on 27 Sep at Patrick's word ("we use the VPS's build checker"),
-  so GitHub requires nothing at all now.
+  Branch protection still enforces no build check, but main's ruleset does:
+  on 25 Sep 35 pull requests were merged with their VPS build red and 18 with
+  no build at all, and main went red with them, so since 31 Oct (#3683,
+  `records/github-repo-settings.json`) the ruleset named main requires
+  `Build check result` and has an empty bypass list. A ruleset holds the
+  admin account too, whatever `enforce_admins` says, so GitHub refuses a
+  merge past red for everybody. And since 31 Oct auto-merge is on (#5182,
+  Patrick's A): turn it on when the pull request opens, with
+  `gh pr merge --auto --squash`, and GitHub squash-merges it the moment
+  `Build check result` is green, so nobody waits to press merge. Turning it on
+  is the moment you say you are confident in the change. The last classic
+  setting, "require branches to be up to date" with no check listed, was
+  removed on 27 Sep at Patrick's word ("we use the VPS's build checker").
   What changed on 23 Sep, since 22 Sep: the review requirement was one
   approving review, which Patrick could not give himself and had to override
   with `--admin` on every one of his own pull requests, and it is now zero.
@@ -1612,11 +1618,12 @@ this is the long form.
   still has to come through a pull request, and a force push or deleting
   main is refused; with `enforce_admins` off, GitHub holds an admin to none
   of main's rules. The build check,
-  `Launcher builds` in `.github/workflows/build.yml`, runs on every pull
-  request on the VPS runner, and the rule is ours rather than a setting:
-  merge your own pull request once it is green, and you are confident in the change. Nothing merges by itself: auto-merge is off on the repository, so
-  somebody presses merge or runs `gh pr merge --squash`. Each of us merges
-  our own. Somebody else on the team reading a pull request first is a habit,
+  `Build check result` in `.github/workflows/build-pr.yml`, runs on every pull
+  request on GitHub's runners, and main's ruleset makes it a setting, not only
+  a rule of ours:
+  turn on auto-merge for your own pull request when you are confident in the
+  change, and GitHub merges it once `Build check result` is green, which main's
+  ruleset requires of everybody (#5182). Each of us does this for our own. Somebody else on the team reading a pull request first is a habit,
   not a setting. `.github/CODEOWNERS` asks the rest of the team for a review when
   a pull request touches one of the shared files, and blocks nothing while
   the code owner review is off. The settings change without a commit, so
