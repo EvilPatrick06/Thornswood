@@ -330,6 +330,8 @@ try {
     Yes 'nor one that exited clean' ((HowItEnded 'Thornswood Dev Server') -eq '')
     Info 1
     Yes 'any other code is said as it is' ((HowItEnded 'Thornswood Dev Server') -eq 'its last run ended with code 1 (0x00000001)')
+    Info 267014
+    Yes 'stopped by request with no hold is said as that (#5155)' ((HowItEnded 'Thornswood Dev Server') -eq 'it was stopped on purpose (0x00041306) and nobody left a hold, so it is started again as if it had stopped by itself')
     Info ([uint32]3221225477)
     Yes 'the access violation of 29 September, as Task Scheduler gives it, with no dump yet' (
         (HowItEnded 'Thornswood Dev Server') -eq ('its last run crashed with 0xC0000005 (an access violation); there is no dump since it started in ' + $dumps))
@@ -585,6 +587,126 @@ try {
         $_.text.Length -gt 1900 -or $_.text -match '[^\x00-\x7F]' -or $_.text -match '(?i)\bplayers?\b' -or $_.text -notmatch '<t:\d+:f>' })
     Yes 'every message is plain ASCII, under Discord''s limit, never says player, and has its time' ($bad.Count -eq 0)
     if ($bad.Count) { $bad | ForEach-Object { Write-Host ('      ' + $_.text) } }
+
+    # -- a server stopped on purpose, held (#5155) ------------------------------------
+    # Holds are written by ServerHold.ps1, the file every stopping script
+    # sends, so this also holds the writer and the watcher's reader together.
+    # The file's time is put on the fake clock, since the watcher takes two
+    # hours from when it was written as the most a hold can be.
+    . (Join-Path $Here '..\scripts\vps\ServerHold.ps1')
+    function Hold([string]$target, [int]$minutes = 30) {
+        $line = Set-ThornswoodHold -Target $target -Why 'swapping the merchant ledger' -By 'Deploy-Server.ps1 (harness)' -Minutes $minutes -Root $script:boxRoot
+        $f = Get-ThornswoodHoldFile -Target $target -Root $script:boxRoot
+        if (Test-Path -LiteralPath $f) { (Get-Item -LiteralPath $f).LastWriteTime = $script:clock }
+        return $line
+    }
+    function HoldThere([string]$target) { return (Test-Path -LiteralPath (Get-ThornswoodHoldFile -Target $target -Root $script:boxRoot)) }
+    function Restarted([string]$name) { return @($script:runs | Where-Object { $_ -eq $name }).Count }
+
+    Box 'held'
+    $g = $script:world['game']
+    $line = Hold 'Thornswood Server'
+    Yes 'a hold is written and said in one line' ($line -match '^held      Thornswood Server until \d\d:\d\d box time \(30 min\), by Deploy-Server\.ps1 \(harness\): swapping the merchant ledger$' -and (HoldThere 'Thornswood Server'))
+    $g.Up = $false; $g.Restart = 'up'
+    $script:world['dev game'].Up = $false; $script:world['dev game'].Restart = 'up'
+    Step 5
+    Yes 'a held server is not started for the whole of its hold' ((Restarted 'Thornswood Server') -eq 0)
+    Yes '  and nothing is said about it' ((Said 'live game server') -eq 0)
+    Yes '  and watch.log says each run who holds it and why' ((LogLines 'game is held by Deploy-Server\.ps1 \(harness\) until 2026-09-28 12:30 VPS time \(swapping the merchant ledger\), so it is left alone') -eq 5)
+    Yes 'a server that is not held is still restarted straight away beside it' ((Restarted 'Thornswood Dev Server') -eq 1 -and (Said 'The dev game server is down') -eq 1)
+    Step 1
+    Yes 'when the hold runs out the server is started' ((Restarted 'Thornswood Server') -eq 1)
+    Yes '  and the hold is taken away' (-not (HoldThere 'Thornswood Server'))
+    Yes '  and staff are told once, who held it, why, until when, and that it answered' (
+        (Said '^\*\*The hold on the live game server has run out\.\*\* Deploy-Server\.ps1 \(harness\) stopped it on purpose \(swapping the merchant ledger\) and held it from <t:\d+:f> until <t:\d+:f>\. The watchdog started it and it answered again\.$') -eq 1)
+    Yes '  and that is the only message about it: no down, no back' ((Said 'live game server') -eq 1)
+    Yes '  in the outbox as its own kind, which availability does not count as an outage' (@(Outbox | Where-Object { $_.service -eq 'game' -and $_.kind -eq 'hold' }).Count -eq 1 -and @(Outbox | Where-Object { $_.service -eq 'game' -and $_.kind -ne 'hold' }).Count -eq 0)
+    Yes '  and the start does not count towards the three restarts an hour' (-not ((Get-Content -LiteralPath (Join-Path $script:boxRoot 'restarts.txt') -Raw) -match '\|game'))
+    Step 6
+    Yes '  and nothing more is said' ((Said 'live game server') -eq 1)
+
+    # The deploy that wrote the hold starts the server and takes the hold away.
+    Box 'held-cleared'
+    $g = $script:world['game']
+    $null = Hold 'Thornswood Server'
+    $g.Up = $false; $g.Restart = 'up'
+    Step 2
+    $g.Up = $true
+    $c = Clear-ThornswoodHold -Target 'Thornswood Server' -Root $script:boxRoot
+    Yes 'taking a hold away says so' ($c -eq 'released  Thornswood Server, the watchdog watches it again' -and -not (HoldThere 'Thornswood Server'))
+    Yes 'taking away one that is not there says so too' ((Clear-ThornswoodHold -Target 'Thornswood Server' -Root $script:boxRoot) -eq 'no hold   Thornswood Server to take away')
+    Step 12
+    Yes 'a stop held and started again by its own script is never started by the watchdog, and nothing is said' ((Restarted 'Thornswood Server') -eq 0 -and $script:said.Count -eq 0)
+    $g.Up = $false; $g.Restart = 'up'
+    Step 1
+    Yes 'once the hold is gone a crash is restarted straight away, as before' ((Restarted 'Thornswood Server') -eq 1 -and (Said 'The live game server is down') -eq 1)
+
+    # A hold left behind by a script that started the server and forgot it.
+    Box 'held-left'
+    $null = Hold 'Thornswood Dev Server'
+    Step 6
+    Yes 'a hold left behind on a running server is taken away when it runs out' (-not (HoldThere 'Thornswood Dev Server') -and (Restarted 'Thornswood Dev Server') -eq 0)
+    Yes '  and staff are told once that it was left behind' ((Said '^\*\*The hold on the dev game server has run out\.\*\* .* It was already running, so whoever stopped it started it again and left the hold behind\. The watchdog took the hold away\.$') -eq 1 -and $script:said.Count -eq 1)
+
+    # A held server that does not come back when its hold runs out.
+    Box 'held-stuck'
+    $g = $script:world['game']
+    $null = Hold 'Thornswood Server'
+    $g.Up = $false; $g.Restart = 'down'
+    Step 6
+    Yes 'a held server that does not answer when started says so in the hold''s message' ((Said 'The hold on the live game server has run out\.\*\* .*The watchdog started it and it is not answering\. From here it is watched like any server that is down\.$') -eq 1)
+    Yes '  and is then a server that is down like any other, told once' ((Said '^\*\*The live game server is down\.\*\* It is not answering on port 3000\.') -eq 1 -and $script:said.Count -eq 2)
+    Yes '  without saying it was stopped by request, which is what the hold''s own stop left' ((Said 'stopped on purpose \(0x') -eq 0)
+    Step 12
+    Yes '  and restarted under the three an hour after that, the hold''s start not counted' ((Restarted 'Thornswood Server') -eq 4)
+
+    # Two hours at most, whatever the file says.
+    Box 'held-most'
+    New-Item -ItemType Directory -Force -Path (Join-Path $script:boxRoot 'holds') | Out-Null
+    $hf = Get-ThornswoodHoldFile -Target 'Thornswood Voice' -Root $script:boxRoot
+    $at = ([DateTimeOffset]$script:clock).ToUnixTimeSeconds()
+    Set-Content -LiteralPath $hf -Value (ConvertTo-Json @{ target = 'Thornswood Voice'; by = 'a run note'; why = 'testing'; set = $at; until = ($at + 10 * 3600) } -Compress) -Encoding ASCII
+    (Get-Item -LiteralPath $hf).LastWriteTime = $script:clock
+    $script:world['voice'].Up = $false; $script:world['voice'].Restart = 'up'
+    Step 23
+    Yes 'a hold that says ten hours holds for two hours' ((Restarted 'Thornswood Voice') -eq 0)
+    Step 1
+    Yes '  and no longer' ((Restarted 'Thornswood Voice') -eq 1 -and (Said 'The hold on live voice has run out') -eq 1)
+    Yes 'Set-ThornswoodHold itself writes two hours at most' ((Hold 'Thornswood Voice' 600) -match '\(120 min\)')
+    Yes '  and a minute at least' ((Hold 'Thornswood Voice' 0) -match '\(1 min\)')
+
+    # A hold file that does not read still holds, for the usual thirty minutes.
+    Box 'held-bad'
+    New-Item -ItemType Directory -Force -Path (Join-Path $script:boxRoot 'holds') | Out-Null
+    $hf = Get-ThornswoodHoldFile -Target 'Thornswood Docs' -Root $script:boxRoot
+    Set-Content -LiteralPath $hf -Value 'half a file' -Encoding ASCII
+    (Get-Item -LiteralPath $hf).LastWriteTime = $script:clock
+    $script:world['website'].Up = $false; $script:world['website'].Restart = 'up'
+    Step 5
+    Yes 'a hold file that does not read holds for thirty minutes' ((Restarted 'Thornswood Docs') -eq 0)
+    Step 1
+    Yes '  then the server is started and the message says the file did not read' ((Restarted 'Thornswood Docs') -eq 1 -and (Said 'somebody stopped it on purpose \(its hold file does not read\)') -eq 1)
+
+    # The bot, a Windows service, is held by its service's name.
+    Box 'held-bot'
+    $null = Hold 'ThornswoodBot' 10
+    $script:world['bot'].Up = $false; $script:world['bot'].Restart = 'up'
+    Step 1
+    Yes 'a held bot is not restarted' ((Restarted 'ThornswoodBot') -eq 0)
+    Step 1
+    Yes '  until its hold runs out' ((Restarted 'ThornswoodBot') -eq 1 -and (Said 'The hold on the Discord bot has run out') -eq 1)
+
+    # A hold on something the watchdog does not watch goes when it runs out.
+    Box 'held-other'
+    $null = Hold 'Thornswood Gate'
+    Step 5
+    Yes 'a hold on something not watched stays while it runs' (HoldThere 'Thornswood Gate')
+    Step 1
+    Yes '  and is taken away once it has run out, saying so in watch.log' (-not (HoldThere 'Thornswood Gate') -and (LogLines 'took away the hold on Thornswood-Gate by Deploy-Server\.ps1 \(harness\)') -eq 1 -and $script:said.Count -eq 0)
+
+    # No watchdog folder, no hold.
+    Yes 'with no watchdog folder there is nothing to hold, and it says so' (
+        (Set-ThornswoodHold -Target 'Thornswood Server' -Why 'x' -Root (Join-Path $tmp 'no-such-box')) -match '^no hold   Thornswood Server: there is no ')
 
     # -- the outbox does not grow forever -------------------------------------------
     Box 'trim'

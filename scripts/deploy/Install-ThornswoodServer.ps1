@@ -204,7 +204,14 @@ $stamp    = Get-Date -Format 'yyyyMMdd-HHmmss'
 $stageDir = "$Root.stage-$stamp"
 
 function Say([string]$m, [string]$c = 'Gray') { Write-Host $m -ForegroundColor $c }
-function Finish([string]$marker, [int]$code) { Write-Host ''; Write-Host $marker; exit $code }
+# The one way out. A hold this run wrote when it stopped the server (#5155,
+# StopServer) goes here, whatever the outcome: started and answering, rolled
+# back, or given up on and left to the watchdog.
+$script:heldTask = ''
+function Finish([string]$marker, [int]$code) {
+    if ($script:heldTask) { Say (Clear-ThornswoodHold -Target $script:heldTask) 'DarkGray' }
+    Write-Host ''; Write-Host $marker; exit $code
+}
 
 # Which settings come from the payload and which stay the server's: beside
 # this script, where Publish-Server sends it and where the repository keeps it.
@@ -1238,6 +1245,129 @@ function Enter-ThornswoodServerFolderTurn([string]$Folder, [string]$Who, [int]$W
 }
 # ---- end ServerFolderTurn.ps1 ----
 
+# The hold (#5155): the server stopped on purpose says so, so the box's
+# watchdog does not start it in the middle of the install. A copy of
+# scripts\vps\ServerHold.ps1 below its header, for the reason the
+# StopAndMove.ps1 copy above is; tests\test-5155-server-holds.ps1 fails when
+# the two differ. StopServer writes it, and Finish, the one way out, takes it
+# away.
+# ---- ServerHold.ps1 (copy) ----
+
+# The folder the watchdog lives in on the box. Holds go in holds\ under it.
+$ThornswoodHoldRoot = 'C:\Thornswood-Watch'
+# Minutes: what a hold is when nobody says, and the most it can be.
+$ThornswoodHoldUsual = 30
+$ThornswoodHoldMost = 120
+
+# Where the hold for a task or service lives.
+function Get-ThornswoodHoldFile {
+    param([Parameter(Mandatory = $true)][string]$Target, [string]$Root = $ThornswoodHoldRoot)
+    $name = ($Target -replace '[^A-Za-z0-9]+', '-').Trim('-')
+    return (Join-Path (Join-Path $Root 'holds') ($name + '.json'))
+}
+
+# Writes the hold and says it in one line. $Target is the task or service
+# name the watchdog knows it by ('Thornswood Server', 'ThornswoodBot'), $Why
+# what the stop is for, $By who is stopping it, $Minutes how long, which is
+# put between 1 and the most. With no watchdog folder there is no watchdog to
+# hold back, and it says so and writes nothing.
+function Set-ThornswoodHold {
+    param(
+        [Parameter(Mandatory = $true)][string]$Target,
+        [Parameter(Mandatory = $true)][string]$Why,
+        [string]$By = '',
+        [int]$Minutes = $ThornswoodHoldUsual,
+        [string]$Root = $ThornswoodHoldRoot
+    )
+    if (-not $Root -or -not (Test-Path -LiteralPath $Root -PathType Container)) {
+        return ('no hold   ' + $Target + ': there is no ' + $Root + ', so no watchdog runs here to hold back')
+    }
+    if ($Minutes -lt 1) { $Minutes = 1 }
+    if ($Minutes -gt $ThornswoodHoldMost) { $Minutes = $ThornswoodHoldMost }
+    if (-not $By) { $By = '' + $env:USERNAME }
+    $file = Get-ThornswoodHoldFile -Target $Target -Root $Root
+    $dir = Split-Path -Parent $file
+    $now = Get-Date
+    $until = $now.AddMinutes($Minutes)
+    try {
+        if (-not (Test-Path -LiteralPath $dir)) { $null = New-Item -ItemType Directory -Path $dir -Force -ErrorAction Stop }
+        $row = ConvertTo-Json @{
+            target = $Target; by = $By; why = $Why
+            set = ([DateTimeOffset]$now).ToUnixTimeSeconds(); until = ([DateTimeOffset]$until).ToUnixTimeSeconds()
+        } -Compress
+        # Written beside it and moved over it, so the watchdog never reads half a file.
+        $tmp = $file + '.tmp'
+        [IO.File]::WriteAllText($tmp, $row, (New-Object Text.UTF8Encoding($false)))
+        Move-Item -LiteralPath $tmp -Destination $file -Force -ErrorAction Stop
+    } catch {
+        return ('NO HOLD   ' + $Target + ': ' + $file + ' could not be written (' + $_.Exception.Message + '), so the watchdog may start it again within five minutes')
+    }
+    return ('held      ' + $Target + ' until ' + $until.ToString('HH:mm', [Globalization.CultureInfo]::InvariantCulture) + ' box time (' + $Minutes + ' min), by ' + $By + ': ' + $Why)
+}
+
+# Takes the hold away and says so in one line. From then on the watchdog
+# treats the server as it treats any other: not answering is started again.
+function Clear-ThornswoodHold {
+    param([Parameter(Mandatory = $true)][string]$Target, [string]$Root = $ThornswoodHoldRoot)
+    if (-not $Root) { return ('no hold   ' + $Target + ' to take away') }
+    $file = Get-ThornswoodHoldFile -Target $Target -Root $Root
+    if (-not (Test-Path -LiteralPath $file)) { return ('no hold   ' + $Target + ' to take away') }
+    try { Remove-Item -LiteralPath $file -Force -ErrorAction Stop }
+    catch { return ('HOLD LEFT ' + $Target + ': ' + $file + ' could not be removed (' + $_.Exception.Message + '), so the watchdog leaves it alone until the hold runs out') }
+    return ('released  ' + $Target + ', the watchdog watches it again')
+}
+
+# The holds there are, one line each, for a person or a script to read.
+function Get-ThornswoodHolds {
+    param([string]$Root = $ThornswoodHoldRoot)
+    $dir = Join-Path $Root 'holds'
+    $files = @(Get-ChildItem -LiteralPath $dir -Filter '*.json' -File -EA SilentlyContinue)
+    if (-not $files.Count) { return 'holds     none' }
+    foreach ($f in $files) {
+        $j = $null
+        try { $j = [IO.File]::ReadAllText($f.FullName) | ConvertFrom-Json }
+        catch {
+            # A file that does not read is a hold all the same: said on the next line.
+            $j = $null
+        }
+        if (-not $j) { 'held      ' + $f.BaseName + ': the file does not read, so it holds for ' + $ThornswoodHoldUsual + ' min from ' + $f.LastWriteTime.ToString('HH:mm'); continue }
+        $until = [DateTimeOffset]::FromUnixTimeSeconds([int64]$j.until).LocalDateTime
+        $most = $f.LastWriteTime.AddMinutes($ThornswoodHoldMost)
+        if ($until -gt $most) { $until = $most }
+        'held      ' + $j.target + ' until ' + $until.ToString('HH:mm') + ' box time, by ' + $j.by + ': ' + $j.why
+    }
+}
+
+# The text a script sends in front of what runs on the box: these functions
+# and the three values, so the box needs nothing of its own. With -Script, a
+# $HoldBy line too, naming that script and where it was started
+# (Get-ThornswoodHoldBy), for the holds it writes.
+function Get-ThornswoodHoldScript {
+    param([string]$Script = '')
+    $parts = @(
+        ('$ThornswoodHoldRoot = ''' + $ThornswoodHoldRoot + ''''),
+        ('$ThornswoodHoldUsual = ' + $ThornswoodHoldUsual),
+        ('$ThornswoodHoldMost = ' + $ThornswoodHoldMost)
+    )
+    if ($Script) { $parts += ('$HoldBy = ''' + (Get-ThornswoodHoldBy -Script $Script).Replace("'", "''") + '''') }
+    foreach ($n in 'Get-ThornswoodHoldFile', 'Set-ThornswoodHold', 'Clear-ThornswoodHold', 'Get-ThornswoodHolds') {
+        $parts += ('function ' + $n + ' {' + (Get-Item ('function:' + $n)).ScriptBlock.ToString() + '}')
+    }
+    return (($parts -join "`r`n") + "`r`n")
+}
+
+# Who is stopping it, for the hold's by: the script and the machine it was
+# started on, so staff reading the watchdog's message know who to ask.
+function Get-ThornswoodHoldBy {
+    param([Parameter(Mandatory = $true)][string]$Script)
+    $who = '' + $env:USERNAME
+    $where = '' + $env:COMPUTERNAME
+    if (-not $where) { $where = '' + [Environment]::MachineName }
+    if ($who) { return ($Script + ' (' + $who + ' on ' + $where + ')') }
+    return ($Script + ' (on ' + $where + ')')
+}
+# ---- end ServerHold.ps1 ----
+
 # A folder rename on one volume, once (Move-ThornswoodPath above), saying why
 # when it is refused.
 function MoveDir([string]$from, [string]$to) {
@@ -1285,6 +1415,12 @@ function ServerProcesses([string]$dir) {
 }
 
 function StopServer([string]$dir) {
+    # Held on purpose from the first stop until Finish (#5155), under the
+    # task's name, which is how the watchdog knows it.
+    if (-not $NoTask -and -not $script:heldTask) {
+        Say (Set-ThornswoodHold -Target $TaskName -Why ('installing a server build into ' + $Root) -By (Get-ThornswoodHoldBy -Script 'Install-ThornswoodServer.ps1')) 'DarkGray'
+        $script:heldTask = $TaskName
+    }
     # Found and opened before the task is stopped, so what is waited for
     # below is these processes and nothing given their ids afterwards.
     $ids = @(ServerProcesses $dir | ForEach-Object { [int]$_.ProcessId })

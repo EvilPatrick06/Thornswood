@@ -145,6 +145,8 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here 'ServiceAccount.ps1')
+# The hold the install writes while it has the admin service stopped (#5155).
+. (Join-Path $Here '..\vps\ServerHold.ps1')
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 
@@ -290,6 +292,8 @@ function StopIt {
     }
 }
 "@
+# The hold goes in front too (#5155), so StopIt's callers can hold and release the task.
+$stopIt = (Get-ThornswoodHoldScript -Script 'Install-AdminService.ps1') + $stopIt
 
 # ------------------------------------------------------------------ remove --
 if ($Remove) {
@@ -460,8 +464,11 @@ function Answers([string[]]`$Lines) {
     return `$false
 }
 
+# Held while it is stopped (#5155, ServerHold.ps1), so the watchdog leaves
+# it; every way out below takes the hold away.
+Set-ThornswoodHold -Target '$TaskName' -Why 'installing new admin service files' -By `$HoldBy
 StopIt
-if (-not `$stopOk) { 'ADMIN REFUSED'; exit 1 }
+if (-not `$stopOk) { Clear-ThornswoodHold -Target '$TaskName'; 'ADMIN REFUSED'; exit 1 }
 New-Item -ItemType Directory -Force -Path '$Root\$prev' | Out-Null
 foreach (`$f in `$want.Keys) {
     `$live = Join-Path '$Root' `$f
@@ -498,6 +505,7 @@ foreach (`$i in `$inState) {
 if (`$open.Count) {
     'ANOTHER SERVICE COULD READ THE APP''S KEY, so the admin service is left stopped and disabled:'
     `$open
+    Clear-ThornswoodHold -Target '$TaskName'
     Disable-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue | Out-Null
     'ADMIN REFUSED'; exit 1
 }
@@ -507,6 +515,7 @@ Start-ScheduledTask -TaskName '$TaskName'
 if (Answers @('$Plain')) {
     'the admin service answers on 127.0.0.1:$Port'
     if (-not (Test-Path -LiteralPath '$state\app.json')) { 'it holds no App yet, so it refuses every ask until -Setup makes one' }
+    Clear-ThornswoodHold -Target '$TaskName'
     'ADMIN OK'; exit 0
 }
 'it did not answer on 127.0.0.1:$Port within $Wait seconds. admin.log says:'
@@ -523,6 +532,7 @@ if (`$oldXml) {
     Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false -EA SilentlyContinue
     'there was no admin service before this, so none is left registered'
 }
+Clear-ThornswoodHold -Target '$TaskName'
 'ADMIN ROLLED BACK'; exit 1
 "@ | ForEach-Object { Say "  $_"; "$_".Trim() })
 if ($out -notcontains 'ADMIN OK') { Die 'the admin service was not installed. The lines above say why and what is running.' }

@@ -104,6 +104,10 @@ function Lit($a) { return (($a | ForEach-Object { "'" + ($_ -replace "'", "''") 
 # The move sends the release list's writer too (#2668), so it is loaded here
 # as the script loads it, with the parts a wipe marks done.
 . (Join-Path $Repo 'scripts\ops\Release-List.ps1')
+# The stop and the start send the watchdog's hold too (#5155), loaded the
+# same way, its folder a scratch one that is never made, so no hold is written.
+. (Join-Path $Repo 'scripts\vps\ServerHold.ps1')
+$ThornswoodHoldRoot = Join-Path $T 'no-watchdog-here'
 $wd = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and "$($n.Left)" -eq '$WipeDone' }, $true))
 $WipeDone = @()
 if ($wd.Count -eq 1) { $WipeDone = @(& ([scriptblock]::Create($wd[0].Right.Extent.Text))) }
@@ -163,9 +167,9 @@ try {
             @($out | Where-Object { $_ -eq ('ended process ' + $waiter.Id) }).Count -eq 1 -and ($out -contains 'stopped'))
         Yes '  and that process is gone' ($null -eq (Get-Process -Id $waiter.Id -ErrorAction SilentlyContinue))
     } else { Write-Host 'SKIP  the stop needs node to stand in for the server' }
-    Yes 'the script stops with nothing moved while a server is still running' (
-        $text -match "if \(\`$running\) \{ Die 'A server is still running, so nothing was moved\." -and
-        $text.IndexOf("if (`$running) { Die") -lt $text.IndexOf("Head 'Moving the old storage aside'"))
+    Yes 'the script stops with nothing moved while a server is still running, and takes its holds away first (#5155)' (
+        $text -match "(?s)if \(\`$running\) \{.{0,400}?Clear-ThornswoodHold.{0,300}?Die 'A server is still running, so nothing was moved\." -and
+        $text.IndexOf("if (`$running) {") -lt $text.IndexOf("Head 'Moving the old storage aside'"))
     Yes 'and no longer sleeps and looks for the server by the program''s path' ($text -notmatch "Start-Sleep -Seconds 3" -and $text -notmatch "Path\)`" -like '\*Thornswood-Server\*'")
 
     # ---- the move
