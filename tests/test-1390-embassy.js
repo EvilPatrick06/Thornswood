@@ -38,6 +38,10 @@ const recSrc = slice(gm, 'var RECIPES_BY_ID = {', '\n  };');
 let RECIPES = null;
 try { RECIPES = new Function('return ' + recSrc.slice('var RECIPES_BY_ID = '.length).replace(/;$/, ''))(); } catch (e) { RECIPES = null; }
 yes('the recipe table reads', !!RECIPES && Object.keys(RECIPES).length > 1500);
+// How many rows each roll holds is the cut file's to say (#1622): a
+// collection revision that adds Empire or Thalmor gear adds rows to them
+// (#4087, Cheddar's Mashups in revision 5).
+const CUT_COUNTS = JSON.parse(fs.readFileSync(path.join(REPO_DIR, 'docs', 'systems', 'cut-items.json'), 'utf8')).counts || {};
 const adminSrc = slice(gm, 'var ADMIN_ITEMS = {', '\n  };');
 let ADMIN_ITEMS = null;
 try { ADMIN_ITEMS = new Function('return ' + adminSrc.slice('var ADMIN_ITEMS = '.length).replace(/;$/, ''))(); } catch (e) { ADMIN_ITEMS = null; }
@@ -420,7 +424,8 @@ if (block && RECIPES && ADMIN_ITEMS) {
     }
     const embassyRows = Object.keys(RECIPES).filter(function (k) { return RECIPES[k].roll === 'embassy'; });
     const remnantRows = Object.keys(RECIPES).filter(function (k) { return RECIPES[k].roll === 'remnant'; });
-    yes('C1 the cut file counts are the table: 15 embassy rows and 9 remnant rows', embassyRows.length === 15 && remnantRows.length === 9);
+    yes('C1 the cut file counts are the table: ' + CUT_COUNTS.embassy + ' embassy rows and ' + CUT_COUNTS.thalmor + ' remnant rows',
+        embassyRows.length > 0 && remnantRows.length > 0 && embassyRows.length === CUT_COUNTS.embassy && remnantRows.length === CUT_COUNTS.thalmor);
     function who(row) {
       const half = String(RECIPES[row].half).toLowerCase();
       const prof = { platewright: 'smith', edgewright: 'smith', liverywright: 'tailor', haberdasher: 'tailor', woodwright: 'woodworker' }[half];
@@ -430,13 +435,13 @@ if (block && RECIPES && ADMIN_ITEMS) {
       const a = answer(who(k), 0xff009999, RECIPES[k]);
       return !(a.refusal && /not made at a public bench/.test(a.refusal));
     });
-    yes('C2 a master of the right half who is on no roll makes none of the 24 at a public forge', publicBench.length === 0);
+    yes('C2 a master of the right half who is on no roll makes none of the ' + (embassyRows.length + remnantRows.length) + ' at a public forge', publicBench.length === 0);
     const envoyMakes = embassyRows.filter(function (k) { return !answer(who(k), 0xff003001, RECIPES[k]).refusal; });
-    yes('C3 a master on the embassy roll makes every embassy row', envoyMakes.length === 15);
+    yes('C3 a master on the embassy roll makes every embassy row', envoyMakes.length === embassyRows.length);
     const envoyThalmor = remnantRows.filter(function (k) { return !answer(who(k), 0xff003001, RECIPES[k]).refusal; });
     yes('C3 and none of the remnant rows', envoyThalmor.length === 0);
     const exileMakes = remnantRows.filter(function (k) { return !answer(who(k), 0xff003002, RECIPES[k]).refusal; });
-    yes('C4 a master on the remnant roll makes every remnant row', exileMakes.length === 9);
+    yes('C4 a master on the remnant roll makes every remnant row', exileMakes.length === remnantRows.length);
     const exileImperial = embassyRows.filter(function (k) { return !answer(who(k), 0xff003002, RECIPES[k]).refusal; });
     yes('C4 and none of the embassy rows', exileImperial.length === 0);
     const robe = remnantRows.filter(function (k) { return RECIPES[k].name === 'Thalmor Robes'; })[0];
@@ -486,7 +491,7 @@ if (block && RECIPES && ADMIN_ITEMS) {
     const outs = Object.keys(RECIPES).filter(function (k) { return RECIPES[k].roll; }).map(function (k) { return RECIPES[k].out; })
       .concat(['65bbf:Skyrim.esm', '10c698:Skyrim.esm']);
     yes('S2 no dungeon chest or body hands out an embassy or remnant piece',
-        !!loot && outs.length === 26 && outs.every(function (d) { return loot.indexOf("'" + d + "'") === -1; }));
+        !!loot && outs.length === CUT_COUNTS.embassy + CUT_COUNTS.thalmor + 2 && outs.every(function (d) { return loot.indexOf("'" + d + "'") === -1; }));
   }
 
   // ---------------------------------------------------------- the words --

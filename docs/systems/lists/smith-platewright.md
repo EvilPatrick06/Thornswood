@@ -1,8 +1,8 @@
 # Smith/Platewright
 
-Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 157 recipes, 157 of them reach the server. A row the server is not asked about is tempering: the armour table and the grindstone never call the server.
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 244 recipes, 244 of them reach the server. A row the server is not asked about is tempering: the armour table and the grindstone never call the server.
 
-By rank: novice 46, advanced 57, expert 31, master 23.
+By rank: novice 68, advanced 118, expert 34, master 24.
 
 | Item | Makes | Rank | Kind | Bench | Asks for | Race | Server asked | Id |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -12,27 +12,47 @@ By rank: novice 46, advanced 57, expert 31, master 23.
 | Iron Boots | 1 | novice | Armoured boots | SmithingForge | 2 Leather Strips, 3 Iron Ingot |  | yes | `db290:Skyrim.esm` |
 | Leather Boots | 1 | novice | Armoured boots | SmithingForge | 2 Leather, 2 Leather Strips |  | yes | `dca01:Skyrim.esm` |
 | Riekling Fur Boots | 1 | novice | Armoured boots | SmithingForge | 2 Leather Strips, 3 Leather | riekling | yes | `19f8d:Playable Rieklings.esp` |
+| Son of Skyrim boots | 1 | novice | Armoured boots | SmithingForge | 2 Leather Strips, 4 Leather |  | yes | `67:cheddars_mashups.esl` |
 | Stormcloak Officer Boots | 1 | novice | Armoured boots | SmithingForge | 2 Leather, 2 Leather Strips, 1 Iron Ingot |  | yes | `8d4:MoreCraftableEquipment.esp` |
 | Fur Armor | 1 | novice | Body armour | SmithingForge | 3 Leather Strips, 5 Leather |  | yes | `844:MoreCraftableEquipment.esp` |
 | Hide Armor | 1 | novice | Body armour | SmithingForge | 3 Leather Strips, 4 Leather |  | yes | `db5d4:Skyrim.esm` |
 | Iron Armor | 1 | novice | Body armour | SmithingForge | 3 Leather Strips, 5 Iron Ingot |  | yes | `db291:Skyrim.esm` |
 | Leather Armor | 1 | novice | Body armour | SmithingForge | 4 Leather, 3 Leather Strips |  | yes | `dca02:Skyrim.esm` |
+| Nord Hero Armor | 1 | novice | Body armour | SmithingForge | 3 Leather Strips, 5 Iron Ingot |  | yes | `194:cheddars_mashups.esl` |
 | Riekling Chief Fur Iron Armour | 1 | novice | Body armour | SmithingForge | 3 Iron Ingot, 3 Leather, 3 Ashen Grass Pod | riekling | yes | `19f97:Playable Rieklings.esp` |
 | Riekling Fur Armour | 1 | novice | Body armour | SmithingForge | 2 Leather Strips, 3 Leather | riekling | yes | `19f8c:Playable Rieklings.esp` |
+| Robed Iron Armor | 1 | novice | Body armour | SmithingForge | 3 Leather Strips, 5 Iron Ingot |  | yes | `e0:cheddars_mashups.esl` |
+| Robed Iron Armor | 1 | novice | Body armour | SmithingForge | 3 Leather Strips, 5 Iron Ingot |  | yes | `df:cheddars_mashups.esl` |
+| Robed Iron Armor | 1 | novice | Body armour | SmithingForge | 3 Leather Strips, 5 Iron Ingot |  | yes | `de:cheddars_mashups.esl` |
+| Robed Iron Armor | 1 | novice | Body armour | SmithingForge | 3 Leather Strips, 5 Iron Ingot |  | yes | `dd:cheddars_mashups.esl` |
+| Robed Iron Armor | 1 | novice | Body armour | SmithingForge | 3 Leather Strips, 5 Iron Ingot |  | yes | `dc:cheddars_mashups.esl` |
+| Robed Iron Armor | 1 | novice | Body armour | SmithingForge | 3 Leather Strips, 5 Iron Ingot |  | yes | `db:cheddars_mashups.esl` |
+| Robed Iron Armor | 1 | novice | Body armour | SmithingForge | 3 Leather Strips, 5 Iron Ingot |  | yes | `c8:cheddars_mashups.esl` |
+| Robed Iron Armor | 1 | novice | Body armour | SmithingForge | 3 Leather Strips, 5 Iron Ingot |  | yes | `da:cheddars_mashups.esl` |
+| Robed Iron Armor | 1 | novice | Body armour | SmithingForge | 3 Leather Strips, 5 Iron Ingot |  | yes | `d9:cheddars_mashups.esl` |
+| Scaled Iron | 1 | novice | Body armour | SmithingForge | 3 Leather Strips, 4 Leather, 3 Iron Ingot |  | yes | `b3:cheddars_mashups.esl` |
+| Son of Skyrim Curiass | 1 | novice | Body armour | SmithingForge | 3 Leather Strips, 5 Iron Ingot |  | yes | `68:cheddars_mashups.esl` |
+| Stalker Armor | 1 | novice | Body armour | SmithingForge | 3 Leather Strips, 2 Iron Ingot, 4 Leather |  | yes | `24:cheddars_mashups.esl` |
 | Stormcloak Cuirass | 1 | novice | Body armour | SmithingForge | 3 Leather Strips, 6 Leather |  | yes | `8d9:MoreCraftableEquipment.esp` |
 | Stormcloak Officer Armor | 1 | novice | Body armour | SmithingForge | 4 Leather, 3 Leather Strips, 2 Iron Ingot |  | yes | `8d5:MoreCraftableEquipment.esp` |
+| Ancient Nord Gauntlets | 1 | novice | Gauntlets | SmithingForge | 2 Leather Strips, 2 Iron Ingot |  | yes | `137:cheddars_mashups.esl` |
 | Forsworn Gauntlets | 1 | novice | Gauntlets | SmithingForge | 2 Sabre Cat Tooth, 2 Leather Strips |  | yes | `8ac:MoreCraftableEquipment.esp` |
 | Fur Bracers | 1 | novice | Gauntlets | SmithingForge | 2 Leather Strips, 1 Leather |  | yes | `848:MoreCraftableEquipment.esp` |
+| Gloved Hide Bracers | 1 | novice | Gauntlets | SmithingForge | 2 Leather Strips, 1 Leather |  | yes | `15e:cheddars_mashups.esl` |
 | Hide Bracers | 1 | novice | Gauntlets | SmithingForge | 2 Leather Strips, 1 Leather |  | yes | `db28e:Skyrim.esm` |
+| Iron Fur Gauntlets | 1 | novice | Gauntlets | SmithingForge | 2 Leather Strips, 2 Iron Ingot |  | yes | `87:cheddars_mashups.esl` |
 | Iron Gauntlets | 1 | novice | Gauntlets | SmithingForge | 2 Leather Strips, 2 Iron Ingot |  | yes | `db28f:Skyrim.esm` |
 | Leather Bracers | 1 | novice | Gauntlets | SmithingForge | 1 Leather, 2 Leather Strips |  | yes | `dca03:Skyrim.esm` |
 | Riekling Fur Gauntlets | 1 | novice | Gauntlets | SmithingForge | 2 Leather Strips, 2 Leather | riekling | yes | `19f8e:Playable Rieklings.esp` |
+| Son of Skyrim gauntlets | 1 | novice | Gauntlets | SmithingForge | 2 Leather Strips, 2 Iron Ingot |  | yes | `66:cheddars_mashups.esl` |
 | Stormcloak Officer Bracers | 1 | novice | Gauntlets | SmithingForge | 1 Leather, 2 Leather Strips, 1 Iron Ingot |  | yes | `8d6:MoreCraftableEquipment.esp` |
+| Werewolf's Bane Gloves | 1 | novice | Gauntlets | SmithingForge | 1 Leather, 2 Leather Strips |  | yes | `33:cheddars_mashups.esl` |
 | Forsworn Headdress | 1 | novice | Helmets | SmithingForge | 1 Deer Hide, 1 Small Antlers, 1 Leather Strips |  | yes | `8ad:MoreCraftableEquipment.esp` |
 | Fur Helmet | 1 | novice | Helmets | SmithingForge | 2 Leather, 1 Leather Strips |  | yes | `849:MoreCraftableEquipment.esp` |
 | Hide Helmet | 1 | novice | Helmets | SmithingForge | 1 Leather Strips, 2 Leather |  | yes | `db5d5:Skyrim.esm` |
 | Iron Helmet | 1 | novice | Helmets | SmithingForge | 2 Leather Strips, 3 Iron Ingot |  | yes | `db292:Skyrim.esm` |
 | Leather Helmet | 1 | novice | Helmets | SmithingForge | 2 Leather, 1 Leather Strips |  | yes | `dca04:Skyrim.esm` |
+| Nord Hero Helmet | 1 | novice | Helmets | SmithingForge | 2 Leather Strips, 3 Iron Ingot |  | yes | `195:cheddars_mashups.esl` |
 | Riekling Chief Helmet | 1 | novice | Helmets | SmithingForge | 2 Iron Ingot, 3 Leather, 3 Scathecraw | riekling | yes | `19f9d:Playable Rieklings.esp` |
 | Riekling Horned Helmet | 1 | novice | Helmets | SmithingForge | 3 Iron Ingot, 2 Leather Strips | riekling | yes | `19f8f:Playable Rieklings.esp` |
 | Stormcloak Helmet | 1 | novice | Helmets | SmithingForge | 3 Iron Ingot, 2 Leather Strips |  | yes | `8db:MoreCraftableEquipment.esp` |
@@ -49,6 +69,8 @@ By rank: novice 46, advanced 57, expert 31, master 23.
 | Steel Ingot | 1 | novice | Ingots | Smelter | 1 Corundum Ore, 1 Iron Ore |  | yes | `a30e4:Skyrim.esm` |
 | Leather | 2 | novice | Leather | TanningRack | 1 Deer Hide |  | yes | `1033de:Skyrim.esm` |
 | Leather Strips | 4 | novice | Leather | TanningRack | 1 Leather |  | yes | `f7f43:Skyrim.esm` |
+| Aspiring Adventurer Garb | 1 | novice | Other armour and clothing | SmithingForge | 4 Leather, 3 Leather Strips |  | yes | `11:cheddars_mashups.esl` |
+| Forsworn Armor | 1 | novice | Other armour and clothing | SmithingForge | 4 Leather, 3 Leather Strips, 2 Wolf Pelt |  | yes | `2a:cheddars_mashups.esl` |
 | Armor Kit | 1 | novice | Other goods | SmithingForge | 1 Iron Ingot, 1 Leather |  | yes | `154b4:Thornswood-Content.esp` |
 | Hide Shield | 1 | novice | Shields | SmithingForge | 2 Leather Strips, 4 Leather |  | yes | `db5d6:Skyrim.esm` |
 | Iron Shield | 1 | novice | Shields | SmithingForge | 1 Leather Strips, 4 Iron Ingot |  | yes | `db293:Skyrim.esm` |
@@ -59,22 +81,65 @@ By rank: novice 46, advanced 57, expert 31, master 23.
 | Dawnguard Boots | 1 | advanced | Armoured boots | SmithingForge | 1 Steel Ingot, 2 Leather Strips, 2 Leather |  | yes | `860:MoreCraftableEquipment.esp` |
 | Dawnguard Heavy Boots | 1 | advanced | Armoured boots | SmithingForge | 3 Steel Ingot, 2 Leather Strips, 1 Leather |  | yes | `85f:MoreCraftableEquipment.esp` |
 | Dwarven Boots | 1 | advanced | Armoured boots | SmithingForge | 2 Leather Strips, 1 Iron Ingot, 2 Dwarven Metal Ingot, 1 Steel Ingot |  | yes | `dd979:Skyrim.esm` |
+| Fallen Companion Boots | 1 | advanced | Armoured boots | SmithingForge | 2 Leather Strips, 1 Iron Ingot, 3 Steel Ingot |  | yes | `50:cheddars_mashups.esl` |
 | Heroic Stormcloak Boots | 1 | advanced | Armoured boots | SmithingForge | 2 Steel Ingot, 1 Corundum Ingot, 3 Leather Strips, 2 Fur Plate |  | yes | `ab75:Hothtrooper44_ArmorCompilation.esp` |
 | Orcish Boots | 1 | advanced | Armoured boots | SmithingForge | 2 Leather Strips, 1 Iron Ingot, 3 Orichalcum Ingot |  | yes | `dd983:Skyrim.esm` |
+| Orcish Executor Boots | 1 | advanced | Armoured boots | SmithingForge | 2 Leather Strips, 1 Iron Ingot, 3 Orichalcum Ingot |  | yes | `1ab:cheddars_mashups.esl` |
 | Scaled Boots | 1 | advanced | Armoured boots | SmithingForge | 1 Corundum Ingot, 2 Steel Ingot, 1 Leather, 2 Leather Strips |  | yes | `dca05:Skyrim.esm` |
 | Steel Plate Boots | 1 | advanced | Armoured boots | SmithingForge | 2 Steel Ingot, 1 Corundum Ingot, 2 Leather Strips, 1 Iron Ingot |  | yes | `dd97e:Skyrim.esm` |
 | Steel Shin Boots | 1 | advanced | Armoured boots | SmithingForge | 2 Leather Strips, 1 Iron Ingot, 3 Steel Ingot |  | yes | `f6f2a:Skyrim.esm` |
+| Vampire Battlemaster Boots | 1 | advanced | Armoured boots | SmithingForge | 2 Steel Ingot, 1 Corundum Ingot, 2 Leather Strips, 1 Iron Ingot |  | yes | `27:cheddars_mashups.esl` |
 | Wolf Boots | 1 | advanced | Armoured boots | SmithingSkyforge | 1 Iron Ingot, 3 Steel Ingot, 2 Leather Strips |  | yes | `855:MoreCraftableEquipment.esp` |
 | Ancient Nord Armor | 1 | advanced | Body armour | SmithingSkyforge | 5 Steel Ingot, 4 Leather Strips, 2 Leather, 2 Iron Ingot |  | yes | `f46cc:Skyrim.esm` |
+| Armored Noble | 1 | advanced | Body armour | SmithingForge | 1 Iron Ingot, 3 Steel Ingot, 3 Leather Strips, 1 Corundum Ingot |  | yes | `13:cheddars_mashups.esl` |
+| Armored Noble | 1 | advanced | Body armour | SmithingForge | 1 Iron Ingot, 3 Steel Ingot, 3 Leather Strips, 1 Corundum Ingot |  | yes | `b7:cheddars_mashups.esl` |
+| Armored Telvanni Robes | 1 | advanced | Body armour | SmithingForge | 2 Netch Leather, 5 Chitin Plate, 1 Iron Ingot | darkelf | yes | `19a:cheddars_mashups.esl` |
 | Banded Iron Armor | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 5 Iron Ingot, 1 Corundum Ingot |  | yes | `dc9ff:Skyrim.esm` |
+| Blades Priest Armor | 1 | advanced | Body armour | SmithingForge | 1 Iron Ingot, 3 Steel Ingot, 3 Leather Strips, 1 Corundum Ingot |  | yes | `57:cheddars_mashups.esl` |
+| Blades Remnant Armor | 1 | advanced | Body armour | SmithingForge | 1 Iron Ingot, 3 Steel Ingot, 3 Leather Strips, 1 Corundum Ingot |  | yes | `30:cheddars_mashups.esl` |
 | Chitin Armor | 1 | advanced | Body armour | SmithingForge | 1 Iron Ingot, 2 Netch Leather, 5 Chitin Plate |  | yes | `2b050:Dragonborn.esm` |
 | Chitin Heavy Armor | 1 | advanced | Body armour | SmithingForge | 1 Corundum Ingot, 2 Netch Leather, 6 Chitin Plate |  | yes | `2b056:Dragonborn.esm` |
+| Dawnguard Alik'r Armor | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 2 Leather, 4 Steel Ingot | redguard | yes | `44:cheddars_mashups.esl` |
 | Dawnguard Armor | 1 | advanced | Body armour | SmithingForge | 2 Steel Ingot, 3 Leather Strips, 2 Leather |  | yes | `863:MoreCraftableEquipment.esp` |
+| Dawnguard Casual Armor | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 2 Leather, 4 Steel Ingot |  | yes | `197:cheddars_mashups.esl` |
+| Dawnguard Executioner Armor | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 2 Leather, 4 Steel Ingot |  | yes | `16:cheddars_mashups.esl` |
 | Dawnguard Heavy Armor | 1 | advanced | Body armour | SmithingForge | 4 Steel Ingot, 3 Leather Strips, 1 Leather |  | yes | `861:MoreCraftableEquipment.esp` |
+| Dawnguard Hunter Armor | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 2 Leather, 4 Steel Ingot |  | yes | `1a0:cheddars_mashups.esl` |
+| Dawnguard Priest Robe | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 2 Leather, 4 Steel Ingot |  | yes | `83:cheddars_mashups.esl` |
+| Dawnguard Scholar Armor | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 2 Leather, 4 Steel Ingot |  | yes | `f:cheddars_mashups.esl` |
+| Fallen Companion Armor | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 4 Steel Ingot, 1 Iron Ingot |  | yes | `4f:cheddars_mashups.esl` |
+| Fallen Dawnguard Armor | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 4 Steel Ingot, 1 Iron Ingot |  | yes | `1a9:cheddars_mashups.esl` |
 | Orcish Armor | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 4 Orichalcum Ingot, 1 Iron Ingot |  | yes | `dd984:Skyrim.esm` |
+| Orcish Executor Armor | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 4 Orichalcum Ingot, 1 Iron Ingot |  | yes | `c4:cheddars_mashups.esl` |
+| Orcish Hunter Armor | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 4 Orichalcum Ingot, 1 Iron Ingot |  | yes | `c3:cheddars_mashups.esl` |
+| Plated Jarl Robe | 1 | advanced | Body armour | SmithingForge | 1 Iron Ingot, 3 Steel Ingot, 3 Leather Strips, 1 Corundum Ingot |  | yes | `b6:cheddars_mashups.esl` |
+| Robed Steel Armor | 1 | advanced | Body armour | SmithingForge | 1 Iron Ingot, 3 Steel Ingot, 3 Leather Strips, 1 Corundum Ingot |  | yes | `17e:cheddars_mashups.esl` |
+| Robed Steel Armor | 1 | advanced | Body armour | SmithingForge | 1 Iron Ingot, 3 Steel Ingot, 3 Leather Strips, 1 Corundum Ingot |  | yes | `17f:cheddars_mashups.esl` |
+| Robed Steel Armor | 1 | advanced | Body armour | SmithingForge | 1 Iron Ingot, 3 Steel Ingot, 3 Leather Strips, 1 Corundum Ingot |  | yes | `180:cheddars_mashups.esl` |
+| Robed Steel Armor | 1 | advanced | Body armour | SmithingForge | 1 Iron Ingot, 3 Steel Ingot, 3 Leather Strips, 1 Corundum Ingot |  | yes | `181:cheddars_mashups.esl` |
+| Robed Steel Armor | 1 | advanced | Body armour | SmithingForge | 1 Iron Ingot, 3 Steel Ingot, 3 Leather Strips, 1 Corundum Ingot |  | yes | `182:cheddars_mashups.esl` |
+| Robed Steel Armor | 1 | advanced | Body armour | SmithingForge | 1 Iron Ingot, 3 Steel Ingot, 3 Leather Strips, 1 Corundum Ingot |  | yes | `183:cheddars_mashups.esl` |
+| Robed Steel Armor | 1 | advanced | Body armour | SmithingForge | 1 Iron Ingot, 3 Steel Ingot, 3 Leather Strips, 1 Corundum Ingot |  | yes | `184:cheddars_mashups.esl` |
+| Robed Steel Armor | 1 | advanced | Body armour | SmithingForge | 1 Iron Ingot, 3 Steel Ingot, 3 Leather Strips, 1 Corundum Ingot |  | yes | `185:cheddars_mashups.esl` |
+| Robed Steel Armor | 1 | advanced | Body armour | SmithingForge | 1 Iron Ingot, 3 Steel Ingot, 3 Leather Strips, 1 Corundum Ingot |  | yes | `186:cheddars_mashups.esl` |
+| Robed Steel Armor | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 4 Steel Ingot, 1 Iron Ingot |  | yes | `e9:cheddars_mashups.esl` |
+| Robed Steel Armor | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 4 Steel Ingot, 1 Iron Ingot |  | yes | `e8:cheddars_mashups.esl` |
+| Robed Steel Armor | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 4 Steel Ingot, 1 Iron Ingot |  | yes | `e7:cheddars_mashups.esl` |
+| Robed Steel Armor | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 4 Steel Ingot, 1 Iron Ingot |  | yes | `e6:cheddars_mashups.esl` |
+| Robed Steel Armor | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 4 Steel Ingot, 1 Iron Ingot |  | yes | `e5:cheddars_mashups.esl` |
+| Robed Steel Armor | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 4 Steel Ingot, 1 Iron Ingot |  | yes | `e4:cheddars_mashups.esl` |
+| Robed Steel Armor | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 4 Steel Ingot, 1 Iron Ingot |  | yes | `e3:cheddars_mashups.esl` |
+| Robed Steel Armor | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 4 Steel Ingot, 1 Iron Ingot |  | yes | `e2:cheddars_mashups.esl` |
+| Robed Steel Armor | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 4 Steel Ingot, 1 Iron Ingot |  | yes | `e1:cheddars_mashups.esl` |
+| Robed Steel Armor | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 4 Steel Ingot, 1 Iron Ingot |  | yes | `b1:cheddars_mashups.esl` |
 | Scaled Armor | 1 | advanced | Body armour | SmithingForge | 2 Corundum Ingot, 3 Steel Ingot, 2 Leather, 3 Leather Strips |  | yes | `dca06:Skyrim.esm` |
+| Scholar of Stendarr | 1 | advanced | Body armour | SmithingForge | 1 Iron Ingot, 3 Steel Ingot, 3 Leather Strips, 1 Corundum Ingot |  | yes | `10:cheddars_mashups.esl` |
 | Steel Armor | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 4 Steel Ingot, 1 Iron Ingot |  | yes | `dd975:Skyrim.esm` |
 | Steel Plate Armor | 1 | advanced | Body armour | SmithingForge | 1 Iron Ingot, 3 Steel Ingot, 3 Leather Strips, 1 Corundum Ingot |  | yes | `dd97f:Skyrim.esm` |
+| Steeled Vigilant | 1 | advanced | Body armour | SmithingForge | 3 Leather Strips, 4 Steel Ingot, 1 Iron Ingot |  | yes | `63:cheddars_mashups.esl` |
+| Vampire Battlelord | 1 | advanced | Body armour | SmithingForge | 1 Iron Ingot, 3 Steel Ingot, 3 Leather Strips, 1 Corundum Ingot |  | yes | `15c:cheddars_mashups.esl` |
+| Vampire Battlemaster | 1 | advanced | Body armour | SmithingForge | 1 Iron Ingot, 3 Steel Ingot, 3 Leather Strips, 1 Corundum Ingot |  | yes | `2b:cheddars_mashups.esl` |
+| Vampire Stalker | 1 | advanced | Body armour | SmithingForge | 1 Iron Ingot, 3 Steel Ingot, 3 Leather Strips, 1 Corundum Ingot |  | yes | `3b:cheddars_mashups.esl` |
 | Wolf Armor | 1 | advanced | Body armour | SmithingSkyforge | 1 Iron Ingot, 4 Steel Ingot, 3 Leather Strips |  | yes | `856:MoreCraftableEquipment.esp` |
 | Ancient Nord Gauntlets | 1 | advanced | Gauntlets | SmithingSkyforge | 3 Leather Strips, 3 Steel Ingot, 2 Iron Ingot, 2 Leather |  | yes | `f46cf:Skyrim.esm` |
 | Bonemold Gauntlets | 1 | advanced | Gauntlets | SmithingForge | 4 Bone Meal, 1 Iron Ingot, 1 Netch Leather |  | yes | `2b05a:Dragonborn.esm` |
@@ -83,23 +148,41 @@ By rank: novice 46, advanced 57, expert 31, master 23.
 | Dawnguard Gauntlets | 1 | advanced | Gauntlets | SmithingForge | 1 Steel Ingot, 2 Leather Strips, 1 Leather |  | yes | `867:MoreCraftableEquipment.esp` |
 | Dawnguard Heavy Gauntlets | 1 | advanced | Gauntlets | SmithingForge | 2 Steel Ingot, 2 Leather Strips, 1 Leather |  | yes | `866:MoreCraftableEquipment.esp` |
 | Dwarven Gauntlets | 1 | advanced | Gauntlets | SmithingForge | 1 Steel Ingot, 2 Leather Strips, 1 Dwarven Metal Ingot, 1 Iron Ingot |  | yes | `dd97b:Skyrim.esm` |
+| Fallen Companion Gauntlets | 1 | advanced | Gauntlets | SmithingForge | 3 Leather Strips, 4 Steel Ingot, 1 Iron Ingot |  | yes | `1a7:cheddars_mashups.esl` |
 | Heroic Stormcloak Gauntlets | 1 | advanced | Gauntlets | SmithingForge | 2 Steel Ingot, 1 Corundum Ingot, 2 Leather Strips, 2 Fur Plate |  | yes | `ab73:Hothtrooper44_ArmorCompilation.esp` |
+| Orcish Executor Gloves | 1 | advanced | Gauntlets | SmithingForge | 3 Leather Strips, 4 Orichalcum Ingot, 1 Iron Ingot |  | yes | `1aa:cheddars_mashups.esl` |
 | Orcish Gauntlets | 1 | advanced | Gauntlets | SmithingForge | 2 Leather Strips, 2 Orichalcum Ingot, 1 Iron Ingot |  | yes | `dd985:Skyrim.esm` |
 | Scaled Bracers | 1 | advanced | Gauntlets | SmithingForge | 1 Corundum Ingot, 1 Steel Ingot, 1 Leather, 2 Leather Strips |  | yes | `dca07:Skyrim.esm` |
+| Scholar of Stendarr Gauntlets | 1 | advanced | Gauntlets | SmithingForge | 1 Corundum Ingot, 2 Steel Ingot, 2 Leather Strips, 1 Iron Ingot |  | yes | `2e:cheddars_mashups.esl` |
+| Steel Fur Gauntlets | 1 | advanced | Gauntlets | SmithingForge | 2 Leather Strips, 2 Steel Ingot, 1 Iron Ingot |  | yes | `153:cheddars_mashups.esl` |
+| Steel Fur Gloves | 1 | advanced | Gauntlets | SmithingForge | 2 Leather Strips, 2 Steel Ingot, 1 Iron Ingot |  | yes | `152:cheddars_mashups.esl` |
 | Steel Plate Gauntlets | 1 | advanced | Gauntlets | SmithingForge | 1 Corundum Ingot, 2 Steel Ingot, 2 Leather Strips, 1 Iron Ingot |  | yes | `dd980:Skyrim.esm` |
+| Vampire Plate Gauntlets | 1 | advanced | Gauntlets | SmithingForge | 1 Corundum Ingot, 2 Steel Ingot, 2 Leather Strips, 1 Iron Ingot |  | yes | `156:cheddars_mashups.esl` |
 | Wolf Gauntlets | 1 | advanced | Gauntlets | SmithingSkyforge | 1 Iron Ingot, 2 Steel Ingot, 2 Leather Strips |  | yes | `857:MoreCraftableEquipment.esp` |
+| Steeled Vigilant Hood | 1 | advanced | Hats and hoods | SmithingForge | 2 Leather Strips, 2 Steel Ingot, 1 Iron Ingot |  | yes | `6a:cheddars_mashups.esl` |
 | Ancient Nord Helmet | 1 | advanced | Helmets | SmithingSkyforge | 3 Leather Strips, 3 Steel Ingot, 2 Iron Ingot, 2 Leather |  | yes | `f46d0:Skyrim.esm` |
 | Bonemold Helmet | 1 | advanced | Helmets | SmithingForge | 6 Bone Meal, 1 Iron Ingot, 1 Netch Leather |  | yes | `2b05b:Dragonborn.esm` |
 | Chitin Heavy Helmet | 1 | advanced | Helmets | SmithingForge | 1 Corundum Ingot, 1 Netch Leather, 4 Chitin Plate |  | yes | `2b052:Dragonborn.esm` |
 | Chitin Helmet | 1 | advanced | Helmets | SmithingForge | 1 Iron Ingot, 1 Netch Leather, 3 Chitin Plate |  | yes | `2b054:Dragonborn.esm` |
 | Dawnguard Full Helmet | 1 | advanced | Helmets | SmithingForge | 1 Iron Ingot, 2 Steel Ingot, 2 Leather Strips |  | yes | `868:MoreCraftableEquipment.esp` |
+| Dawnguard Hooded Helmet | 1 | advanced | Helmets | SmithingForge | 3 Leather Strips, 2 Leather, 2 Steel Ingot, 2 Silver Ingot |  | yes | `164:cheddars_mashups.esl` |
+| Dawnguard Hooded Helmet | 1 | advanced | Helmets | SmithingForge | 3 Leather Strips, 2 Leather, 2 Steel Ingot, 2 Silver Ingot |  | yes | `165:cheddars_mashups.esl` |
+| Dawnguard Hooded Helmet | 1 | advanced | Helmets | SmithingForge | 3 Leather Strips, 2 Leather, 2 Steel Ingot, 2 Silver Ingot |  | yes | `166:cheddars_mashups.esl` |
+| Dawnguard Hooded Helmet | 1 | advanced | Helmets | SmithingForge | 3 Leather Strips, 2 Leather, 2 Steel Ingot, 2 Silver Ingot |  | yes | `167:cheddars_mashups.esl` |
+| Dawnguard Horned Helmet | 1 | advanced | Helmets | SmithingForge | 3 Leather Strips, 2 Leather, 4 Steel Ingot |  | yes | `1a5:cheddars_mashups.esl` |
+| Dawnguard Hunter Helmet | 1 | advanced | Helmets | SmithingForge | 3 Leather Strips, 2 Leather, 4 Steel Ingot |  | yes | `1a1:cheddars_mashups.esl` |
+| Dawnguard Priest Hood | 1 | advanced | Helmets | SmithingForge | 3 Leather Strips, 2 Leather, 4 Steel Ingot |  | yes | `163:cheddars_mashups.esl` |
 | Dwarven Helmet | 1 | advanced | Helmets | SmithingForge | 1 Steel Ingot, 2 Leather Strips, 2 Dwarven Metal Ingot, 1 Iron Ingot |  | yes | `dd97c:Skyrim.esm` |
+| Hooded Steel Helmet | 1 | advanced | Helmets | SmithingForge | 2 Leather Strips, 2 Steel Ingot, 1 Iron Ingot |  | yes | `12e:cheddars_mashups.esl` |
+| Hooded Steel Helmet | 1 | advanced | Helmets | SmithingForge | 2 Leather Strips, 2 Steel Ingot, 1 Iron Ingot |  | yes | `12c:cheddars_mashups.esl` |
+| Orcish Executor Helmet | 1 | advanced | Helmets | SmithingForge | 2 Leather Strips, 2 Orichalcum Ingot, 1 Iron Ingot |  | yes | `c2:cheddars_mashups.esl` |
 | Orcish Helmet | 1 | advanced | Helmets | SmithingForge | 2 Leather Strips, 2 Orichalcum Ingot, 1 Iron Ingot |  | yes | `dd986:Skyrim.esm` |
 | Scaled Helmet | 1 | advanced | Helmets | SmithingForge | 1 Corundum Ingot, 2 Steel Ingot, 1 Leather, 1 Leather Strips |  | yes | `dca08:Skyrim.esm` |
 | Steel Helmet | 1 | advanced | Helmets | SmithingForge | 2 Leather Strips, 2 Steel Ingot, 1 Iron Ingot |  | yes | `dd977:Skyrim.esm` |
 | Steel Plate Helmet | 1 | advanced | Helmets | SmithingForge | 1 Iron Ingot, 2 Steel Ingot, 2 Leather Strips, 1 Corundum Ingot |  | yes | `dd981:Skyrim.esm` |
 | Wolf Helmet | 1 | advanced | Helmets | SmithingSkyforge | 1 Iron Ingot, 2 Steel Ingot, 2 Leather Strips |  | yes | `858:MoreCraftableEquipment.esp` |
 | Forsworn Armor | 1 | advanced | Other armour and clothing | SmithingForge | 1 Sabre Cat Pelt, 3 Leather Strips |  | yes | `8ab:MoreCraftableEquipment.esp` |
+| Alik'r Knight | 1 | advanced | Robes and body wear | SmithingForge | 3 Leather Strips, 2 Leather, 4 Steel Ingot | redguard | yes | `c0:cheddars_mashups.esl` |
 | Banded Iron Shield | 1 | advanced | Shields | SmithingForge | 1 Leather Strips, 4 Iron Ingot, 1 Corundum Ingot |  | yes | `dca00:Skyrim.esm` |
 | Bonemold Shield | 1 | advanced | Shields | SmithingForge | 8 Bone Meal, 1 Iron Ingot, 1 Netch Leather |  | yes | `2b05c:Dragonborn.esm` |
 | Chitin Shield | 1 | advanced | Shields | SmithingForge | 1 Iron Ingot, 1 Netch Leather, 4 Chitin Plate |  | yes | `2b053:Dragonborn.esm` |
@@ -115,14 +198,17 @@ By rank: novice 46, advanced 57, expert 31, master 23.
 | Falmer Heavy Boots | 1 | expert | Armoured boots | SmithingForge | 3 Chaurus Chitin, 2 Leather Strips |  | yes | `88c:MoreCraftableEquipment.esp` |
 | Glass Boots | 1 | expert | Armoured boots | SmithingForge | 2 Leather Strips, 1 Leather, 2 Refined Malachite, 1 Refined Moonstone |  | yes | `dca0e:Skyrim.esm` |
 | Tribunal Light Boots Black | 1 | expert | Armoured boots | SmithingForge | 1 Linen Wrap, 3 Refined Malachite, 3 Leather Strips, 1 Fur Plate |  | yes | `231a9:Hothtrooper44_ArmorCompilation.esp` |
+| Ancient Falmer Robes | 1 | expert | Body armour | SmithingForge | 3 Leather Strips, 1 Leather, 4 Refined Moonstone, 1 Iron Ingot |  | yes | `c5:cheddars_mashups.esl` |
 | Bonemold Armor | 1 | expert | Body armour | SmithingForge | 10 Bone Meal, 1 Iron Ingot, 2 Netch Leather |  | yes | `3d2dd:Dragonborn.esm` |
 | Bosmer Cuirass | 1 | expert | Body armour | SmithingForge | 1 Steel Ingot, 3 Refined Moonstone, 3 Leather Strips, 2 Leather | woodelf | yes | `23900:Hothtrooper44_ArmorCompilation.esp` |
 | Dwarven Armor | 1 | expert | Body armour | SmithingForge | 3 Leather Strips, 3 Dwarven Metal Ingot, 1 Iron Ingot, 1 Steel Ingot |  | yes | `dd97a:Skyrim.esm` |
 | Elven Armor | 1 | expert | Body armour | SmithingForge | 3 Leather Strips, 1 Leather, 4 Refined Moonstone, 1 Iron Ingot |  | yes | `dc9fb:Skyrim.esm` |
 | Falmer Armor | 1 | expert | Body armour | SmithingForge | 2 Chaurus Chitin, 3 Leather Strips |  | yes | `87b:MoreCraftableEquipment.esp` |
 | Falmer Heavy Armor | 1 | expert | Body armour | SmithingForge | 5 Chaurus Chitin, 3 Leather Strips |  | yes | `88d:MoreCraftableEquipment.esp` |
+| Forsworn Bonemold | 1 | expert | Body armour | SmithingForge | 1 Iron Ingot, 10 Bone Meal, 2 Netch Leather |  | yes | `6d:cheddars_mashups.esl` |
 | Glass Armor | 1 | expert | Body armour | SmithingForge | 3 Leather Strips, 1 Leather, 4 Refined Malachite, 2 Refined Moonstone |  | yes | `dca0f:Skyrim.esm` |
 | Heroic Stormcloak Armor | 1 | expert | Body armour | SmithingForge | 3 Steel Ingot, 1 Corundum Ingot, 2 Bear Claws, 4 Leather Strips, 5 Fur Plate |  | yes | `ab74:Hothtrooper44_ArmorCompilation.esp` |
+| Werewolf's Bane | 1 | expert | Body armour | SmithingForge | 3 Leather Strips, 5 Iron Ingot, 1 Werewolf Pelt |  | yes | `35:cheddars_mashups.esl` |
 | Bosmer Bracers | 1 | expert | Gauntlets | SmithingForge | 1 Refined Moonstone, 2 Leather Strips, 1 Leather | woodelf | yes | `23908:Hothtrooper44_ArmorCompilation.esp` |
 | Elven Gauntlets | 1 | expert | Gauntlets | SmithingForge | 2 Leather Strips, 1 Leather, 1 Refined Moonstone, 1 Iron Ingot |  | yes | `dc9fc:Skyrim.esm` |
 | Falmer Gauntlets | 1 | expert | Gauntlets | SmithingForge | 1 Chaurus Chitin, 2 Leather Strips |  | yes | `87c:MoreCraftableEquipment.esp` |
@@ -147,6 +233,7 @@ By rank: novice 46, advanced 57, expert 31, master 23.
 | Tribunal Heavy Boots Black | 1 | master | Armoured boots | SmithingForge | 1 Linen Wrap, 3 Ebony Ingot, 3 Leather Strips, 1 Fur Plate |  | yes | `23190:Hothtrooper44_ArmorCompilation.esp` |
 | Ebony Armor | 1 | master | Body armour | SmithingForge | 3 Leather Strips, 5 Ebony Ingot |  | yes | `dd989:Skyrim.esm` |
 | Nordic Carved Armor | 1 | master | Body armour | SmithingForge | 3 Leather Strips, 6 Steel Ingot, 1 Ebony Ingot, 1 Quicksilver Ingot |  | yes | `2b067:Dragonborn.esm` |
+| Nordic Carved Robes | 1 | master | Body armour | SmithingForge | 3 Leather Strips, 6 Steel Ingot, 1 Ebony Ingot, 1 Quicksilver Ingot |  | yes | `ea:cheddars_mashups.esl` |
 | Stalhrim Armor | 1 | master | Body armour | SmithingForge | 3 Leather Strips, 6 Stalhrim, 1 Quicksilver Ingot |  | yes | `2b071:Dragonborn.esm` |
 | Stalhrim Light Armor | 1 | master | Body armour | SmithingForge | 3 Leather Strips, 5 Stalhrim, 1 Steel Ingot |  | yes | `2b06c:Dragonborn.esm` |
 | Tribunal Heavy Robe Black | 1 | master | Body armour | SmithingForge | 1 Common Soul Gem, 2 Linen Wrap, 5 Ebony Ingot, 3 Leather Strips, 4 Leather |  | yes | `2319f:Hothtrooper44_ArmorCompilation.esp` |

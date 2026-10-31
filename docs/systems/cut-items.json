@@ -2,9 +2,9 @@
   "builtFrom": "game/data/recipes.json",
   "note": "References held out of the open craft book. recipes.json is not edited by the script that writes this file.",
   "counts": {
-    "cut": 3319,
-    "embassy": 15,
-    "thalmor": 9,
+    "cut": 3417,
+    "embassy": 19,
+    "thalmor": 10,
     "kept": 595
   },
   "rieklingKept": [
@@ -21,6 +21,18 @@
     "Riekling Footwraps"
   ],
   "items": [
+    {
+      "id": "8a:cheddars_mashups.esl",
+      "name": "Wamsu Bone Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "master",
+      "fires": true,
+      "disposition": "cut",
+      "why": "Asks for Dragon Bone, which this file cuts, so nobody could make it. Not found and not made. The reference stays here so it can come back for an event."
+    },
     {
       "id": "2731d:Immersive Weapons.esp",
       "name": "Dragon Bone",
@@ -18346,6 +18358,18 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "bf:cheddars_mashups.esl",
+      "name": "Alik'r Knight",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Robes and body wear",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "947:YokuWeapons.esp",
       "name": "Alik'r Nomad Robes",
       "plugin": "YokuWeapons.esp",
@@ -18389,6 +18413,18 @@
       "owner": "Smith",
       "family": "Helmets",
       "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "54:cheddars_mashups.esl",
+      "name": "Alik'r Warrior Garb",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Haberdasher",
+      "owner": "Tailor",
+      "family": "Robes and body wear",
+      "rank": "novice",
       "fires": false,
       "disposition": "cut",
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
@@ -18454,6 +18490,18 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "c6:cheddars_mashups.esl",
+      "name": "Ancient Falmer Robes",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "expert",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "1731c:Skyrim.esm",
       "name": "Ancient Nord Armor",
       "plugin": "Skyrim.esm",
@@ -18505,6 +18553,18 @@
       "id": "1731d:Skyrim.esm",
       "name": "Ancient Nord Gauntlets",
       "plugin": "Skyrim.esm",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Gauntlets",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "be:cheddars_mashups.esl",
+      "name": "Ancient Nord Gauntlets",
+      "plugin": "cheddars_mashups.esl",
       "half": "Platewright",
       "owner": "Smith",
       "family": "Gauntlets",
@@ -18862,6 +18922,42 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "12:cheddars_mashups.esl",
+      "name": "Armored Noble",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "b4:cheddars_mashups.esl",
+      "name": "Armored Noble",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "19b:cheddars_mashups.esl",
+      "name": "Armored Telvanni Robes",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "285c:Immersive Weapons.esp",
       "name": "Armsman's Sword",
       "plugin": "Immersive Weapons.esp",
@@ -18941,6 +19037,18 @@
       "owner": "Smith",
       "family": "Helmets",
       "rank": "expert",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "15:cheddars_mashups.esl",
+      "name": "Aspiring Adventurer Garb",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Other armour and clothing",
+      "rank": "novice",
       "fires": false,
       "disposition": "cut",
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
@@ -19480,6 +19588,30 @@
       "half": "Platewright",
       "owner": "Smith",
       "family": "Helmets",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "58:cheddars_mashups.esl",
+      "name": "Blades Priest Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "b:cheddars_mashups.esl",
+      "name": "Blades Remnant Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
       "rank": "advanced",
       "fires": false,
       "disposition": "cut",
@@ -20866,6 +20998,18 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "45:cheddars_mashups.esl",
+      "name": "Dawnguard Alik'r Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "17eb7:Dawnguard.esm",
       "name": "Dawnguard Armor",
       "plugin": "Dawnguard.esm",
@@ -20908,6 +21052,30 @@
       "half": "Platewright",
       "owner": "Smith",
       "family": "Armoured boots",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "198:cheddars_mashups.esl",
+      "name": "Dawnguard Casual Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "17:cheddars_mashups.esl",
+      "name": "Dawnguard Executioner Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
       "rank": "advanced",
       "fires": false,
       "disposition": "cut",
@@ -20998,6 +21166,102 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "b8:cheddars_mashups.esl",
+      "name": "Dawnguard Hooded Helmet",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Helmets",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "b9:cheddars_mashups.esl",
+      "name": "Dawnguard Hooded Helmet",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Helmets",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "ba:cheddars_mashups.esl",
+      "name": "Dawnguard Hooded Helmet",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Helmets",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "bb:cheddars_mashups.esl",
+      "name": "Dawnguard Hooded Helmet",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Helmets",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "1a6:cheddars_mashups.esl",
+      "name": "Dawnguard Horned Helmet",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Helmets",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "1a2:cheddars_mashups.esl",
+      "name": "Dawnguard Hunter Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "162:cheddars_mashups.esl",
+      "name": "Dawnguard Priest Hood",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Helmets",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "82:cheddars_mashups.esl",
+      "name": "Dawnguard Priest Robe",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "17eb3:Dawnguard.esm",
       "name": "Dawnguard Rune Axe",
       "plugin": "Dawnguard.esm",
@@ -21028,6 +21292,18 @@
       "half": "Platewright",
       "owner": "Smith",
       "family": "Shields",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "18:cheddars_mashups.esl",
+      "name": "Dawnguard Scholar Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
       "rank": "advanced",
       "fires": false,
       "disposition": "cut",
@@ -23794,6 +24070,18 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "135:cheddars_mashups.esl",
+      "name": "Falkreath Ranger Helmet",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Helmets",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "dd4:Hothtrooper44_ArmorCompilation.esp",
       "name": "Falkreath Shield",
       "plugin": "Hothtrooper44_ArmorCompilation.esp",
@@ -23813,6 +24101,42 @@
       "owner": "Smith",
       "family": "Warhammers",
       "rank": "master",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "4d:cheddars_mashups.esl",
+      "name": "Fallen Companion Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "4c:cheddars_mashups.esl",
+      "name": "Fallen Companion Boots",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Armoured boots",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "4e:cheddars_mashups.esl",
+      "name": "Fallen Companion Gauntlets",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Gauntlets",
+      "rank": "advanced",
       "fires": false,
       "disposition": "cut",
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
@@ -24094,6 +24418,18 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "a:cheddars_mashups.esl",
+      "name": "Forsworn Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Other armour and clothing",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "109489:Skyrim.esm",
       "name": "Forsworn Axe",
       "plugin": "Skyrim.esm",
@@ -24101,6 +24437,18 @@
       "owner": "Smith",
       "family": "War axes",
       "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "6c:cheddars_mashups.esl",
+      "name": "Forsworn Bonemold",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "expert",
       "fires": false,
       "disposition": "cut",
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
@@ -24857,6 +25205,18 @@
       "owner": "Smith",
       "family": "Warhammers",
       "rank": "expert",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "15f:cheddars_mashups.esl",
+      "name": "Gloved Hide Bracers",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Gauntlets",
+      "rank": "novice",
       "fires": false,
       "disposition": "cut",
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
@@ -27586,6 +27946,18 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "133:cheddars_mashups.esl",
+      "name": "Hjaalmarch Guard's Helmet",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Helmets",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "10fb1a:Skyrim.esm",
       "name": "Hjaalmarch Guard's Shield",
       "plugin": "Skyrim.esm",
@@ -27778,6 +28150,30 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "12b:cheddars_mashups.esl",
+      "name": "Hooded Steel Helmet",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Helmets",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "12d:cheddars_mashups.esl",
+      "name": "Hooded Steel Helmet",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Helmets",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "3a9e3:Dragonborn.esm",
       "name": "Horksbane",
       "plugin": "Dragonborn.esm",
@@ -27886,6 +28282,30 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "150:cheddars_mashups.esl",
+      "name": "Imperial Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "151:cheddars_mashups.esl",
+      "name": "Imperial Battlelord Hood",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Helmets",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "eb7ec:Skyrim.esm",
       "name": "Imperial Boots",
       "plugin": "Skyrim.esm",
@@ -27977,6 +28397,18 @@
       "owner": "Smith",
       "family": "Body armour",
       "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "d:cheddars_mashups.esl",
+      "name": "Imperial Cleric Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
       "fires": false,
       "disposition": "cut",
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
@@ -28222,6 +28654,18 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "6e:cheddars_mashups.esl",
+      "name": "Imperial Priest Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "eb7ee:Skyrim.esm",
       "name": "Imperial Soldier's Armor",
       "plugin": "Skyrim.esm",
@@ -28396,6 +28840,18 @@
       "half": "Edgewright",
       "owner": "Smith",
       "family": "Battleaxes",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "86:cheddars_mashups.esl",
+      "name": "Iron Fur Gauntlets",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Gauntlets",
       "rank": "novice",
       "fires": false,
       "disposition": "cut",
@@ -31306,6 +31762,18 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "134:cheddars_mashups.esl",
+      "name": "Markarth Ranger Helmet",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Helmets",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "30fde:ZIA_Complete Pack.esp",
       "name": "Masque of Clavicus Vile",
       "plugin": "ZIA_Complete Pack.esp",
@@ -32086,6 +32554,18 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "193:cheddars_mashups.esl",
+      "name": "Nord Hero Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "394e:Immersive Weapons.esp",
       "name": "Nord Hero Axestaff",
       "plugin": "Immersive Weapons.esp",
@@ -32141,6 +32621,18 @@
       "owner": "Smith",
       "family": "Greatswords",
       "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "192:cheddars_mashups.esl",
+      "name": "Nord Hero Helmet",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Helmets",
+      "rank": "novice",
       "fires": false,
       "disposition": "cut",
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
@@ -32776,6 +33268,54 @@
       "half": "Edgewright",
       "owner": "Smith",
       "family": "Daggers",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "1ad:cheddars_mashups.esl",
+      "name": "Orcish Executor Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "1ae:cheddars_mashups.esl",
+      "name": "Orcish Executor Boots",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Armoured boots",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "1ac:cheddars_mashups.esl",
+      "name": "Orcish Executor Gloves",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Gauntlets",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "c1:cheddars_mashups.esl",
+      "name": "Orcish Executor Helmet",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Helmets",
       "rank": "advanced",
       "fires": false,
       "disposition": "cut",
@@ -33658,6 +34198,18 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "136:cheddars_mashups.esl",
+      "name": "Pale Ranger Helmet",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Helmets",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "977d65:Immersive Weapons.esp",
       "name": "PenUmbra",
       "plugin": "Immersive Weapons.esp",
@@ -33749,6 +34301,18 @@
       "owner": "Smith",
       "family": "Swords",
       "rank": "master",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "b5:cheddars_mashups.esl",
+      "name": "Plated Jarl Robe",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
       "fires": false,
       "disposition": "cut",
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
@@ -35386,6 +35950,18 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "132:cheddars_mashups.esl",
+      "name": "Riften Ranger Helmet",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Helmets",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "2333b:Hothtrooper44_ArmorCompilation.esp",
       "name": "Ringmail Armor",
       "plugin": "Hothtrooper44_ArmorCompilation.esp",
@@ -35506,6 +36082,330 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "c7:cheddars_mashups.esl",
+      "name": "Robed Iron Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "d1:cheddars_mashups.esl",
+      "name": "Robed Iron Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "d2:cheddars_mashups.esl",
+      "name": "Robed Iron Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "d3:cheddars_mashups.esl",
+      "name": "Robed Iron Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "d4:cheddars_mashups.esl",
+      "name": "Robed Iron Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "d5:cheddars_mashups.esl",
+      "name": "Robed Iron Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "d6:cheddars_mashups.esl",
+      "name": "Robed Iron Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "d7:cheddars_mashups.esl",
+      "name": "Robed Iron Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "d8:cheddars_mashups.esl",
+      "name": "Robed Iron Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "187:cheddars_mashups.esl",
+      "name": "Robed Plate Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "188:cheddars_mashups.esl",
+      "name": "Robed Plate Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "189:cheddars_mashups.esl",
+      "name": "Robed Plate Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "18a:cheddars_mashups.esl",
+      "name": "Robed Plate Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "18b:cheddars_mashups.esl",
+      "name": "Robed Plate Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "18c:cheddars_mashups.esl",
+      "name": "Robed Plate Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "18d:cheddars_mashups.esl",
+      "name": "Robed Plate Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "18e:cheddars_mashups.esl",
+      "name": "Robed Plate Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "18f:cheddars_mashups.esl",
+      "name": "Robed Plate Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "b0:cheddars_mashups.esl",
+      "name": "Robed Steel Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "c9:cheddars_mashups.esl",
+      "name": "Robed Steel Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "ca:cheddars_mashups.esl",
+      "name": "Robed Steel Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "cb:cheddars_mashups.esl",
+      "name": "Robed Steel Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "cc:cheddars_mashups.esl",
+      "name": "Robed Steel Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "cd:cheddars_mashups.esl",
+      "name": "Robed Steel Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "ce:cheddars_mashups.esl",
+      "name": "Robed Steel Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "cf:cheddars_mashups.esl",
+      "name": "Robed Steel Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "d0:cheddars_mashups.esl",
+      "name": "Robed Steel Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "2acf:Immersive Weapons.esp",
       "name": "Ruby Gemstone Bow",
       "plugin": "Immersive Weapons.esp",
@@ -35596,6 +36496,42 @@
       "half": "Platewright",
       "owner": "Smith",
       "family": "Helmets",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "b2:cheddars_mashups.esl",
+      "name": "Scaled Iron",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "14:cheddars_mashups.esl",
+      "name": "Scholar of Stendarr",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "2f:cheddars_mashups.esl",
+      "name": "Scholar of Stendarr Gauntlets",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Gauntlets",
       "rank": "advanced",
       "fires": false,
       "disposition": "cut",
@@ -36406,12 +37342,60 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "131:cheddars_mashups.esl",
+      "name": "Solitude Guard's Helmet",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Helmets",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "10fb1e:Skyrim.esm",
       "name": "Solitude Guard's Shield",
       "plugin": "Skyrim.esm",
       "half": "Platewright",
       "owner": "Smith",
       "family": "Shields",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "69:cheddars_mashups.esl",
+      "name": "Son of Skyrim Curiass",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "65:cheddars_mashups.esl",
+      "name": "Son of Skyrim boots",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Armoured boots",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "64:cheddars_mashups.esl",
+      "name": "Son of Skyrim gauntlets",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Gauntlets",
       "rank": "novice",
       "fires": false,
       "disposition": "cut",
@@ -36826,6 +37810,18 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "25:cheddars_mashups.esl",
+      "name": "Stalker Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "14c08:Dawnguard.esm",
       "name": "Steel Armor",
       "plugin": "Dawnguard.esm",
@@ -36940,6 +37936,30 @@
       "half": "Edgewright",
       "owner": "Smith",
       "family": "Daggers",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "155:cheddars_mashups.esl",
+      "name": "Steel Fur Gauntlets",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Gauntlets",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "154:cheddars_mashups.esl",
+      "name": "Steel Fur Gloves",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Gauntlets",
       "rank": "advanced",
       "fires": false,
       "disposition": "cut",
@@ -37234,6 +38254,30 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "62:cheddars_mashups.esl",
+      "name": "Steeled Vigilant",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "6b:cheddars_mashups.esl",
+      "name": "Steeled Vigilant Hood",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Hats and hoods",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "83d:YokuWeapons.esp",
       "name": "Stone Mace",
       "plugin": "YokuWeapons.esp",
@@ -37516,6 +38560,18 @@
       "half": "Platewright",
       "owner": "Smith",
       "family": "Helmets",
+      "rank": "master",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "bc:cheddars_mashups.esl",
+      "name": "Thalmor Plate",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Haberdasher",
+      "owner": "Tailor",
+      "family": "Robes and body wear",
       "rank": "master",
       "fires": false,
       "disposition": "cut",
@@ -38830,6 +39886,42 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "15d:cheddars_mashups.esl",
+      "name": "Vampire Battlelord",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "c:cheddars_mashups.esl",
+      "name": "Vampire Battlemaster",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "26:cheddars_mashups.esl",
+      "name": "Vampire Battlemaster Boots",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Armoured boots",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "11cf9:Dawnguard.esm",
       "name": "Vampire Boots",
       "plugin": "Dawnguard.esm",
@@ -38854,6 +39946,18 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "157:cheddars_mashups.esl",
+      "name": "Vampire Plate Gauntlets",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Gauntlets",
+      "rank": "advanced",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "e8f4:Dawnguard.esm",
       "name": "Vampire Royal Armor",
       "plugin": "Dawnguard.esm",
@@ -38861,6 +39965,18 @@
       "owner": "Smith",
       "family": "Body armour",
       "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "3c:cheddars_mashups.esl",
+      "name": "Vampire Stalker",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
       "fires": false,
       "disposition": "cut",
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
@@ -39094,6 +40210,18 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "8b:cheddars_mashups.esl",
+      "name": "Wamsu Bone Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "master",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "df4:Hothtrooper44_ArmorCompilation.esp",
       "name": "Warchief Heavy Battlecrown",
       "plugin": "Hothtrooper44_ArmorCompilation.esp",
@@ -39226,6 +40354,30 @@
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
     },
     {
+      "id": "36:cheddars_mashups.esl",
+      "name": "Werewolf's Bane",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "34:cheddars_mashups.esl",
+      "name": "Werewolf's Bane Gloves",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Gauntlets",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
       "id": "4e8c:Immersive Weapons.esp",
       "name": "White Mammoth Recurve Bow",
       "plugin": "Immersive Weapons.esp",
@@ -39268,6 +40420,18 @@
       "half": "Platewright",
       "owner": "Smith",
       "family": "Shields",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "130:cheddars_mashups.esl",
+      "name": "Whiterun Ranger Helmet",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Helmets",
       "rank": "novice",
       "fires": false,
       "disposition": "cut",
@@ -39472,6 +40636,18 @@
       "half": "Platewright",
       "owner": "Smith",
       "family": "Shields",
+      "rank": "novice",
+      "fires": false,
+      "disposition": "cut",
+      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "12f:cheddars_mashups.esl",
+      "name": "Winterhold Ranger Helmet",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Helmets",
       "rank": "novice",
       "fires": false,
       "disposition": "cut",
@@ -39850,6 +41026,30 @@
       "why": "The fishing mod's pole. The fisher page plans Thornswood-Content.esp's three poles and says the fishing mod's rows are not the plan; only ours fish (TOOLS in the gamemode). Not found and not made (issue #1766). It also asked for dragon bone, which is cut."
     },
     {
+      "id": "14e:cheddars_mashups.esl",
+      "name": "Imperial Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "advanced",
+      "fires": true,
+      "disposition": "embassy",
+      "why": "Empire gear. Not found in Skyrim. Only the embassy roll may craft it."
+    },
+    {
+      "id": "14f:cheddars_mashups.esl",
+      "name": "Imperial Battlelord Hood",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Helmets",
+      "rank": "advanced",
+      "fires": true,
+      "disposition": "embassy",
+      "why": "Empire gear. Not found in Skyrim. Only the embassy roll may craft it."
+    },
+    {
       "id": "dc9f5:Skyrim.esm",
       "name": "Imperial Boots",
       "plugin": "Skyrim.esm",
@@ -39868,6 +41068,18 @@
       "half": "Platewright",
       "owner": "Smith",
       "family": "Gauntlets",
+      "rank": "advanced",
+      "fires": true,
+      "disposition": "embassy",
+      "why": "Empire gear. Not found in Skyrim. Only the embassy roll may craft it."
+    },
+    {
+      "id": "e:cheddars_mashups.esl",
+      "name": "Imperial Cleric Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
       "rank": "advanced",
       "fires": true,
       "disposition": "embassy",
@@ -39964,6 +41176,18 @@
       "half": "Platewright",
       "owner": "Smith",
       "family": "Shields",
+      "rank": "advanced",
+      "fires": true,
+      "disposition": "embassy",
+      "why": "Empire gear. Not found in Skyrim. Only the embassy roll may craft it."
+    },
+    {
+      "id": "6f:cheddars_mashups.esl",
+      "name": "Imperial Priest Armor",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
       "rank": "advanced",
       "fires": true,
       "disposition": "embassy",
@@ -40121,6 +41345,18 @@
       "owner": "Tailor",
       "family": "Hats and hoods",
       "rank": "novice",
+      "fires": true,
+      "disposition": "thalmor",
+      "why": "Thalmor or Justiciar. Not found in the world. Only someone on the remnant roll may craft it."
+    },
+    {
+      "id": "bd:cheddars_mashups.esl",
+      "name": "Thalmor Plate",
+      "plugin": "cheddars_mashups.esl",
+      "half": "Haberdasher",
+      "owner": "Tailor",
+      "family": "Robes and body wear",
+      "rank": "master",
       "fires": true,
       "disposition": "thalmor",
       "why": "Thalmor or Justiciar. Not found in the world. Only someone on the remnant roll may craft it."

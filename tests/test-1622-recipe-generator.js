@@ -122,7 +122,9 @@ items.forEach(function (it) {
 wrong.forEach(function (w) { if (w) { console.log("      " + w); } });
 yes("every cut owned row in recipes.json carries book cut, as the build writes it (" + cutOwned + ")", cutOwned > 3000);
 yes("every cut row nobody owned is refused, as the build writes it (" + cutRefused + ")", cutRefused > 200);
-yes("every embassy and thalmor row carries its roll (" + rolled + ")", rolled === 24);
+const rollRows = items.filter(function (it) { return ROLL[it.disposition]; }).length;
+yes("every embassy and thalmor row carries its roll (" + rolled + ")",
+  rolled > 0 && rolled === rollRows && rolled === (cutDoc.counts || {}).embassy + (cutDoc.counts || {}).thalmor);
 yes("and no row of the cut file is open to anybody or carries the wrong mark", wrong.length === 0);
 const stray = Object.keys(recipes.recipes).filter(function (k) {
   const r = recipes.recipes[k];

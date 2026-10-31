@@ -1733,7 +1733,7 @@
   "trespass": "0x400",
   "werewolf": "0x10000"
  },
- "readFrom": "103 plugins in load order (names sha256 015fd63125cf)",
+ "readFrom": "106 plugins in load order (names sha256 16098210dbc1)",
  "scripts": {
   "read": 15496,
   "rule": "records/papyrus-events.json at 1afaf2ef01aa19b667c7b20c8a7b65b87e05921a",

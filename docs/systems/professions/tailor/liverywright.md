@@ -49,7 +49,7 @@ gives back 10% of each hit. See [Tailor](../tailor.md).
 
 ## Every recipe
 
-Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 81 recipes. 81 reach the server. None of them are tempering. The same rows, with ids, are in [tailor-liverywright](../../lists/tailor-liverywright.md).
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 82 recipes. 82 reach the server. None of them are tempering. The same rows, with ids, are in [tailor-liverywright](../../lists/tailor-liverywright.md).
 
 The rank on the row is the rank. It is the dearest ingredient a class produces. An item has no gold price.
 
@@ -61,7 +61,7 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 
 **Expert** (5 names). Dwarven Mage Unarmored Robe. Shaman Unarmored Robe. Tribunal Unarmored Robe Black. Tribunal Unarmored Robe Blue. Tribunal Unarmored Robe Green.
 
-**Master** (3 names). Ebony Mage Unarmored Robe. Tribunal Unarmored Robe Red. Tribunal Unarmored Robe White.
+**Master** (4 names). Cultist Mask. Ebony Mage Unarmored Robe. Tribunal Unarmored Robe Red. Tribunal Unarmored Robe White.
 
 | Item | Makes | Rank | Kind | Bench | Asks for | Race | Server asked | Id |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -143,6 +143,7 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 | Tribunal Unarmored Robe Black | 1 | expert | Robes and body wear | MCE_CraftingLoom | 1 Common Soul Gem, 2 Linen Wrap, 5 Troll Fat, 3 Leather Strips, 9 Leather |  | yes | `231d5:Hothtrooper44_ArmorCompilation.esp` |
 | Tribunal Unarmored Robe Blue | 1 | expert | Robes and body wear | MCE_CraftingLoom | 1 Common Soul Gem, 2 Linen Wrap, 5 Troll Fat, 3 Leather Strips, 9 Leather |  | yes | `231d6:Hothtrooper44_ArmorCompilation.esp` |
 | Tribunal Unarmored Robe Green | 1 | expert | Robes and body wear | MCE_CraftingLoom | 1 Common Soul Gem, 2 Linen Wrap, 5 Troll Fat, 3 Leather Strips, 9 Leather |  | yes | `231d7:Hothtrooper44_ArmorCompilation.esp` |
+| Cultist Mask | 1 | master | Hats and hoods | MCE_CraftingLoom | 2 Leather, 1 Leather Strips, 1 Skull, 2 Leather |  | yes | `3e:cheddars_mashups.esl` |
 | Ebony Mage Unarmored Robe | 1 | master | Robes and body wear | MCE_CraftingLoom | 4 Troll Fat, 2 Ebony Ingot, 3 Leather Strips, 6 Leather |  | yes | `37301:Hothtrooper44_ArmorCompilation.esp` |
 | Tribunal Unarmored Robe Red | 1 | master | Robes and body wear | MCE_CraftingLoom | 1 Common Soul Gem, 2 Linen Wrap, 5 Troll Fat, 3 Leather Strips, 9 Leather |  | yes | `231d8:Hothtrooper44_ArmorCompilation.esp` |
 | Tribunal Unarmored Robe White | 1 | master | Robes and body wear | MCE_CraftingLoom | 1 Common Soul Gem, 2 Linen Wrap, 5 Troll Fat, 3 Leather Strips, 9 Leather |  | yes | `231d9:Hothtrooper44_ArmorCompilation.esp` |
