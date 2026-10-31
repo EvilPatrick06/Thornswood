@@ -60,7 +60,10 @@ Skyrim's own help, which the help panel (F7) replaced (#1633); Creations and
 Installed Content are the Creation Club, and Thornswood is Special Edition
 only. Settings, Mod Configuration, Controls and Quit stay. The page finds each
 entry by its text (UpdateIndices), so an entry that is never put in has no
-index, and no press can reach its action.
+index, and no press can reach its action. The game itself still asks for
+those entries: each time the journal opens, UpdateSystemButtons hands it
+every entry by its index, and the game writes "disabled" into each one, so
+each entry taken off is handed over as an empty object of its own.
 
 WHAT EACH EDIT IS
 
@@ -82,6 +85,13 @@ WHAT EACH EDIT IS
                   says, so Creations is never put in; startPage jumps over the
                   block that puts in Installed Content. Same length, and every
                   jump lands on the action after the block, so nothing moves.
+                  UpdateSystemButtons hands the game, in SetSaveDisabled, a
+                  new empty object in the places of Quick Save, Save, Load and
+                  Help, where it handed entryList[IDX_...]: the game sets
+                  "disabled" on every object in that array without checking
+                  it is one, and crashed on the undefined an entry that is not
+                  there gives (31 Oct 2026). Any entry taken off the page has
+                  to be handed over this way too.
 
 Each edit is checked for what it must find (how many places, which bytes) and
 stops when the mod's file is not the one it was written for. The recipe pins
@@ -323,12 +333,46 @@ CONTENT_BEFORE = bytes.fromhex('9602000890' '52' '12' '9d02007100' '9602000840' 
 CONTENT_AFTER = CONTENT_BEFORE[:12] + jump(113 - 5) + CONTENT_BEFORE[17:]
 
 
+# UpdateSystemButtons hands the game every entry of the page, by its index,
+# in GameDelegate.call("SetSaveDisabled", [...]): Quick Save, Save and Load,
+# Installed Content and Creations when they are there, then Settings, Mod
+# Configuration, Controls, Help and Quit, then abRefreshMode. The game's
+# handler sets "disabled" on each object in that array without asking whether
+# it is one, so an entry that is never put in (its index undefined, so
+# entryList[undefined] is undefined) is a null object to it, and the game
+# crashes reading through it the moment the journal opens (31 Oct 2026, dev,
+# EXCEPTION_ACCESS_VIOLATION reading 0 at SkyrimSE.exe+0FAE262, with
+# Journal_SystemTab and "disabled" in the crash log). Installed Content and
+# Creations are already pushed only when their index is defined; the four
+# entries this takes off the page are handed over in a fixed place, so each
+# of their slots, Push register3 (entryList), register1, "IDX_..."; GetMember;
+# GetMember (18 bytes), hands an object of its own instead: Push 0;
+# InitObject (a new, empty object, on no list, so its "disabled" draws
+# nothing), then Push 0; Pop, which leaves the stack as it was. Same length,
+# and every slot still hands one value, so the game's array keeps its places.
+def slot(index):
+    """The 18 bytes that push entryList[this[IDX_...]], the constant's index given."""
+    return bytes.fromhex('9602000403' '9602000401' '96030009') + struct.pack('<H', index) + bytes.fromhex('4e4e')
+
+
+OWN_OBJECT = bytes.fromhex('960500070000000043' '960500070000000017')
+IDX_QUICKSAVE, IDX_SAVE, IDX_LOAD, IDX_HELP, IDX_QUIT = 0x104, 0x105, 0x106, 0x10c, 0x10d
+# [Quick Save, Save, Load]: their three slots, then Push 3; InitArray.
+GIVE_SAVES_BEFORE = slot(IDX_LOAD) + slot(IDX_SAVE) + slot(IDX_QUICKSAVE) + bytes.fromhex('9605000703000000' '42')
+GIVE_SAVES_AFTER = OWN_OBJECT * 3 + GIVE_SAVES_BEFORE[54:]
+# The push of the rest: Quit's slot, then Help's, which is the one that goes.
+GIVE_HELP_BEFORE = slot(IDX_QUIT) + slot(IDX_HELP)
+GIVE_HELP_AFTER = GIVE_HELP_BEFORE[:18] + OWN_OBJECT
+
+
 def edit_journal(plain):
     edits = []
     for before, after, what in ((SAVES_BEFORE, SAVES_AFTER, 'Quick Save, Save and Load'),
                                 (HELP_BEFORE, HELP_AFTER, 'Help'),
                                 (MOD_BEFORE, MOD_AFTER, 'Creations'),
-                                (CONTENT_BEFORE, CONTENT_AFTER, 'Installed Content')):
+                                (CONTENT_BEFORE, CONTENT_AFTER, 'Installed Content'),
+                                (GIVE_SAVES_BEFORE, GIVE_SAVES_AFTER, 'what SetSaveDisabled gets for Quick Save, Save and Load'),
+                                (GIVE_HELP_BEFORE, GIVE_HELP_AFTER, 'what SetSaveDisabled gets for Help')):
         edits += edit_once(plain, before, after, 'SkyUI\'s journal, ' + what)
     return edits, 'Quick Save, Save, Load, Help, Creations and Installed Content never put on the System page'
 
