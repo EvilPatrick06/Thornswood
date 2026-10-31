@@ -2,10 +2,9 @@
 # change build.yml and run  node scripts/dev/Build-PrWorkflow.js
 #
 # Every pull request runs the same checks as build.yml, on GitHub's hosted
-# windows-latest runner first (#1306). If that job does not succeed, the VPS
-# fallback builds it, for a branch of this repository only, never a fork
-# (Patrick, 12 Oct 2026). No secrets, no live folders: every scratch path is
-# under RUNNER_TEMP. The hosted job keeps the name "Launcher builds".
+# windows-latest runner (#1306, #4983). No secrets, no live folders: every
+# scratch path is under RUNNER_TEMP. The job keeps the name "Launcher builds",
+# and the gate runs beside it in shares, "Gate harnesses (n of 5)".
 name: Build check (pull requests)
 on:
   pull_request:
@@ -25,74 +24,122 @@ concurrency:
   group: build-pr-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  # WHERE IT RUNS, since 11 October (#1306, Patrick's final call on #2161):
-  # GitHub's hosted windows-latest is the default, in the job "launcher"
-  # at the end of this file. This job is the VPS FALLBACK. It runs only
-  # when the hosted job did not succeed (for a pull request, only on a
-  # branch of this repository, never a fork), that is when
-  #   - the repository variable BUILD_RUNNER is vps, which skips the hosted
-  #     job outright (Settings, Variables). Optional: a refused hosted job
-  #     already falls through to the box, the variable only saves the red, or
-  #   - a manual run asked for runner: vps, or
-  #   - the hosted job failed. A quota or billing stop fails it before any
-  #     step runs, and this picks the build up on the box. A real red fails
-  #     here too, so a broken main shows red twice; that is the price of not
-  #     telling a quota stop from a test failure.
-  # The steps are the hosted job's own, by the YAML anchor checks, so the two
-  # can never test different things.
-  launcher-vps:
-    name: Launcher builds (VPS fallback)
-    needs: launcher
-    if: ${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' && github.event.pull_request.head.repo.full_name == github.repository }}
-    # thornswood-build (#2994): only the runners records/build-runners.json
-    # lists carry it, so no more builds run on the box at once than its six
-    # cores finish fastest. Seven at once on 21 Oct took 34 to 39 minutes for
-    # the harness step alone and the limit below cancelled passing builds.
-    # Main's build stays on the box: only the box's runners have the trace
-    # task, and a main build is what leaves the gate map the next pull
-    # requests measure from (#3114, #3874). Build-PrWorkflow.js gives
-    # build-pr.yml's fallback the pull request build label alone instead
-    # (records/pr-build-runners.json): box runner 2 and One's off-box runners
-    # carry it and runner 1 does not, so main's build never waits behind pull
-    # requests for runner 1 (#3860; #4010, Patrick's A, 27 Oct 2026).
-    runs-on: [self-hosted, Windows, thornswood-pr-build]
-    # actions: read for the gate step off the box, which reads the map main's
-    # build handed on in its log (#4009, scripts\dev\Gate-Map.ps1).
-    permissions:
-      actions: read
-      contents: read
-    # Often past twenty minutes on the VPS (#2557): it is shared with the live
-    # server and other jobs, and the harness list keeps growing (#2544 added
-    # test-release-workflow.ps1, #2525 the feed-watch test, #2546 the remote
-    # command map under both pwsh and PowerShell 5.1). Forty leaves room for
-    # that; past it the job is stuck, not slow.
-    timeout-minutes: 40
-    steps: &checks
+  # THE GATE, IN FIVE SHARES (31 Oct 2026). Every gate harness, split over
+  # five of GitHub's hosted Windows runners at once, beside the launcher job.
+  # Since #5119 no build runs on the box, so no main build is traced and no
+  # map of what a change can reach is handed on, and every pull request ran
+  # the whole gate on one runner's four cores: 707 harnesses, 3741 s of
+  # processor, the gate step 1104 s of a 20.7 minute build (run 41231641217),
+  # and 1186 s of 21 minutes on a slower runner (41233444404, 4061 s of
+  # processor for the same harnesses). Patrick's mark is under ten minutes
+  # for a pull request's checks, and over twenty means something is wrong.
+  # scripts\dev\Run-Gate.ps1 -Shard n -Of 5 takes harness number i of the
+  # gate list when i mod 5 is n - 1, the way nightly.yml splits its own, so
+  # every gate harness runs in exactly one share. The runners are free on a
+  # public repository; each share costs about a minute to start. The check
+  # main's ruleset requires, "Build check result", needs this job and the
+  # launcher job both (scripts\dev\Build-PrWorkflow.js), and
+  # scripts\dev\Tested-Tree.js counts a pull request's tree as tested only
+  # when every share of its run passed.
+  gate:
+    name: Gate harnesses (${{ matrix.shard }} of ${{ strategy.job-total }})
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      # Every share runs to its end, so one red share does not hide what
+      # the others would have found.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5]
+    steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      # A runner keeps its folder from one job to the next, and a checkout
-      # there rewrites only the files that differ from the last job's commit,
-      # so every other file keeps the line endings the last job's
-      # .gitattributes gave it (#3029). Every tracked file is written again,
-      # the way this commit checks it out.
-      - name: Check every tracked file out again
-        if: runner.environment == 'self-hosted'
-        shell: pwsh
-        run: |
-          git rm -r -q --cached .
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          git reset -q --hard HEAD
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-
-      # The hosted image ships whatever node and python it has this month;
-      # these are pinned so a check means the same thing as on the VPS, which
-      # has its own and skips them.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        if: runner.environment == 'github-hosted'
         with:
           node-version: '24'
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        if: runner.environment == 'github-hosted'
+        with:
+          python-version: '3.12'
+
+      - name: Run the gate harnesses
+        id: gate
+        shell: pwsh
+        env:
+          SHARD: ${{ matrix.shard }}
+          OF: ${{ strategy.job-total }}
+        run: |
+          # Issue #3009. The gate is every tests\test-*.js and tests\test-*.ps1
+          # that tests\gate-excluded.txt does not name, read from the files by
+          # scripts\dev\Gate-Harnesses.ps1 when this runs, in name order. It
+          # was a hand-kept list here, and every pull request adding a harness
+          # appended to its end, so any two of them conflicted in this file and
+          # in build-pr.yml. A new harness is on the gate by being in tests\;
+          # one comes off by a line in gate-excluded.txt with its reason; why
+          # each one exists is in its own header. Name no harness in this step
+          # or in Run-Gate.ps1: a name there is a second list
+          # (test-gate-list.ps1 fails on one).
+          # It began as six that sat red on main unseen (#875) and grew from
+          # there (#1088, #1273, #2513). pwsh on purpose: test-script-index.ps1
+          # starts Windows PowerShell 5.1 itself to compare what the two write.
+          # On 21 Oct 2026 the 550 then on the gate took 26 minutes of a 28
+          # minute build one at a time, in a foreach here (#3114). They run
+          # through scripts\dev\Nightly-Harnesses.ps1 now, -Throttle at once:
+          # each a process of its own with its output in files of its own,
+          # printed as it ends, on the nightly's clock, in a job object that
+          # counts its processor time. The summary says what the box's cores
+          # did meanwhile. Beside four other builds on 21 Oct 2026 the 550
+          # took 2110 s one at a time, 1112 s two at a time, 887 s at three and
+          # 765 s at six, every one passing. Since 22 Oct two builds run at
+          # once, not four (records\build-runners.json says why), and each
+          # runs its share of the cores, three of six, whatever the box is
+          # doing; past that, up to six, only into cores the box has free, so
+          # a build alone uses the idle ones and two side by side share them
+          # rather than one grabbing them (#3106's build got under one core
+          # beside one at six, and ran out of time). A harness that writes
+          # where another reads says RUNS ALONE in its header and runs after
+          # the rest. tests\test-signer-check.ps1 and
+          # tests\test-build-generated.ps1 had steps of their own after this
+          # one (#2046, #1982), one after the other; they are on the gate
+          # list and run beside the rest.
+          # 1200 s of the job's 30 minutes: a harness starts only when its
+          # whole clock still fits, so the list of what failed is printed
+          # before the job could be cancelled. A share takes about five
+          # minutes, so a share near its budget is a fault to find, and one
+          # past it is red and names what did not run.
+          # ONLY WHAT A CHANGE CAN REACH (#3114, Patrick's option A on
+          # q-3114-map-refresh, 22 Oct 2026). scripts\dev\Run-Gate.ps1 runs
+          # all of that. On main, on the VPS, the trace task on the box
+          # traces the gate as it runs (scripts\dev\Trace-Gate-Task.ps1);
+          # on a pull request built on the VPS, the newest traced map says
+          # which harnesses its change can reach, and only those run, each
+          # with why. Only a main build on the box handed a map on
+          # (scripts\dev\Gate-Map.ps1), and none runs there since #4983, so
+          # a share reads no map: each runs its part of the whole gate.
+          if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+            Write-Host '::error::no node on this runner, so the .js gate harnesses were not run'
+            exit 1
+          }
+          .\scripts\dev\Run-Gate.ps1 -Shard $env:SHARD -Of $env:OF -Throttle 6 -BudgetSeconds 1200
+          exit $LASTEXITCODE
+
+  # The launcher build and every check, on GitHub's hosted windows-latest
+  # (#1306; the only runner since #4983).
+  launcher:
+    name: Launcher builds
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    # Its steps take about three minutes since the gate went to the job
+    # above; twenty is Patrick's mark for something seriously wrong.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # The hosted image ships whatever node and python it has this month;
+      # these are pinned so a check means the same thing every month.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
 
@@ -257,79 +304,6 @@ jobs:
           # The fingerprints are in bot\content.py now, no discord.py needed.
           & python tests/test-3457-doc-change-lines.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      - name: Run the gate harnesses
-        id: gate
-        shell: pwsh
-        # Off the box a pull request's gate reads the map main's build handed
-        # on with it (#4009). Run-Gate.ps1 takes it out of the environment
-        # before any harness starts.
-        env:
-          GATE_MAP_TOKEN: ${{ github.token }}
-        run: |
-          # Issue #3009. The gate is every tests\test-*.js and tests\test-*.ps1
-          # that tests\gate-excluded.txt does not name, read from the files by
-          # scripts\dev\Gate-Harnesses.ps1 when this runs, in name order. It
-          # was a hand-kept list here, and every pull request adding a harness
-          # appended to its end, so any two of them conflicted in this file and
-          # in build-pr.yml. A new harness is on the gate by being in tests\;
-          # one comes off by a line in gate-excluded.txt with its reason; why
-          # each one exists is in its own header. Name no harness in this step
-          # or in Run-Gate.ps1: a name there is a second list
-          # (test-gate-list.ps1 fails on one).
-          # It began as six that sat red on main unseen (#875) and grew from
-          # there (#1088, #1273, #2513). pwsh on purpose: test-script-index.ps1
-          # starts Windows PowerShell 5.1 itself to compare what the two write.
-          # On 21 Oct 2026 the 550 then on the gate took 26 minutes of a 28
-          # minute build one at a time, in a foreach here (#3114). They run
-          # through scripts\dev\Nightly-Harnesses.ps1 now, -Throttle at once:
-          # each a process of its own with its output in files of its own,
-          # printed as it ends, on the nightly's clock, in a job object that
-          # counts its processor time. The summary says what the box's cores
-          # did meanwhile. Beside four other builds on 21 Oct 2026 the 550
-          # took 2110 s one at a time, 1112 s two at a time, 887 s at three and
-          # 765 s at six, every one passing. Since 22 Oct two builds run at
-          # once, not four (records\build-runners.json says why), and each
-          # runs its share of the cores, three of six, whatever the box is
-          # doing; past that, up to six, only into cores the box has free, so
-          # a build alone uses the idle ones and two side by side share them
-          # rather than one grabbing them (#3106's build got under one core
-          # beside one at six, and ran out of time). A harness that writes
-          # where another reads says RUNS ALONE in its header and runs after
-          # the rest. tests\test-signer-check.ps1 and
-          # tests\test-build-generated.ps1 had steps of their own after this
-          # one (#2046, #1982), one after the other; they are on the gate
-          # list and run beside the rest.
-          # 1800 s of the job's 40 minutes: a harness starts only when its
-          # whole clock still fits, so the list of what failed is printed
-          # before the job could be cancelled.
-          # ONLY WHAT A CHANGE CAN REACH (#3114, Patrick's option A on
-          # q-3114-map-refresh, 22 Oct 2026). scripts\dev\Run-Gate.ps1 runs
-          # all of that. On main, on the VPS, the trace task on the box
-          # traces the gate as it runs (scripts\dev\Trace-Gate-Task.ps1);
-          # on a pull request built on the VPS, the newest traced map says
-          # which harnesses its change can reach, and only those run, each
-          # with why. It writes whole=true only when every one ran, and the
-          # note below is kept only then, so main builds in full, and is
-          # traced, after any pull request that ran less.
-          if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-            Write-Host '::error::no node on this runner, so the .js gate harnesses were not run'
-            exit 1
-          }
-          .\scripts\dev\Run-Gate.ps1 -Throttle 6 -BudgetSeconds 1800
-          exit $LASTEXITCODE
-
-      # THE MAP FOR RUNNERS OFF THE BOX (#4009). The trace task leaves the map
-      # only in the box's build runners' folders, so a pull request built on
-      # One's runners or GitHub's ran the whole gate. Main's build prints the
-      # box's newest map into this job's log, which costs no storage
-      # (artifacts do, #3399), and a gate off the box reads it from there.
-      # scripts\dev\Gate-Map.ps1 says how; it hands on only in main's push
-      # build, and never fails a build.
-      - name: Hand the traced map to runners off the box
-        if: ${{ !cancelled() && runner.environment == 'self-hosted' }}
-        shell: pwsh
-        run: .\scripts\dev\Gate-Map.ps1 -Hand
 
       - name: Run the voice service's /health harness
         shell: pwsh
@@ -507,8 +481,7 @@ jobs:
           # comparison with the old csc build proved: every resource byte for
           # byte its file, the references, the PE kind, the version in the
           # file details and the manifest, the icon, nothing beside the exe.
-          # GitHub's image has Visual Studio; the VPS runners have the Build
-          # Tools from Bootstrap-VPS.ps1 -IncludeBuildTools (option A, 12 Oct).
+          # GitHub's image has Visual Studio.
           # It builds both exes with Build-Launcher.ps1, then runs
           # tests\test-app-manifest.ps1 (#463) and Check-Secrets.ps1 -Binary on
           # the pair, so this build has no build, manifest or secrets step of
@@ -545,16 +518,12 @@ jobs:
       # The note main's build looks for (#3182, the job "tested" at the top
       # of build.yml): the tree every step before this one passed on, one
       # line of this job's log. Last, so it is written only when they all
-      # did, and only when the gate step ran every gate harness (#3114): a
-      # pull request that ran only what its change can reach leaves main to
-      # build in full. Only on GitHub's hosted runner (#3874), which has no
-      # traced map and runs every harness anyway: a main build skipped by
-      # this note is not traced either, so on the VPS, where a pull request
-      # ran the whole gate only because the map could not serve it, the note
-      # kept the map stale and every pull request after it ran the whole gate
-      # too. Without it main builds in full and is traced (Patrick's option A
-      # on q-3114-map-refresh, every main build traced), and the next pull
-      # request runs only what it can reach. A pull request's checkout is
+      # did. The gate runs in the job "gate" beside this one, every harness
+      # in one of its shares, and scripts\dev\Tested-Tree.js counts this
+      # note only when every share of the same run passed. While the box
+      # built, this was written only on GitHub's
+      # hosted runner (#3874), so a VPS build left main to be built and
+      # traced; every build is hosted now (#4983). A pull request's checkout is
       # GitHub's merge of it into main, so this is the tree a squash merge
       # gives main while main has not moved. In the log and not an artifact
       # since #3399: this
@@ -563,7 +532,7 @@ jobs:
       # upload failed and took every pull request's build red. A log costs no
       # storage and is kept 90 days; scripts\dev\Tested-Tree.js reads it.
       - name: Write down the tree these checks passed on
-        if: github.event_name == 'pull_request' && steps.gate.outputs.whole == 'true' && runner.environment == 'github-hosted'
+        if: github.event_name == 'pull_request'
         shell: pwsh
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -581,18 +550,23 @@ jobs:
       # pdb was never kept either (#1356 / #462): it carries absolute
       # build-machine source paths.
 
-  # The default: GitHub's hosted Windows runner (#1306). Skipped when
-  # BUILD_RUNNER is vps or a manual run asked for the box, and then the
-  # fallback above runs instead.
-  launcher:
-    name: Launcher builds
-    if: ${{ vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
-    runs-on: windows-latest
-    # As the fallback's: the gate step reads the map main's build handed on.
-    permissions:
-      actions: read
-      contents: read
-    # The hosted runner has two cores: the harness step alone took over
-    # eighteen minutes on it, so it gets an hour.
-    timeout-minutes: 60
-    steps: *checks
+  # The one check main's ruleset requires (#3683): passes only when the
+  # build and every share of the gate above succeeded. Written by
+  # Build-PrWorkflow.js, which says why.
+  result:
+    name: Build check result
+    needs: [launcher, gate]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: The launcher build and the gate passed
+        env:
+          BUILD: ${{ needs.launcher.result }}
+          GATE: ${{ needs.gate.result }}
+        run: |
+          echo "Launcher builds: $BUILD"
+          echo "Gate harnesses, every share: $GATE"
+          if [ "$BUILD" = success ] && [ "$GATE" = success ]; then exit 0; fi
+          echo "::error::the launcher build or a share of the gate did not pass, so this pull request may not merge"
+          exit 1

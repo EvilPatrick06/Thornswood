@@ -92,10 +92,7 @@ namespace Thornswood
         // has moved past, which is what happened to everybody on 1.1.40.
         static DateTime updateSeenAt = DateTime.MinValue;
         static bool closedForUpdate = false;
-        static bool installWhenSeen = false;
         static int inPlayTicks = 0;
-        static int modTab;   // 0 server plugins, 1 script extender, 2 your own, 3 add-ons
-        static Border addonsCard;
         static DispatcherTimer timer;
 
         // The character bar (charBar, charRow, txtCharNote, charPickerOpen)
@@ -105,13 +102,12 @@ namespace Thornswood
         static int chosenId;
 
         static TextBlock txtServer, txtPing, txtStatus, txtStatusRight, txtVersion, txtBuildLine,
-                         txtUpdateTitle, txtUpdateNote, txtModCount, txtUpdateSource,
+                         txtUpdateTitle, txtUpdateNote,
                          txtPageTitle, txtHeroLine, txtVerifyTitle, txtVerifyNote,
-                         txtSaveNote, txtSaveCount, txtLogCount, txtDisplayNote,
+                         txtDisplayNote,
                          txtReadyTitle, txtReadyNote;
         static Ellipse dotServer, dotVerify, dotReady;
-        static StackPanel statusList, modList, themeRow, themeEditor, pathRows, helpList,
-                          saveList, logList, displayModeRow,
+        static StackPanel statusList, themeRow, themeEditor, pathRows, displayModeRow,
                           firstRunCard, quickKeysCard, quickKeys;
         // Play hero stats strip: three equal columns (Played / Sessions / Last played).
         static UniformGrid statRow;
@@ -140,22 +136,19 @@ namespace Thornswood
         static StackPanel galleryChosenList;
         static WrapPanel galleryApprovedList;
         static List<Gallery.Pending> galleryPending;
-        static TextBox boxSearch, boxAddress, boxPort, boxResolution, boxFrameLimit;
+        static TextBox boxResolution, boxFrameLimit;
         static CheckBox chkAutoUpdate, chkVSync, chkKeepOpen, chkLockRes;
         static CheckBox chkCrashSnapshots; static TextBlock txtCrashFolder; static Button btnCrashFolder;
         static CheckBox chkMusic; static Slider sldMusic; static TextBlock txtMusic;
         static CheckBox chkKeepSaves;
         static CheckBox chkDeleteMods;
-        static Button btnVoiceTest;
-        static TextBlock txtVoiceState;
-        static Button btnUninstall, btnServerStart, btnServerStop;
+        static Button btnUninstall;
         static Button btnServerMain, btnServerDev, btnServerPick, btnCheckDiagnostics, btnOpenSteam;
         static Popup serverPickPopup;
         static Border serverPickPanel;
         static TextBlock txtBrandSmall, txtBrandBig, txtServerPick, txtServerPickMeta;
         static TextBlock txtServerMainMeta, txtServerDevMeta;
         static Ellipse dotServerPick, dotServerMain, dotServerDev;
-        static TextBlock txtServerState;
         static string pingMsText = "";
         static string awakeMineText = "";
         static string awakeOtherText = "";
@@ -166,7 +159,7 @@ namespace Thornswood
         static string awakeDevText = "";
         static string dotMainKey = "Faint";
         static string dotDevKey = "Faint";
-        static Border updateBar, mineCard;
+        static Border updateBar;
         static Border downgradeBar;
         static TextBlock txtDowngradeNote, txtDowngradeTitle;
         static Button btnDowngrade;
@@ -182,16 +175,11 @@ namespace Thornswood
         static TextBlock labelDiscord;
         static Ellipse discordAvatar;
         static Button btnPlay, btnCopy, btnUpdate, btnMin, btnMax, btnClose,
-                      btnSaveServer, btnCheckNow, btnFolder, btnOpenLog,
-                      btnIcons, tabPlugins, tabSkse, tabMine, tabAddons,
-                      btnRefreshAddons,
-                      btnScan, btnFix, btnOpenMine, btnRefreshMine, btnInstallNow,
-                      btnBackupSaves, btnOpenSaveFolder, btnCopyCrash, btnOpenLogFolder, btnSaveDisplay, btnShowServer,
+                      btnCheckNow, btnFolder, btnOpenLog,
+                      btnIcons, btnScan, btnFix, btnInstallNow, btnSaveDisplay,
                       btnQuitGame;
         static Button[] navButtons;
         static UIElement[] pages;
-
-        const string SearchHint = "Search";
 
         [STAThread]
         static void Main(string[] args)
@@ -326,6 +314,10 @@ namespace Thornswood
                 if (args[i].Equals("-uninstall", StringComparison.OrdinalIgnoreCase)) askedToUninstall = true;
 
             Paths.Init(root);
+            // The log and the support zips are kept for LocalKeep.Days days on
+            // this PC, and the privacy page says so (#3679). Here, inside this
+            // install's mutex and before anything else in it writes the log.
+            LocalKeep.Tidy(DateTime.Now);
             // Profile\accepted.json is the setup program's record of the terms,
             // the privacy policy and the rules (issue #1009). An install made
             // before that has no file, and silence is not a yes. Ask before
@@ -353,7 +345,6 @@ namespace Thornswood
             BuildDisplay();
             BuildStatRow();
             BuildPathRows();
-            BuildHelp();
 
             // Windows Settings sends people here with -uninstall. The window
             // and the Settings page above are what the uninstall is made of;
@@ -361,7 +352,6 @@ namespace Thornswood
             // it belongs on the way out. ShellUninstall.cs says what still runs.
             if (askedToUninstall) { OpenForUninstall(); return; }
 
-            BuildModList();
             RefreshDiscord();
             // Linked tickets from before the site sent avatar still need a hash.
             // Join answers with it; paint once it lands so the sidebar is not stuck on Clyde.
@@ -569,6 +559,14 @@ namespace Thornswood
                         try { moved = Icons.Ensure(true); } catch (Exception ex) { Swallow.Note("Shell.Run, refreshing shortcut icons after self update", ex); }
                         if (moved > 0)
                             try { win.Dispatcher.BeginInvoke((Action)delegate { Log("Shortcut icon brought up to date after the update."); }); } catch (Exception ex) { Swallow.Note("Shell.Run, saying shortcut icons were refreshed", ex); }
+                        // The rest of the update that restarted the launcher
+                        // (#3201): the same Fix Install now runs after an
+                        // update that needs no restart, after the icon pass so
+                        // the two never race. Not without a folder of our own,
+                        // where the offer to make one (OwnGameAtStart) is the
+                        // thing to answer first.
+                        if (!Paths.Collection)
+                            try { win.Dispatcher.BeginInvoke((Action)delegate { RunFix(true); }); } catch (Exception ex) { Swallow.Note("Shell.Run, the scan after the launcher update", ex); }
                     }
                     if (string.IsNullOrEmpty(said)) return;
                     try { win.Dispatcher.BeginInvoke((Action)delegate { Log(said); }); } catch (Exception ex) { Swallow.Note("Shell.Run, saying what the self update left", ex); }
@@ -721,18 +719,13 @@ namespace Thornswood
             txtStatus = F<TextBlock>("TxtStatus"); txtStatusRight = F<TextBlock>("TxtStatusRight");
             txtVersion = F<TextBlock>("TxtVersion"); txtBuildLine = F<TextBlock>("TxtBuildLine");
             txtUpdateTitle = F<TextBlock>("TxtUpdateTitle"); txtUpdateNote = F<TextBlock>("TxtUpdateNote");
-            txtModCount = F<TextBlock>("TxtModCount"); txtUpdateSource = F<TextBlock>("TxtUpdateSource");
             txtPageTitle = F<TextBlock>("TxtPageTitle"); txtHeroLine = F<TextBlock>("TxtHeroLine");
             txtVerifyTitle = F<TextBlock>("TxtVerifyTitle"); txtVerifyNote = F<TextBlock>("TxtVerifyNote");
-            txtSaveNote = F<TextBlock>("TxtSaveNote"); txtSaveCount = F<TextBlock>("TxtSaveCount");
-            txtLogCount = F<TextBlock>("TxtLogCount"); txtDisplayNote = F<TextBlock>("TxtDisplayNote");
-            newsList = F<StackPanel>("NewsList"); saveList = F<StackPanel>("SaveList");
-            logList = F<StackPanel>("LogList"); statRow = F<UniformGrid>("StatRow");
+            txtDisplayNote = F<TextBlock>("TxtDisplayNote");
+            newsList = F<StackPanel>("NewsList"); statRow = F<UniformGrid>("StatRow");
             displayModeRow = F<StackPanel>("DisplayModeRow");
             boxResolution = F<TextBox>("BoxResolution"); boxFrameLimit = F<TextBox>("BoxFrameLimit");
             chkVSync = F<CheckBox>("ChkVSync"); chkKeepOpen = F<CheckBox>("ChkKeepOpen");
-            btnBackupSaves = F<Button>("BtnBackupSaves"); btnOpenSaveFolder = F<Button>("BtnOpenSaveFolder");
-            btnCopyCrash = F<Button>("BtnCopyCrash"); btnOpenLogFolder = F<Button>("BtnOpenLogFolder");
             btnSaveDisplay = F<Button>("BtnSaveDisplay");
             btnQuitGame = F<Button>("BtnQuitGame");
             chkLockRes = F<CheckBox>("ChkLockRes");
@@ -742,13 +735,9 @@ namespace Thornswood
             dotServer = F<Ellipse>("DotServer"); dotVerify = F<Ellipse>("DotVerify");
             dotReady = F<Ellipse>("DotReady");
             txtReadyTitle = F<TextBlock>("TxtReadyTitle"); txtReadyNote = F<TextBlock>("TxtReadyNote");
-            mineCard = F<Border>("MineCard");
-            statusList = F<StackPanel>("StatusList"); modList = F<StackPanel>("ModList");
+            statusList = F<StackPanel>("StatusList");
             themeRow = F<StackPanel>("ThemeRow"); themeEditor = F<StackPanel>("ThemeEditor");
             pathRows = F<StackPanel>("PathRows");
-            helpList = F<StackPanel>("HelpList");
-            boxSearch = F<TextBox>("BoxSearch"); boxAddress = F<TextBox>("BoxAddress"); boxPort = F<TextBox>("BoxPort");
-            btnShowServer = F<Button>("BtnShowServer");
             chkAutoUpdate = F<CheckBox>("ChkAutoUpdate");
             updateBar = F<Border>("UpdateBar"); titleBar = F<Grid>("TitleBar");
             downgradeBar = F<Border>("DowngradeBar"); txtDowngradeNote = F<TextBlock>("TxtDowngradeNote"); btnDowngrade = F<Button>("BtnDowngrade");
@@ -758,7 +747,7 @@ namespace Thornswood
 
             btnPlay = F<Button>("BtnPlay"); btnCopy = F<Button>("BtnCopy");
             btnUpdate = F<Button>("BtnUpdate"); btnMin = F<Button>("BtnMin"); btnMax = F<Button>("BtnMax");
-            btnClose = F<Button>("BtnClose"); btnSaveServer = F<Button>("BtnSaveServer");
+            btnClose = F<Button>("BtnClose");
             btnCheckNow = F<Button>("BtnCheckNow"); btnInstallNow = F<Button>("BtnInstallNow");
             btnFolder = F<Button>("BtnFolder");
             btnOpenLog = F<Button>("BtnOpenLog");
@@ -778,15 +767,7 @@ namespace Thornswood
             txtBrandSmall = F<TextBlock>("TxtBrandSmall"); txtBrandBig = F<TextBlock>("TxtBrandBig");
             btnUninstall = F<Button>("BtnUninstall"); chkKeepSaves = F<CheckBox>("ChkKeepSaves");
             chkDeleteMods = F<CheckBox>("ChkDeleteMods");
-            btnServerStart = F<Button>("BtnServerStart"); btnServerStop = F<Button>("BtnServerStop");
-            txtServerState = F<TextBlock>("TxtServerState");
-            btnVoiceTest = F<Button>("BtnVoiceTest");
-            txtVoiceState = F<TextBlock>("TxtVoiceState");
-            tabPlugins = F<Button>("TabPlugins"); tabSkse = F<Button>("TabSkse"); tabMine = F<Button>("TabMine");
-            tabAddons = F<Button>("TabAddons"); btnRefreshAddons = F<Button>("BtnRefreshAddons");
-            addonsCard = F<Border>("AddonsCard");
             btnScan = F<Button>("BtnScan"); btnFix = F<Button>("BtnFix");
-            btnOpenMine = F<Button>("BtnOpenMine"); btnRefreshMine = F<Button>("BtnRefreshMine");
 
             firstRunCard = F<StackPanel>("FirstRunCard");
             quickKeysCard = F<StackPanel>("QuickKeysCard");
@@ -811,52 +792,36 @@ namespace Thornswood
             galleryChosenList = F<StackPanel>("GalleryChosenList");
             galleryApprovedList = F<WrapPanel>("GalleryApprovedList");
 
-            // Same order as the PageXxx constants above, and as PageTitles.
-            // Gallery is appended at the end on purpose: renumbering the middle
-            // once sent people to the wrong page for weeks.
+            // Same order as the PageXxx constants, and as PageTitles.
             navButtons = new Button[] {
-                F<Button>("NavPlay"), F<Button>("NavNews"), F<Button>("NavServer"),
-                F<Button>("NavMods"), F<Button>("NavBuild"), F<Button>("NavSaves"),
-                F<Button>("NavLogs"), F<Button>("NavDiag"),
-                F<Button>("NavHelp"), F<Button>("NavSettings"), F<Button>("NavGallery") };
+                F<Button>("NavPlay"), F<Button>("NavNews"), F<Button>("NavDiag"),
+                F<Button>("NavSettings"), F<Button>("NavGallery") };
             pages = new UIElement[] {
-                F<Grid>("PagePlay"), F<Grid>("PageNews"), F<Grid>("PageServer"),
-                F<Grid>("PageMods"), F<Grid>("PageBuild"), F<Grid>("PageSaves"),
-                F<Grid>("PageLogs"), F<Grid>("PageDiag"),
-                F<Grid>("PageHelp"), F<Grid>("PageSettings"), F<Grid>("PageGallery") };
+                F<Grid>("PagePlay"), F<Grid>("PageNews"), F<Grid>("PageDiag"),
+                F<Grid>("PageSettings"), F<Grid>("PageGallery") };
 
             /*
-              Saves is gone, and with it Server, Mods, What is installed and
-              Logs (issue #599).
-
-              Characters live on the server now, so a page for browsing and
-              backing up local save files is showing people something that is
-              no longer where their character is, which is worse than showing
-              them nothing. The other four are the read-and-diagnose pages the
-              team no longer wants in the everyday rail: Play, News,
-              Diagnostics, Help and Settings are what is left. Controls was
-              cut out of the arrays when its keys moved into the game (#3126).
-
-              Collapsed rather than cut out of the arrays. The three arrays
-              (navButtons, pages, PageTitles) and the PageXxx constants are
-              parallel and indexed by number, and the comment on those
-              constants records that a bare number in the middle of Play() once
-              sent people to the wrong page for weeks. Renumbering eleven
-              entries to save a few unreachable Grids is how that happens again.
-              The pages cannot be reached from the rail, which is what was
-              asked for; the dead Grids cost nothing and can be cut properly
-              whenever the xaml is next opened on a machine with the compiler.
+              What the launcher keeps once settings and keys are in the game
+              (#3146, Patrick's A, 22 Oct): Play, News, the update, Diagnostics,
+              the Discord account and the display settings that need a restart.
+              Everything else moved into the game or was cut:
+              - Controls went into the game as Settings (#3126).
+              - Help is F7 in the game and help.md on the site. The rail's Help
+                opens the site's page; it is not a page here (Wire).
+              - Server, Mods, What is installed, Saves and Logs had been off
+                the rail since #599 and were kept as collapsed Grids, because
+                renumbering these arrays by hand once sent people to the wrong
+                page for weeks. They are cut out now, and every use goes
+                through the PageXxx names, never a number. Server's voice line
+                is a Diagnostics reading; Logs' newest crash is in the report
+                Diagnostics builds; the add-ons and the collection card were
+                already on Diagnostics (#1170).
+              Gallery stays a page: Patrick kept it in the launcher on
+              26 Oct (#3146).
 
               A blocked Play sends people to Diagnostics (ShowPage(PageDiag)),
-              where Scan and Fix are since #607 and which the rail shows. Until
-              #982 it sent them to Mods, which by then had no Fix on it
-              and no rail button to come back to.
+              where Scan and Fix are since #607.
             */
-            int[] hiddenNav = { PageSaves, PageServer, PageMods, PageBuild, PageLogs };
-            foreach (int p in hiddenNav)
-                if (navButtons[p] != null)
-                    navButtons[p].Visibility = Visibility.Collapsed;
-
             buttonDiscord  = F<Button>("ButtonDiscord");
             labelDiscord   = F<TextBlock>("LabelDiscord");
             discordAvatar  = F<Ellipse>("DiscordAvatar");
@@ -1130,13 +1095,10 @@ namespace Thornswood
         // Named, because these are the index into three parallel arrays and a
         // bare number in the middle of Play() sent people to the wrong page for
         // weeks without anyone noticing.
-        const int PagePlay = 0, PageNews = 1, PageServer = 2, PageMods = 3, PageBuild = 4,
-                  PageSaves = 5, PageLogs = 6, PageDiag = 7,
-                  PageHelp = 8, PageSettings = 9, PageGallery = 10;
+        const int PagePlay = 0, PageNews = 1, PageDiag = 2, PageSettings = 3, PageGallery = 4;
 
         static readonly string[] PageTitles = {
-            "Play", "News", "Server", "Mods", "What is installed",
-            "Saves", "Logs", "Diagnostics", "Help", "Settings", "Gallery" };
+            "Play", "News", "Diagnostics", "Settings", "Gallery" };
 
         static void ShowPage(int i)
         {
@@ -1152,10 +1114,6 @@ namespace Thornswood
             // launcher sits there, so anything cached goes stale.
             if (i == PagePlay) DrawStatus();
             else if (i == PageNews) BuildNews();
-            else if (i == PageServer) BuildServer();
-            else if (i == PageMods) BuildModList();
-            else if (i == PageBuild) BuildInstalled();
-            else if (i == PageLogs) BuildLogs();
             else if (i == PageDiag) BuildDiag();
             else if (i == PageGallery) BuildGalleryPage();
 
@@ -1493,6 +1451,11 @@ namespace Thornswood
                 win.Dispatcher.BeginInvoke(new Action(delegate
                 {
                     galleryWho = who;
+                    // A list that could not be read leaves the pictures as
+                    // they are rather than hiding Play's card; one that was
+                    // read keeps every picture already loaded.
+                    if (shots == null) shots = galleryShots;
+                    else Gallery.KeepLoaded(shots, galleryShots);
                     // Keep Play's rotation in step with what the Gallery page
                     // just learnt, without forcing a turn mid-page.
                     if (shots != null && shots.Count > 0)
@@ -2182,7 +2145,6 @@ namespace Thornswood
             // The Play page names the server rather than addressing it. See the
             // note on BtnSrvCopy in Pages.cs.
             txtServer.Text = "Thornswood";
-            PaintServerBoxes();
             chkAutoUpdate.IsChecked = cfg.AutoUpdate;
             txtVersion.Text = "launcher " + Updater.Version;
             // Channel is already on the sidebar brand (Thornswood over Dev).
@@ -2197,8 +2159,6 @@ namespace Thornswood
                 try { win.Title = "Thornswood Dev"; } catch (Exception ex) { Swallow.Note("Shell.ApplyConfig", ex); }
             }
             DrawServerPick();
-            boxSearch.Text = SearchHint;
-            boxSearch.Foreground = Res("Faint");
 
             DrawBuildLine();
             // Source code, under the version lines: the fork at the commit the
@@ -2227,8 +2187,8 @@ namespace Thornswood
             // nothing on screen saying why.
             if (!cfg.AutoJoin) { cfg.AutoJoin = true; cfg.Save(Paths.CfgFile); }
             // A request to the voice service. Somebody who came to uninstall
-            // is not waiting on its answer, and the Server page asks again.
-            if (!askedToUninstall) DrawVoiceState();
+            // is not waiting on its answer, and Diagnostics asks again.
+            if (!askedToUninstall) CheckVoice();
 
             // The emblem travels inside the exe rather than beside it, so the
             // update that replaces the launcher carries its artwork with it and
@@ -2298,6 +2258,10 @@ namespace Thornswood
                 int k = i;
                 navButtons[i].Click += delegate { ShowPage(k); };
             }
+            // Help is the site's, in the browser: the game has it on F7, and a
+            // third copy here is the one that goes stale (#3146).
+            Button navHelp = F<Button>("NavHelp");
+            if (navHelp != null) navHelp.Click += delegate { Open(cfg.SiteUrl.TrimEnd('/') + "/help"); };
 
             btnCopy.Visibility = Visibility.Collapsed;
 
@@ -2325,18 +2289,13 @@ namespace Thornswood
             };
             if (buttonDiscord != null) buttonDiscord.Click += delegate { ConnectDiscord(); };
 
-            btnUpdate.Click += delegate { RunUpdate(); };
+            // The card above Play and Settings' button are one button in two
+            // places (#3201). The card's used to run the update whatever the
+            // card said, so under "Your mods are not installed yet" it ran an
+            // update with nothing in it instead of opening the collection.
+            btnUpdate.Click += delegate { InstallNowPressed(); };
             if (btnDowngrade != null) btnDowngrade.Click += delegate { RunDowngrade(); };
-            btnInstallNow.Click += delegate
-            {
-                if (collectionBarUp || (collectionNoteUp && !updatePending))
-                {
-                    try { Process.Start(new ProcessStartInfo(cfg.CollectionUrl) { UseShellExecute = true }); }
-                    catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
-                    return;
-                }
-                RunUpdate();
-            };
+            btnInstallNow.Click += delegate { InstallNowPressed(); };
 
             if (chkMusic != null) chkMusic.Click += delegate
             {
@@ -2356,8 +2315,6 @@ namespace Thornswood
                 cfg.KeepLauncherOpen = chkKeepOpen.IsChecked == true;
                 cfg.Save(Paths.CfgFile);
             };
-
-            btnVoiceTest.Click += delegate { DrawVoiceState(); };
 
             // The dev build's uninstall is its own removal, never the main
             // uninstaller: that one deletes Thornswood's files out of the
@@ -2389,31 +2346,6 @@ namespace Thornswood
             if (btnCheckDiagnostics != null) btnCheckDiagnostics.Click += delegate { ShowPage(PageDiag); };
             if (btnOpenSteam != null) btnOpenSteam.Click += delegate { OpenSteam(); };
 
-            btnOpenSaveFolder.Click += delegate { Open(Files.SaveDir); };
-            btnOpenLogFolder.Click += delegate { Open(Files.SkseLogDir); };
-            btnBackupSaves.Click += delegate
-            {
-                try
-                {
-                    string zip = Files.BackupSaves();
-                    Log("Saves backed up to " + System.IO.Path.GetFileName(zip));
-                    BuildSaves();
-                }
-                catch (Exception ex) { Log("Backup failed: " + ex.Message); }
-            };
-            btnCopyCrash.Click += delegate
-            {
-                Entry e = Files.NewestCrash();
-                if (e == null) { Log("No crash logs, which is the good outcome."); return; }
-                try
-                {
-                    string text = File.ReadAllText(e.FullPath);
-                    if (text.Length > 60000) text = text.Substring(0, 60000) + "\n... truncated ...";
-                    Clipboard.SetText(text);
-                    Log("Copied " + e.Name + ". Paste it into Discord.");
-                }
-                catch (Exception ex) { Log("Could not read it: " + ex.Message); }
-            };
             btnSaveDisplay.Click += delegate { SaveDisplay(); };
             btnQuitGame.Click += delegate
             {
@@ -2459,35 +2391,10 @@ namespace Thornswood
                     : "Resolution unlocked. Play will match it to your screen.");
             };
 
-            tabPlugins.Click += delegate { modTab = 0; BuildModList(); };
-            tabSkse.Click += delegate { modTab = 1; BuildModList(); };
-            tabMine.Click += delegate { modTab = 2; BuildModList(); };
-            tabAddons.Click += delegate { modTab = 3; BuildModList(); };
-            btnRefreshAddons.Click += delegate
-            {
-                Log("Checking for add-ons...");
-                ThreadPool.QueueUserWorkItem(delegate { CheckUpdatesBackground(false); });
-            };
             // Scan looks at everything and Fix puts right what it found, then
             // looks again and says what is left (#2627, ShellScanFix.cs).
             btnScan.Click += delegate { RunScan(true); };
             btnFix.Click += delegate { RunFix(); };
-            btnOpenMine.Click += delegate
-            {
-                try { System.IO.Directory.CreateDirectory(Paths.Personal); } catch (Exception ex) { Swallow.Note("Shell.Wire, mkdir", ex); }
-                Open(Paths.Personal);
-            };
-            btnRefreshMine.Click += delegate { BuildModList(); };
-            boxSearch.TextChanged += delegate { if (boxSearch.Text != SearchHint) BuildModList(); };
-            boxSearch.GotKeyboardFocus += delegate
-            {
-                if (boxSearch.Text == SearchHint) { boxSearch.Text = ""; boxSearch.Foreground = Res("Ink"); }
-            };
-            boxSearch.LostKeyboardFocus += delegate
-            {
-                if (boxSearch.Text.Length == 0) { boxSearch.Text = SearchHint; boxSearch.Foreground = Res("Faint"); }
-            };
-
 
             chkAutoUpdate.Click += delegate
             {
@@ -2650,7 +2557,8 @@ namespace Thornswood
                 // so the launcher is the only thing in a position to count.
                 // The character is whoever the menu's choice file named this
                 // session; 0 when it never did, and then nothing is counted.
-                try { Chars.AddPlaytime(chosenId, DateTime.Now - playStartedAt); } catch (Exception ex) { Swallow.Note("Shell.Wire", ex); }
+                // Since its pick, when Change character came first (#3128).
+                try { Chars.AddPlaytime(chosenId, DateTime.Now - PlayCountedFrom()); } catch (Exception ex) { Swallow.Note("Shell.Wire", ex); }
                 BuildStatRow();
                 btnPlay.Content = "PLAY";
                 btnQuitGame.Visibility = Visibility.Collapsed;
@@ -2734,7 +2642,8 @@ namespace Thornswood
                 if (closedForUpdate)
                 {
                     closedForUpdate = false;
-                    installWhenSeen = true;
+                    // With automatic updates on, the check's answer takes it
+                    // (UpdateBySelf, #3202), as it takes any update it finds.
                     Log("Fetching the update the game was closed for...");
                     ThreadPool.QueueUserWorkItem(delegate { CheckUpdatesBackground(true); });
                 }
@@ -2884,9 +2793,9 @@ namespace Thornswood
             else if (collectionBarUp && updateBar != null && btnInstallNow != null)
             {
                 collectionBarUp = false;
-                btnInstallNow.Content = "Install now";
+                InstallLabel("Install now");
                 updateBar.Visibility = Visibility.Collapsed;
-                btnInstallNow.Visibility = Visibility.Collapsed;
+                InstallShown(Visibility.Collapsed);
             }
 
             // Mods that could not be confirmed (Djinn, 2 Oct). CollectionProblem
@@ -2905,18 +2814,18 @@ namespace Thornswood
                         "The launcher could not read which revision of the Thornswood collection " +
                         "Vortex has installed. If you have not installed it, or are not sure, open " +
                         "the collection and let Vortex install or update it. Play is not held for this.";
-                    btnInstallNow.Content = "Open the collection";
+                    InstallLabel(CollectionButtonText());
                     btnInstallNow.IsEnabled = true;
                     updateBar.Visibility = Visibility.Visible;
-                    btnInstallNow.Visibility = Visibility.Visible;
+                    InstallShown(Visibility.Visible);
                     collectionNoteUp = true;
                 }
                 else if (!unsure && collectionNoteUp)
                 {
                     collectionNoteUp = false;
-                    btnInstallNow.Content = "Install now";
+                    InstallLabel("Install now");
                     updateBar.Visibility = Visibility.Collapsed;
-                    btnInstallNow.Visibility = Visibility.Collapsed;
+                    InstallShown(Visibility.Collapsed);
                 }
             }
             else if (collectionNoteUp)
@@ -2926,9 +2835,9 @@ namespace Thornswood
                 collectionNoteUp = false;
                 if (!collectionBarUp && !updatePending && updateBar != null && btnInstallNow != null)
                 {
-                    btnInstallNow.Content = "Install now";
+                    InstallLabel("Install now");
                     updateBar.Visibility = Visibility.Collapsed;
-                    btnInstallNow.Visibility = Visibility.Collapsed;
+                    InstallShown(Visibility.Collapsed);
                 }
             }
 
@@ -2974,10 +2883,20 @@ namespace Thornswood
                 btnPlay.Content = "PREPARING THE GAME FOLDER";
                 btnPlay.ToolTip = "Thornswood's own Skyrim folder is being brought up to date from Vortex. Play comes back when it is done.";
             }
+            // Ahead is the server's to fix, not the person's (#4115). It used to
+            // read INSTALL THE MODS FIRST and say to open the collection, which
+            // cannot help and, from the newest revision, can only lead further on.
+            else if (collectionBarUp && !playing && CollectionProblem(collectionRevision) == "ahead")
+            {
+                btnPlay.Content = "WAITING FOR THE SERVER";
+                btnPlay.ToolTip = "The server was built against collection revision " + Updater.FeedCollectionRevision +
+                                  " and this copy is on " + collectionRevision + ". Nothing needs installing. " +
+                                  "Play opens once the server is rebuilt on your revision.";
+            }
             else if (collectionBarUp && !playing)
             {
-                btnPlay.Content = "INSTALL THE MODS FIRST";
-                btnPlay.ToolTip = "Open the collection from the card above, then come back.";
+                btnPlay.Content = CollectionProblem(collectionRevision) == "stale" ? "UPDATE THE MODS FIRST" : "INSTALL THE MODS FIRST";
+                btnPlay.ToolTip = "Open the collection from the card above, install the revision it opens in Vortex, then come back.";
             }
             else if (updatePending && !playing)
             {
@@ -3282,136 +3201,6 @@ namespace Thornswood
                 });
         }
 
-        // ------------------------------------------------------------- mods
-        // RunScan, ShowVerify and the Fix button are in ShellScanFix.cs (#2627).
-
-        static void BuildModList()
-        {
-            if (modList == null) return;
-            modList.Children.Clear();
-            tabPlugins.Background = Res(modTab == 0 ? "CardHover" : "Card");
-            tabSkse.Background    = Res(modTab == 1 ? "CardHover" : "Card");
-            tabMine.Background    = Res(modTab == 2 ? "CardHover" : "Card");
-            tabAddons.Background  = Res(modTab == 3 ? "CardHover" : "Card");
-            mineCard.Visibility   = modTab == 2 ? Visibility.Visible : Visibility.Collapsed;
-            if (addonsCard != null)
-                addonsCard.Visibility = modTab == 3 ? Visibility.Visible : Visibility.Collapsed;
-            // Scan and Fix moved to the Diagnostics page (#607), so this page no
-            // longer shows or hides that card per tab.
-
-            // Above every sub tab, not just Add-ons. It lived in BuildPackRows,
-            // which only runs when somebody has already clicked Add-ons, so the
-            // one thing in the launcher that says where the mods come from was
-            // behind a chip nobody had a reason to press.
-            if (!string.IsNullOrEmpty(cfg.CollectionUrl))
-                modList.Children.Add(CollectionCard());
-
-            if (modTab == 3) { BuildPackRows(); return; }
-
-            string filter = (boxSearch.Text == SearchHint) ? "" : boxSearch.Text.Trim().ToLowerInvariant();
-            int shown = 0, total = 0, enabled = 0;
-
-            if (modTab == 0)
-            {
-                string plug = Path.Combine(Paths.Live, "plugins.txt");
-                if (!File.Exists(plug)) { txtModCount.Text = "No plugin list found in this build's profile."; return; }
-                // Only the enabled plugins are what the server compares against.
-                // Everything switched off is not part of this build and is left out.
-                int index = 0;
-                foreach (string raw in File.ReadAllLines(plug))
-                {
-                    string line = raw.Trim();
-                    if (line.Length == 0 || line.StartsWith("#")) continue;
-                    bool on = line.StartsWith("*");
-                    string name = on ? line.Substring(1) : line;
-                    total++;
-                    if (!on) continue;
-                    enabled++; index++;
-                    if (filter.Length > 0 && name.ToLowerInvariant().IndexOf(filter) < 0) continue;
-                    modList.Children.Add(LinkedRow(index, name, true,
-                        Path.GetExtension(name).TrimStart('.').ToUpperInvariant()));
-                    shown++;
-                }
-                int off = total - enabled;
-                txtModCount.Text = enabled + " plugins, in the order the server expects them." +
-                                   (off > 0 ? "   ·   " + off + " switched off and not shown" : "") +
-                                   (filter.Length > 0 ? "   ·   showing " + shown : "") +
-                                   "   ·   click one to open its mod page";
-            }
-            else if (modTab == 1)
-            {
-                string dir = Path.Combine(Paths.Game, "Data\\SKSE\\Plugins");
-                if (!Directory.Exists(dir)) { txtModCount.Text = "No script extender folder in this build."; return; }
-                var files = Directory.GetFiles(dir, "*.dll");
-                Array.Sort(files);
-                int index = 0;
-                foreach (string f in files)
-                {
-                    string name = Path.GetFileNameWithoutExtension(f);
-                    total++; index++;
-                    if (filter.Length > 0 && name.ToLowerInvariant().IndexOf(filter) < 0) continue;
-                    long kb = 0;
-                    try { kb = new FileInfo(f).Length / 1024; } catch (Exception ex) { Swallow.Note("Shell.BuildModList, leaf", ex); }
-                    // C# 4 captures the loop variable itself, so the path has to
-                    // be copied before a handler can be trusted with it.
-                    string dll = f;
-                    string dllName = name;
-                    modList.Children.Add(ModRow(index, name, true, kb + " KB",
-                        delegate { Open(Links.Target(dllName) ?? dir); }, "Open the mod page",
-                        delegate
-                        {
-                            DeleteFromBuild(dll, dllName + ".dll",
-                                "The server never looks at script extender plugins, so this will not stop you " +
-                                "connecting. Whatever mod relies on it will stop working until it is back.");
-                        }));
-                    shown++;
-                }
-                txtModCount.Text = total + " script extender plugins. The server never sees these." +
-                                   (filter.Length > 0 ? "   ·   showing " + shown : "") +
-                                   "   ·   click one to open its mod page";
-            }
-            else
-            {
-                string[] files = Verify.PersonalFiles();
-                int index = 0;
-                foreach (string f in files)
-                {
-                    string rel = f.Substring(Paths.Personal.Length).TrimStart('\\');
-                    string ext = Path.GetExtension(f).ToLowerInvariant();
-                    bool bad = (ext == ".esp" || ext == ".esm" || ext == ".esl");
-                    total++; index++;
-                    if (filter.Length > 0 && rel.ToLowerInvariant().IndexOf(filter) < 0) continue;
-                    long kb = 0;
-                    try { kb = new FileInfo(f).Length / 1024; } catch (Exception ex) { Swallow.Note("Shell.BuildModList", ex); }
-                    string full = f;
-                    string relName = rel;
-                    modList.Children.Add(ModRow(index, rel, !bad,
-                        bad ? "PLUGIN, NOT ALLOWED" : kb + " KB",
-                        delegate { Reveal(full); }, "Show this file in Explorer",
-                        delegate
-                        {
-                            DeleteFromBuild(full, relName,
-                                "This is one of your own files. Nothing else uses it and the server " +
-                                "never sees it.");
-                        }));
-                    shown++;
-                }
-                txtModCount.Text = total == 0
-                    ? "Nothing here yet."
-                    : total + " file" + (total == 1 ? "" : "s") + " of your own, copied in every time you press Play." +
-                      (filter.Length > 0 ? "   ·   showing " + shown : "");
-            }
-
-            if (shown == 0 && filter.Length > 0)
-            {
-                var none = new TextBlock();
-                none.Text = "Nothing matches \"" + filter + "\".";
-                none.Foreground = Res("Faint"); none.FontSize = 12.5;
-                none.Margin = new Thickness(2, 10, 0, 0);
-                modList.Children.Add(none);
-            }
-        }
-
         /// <summary>Log from a background thread. Log itself touches the UI.</summary>
         static void SafeLog(string m)
         {
@@ -3423,171 +3212,8 @@ namespace Thornswood
             catch (Exception ex) { Swallow.Note("Shell.SafeLog", ex); }
         }
 
-        // Plugin and DLL rows go to the mod's own page. Anything the catalogue
-        // does not have a confirmed address for falls back to a Nexus search
-        // for the name, which is honest about not knowing and still lands the
-        // reader one click away. The Bethesda masters and the two another server
-        // plugins have nowhere to go, so those rows stay plain.
-        static UIElement LinkedRow(int index, string name, bool on, string tag)
-        {
-            string url = Links.Target(name);
-            if (url == null) return ModRow(index, name, on, tag, null, null);
-            string hint = Links.Exact(name)
-                ? "Open the mod page" + Environment.NewLine + url
-                : "No page recorded for this one. Opens a Nexus search instead."
-                  + Environment.NewLine + url;
-            string target = url;
-            return ModRow(index, name, on, tag, delegate { Open(target); }, hint);
-        }
-
-        /// <summary>
-        /// Deletes one file out of the build, on purpose, with the person told
-        /// what it costs first.
-        ///
-        /// This exists so somebody leaving Thornswood can keep what they still
-        /// want rather than throwing the lot away and downloading it again for
-        /// the next server. It refuses anything outside the build, because a
-        /// delete button that can be pointed at the wrong folder is not a
-        /// feature.
-        /// </summary>
-        static void DeleteFromBuild(string full, string shown, string consequence)
-        {
-            string root;
-            try { root = Path.GetFullPath(Paths.Root); }
-            catch { Log("Could not work out the install folder, so nothing was deleted."); return; }
-
-            string fence = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                         + Path.DirectorySeparatorChar;
-            string target;
-            try { target = Path.GetFullPath(full); }
-            catch { Log("That path could not be read, so nothing was deleted."); return; }
-
-            if (!target.StartsWith(fence, StringComparison.OrdinalIgnoreCase))
-            {
-                MessageBox.Show("That file is not inside the Thornswood folder, so this will not delete it.\n\n    " + target,
-                                "Thornswood", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            var r = MessageBox.Show(
-                "Delete this?\n\n    " + shown + "\n\n" + consequence +
-                "\n\nThere is no undo in the launcher.",
-                "Thornswood", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            if (r != MessageBoxResult.Yes) return;
-
-            try
-            {
-                if (File.Exists(target)) File.Delete(target);
-                Log("Deleted " + shown);
-            }
-            catch (Exception ex)
-            {
-                Log("Could not delete " + shown + ": " + ex.Message);
-                MessageBox.Show(ex.Message + "\n\nNothing was deleted. Close Skyrim if it is running.",
-                                "Thornswood", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-            BuildModList();
-        }
-
-        // A row in the mod list. When there is somewhere to send the reader,
-        // the whole row becomes the link: hand cursor, a lift on hover, and an
-        // arrow at the end so it reads as clickable before anyone hovers it.
-        static UIElement ModRow(int index, string name, bool on, string tag, Action onClick, string hint)
-        {
-            return ModRow(index, name, on, tag, onClick, hint, null);
-        }
-
-        static UIElement ModRow(int index, string name, bool on, string tag, Action onClick, string hint, Action onDelete)
-        {
-            var g = new Grid();
-            g.Margin = new Thickness(0, 0, 0, 1);
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(42) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) });
-
-            var idx = new TextBlock();
-            idx.Text = index.ToString();
-            idx.FontFamily = new FontFamily("Cascadia Mono, Consolas");
-            idx.FontSize = 11; idx.Foreground = Res("Faint");
-            idx.VerticalAlignment = VerticalAlignment.Center;
-            Grid.SetColumn(idx, 0); g.Children.Add(idx);
-
-            var t = new TextBlock();
-            t.Text = name; t.FontSize = 12.5;
-            t.Foreground = Res(on ? "Ink" : "Faint");
-            t.TextTrimming = TextTrimming.CharacterEllipsis;
-            t.VerticalAlignment = VerticalAlignment.Center;
-            Grid.SetColumn(t, 1); g.Children.Add(t);
-
-            var tg = new TextBlock();
-            tg.Text = on ? tag : tag + "  off";
-            tg.FontFamily = new FontFamily("Cascadia Mono, Consolas");
-            tg.FontSize = 10.5;
-            tg.Foreground = Res(on ? "Muted" : "Bad");
-            tg.VerticalAlignment = VerticalAlignment.Center;
-            Grid.SetColumn(tg, 2); g.Children.Add(tg);
-
-            var arrow = new TextBlock();
-            arrow.Text = "\u2197";                       // north east arrow
-            arrow.FontSize = 11;
-            arrow.Margin = new Thickness(7, 0, 0, 0);
-            arrow.Foreground = Res("Faint");
-            arrow.VerticalAlignment = VerticalAlignment.Center;
-            arrow.HorizontalAlignment = HorizontalAlignment.Right;
-            arrow.Visibility = onClick == null ? Visibility.Hidden : Visibility.Visible;
-            Grid.SetColumn(arrow, 4); g.Children.Add(arrow);
-
-            // Only where deleting is a real choice. The server plugins tab does
-            // not get one: a row there is a plugin, not a mod, so deleting it
-            // takes the esp and leaves that mod's textures and archives behind,
-            // and the person cannot connect until it is back.
-            if (onDelete != null)
-            {
-                var del = new Button();
-                del.Content = "Delete";
-                del.Style = (Style)win.Resources["Ghost"];
-                del.FontSize = 11;
-                del.Padding = new Thickness(9, 2, 9, 2);
-                del.Margin = new Thickness(10, 0, 0, 0);
-                del.VerticalAlignment = VerticalAlignment.Center;
-                del.ToolTip = "Delete this file from the build";
-                Action mine = onDelete;
-                del.Click += delegate { mine(); };
-                Grid.SetColumn(del, 3); g.Children.Add(del);
-            }
-
-            var b = new Border();
-            b.Padding = new Thickness(10, 8, 12, 8);
-            b.Background = Res("Panel");
-            b.Margin = new Thickness(0, 0, 8, 3);
-            b.Child = g;
-
-            if (onClick != null)
-            {
-                b.Cursor = Cursors.Hand;
-                b.ToolTip = hint;
-                b.MouseEnter += delegate
-                {
-                    b.Background = Res("CardHover");
-                    arrow.Foreground = Res("Accent");
-                    t.Foreground = Res("Accent");
-                };
-                b.MouseLeave += delegate
-                {
-                    b.Background = Res("Panel");
-                    arrow.Foreground = Res("Faint");
-                    t.Foreground = Res(on ? "Ink" : "Faint");
-                };
-                b.MouseLeftButtonUp += delegate { onClick(); };
-            }
-            return b;
-        }
-
-        // Explorer, with the file already picked out. Used by the Your own tab,
-        // where the thing worth reaching is the file itself, not a mod page.
+        // Explorer, with the file already picked out: the report Diagnostics
+        // builds, where the thing worth reaching is the file itself.
         static void Reveal(string path)
         {
             try
@@ -3883,10 +3509,9 @@ namespace Thornswood
         // binding to them. Called after a theme change, and nowhere else.
         static void Redraw()
         {
-            BuildThemeRow(); BuildThemeEditor(); BuildModList(); DrawStatus(); BuildPathRows(); BuildHelp();
-            BuildStatRow(); BuildNews(); BuildLogs(); BuildDisplay();
-            BuildServer(); BuildInstalled(); BuildDiag(); RefreshDiscord();
-            boxSearch.Foreground = Res(boxSearch.Text == SearchHint ? "Faint" : "Ink");
+            BuildThemeRow(); BuildThemeEditor(); DrawStatus(); BuildPathRows();
+            BuildStatRow(); BuildNews(); BuildDisplay();
+            BuildDiag(); RefreshDiscord();
         }
 
         static void BuildPathRows()
@@ -3921,51 +3546,6 @@ namespace Thornswood
             pathRows.Children.Add(g);
         }
 
-        // ------------------------------------------------------------- help
-        static void BuildHelp()
-        {
-            helpList.Children.Clear();
-            string section = null;
-            foreach (HelpItem h in Help.Items)
-            {
-                if (h.Section != section)
-                {
-                    section = h.Section;
-                    var eyebrow = new TextBlock();
-                    eyebrow.Text = section.ToUpperInvariant();
-                    eyebrow.Foreground = Res("Accent");
-                    eyebrow.FontSize = 10.5;
-                    eyebrow.FontWeight = FontWeights.SemiBold;
-                    eyebrow.Margin = new Thickness(0, helpList.Children.Count == 0 ? 0 : 22, 0, 14);
-                    helpList.Children.Add(eyebrow);
-                }
-
-                var g = new Grid();
-                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
-                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-                var t = new TextBlock();
-                t.Text = h.Title; t.FontSize = 13; t.FontWeight = FontWeights.SemiBold;
-                t.Foreground = Res("Ink"); t.TextWrapping = TextWrapping.Wrap;
-                t.Margin = new Thickness(0, 0, 20, 0);
-                Grid.SetColumn(t, 0); g.Children.Add(t);
-
-                var a = new TextBlock();
-                a.Text = h.Body; a.FontSize = 12.5; a.Foreground = Res("Muted");
-                a.TextWrapping = TextWrapping.Wrap; a.LineHeight = 20;
-                Grid.SetColumn(a, 1); g.Children.Add(a);
-
-                var b = new Border();
-                b.BorderBrush = Res("Line");
-                b.BorderThickness = new Thickness(0, 0, 0, 1);
-                b.Padding = new Thickness(0, 0, 0, 14);
-                b.Margin = new Thickness(0, 0, 0, 14);
-                b.Child = g;
-                helpList.Children.Add(b);
-            }
-        }
-
-
         // ------------------------------------------------------------- stat strip
         static void BuildStatRow()
         {
@@ -3976,8 +3556,11 @@ namespace Thornswood
             BuildSideCard();
         }
 
-        // The first-time notes are read once and then become wallpaper, so the
-        // side column hands itself over to something still worth glancing at.
+        // The first-time note is read once and then becomes wallpaper, so once
+        // this machine has played the side column hands itself over to the In
+        // game card of keys, which is still worth a glance. #3146 took the card
+        // off with the launcher's help pages, which Patrick had not asked for,
+        // and it came back on 30 Oct.
         static void BuildSideCard()
         {
             bool played = Stats.Sessions > 0 || File.Exists(Paths.PlayedFile);
@@ -3987,20 +3570,16 @@ namespace Thornswood
 
             quickKeys.Children.Clear();
 
-            // Read out of the real files rather than typed here. A hardcoded
-            // list went stale the moment the build moved to SkyMP:
-            // it was still offering an F2 party menu that no longer exists and
-            // a trade key belonging to a mod that had been removed. A row now
-            // appears only if its binding is really there, and it shows the key
-            // it is really bound to.
-            //
-            // The five that matter first for somebody joining the server: the
-            // emote wheel, and the four keys that only make sense here, trade,
-            // party, friend and journal. All are Thornswood's own, in
-            // Thornswood.ini, so each shows the key it is really bound to, and
-            // Settings in the game carries the rest and changes them (#3126).
+            // Read out of Thornswood.ini rather than typed here, so a row
+            // appears only if its binding is really there, and it shows the
+            // key it is really bound to. The five that matter first for
+            // somebody joining the server: the emote wheel, and the four keys
+            // that only make sense here, trade, party, friend and journal.
+            // Settings in the game shows the rest and changes every one
+            // (#3126); the launcher only reads them.
             List<Keys.Binding> keys;
-            try { keys = Keys.All(); } catch { keys = new List<Keys.Binding>(); }
+            try { keys = Keys.All(); }
+            catch (Exception ex) { Swallow.Note("Shell.BuildSideCard, reading the keys", ex); keys = new List<Keys.Binding>(); }
 
             AddKeyFor(keys, "emotewheel", "The emote wheel of gestures and animations, seen by everyone near you.");
             AddKeyFor(keys, "tradewith",  "Offer a trade to whoever you are looking at.");
@@ -4071,73 +3650,6 @@ namespace Thornswood
             sp.Children.Add(v);
 
             statRow.Children.Add(sp);
-        }
-
-        // ------------------------------------------------------------- saves and logs
-        static void BuildSaves()
-        {
-            saveList.Children.Clear();
-            var saves = Files.Saves();
-            var backups = Files.Backups();
-
-            txtSaveNote.Text = Files.SaveDir;
-            txtSaveCount.Text = saves.Count == 0
-                ? "No saves yet."
-                : saves.Count + (saves.Count == 1 ? " save" : " saves") +
-                  (backups.Count > 0 ? "   ·   " + backups.Count + " backup" + (backups.Count == 1 ? "" : "s") : "");
-
-            int i = 0;
-            foreach (Entry e in saves) { i++; saveList.Children.Add(FileRow(i, e.Name, e.Detail, false)); }
-            foreach (Entry e in backups) { i++; saveList.Children.Add(FileRow(i, e.Name, e.Detail, true)); }
-        }
-
-        static void BuildLogs()
-        {
-            logList.Children.Clear();
-            var logs = Files.Logs();
-            int crashes = 0;
-            foreach (Entry e in logs) if (e.Name.StartsWith("crash-")) crashes++;
-
-            txtLogCount.Text = crashes == 0
-                ? "No crash logs. " + Files.SkseLogDir
-                : crashes + (crashes == 1 ? " crash log" : " crash logs") + ", newest first.   ·   " + Files.SkseLogDir;
-
-            int i = 0;
-            foreach (Entry e in logs) { i++; logList.Children.Add(FileRow(i, e.Name, e.Detail, !e.Name.StartsWith("crash-"))); }
-        }
-
-        static UIElement FileRow(int index, string name, string detail, bool dim)
-        {
-            var g = new Grid();
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(42) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-            var idx = new TextBlock();
-            idx.Text = index.ToString();
-            idx.FontFamily = new FontFamily("Cascadia Mono, Consolas"); idx.FontSize = 11;
-            idx.Foreground = Res("Faint"); idx.VerticalAlignment = VerticalAlignment.Center;
-            Grid.SetColumn(idx, 0); g.Children.Add(idx);
-
-            var t = new TextBlock();
-            t.Text = name; t.FontSize = 12.5;
-            t.Foreground = Res(dim ? "Muted" : "Ink");
-            t.TextTrimming = TextTrimming.CharacterEllipsis;
-            t.VerticalAlignment = VerticalAlignment.Center;
-            Grid.SetColumn(t, 1); g.Children.Add(t);
-
-            var d = new TextBlock();
-            d.Text = detail; d.FontFamily = new FontFamily("Cascadia Mono, Consolas"); d.FontSize = 10.5;
-            d.Foreground = Res("Faint"); d.VerticalAlignment = VerticalAlignment.Center;
-            d.Margin = new Thickness(16, 0, 0, 0);
-            Grid.SetColumn(d, 2); g.Children.Add(d);
-
-            var b = new Border();
-            b.Padding = new Thickness(10, 9, 12, 9);
-            b.Background = Res("Panel");
-            b.Margin = new Thickness(0, 0, 8, 3);
-            b.Child = g;
-            return b;
         }
 
         // ------------------------------------------------------------- display
@@ -4458,33 +3970,25 @@ namespace Thornswood
         }
         // ------------------------------------------------------------- play
         /// <summary>
-        /// <summary>
-        /// What the Server page says about voice.
+        /// Whether the voice service on the server answers, for its reading on
+        /// Diagnostics.
         ///
-        /// This launcher no longer opens anything. Voice used to run in a
-        /// Chromium window beside the game, which was wrong twice over: it was
-        /// a second window to alt-tab to, and it could not have worked anyway.
-        /// It was served from http://&lt;address&gt;:7778, and Chromium exposes
-        /// the microphone only on https or on localhost, so on a plain http
-        /// remote address navigator.mediaDevices is not blocked, it is absent.
-        /// No command line flag changes that: it is an origin rule.
-        ///
-        /// So voice runs in the game's own browser, the one already drawing the
-        /// chat and the names, loaded from file://, which Chromium does treat as
-        /// trustworthy. The plugin forwards the push to talk key, because the
-        /// game's browser never holds focus while you play. Nothing to open,
-        /// nothing to allow, no window.
-        ///
-        /// All that is left here is whether the service answers, which is worth
-        /// showing because it is the one part that lives on the server.
+        /// The microphone and the audio run in this launcher, in the hidden
+        /// WebView2 page Voice.cs holds; this only asks whether the server's
+        /// half answers, which is worth showing because it is the one part
+        /// nothing on this PC can put right. It was a card on the Server page
+        /// until that page was cut (#3146). The page had been off the rail
+        /// since #599, so for weeks the answer went into a TextBlock nobody
+        /// could see, under a comment that still said voice ran in the game.
         /// </summary>
+        static bool? voiceUp;
 
-
-        static void DrawVoiceState()
+        static void CheckVoice()
         {
-            if (txtVoiceState == null) return;
             Config c = cfg;
-            if (string.IsNullOrEmpty(txtVoiceState.Text)) txtVoiceState.Text = "checking";
+            // The probe waits on a socket, so it does not run on the thread
+            // that draws. A page that freezes for most of a second every time
+            // it is opened is worse than one that fills in a moment later.
             ThreadPool.QueueUserWorkItem(delegate
             {
                 // Asked at the address voice really uses, not by knocking on the
@@ -4498,7 +4002,7 @@ namespace Thornswood
                 bool up = false;
                 try
                 {
-                    try { System.Net.ServicePointManager.SecurityProtocol |= (System.Net.SecurityProtocolType)3072; } catch (Exception ex) { Swallow.Note("Shell.DrawVoiceState", ex); }
+                    try { System.Net.ServicePointManager.SecurityProtocol |= (System.Net.SecurityProtocolType)3072; } catch (Exception ex) { Swallow.Note("Shell.CheckVoice", ex); }
                     var req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(where + "/health");
                     req.Method = "GET";
                     req.Timeout = 4000;
@@ -4506,36 +4010,17 @@ namespace Thornswood
                     using (var resp = (System.Net.HttpWebResponse)req.GetResponse())
                         up = resp.StatusCode == System.Net.HttpStatusCode.OK;
                 }
-                catch (Exception ex) { Swallow.Note("Shell.DrawVoiceState", ex); }
+                catch (Exception ex) { Swallow.Note("Shell.CheckVoice", ex); }
 
                 bool fUp = up;
                 win.Dispatcher.BeginInvoke(new Action(delegate
                 {
-                    try
-                    {
-                        string keys = "";
-                        try
-                        {
-                            foreach (Keys.Binding b in Keys.All())
-                            {
-                                if (b.Id == "ptt") keys = "  Hold " + b.Value + " to talk.";
-                            }
-                        }
-                        catch (Exception ex) { Swallow.Note("Shell.DrawVoiceState", ex); }
-
-                        // where is still used to probe /health; do not show the URL (#797).
-                        txtVoiceState.Text = fUp
-                            ? ("Running. It starts inside the game on its own." + keys)
-                            : ("Not answering, so nobody will hear anybody. It is not installed on the server, or not running.");
-                    }
-                    catch (Exception ex) { Swallow.Note("Shell.DrawVoiceState", ex); }
+                    voiceUp = fUp;
+                    if (pages != null && pages[PageDiag].Visibility == Visibility.Visible) DrawReadings();
                 }));
             });
         }
 
-        // The probe waits on a socket, so it does not run on the thread that
-        // draws. A settings page that freezes for most of a second every time
-        // it is opened is worse than one that fills in a moment later.
         /// <summary>
         /// The compact Server control on Play: the closed label is the server
         /// this build is on, and the dropdown lists Main and Dev. Picking the
@@ -4826,6 +4311,10 @@ namespace Thornswood
             {
                 stays.AppendLine("    " + Paths.ProfileDir + "   (your characters and settings)");
                 stays.AppendLine("    " + Paths.CfgFile);
+                // Kept saves and settings are only that (#3679): the log, the
+                // Discord sign-in, name and picture, the support reports and
+                // the browser folders inside Profile go either way.
+                goes.AppendLine("    From " + Paths.ProfileDir + ": " + LocalKeep.NotSavesInWords);
             }
 
             // Named rather than removed quietly, because it is not where
@@ -4902,51 +4391,6 @@ namespace Thornswood
             Application.Current.Shutdown();
         }
 
-        static void DrawServerState()
-        {
-            if (txtServerState == null) return;
-            Config c = cfg;
-            ThreadPool.QueueUserWorkItem(delegate
-            {
-                bool local = false, up = false, ours = false, node = true;
-                string dir = null;
-                try
-                {
-                    local = SkyMp.IsLocal(c);
-                    up = SkyMp.Up(c);
-                    dir = SkyMp.ServerDir(c);
-                    ours = SkyMp.Ours() != null;
-                    if (local && dir != null) node = SkyMp.NodeExe() != null;
-                }
-                catch (Exception ex) { Swallow.Note("Shell.DrawServerState", ex); }
-
-                bool fLocal = local, fUp = up, fOurs = ours, fNode = node;
-                string fDir = dir;
-                win.Dispatcher.BeginInvoke(new Action(delegate
-                {
-                    try
-                    {
-                        var sb = new StringBuilder();
-                        // Host:port stays off the UI (see #797). Local still names this machine.
-                        sb.Append(fUp ? "UP" : "not answering");
-                        if (fLocal) sb.Append("   this machine");
-                        if (fUp && fOurs) sb.Append("   started by this launcher");
-                        if (fLocal)
-                        {
-                            sb.Append(Environment.NewLine);
-                            sb.Append(fDir != null ? fDir : "no server folder found on this machine");
-                            if (fDir != null && !fNode)
-                                sb.Append(Environment.NewLine).Append("Node is not installed, so it cannot be started from here.");
-                        }
-                        txtServerState.Text = sb.ToString();
-                        btnServerStart.IsEnabled = fLocal && !fUp;
-                        btnServerStop.IsEnabled = fOurs;
-                    }
-                    catch (Exception ex) { Swallow.Note("Shell.DrawServerState", ex); }
-                }));
-            });
-        }
-
         // ------------------------------------------------------------- updates
         // ------------------------------------------------------------- who is on
         static string pingText = "";
@@ -4994,31 +4438,6 @@ namespace Thornswood
                     }
                 }));
             });
-        }
-
-        // The address, port and password sit behind one toggle. Hidden is the
-        // resting state because these boxes are the only place the address is
-        // still written down, and a launcher is a thing people screen share.
-        // Hidden also means read only, so nothing can be edited blind.
-        static bool serverShown = false;
-
-        static string Dots(string s)
-        {
-            if (string.IsNullOrEmpty(s)) return "";
-            return new string('\u2022', Math.Min(s.Length, 18));
-        }
-
-        static void PaintServerBoxes()
-        {
-            if (boxAddress == null) return;
-            boxAddress.Text  = serverShown ? cfg.ServerAddress  : Dots(cfg.ServerAddress);
-            boxPort.Text     = serverShown ? cfg.ServerPort     : Dots(cfg.ServerPort);
-
-            boxAddress.IsReadOnly  = !serverShown;
-            boxPort.IsReadOnly     = !serverShown;
-
-            if (btnShowServer != null) btnShowServer.Content = serverShown ? "Hide" : "Show";
-            if (btnSaveServer != null) btnSaveServer.IsEnabled = serverShown;
         }
 
         /// <summary>
@@ -5178,10 +4597,10 @@ namespace Thornswood
                 int wants = Updater.FeedCollectionRevision;
                 txtUpdateTitle.Text = "Your mods need updating";
                 txtUpdateNote.Text =
-                    "The collection is on revision " + wants + " and this copy is on " + mine +
-                    ", so part of what the server expects is not installed. Open it and let " +
-                    "Vortex bring it up to date. It is one button there and it takes the lot " +
-                    "in one go.";
+                    "The server was built against collection revision " + wants + " and this copy is on " + mine +
+                    ", so part of what the server expects is not installed. The button opens revision " +
+                    wants + " on Nexus; install that one in Vortex, not a newer one Nexus may show first. " +
+                    "It is one button there and it takes the lot in one go.";
             }
             else if (problem == "ahead")
             {
@@ -5194,9 +4613,9 @@ namespace Thornswood
                 txtUpdateTitle.Text = "The server has not caught up with you";
                 txtUpdateNote.Text =
                     "You are on collection revision " + mine + " and the server was built " +
-                    "against revision " + wants + ". Nothing is wrong with your install. Play " +
-                    "will refuse you over the load order until the server is rebuilt, which is " +
-                    "ours to do, so say so in the Discord if nobody has.";
+                    "against revision " + wants + ". Nothing is wrong with your install and " +
+                    "nothing needs installing. Play stays shut until the server is rebuilt on " +
+                    "your revision, which is ours to do, so say so in the Discord if nobody has.";
             }
             else
             {
@@ -5207,7 +4626,9 @@ namespace Thornswood
                     "here comes right until that is done, updates included.";
             }
             updateBar.Visibility = Visibility.Visible;
-            btnInstallNow.Visibility = Visibility.Visible;
+            // Ahead has no button (#4115): there is nothing to install, and
+            // every collection page leads to the same revision or a newer one.
+            InstallShown(problem == "ahead" ? Visibility.Collapsed : Visibility.Visible);
             collectionBarUp = true;
 
             // Open to everybody (#428). Patrick, 28 Sep: "we are in alpha so the
@@ -5217,8 +4638,54 @@ namespace Thornswood
             // left somebody still waiting on their application with a button
             // that only said Connect Discord, which the site refuses until they
             // are accepted. The application is what unlocks Play, not the mods.
-            btnInstallNow.Content = "Open the collection";
+            InstallLabel(CollectionButtonText());
             btnInstallNow.IsEnabled = true;
+        }
+
+        /// <summary>
+        /// The page the collection buttons open: the revision the server was
+        /// built against (#4115, Checks.CollectionRevisionUrl).
+        /// </summary>
+        static string CollectionLink()
+        {
+            return Checks.CollectionRevisionUrl(cfg, Updater.FeedCollectionRevision);
+        }
+
+        /// <summary>The button's words, naming the revision it opens when one is known.</summary>
+        static string CollectionButtonText()
+        {
+            int wants = Updater.FeedCollectionRevision;
+            return wants > 0 ? "Open revision " + wants : "Open the collection";
+        }
+
+        /// <summary>
+        /// Why the mod updates wait while the collection card is up, in two
+        /// halves: what is wrong, and what they wait for (#4115). The log said
+        /// "the collection is not installed yet" for all three cases, which
+        /// was wrong for a copy behind the server and for one ahead of it.
+        /// </summary>
+        static string[] CollectionWait()
+        {
+            int mine = 0;
+            try { mine = Checks.CollectionRevision(cfg); }
+            catch (Exception ex) { Swallow.Note("Shell.CollectionWait", ex); }
+            int wants = Updater.FeedCollectionRevision;
+            string problem = CollectionProblem(mine);
+            if (problem == "stale")
+                return new[] { "The collection here is on revision " + mine + " and the server's is " + wants + ".",
+                               "for the collection to be updated to revision " + wants };
+            if (problem == "ahead")
+                return new[] { "The collection here is on revision " + mine + ", ahead of the server's " + wants + ".",
+                               "for the server to be rebuilt on revision " + mine };
+            return new[] { "The collection is not installed yet.", "for it to be installed" };
+        }
+
+        /// <summary>What Play says when a press reaches it with the collection card up (#4115).</summary>
+        static string CollectionHeldLine()
+        {
+            return CollectionWait()[0] + (CollectionProblem() == "ahead"
+                ? " Nothing needs installing; Play opens once the server is rebuilt."
+                : " Open the collection from the card above Play, then come back.");
         }
 
 

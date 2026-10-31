@@ -93,7 +93,13 @@ working directory (`gamemode.js:logPath`). The gamemode reads `dataDir`
 `thornswoodAdmins` (`gamemode.js:cfg.thornswoodAdmins`), `thornswoodTradeShips`
 (`gamemode.js:settings.thornswoodTradeShips === true`, off unless it is true: the trade ships of
 issue #511, whose register is still read and counted while off; on, a port's crate opens the dock and staff
-keep the ports and routes from the Office page of K, issue #2700) and `loadOrder`
+keep the ports and routes from the Office page of K, issue #2700; at a docked hold anybody may take what is aboard,
+written on the manifest as taken by their character and shown to staff, a hold at sea opens for nobody, and what nobody
+collects goes into that port's hold drop box under the recipient's name once the staff list's `uncollectedDays` have
+passed since it landed, 7 unless staff set it (`gamemode.js:function uncollectedNow`), freeing its line, issue #511),
+`thornswoodTradeCarts`
+(`gamemode.js:settings.thornswoodTradeCarts === false`, on unless it is false: the trade carts of issue #3158,
+a cart stop's crate opens the stop and staff keep the stops and roads from the Office page of K) and `loadOrder`
 (`gamemode.js:Array.isArray(doc.loadOrder)`). `Deploy-Gamemode.ps1` writes that file on every deploy
 (`scripts\deploy\Deploy-Gamemode.ps1:-NotePropertyName dataDir -NotePropertyValue 'data'`).
 
@@ -202,7 +208,8 @@ door reads from the site (`__thornswoodOffices`, read through `officeOf`,
 #2551): a Jarl gives their hold's Court, Steward and Guard on the Office
 page (`officeCmd`, which asks the site to set the role), and only a
 steward can `evict`. A hold's box is the drop box on its board
-(`dropboxCmd`), where rent (`rentDue`, `rentCmd`) is paid; board fees
+(`dropboxCmd`), where rent (`rentDue`, `rentCmd`) is paid and trade ship
+cargo nobody collected waits for a steward to hand out (`boxShipped`, #511); board fees
 (`takeGold`) are counted on the hold's ledger (`funds`). Notice boards come after them. Coin enters the world in one
 place, the starting purse (`purse`, `test-one-mint.js`), and otherwise
 moves by trade (`gold`). No container holds gold the world put there,
@@ -264,7 +271,7 @@ In the server's folder, `C:\Thornswood-Server` live and
 | Folder | What the gamemode keeps there | Served to anybody? |
 |---|---|---|
 | `data` | `online.json`, `manifest.json`, `server-bases.json`, `thornswood-log.json`, `restart.json` | Yes: the resources port (3000 live, 7788 dev) hands out anything under it over plain HTTP (`gamemode.js:The resources server hands out anything under data over plain HTTP`) |
-| `private` | `characters.json`, `allowed.json`, `door.json`, `door.log`, `property.json`, `farm-claims.json`, `mod-settings.json` (the first six moved from `data` on 25 September, issue #541, because they carry profile ids), and the books, `books.json` and `last-left.json` (moved from `data` on 16 October, issue #2582, for the same reason); the gamemode never reads, moves or removes a copy in `data`, because the alpha carries no data over a change (issue #3094); and the other registers naming characters, `law.json`, `beds.json`, `embassy.json`, `take-limit.json` and `dungeon-rewards-ledger.json`; and `deleted-characters.json`, a list of deleted characters that `Delete-Person.ps1` writes and the gamemode lets go of at its next start and then deletes (issue #2351); `Reset-Character.ps1`, `Wipe-Saves.ps1` and `New-Character.ps1` write it too, naming the characters they throw away by form id and never a profile (issues #2668 and #2673); and `trade-cargo.json`, the trade ships' register of ports, routes and what each hold carries, naming characters by form id and profile and never by name (issue #511) | No |
+| `private` | `characters.json`, `allowed.json`, `door.json`, `door.log`, `property.json`, `farm-claims.json`, `mod-settings.json` (the first six moved from `data` on 25 September, issue #541, because they carry profile ids), and the books, `books.json` and `last-left.json` (moved from `data` on 16 October, issue #2582, for the same reason); the gamemode never reads, moves or removes a copy in `data`, because the alpha carries no data over a change (issue #3094); and the other registers naming characters, `law.json`, `beds.json`, `embassy.json`, `take-limit.json` and `dungeon-rewards-ledger.json`; and `deleted-characters.json`, a list of deleted characters that `Delete-Person.ps1` writes and the gamemode lets go of at its next start and then deletes (issue #2351); `Reset-Character.ps1`, `Wipe-Saves.ps1` and `New-Character.ps1` write it too, naming the characters they throw away by form id and never a profile (issues #2668 and #2673); and `trade-cargo.json`, the trade ships' register of ports, routes and what each hold carries, naming characters by form id and profile and never by name (issue #511); and `trade-carts.json`, the trade carts' register of the same shape, with who drives each cart on the road (issue #3158) | No |
 | `world` | Not the gamemode's: SkyMP's changeform database, every reference the server has written to (`scripts\ops\Wipe-Saves.ps1:the changeform database. Every reference the server has ever written to`; `scripts\release\Where.ps1 ChangeForms` names its folder in the server build) | No |
 | the folder itself | `thornswood.log`, rolled at 4 MB with five kept (`gamemode.js:LOG_MAX_BYTES`) | No |
 
@@ -273,7 +280,8 @@ In the server's folder, `C:\Thornswood-Server` live and
 and, since 17 October (issue #2351), every other register naming a character:
 `law.json`, `beds.json`, `embassy.json`, `books.json`, `last-left.json`,
 `take-limit.json`, the trade ships' `trade-cargo.json` (issue #511, with the
-staff list of ports and routes in force beside the goods aboard), the dungeon
+staff list of ports and routes in force beside the goods aboard), the trade
+carts' `trade-carts.json` (issue #3158), the dungeon
 chests' ledger with its `.initialized` mark,
 and a waiting `deleted-characters.json`. It leaves `mod-settings.json`, each
 person's menu choices, and `merchant-ledger.json`, which the merchant code

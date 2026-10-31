@@ -1,21 +1,26 @@
 # Third-party notices
 
-This file lists what Thornswood hands to people that somebody else wrote, the
-licence each part is under, and where its source is. Every row was read off the
+This file lists what Thornswood hands to people that somebody else wrote, and
+the files kept in this repository that somebody else wrote even though they
+never ship ("Kept in the repository, not shipped"), the licence each part is
+under, and where its source is. Every row was read off the
 files on 24 September 2026. Licences come from each component's own licence
 file or from a font's own name table. Where a file came from was checked by
 comparing its sha256 with the copy it came from. Where something could not be
 identified, this file says so instead of guessing.
 
-This file does not license Thornswood's own work. That is `LICENSE` at the
-root: all rights reserved, with terms every contributor agrees to once
-(decided by Patrick on 12 Oct 2026, #1331).
+This file does not license Thornswood's own work. Thornswood's own code is
+under MIT, in `LICENSE` at the root (decided by Patrick on 26 Oct 2026,
+#3688). `LICENSING.md` says what that licence does not cover, which includes
+everything this file lists, and holds the terms every contributor agrees to
+once (#1331).
 
 `tests\test-third-party.js` checks this file against the build. It covers every
 resource Build-Launcher.ps1 compiles into the launcher, the header of every
 file of the launcher's and the setup stub's source, every file under
 `launcher\lib`, every font and minified script the site serves from
-`site\public`, the six client files and the commits in
+`site\public`, every fixture under `tests\fixtures` that is large or
+carries somebody else's notice, the six client files and the commits in
 `records\client-build.json` and `records\server-build.json`, the two
 libraries the fork links that are not permissive, and the source paragraph on
 the public credits page. Where Vortex's copy of the Thornswood
@@ -184,7 +189,7 @@ file carries outside code and the file does not carry that project's notice.
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `20bb0b88` (in full, `20bb0b88f8d77e5835d9ec8f7a874ff79a51acc0`). That
+commit `d258e53e` (in full, `d258e53e71faa7470b01b1399fd0f0f4087761dd`). That
 is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
@@ -399,7 +404,7 @@ fork wherever the fork has a copy.
 |---|---|---|
 | `Data\Scripts\MpClientPlugin.pex` | Byte for byte the fork's `client-deps\common\Data\Scripts\MpClientPlugin.pex`. | `client-deps` has no licence file of its own. Upstream's `TERMS.md` says SkyMP is "primarily distributed under the GPLv3 and AGPLv3 licenses". |
 | `Data\Platform\Fonts\Tavern.ttf` and `Tavern.spritefont` | Byte for byte the fork's `client-deps\common\Data\Platform\Fonts` copies. The font calls itself Typey McTypeface, by Paul J. Miller (2016) and Dieter Steffmann (1995). | SIL Open Font License, by the font's own licence field and by upstream's `THIRD_PARTY_LICENSES`. Neither gives the version. |
-| `Data\Platform\Fonts\DIN-Pro-bold.spritefont` | Byte for byte the fork's `client-deps` copy: a sprite font whose name says DIN Pro Bold. | None found. DIN Pro is FSI FontShop's typeface, whose own files point at FontFont's end user licence (below), and upstream names no licence for this file. |
+| `Data\Platform\Fonts\DIN-Pro-bold.spritefont`, until #1317 | Byte for byte the fork's `client-deps` copy: a sprite font whose name says DIN Pro Bold. | None found. DIN Pro is FSI FontShop's typeface, whose own files point at FontFont's end user licence (below), and upstream names no licence for this file. It stops shipping and every pack deletes it from installs (`$ShipCommercialFonts` in Ship-Rules.ps1, and OwnGame.Foreign); the voice mark that drew in it draws in `Barlow-SemiBold.spritefont` ("Thornswood's own sprite font", below). |
 | `Data\Platform\Modules\skyrimPlatform.ts` | skyrim-platform's TypeScript declarations, an older copy (136,561 bytes) than the fork builds (136,768). | GPL-3.0 |
 | `Data\Platform\UI\build.js`, in main's releases until its next one | A development build of `skymp5-front`, dated 13 September 04:33 in the game folder. It was not built here, and nobody recorded the commit it came from. It bundles npm packages under their own licences, among them React 16.13.1 and 17.0.2, MIT by the `@license` comments inside it. Since 20 October every release carries the fork's own build in its place ("SkyMP's interface, built from the fork", below). | GPL-3.0 |
 | The files beside that build.js that it names by hash | Its fonts, sounds and pictures. 26 are byte for byte files in the fork's `skymp5-front\src`. Ship parses the names from build.js at pack time (#1318); it does not keep a count by hand. | As build.js, except the fonts below. |
@@ -419,9 +424,9 @@ byte for byte the files in upstream's `skymp5-front\src\fonts`:
 Futura PT and DIN Pro point at their foundries' end user licences. This file
 found nothing that gives SkyMP or Thornswood the right to hand them on, and
 upstream names none. Upstream SkyMP ships them the same way. The fork's own
-build has none of the four (below), so they leave with main's next release;
-installs that already have them keep them until a release lists them as gone,
-which is #1317.
+build has none of the four (below), so they leave with main's next release,
+and `records\ui-gone.json` lists all four, so every pack deletes them from
+the installs that took them and no release carries them again (#1317).
 
 Bankir-Retro and icomoon keep shipping, credited to SkyMP and to their makers
 (Patrick, 15 Oct 2026, #2177): they came to Thornswood with SkyMP's
@@ -449,7 +454,7 @@ Since 20 October 2026 (#2754, #2931) every Ship builds `Data\Platform\UI\build.j
 and the fonts, sounds and pictures beside it from the fork's `skymp5-front`
 at the engine pin, with webpack, and holds what it built to
 `records\front-build.json`: 68 files, 8,434,780 bytes, from commit
-`20bb0b88`, the commit the client record names (the same 68 files, byte for
+`d258e53e`, the commit the client record names (the same 68 files, byte for
 byte, as at `445ded38`: what changed in `skymp5-front` since, the unused
 login page taken out (#3927), was never in what webpack builds). Read on 21 October (#421):
 the dev feed's release `20261021-104809-dev` carries that build.js, 2,448,900
@@ -508,6 +513,25 @@ Pro, from Google Fonts' `google/fonts` at `2eb0b48d`, and the same change
 took out the Futura PT and DIN Pro faces. The OFL lets a font travel with its
 copyright notice and licence in its own metadata, which this one carries;
 the fork keeps the full text beside it as `skymp5-front\src\fonts\OFL.txt`.
+
+## Thornswood's own sprite font
+
+`Data\Platform\Fonts\Barlow-SemiBold.spritefont` is Barlow SemiBold drawn
+into a Skyrim Platform sprite font: printable ASCII, Latin-1, dashes, curly
+quotes, the bullet and the ellipsis, at 30 pixels. The overhead voice mark
+draws its dot in it (#1317), in place of `DIN-Pro-bold.spritefont`. It is in
+this repository at `game\ours\Data\Platform\Fonts`, and
+`scripts\mods\Build-SpriteFont.py` makes it from the fork's
+`skymp5-front\src\fonts\Barlow-SemiBold.ttf`, the same file as the front's
+`dc3cbd21104d40477da6.ttf` above (sha256 `86577cb3`).
+
+A sprite font is a picture of the font, so it is a copy of Barlow as the OFL
+means it, and goes out under the OFL 1.1. Barlow names no Reserved Font Name,
+so the name may stay. A sprite font has no field to carry the licence in, so
+`Barlow-SemiBold-OFL.txt` goes out beside it in the same folder: the fork's
+`OFL.txt`, byte for byte, with Barlow's copyright line ("Copyright 2017 The
+Barlow Project Authors (https://github.com/jpt/barlow)") and the licence's
+full text.
 
 ## Thornswood Client Runtime, Thornswood's mod on Nexus Mods
 
@@ -821,7 +845,8 @@ no licence this file can name.
   four, one and one glyphs, stop shipping and every pack deletes them from
   installs (Patrick, 15 Oct 2026, #2177; `$ShipPlatformUnused` in
   Ship-Rules.ps1, and OwnGame.Foreign so a refresh cannot bring them back).
-  Futura.spritefont still ships, with #1317.
+  Futura.spritefont, by its name ParaType's Futura PT, goes the same way with
+  DIN-Pro-bold.spritefont (#1317, `$ShipCommercialFonts`).
 - `Data\Platform\Images\lock.png` and `speaking.png`, dated 12 September 13:40.
   They are not in the fork, and nothing names them. They stop shipping and
   every pack deletes them from installs the same way (#2177).
@@ -1022,6 +1047,14 @@ sha256 of the collection's version of the file
 `$ShipMadeFromMods` keeps the five out of every pack, release record and
 installer.
 
+SkyUI's journal (`interface\quest_journal.swf` in the same `SkyUI_SE.bsa`),
+the book Escape opens, is made the same way with six entries taken off its
+System page that Thornswood does not use (#3127): Quick Save, Save and Load,
+because a character lives on the server and not in a save; Help, Skyrim's own,
+which Thornswood's help panel replaced; and Creations and Installed Content,
+the Creation Club, since Thornswood is Special Edition only. It ships no more
+than the five above do, and `$ShipMadeFromMods` keeps it out the same way.
+
 `Data\SKSE\Plugins\QuickLootIE.json` does ship: QuickLoot IE 4.1.3's own
 settings file (Nexus Mods mod 120075, file 806802, which revisions 4 and 5
 both install) with one line added, which sets its loot menu's columns to
@@ -1037,10 +1070,13 @@ October).
 ## Made for Thornswood by somebody else
 
 - `Data\Platform\UI\thornswood-theme.mp3` (in the repo as
-  `game\ui\thornswood-theme.mp3`) is the theme. It was made for Thornswood
-  by an artist this repository does not name, and it went to everybody on
-  Patrick's word of 22 September (commit ec8d113). The terms are between
-  Patrick and the artist and are not written down here.
+  `game\ui\thornswood-theme.mp3`) is the theme. Copyright its composer,
+  who is not named here. All rights reserved. Its composer gave Thornswood,
+  in writing on 28 October 2026, the right to use it, change it and earn
+  from it, with no fee and no credit asked (the grant is on #1333). That
+  right is Thornswood's only: the theme is not under the licence that
+  covers Thornswood's art, and nobody else may copy, change, share or use it,
+  even for free, from this repository, from a pack or from the installer.
 
 ## On the site
 
@@ -1160,11 +1196,27 @@ reserves every right it does not grant; it grants no right to copy the game's
 own files from anywhere but the person's own copy. Whether the fork's build
 keeps downloading them is Patrick's decision on #3728.
 
+## Kept in the repository, not shipped
+
+These files sit in the repository for its tests and are never handed to
+anybody. `tests\test-third-party.js` fails when a file under `tests\fixtures`
+is over 100 KB, or carries "@license", "Copyright", "certifi" or a
+certificate, and has no row here (#3761).
+
+| File | What it is | Where it came from | Licence | Read by |
+|---|---|---|---|---|
+| `tests\fixtures\ui-front-build.js` | The 68 asset modules of the shipped `Data\Platform\UI\build.js`, verbatim: the stub webpack writes for each picture, sound and font, with the hashed name it was given and the source path it came from. 47,757 bytes. | Cut on 26 October 2026 (#3761) from the whole development build of `skymp5-front` that was the fixture until then (2,451,499 bytes, sha256 `5e70e4d7de167fac71522416c59ee4e1f7d5274ecfe30161cbedc46d8a4e9ea2`), the build "SkyMP's interface, built from the fork" describes. The cut leaves out the front's own code and the npm code bundled with it (React, Redux and the rest, under MIT and BSD notices); `tests\fixtures\ui-front-build.assets.txt` names its sha256. | GNU General Public License version 3, `skymp5-front`'s, as the build it was cut from | `tests\fixtures\ui-front.ps1`, `tests\test-ship-rules.ps1` (#1318) |
+| `tests\fixtures\3111-roots.pem` | Eight public root certificates and their comment lines, no key. 223 lines. | Copied from certifi 2026.7.22's `cacert.pem` (#3111): four of eMudhra's emSign roots and the four the bot needs. | Mozilla Public License 2.0, certifi's, as "The Discord bot, on the VPS" gives it | `tests\test-3111-emudhra-trust.js` |
+| `tests\fixtures\webview2-setup-chain.txt` | Three public certificates, no key: the signing certificate and issuer of Microsoft's WebView2 setup program, and the root. | Read out of the Authenticode signature of `MicrosoftEdgeWebview2Setup.exe` as Microsoft handed it out on 5 October 2026, and the root from the address the issuer names (#1330). | None given: they are Microsoft's public certificates, which every copy of that program carries | `tests\test-1330-webview2-signature.js` |
+
+The whole 2.4 MB build is still in the repository's history until the history
+rewrite takes it out (#3684).
+
 ## On our servers
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `20bb0b88f8d77e5835d9ec8f7a874ff79a51acc0` on the public fork. The
+  name `d258e53e71faa7470b01b1399fd0f0f4087761dd` on the public fork. The
   server module and the six client files were built from that commit, which
   adds the 5 October security fixes (the RPC route, request bodies, metrics,
   the login line, the settings files), the server's equipment write for a new
@@ -1236,10 +1288,16 @@ keeps downloading them is Patrick's decision on #3728.
   deleted across a restart (#3498), the client logs only the kind of a
   message from the in-game page, never what it says (#3941), and the
   server's resources port refuses masters, archives and scripts and its save
-  reader reads a list's size in 64 bits (#3927).
+  reader reads a list's size in 64 bits (#3927), and since `09a4b398` every
+  listener that serves /rpc refuses another machine (#1294), a person no
+  longer starts with the game's own Flames and Healing (#1688), each step of
+  an NPC's spawn is logged (#1287), and trees and flora show harvested by
+  their flag alone (#2382). `d258e53e` adds only the fork's own build
+  workflow keeping each push's engine build as a package (fork #131), so
+  nothing in what is built changed.
   The server module's SHA256
-  is `f8509c15c712d475fa30177b11cfbd9a31ae75466b8ef5e9b8bf83c8ab559961`, built
-  2026-10-27T05:32:52Z. This is the recorded next release, not a deployment
+  is `09d2eabd05d7dbe4c940834fee4a4a93cecd7921b644cb7ec548245e24879ffc`, built
+  2026-10-31T04:42:41Z. This is the recorded next release, not a deployment
   claim. Main remains on `2008327879e6cad6369ec3afe1d6d1b8ecf37724` until this goes
   out.
   It goes to the dev server (Publish-Server -Channel dev) and to the dev
@@ -1274,7 +1332,7 @@ For the six recorded client files and the recorded game server module, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
-https://github.com/EvilPatrick06/skymp/tree/20bb0b88f8d77e5835d9ec8f7a874ff79a51acc0
+https://github.com/EvilPatrick06/skymp/tree/d258e53e71faa7470b01b1399fd0f0f4087761dd
 
 For the engine Main runs until then:
 
@@ -1304,23 +1362,10 @@ https://github.com/EvilPatrick06/Thornswood/releases/tag/frida-sources-16.0.19
 
 `records\frida-sources.json` holds each archive's sha256 and size, and
 `scripts\release\Publish-FridaSources.ps1` makes the Release from it and checks
-it every night. Until this repository is public a stranger cannot open the
-Release, so until then the same commits are also in Thornswood's fork of
-each of Frida's repositories, tagged `thornswood-frida-16.0.19`, and every
-note beside the files names both:
-
-| Inside `frida-gum.lib` | Source until the repository is public |
-|---|---|
-| gum | https://github.com/EvilPatrick06/frida-gum/tree/698b356fef0ecfc3ac2818f0b387be90e93deeda |
-| glib, gobject, gnulib, libcharset | https://github.com/EvilPatrick06/frida-glib/tree/f3af6c29d39eb7590425d1b22bae29ff6a0ebb6f |
-| proxy-libintl | https://github.com/EvilPatrick06/frida-proxy-libintl/tree/c03e1a74b17fa7ec467e110130775409e4828a4c |
-| pcre2 | https://github.com/EvilPatrick06/frida-pcre2/tree/b47486922fdc3486499b310dc9cf903449700474 |
-| capstone | https://github.com/EvilPatrick06/frida-capstone/tree/22d317042ee4d251280d2960f5cf294433977db4 |
-| libffi | https://github.com/EvilPatrick06/frida-libffi/tree/938b07aa8280bcc4f92f08a0fdbb4ad81024bde0 |
-
-The forks are deleted only when `Publish-FridaSources.ps1 -ForksMayGo` says
-nothing offered still names only them: notes made before the Release
-existed name the forks alone.
+it every night. Until this repository went public on 30 October 2026 the same
+commits were also in Thornswood's own forks of Frida's repositories; every
+note offered since names the Release, so the forks are gone and the Release
+is the one place the source is.
 
 That covers what Thornswood built, and since 20 October that includes
 `Data\Platform\UI\build.js` and the files beside it: `records\front-build.json`
@@ -1413,12 +1458,13 @@ beside its `___systemPolyfill.js`.
   installer from now on that carries the recorded build, do.
 - Main's releases carry the older build.js, with no recorded source commit,
   until main's next release carries the fork's own (#2754).
-- The Futura PT and DIN Pro fonts in main's older build.js, the Bankir-Retro
-  and icomoon fonts in both builds, and `Futura.spritefont` under "Shipped
-  today with no licence this file can name", ship with no licence found. The 37 Daedric Online menu files do not:
-  they are removed and deleted from installs (#1318), and so are the two
-  pictures in `Images` and the ChainLink, NoticeIcon and VoiceIcon sprite
-  fonts (#2177).
+- The Bankir-Retro and icomoon fonts in both front builds ship with no
+  licence found (fork pull request 41 swaps them). The 37 Daedric Online menu
+  files do not: they are removed and deleted from installs (#1318), and so
+  are the two pictures in `Images` and the ChainLink, NoticeIcon and
+  VoiceIcon sprite fonts (#2177), and the Futura PT and DIN Pro faces, as the
+  four ttf files in main's older build.js and as `DIN-Pro-bold.spritefont` and
+  `Futura.spritefont` (#1317).
 - `Data\Interface\startmenu.swf` is Bethesda's file, edited, and the notice
   board and drop box meshes are built from Bethesda's ("Bethesda's own files,
   made on each machine"). Bethesda's terms for mods were read on 19 October

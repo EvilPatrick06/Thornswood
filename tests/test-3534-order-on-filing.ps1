@@ -10,7 +10,7 @@
 
   What it checks:
     1. the workflow: started only by a new issue, the run's token given
-       nothing, the board token from the board environment, on a VPS runner
+       nothing, the board token from the board environment, on GitHub's runner
        with a timeout, no checkout and no action, and nothing from the event
        pasted into the script;
     2. its step, run in a child pwsh against a stand-in for GitHub's GraphQL:
@@ -55,7 +55,7 @@ $on = [regex]::Match($code, '(?ms)^on:\n(.*?)^\S').Groups[1].Value
 Yes 'started only by a new issue' ($on -match '(?m)^  issues:\n    types: \[opened\]\s*$' -and @([regex]::Matches($on, '(?m)^  \S')).Count -eq 1)
 Yes 'the run''s token is given nothing' ($code -match '(?m)^permissions:\s*\{\}\s*$' -and $code -notmatch '(?m)^\s+permissions:' -and $code -notmatch 'github\.token')
 Yes 'the board token, from the board environment' ($code -match '(?m)^    environment: board$' -and $code.Contains('BOARD_TOKEN: ${{ secrets.BOARD_TOKEN }}') -and @([regex]::Matches($code, 'secrets\.')).Count -eq 1)
-Yes 'on any VPS runner, with a timeout' ($code -match '(?m)^    runs-on: \[self-hosted, Windows, thornswood-vps\]$' -and $code -match '(?m)^    timeout-minutes: \d+$')
+Yes 'on GitHub''s Windows runner, never the box, since anyone can open an issue (#3685, #4983), with a timeout' ($code -match ('(?m)^    runs-on: ' + [regex]::Escape('windows-latest') + '$') -and $code -match '(?m)^    timeout-minutes: \d+$')
 Yes 'no checkout and no action' ($code -notmatch 'uses:')
 Yes 'the issue comes in through the environment' ($code.Contains('ISSUE: ${{ github.event.issue.number }}') -and $code.Contains('ISSUE_NODE: ${{ github.event.issue.node_id }}'))
 $step = [regex]::Match($code, '(?ms)- name: Set the card''s Order to 10000 plus the issue''s number\n.*?run: \|\n(.*)$').Groups[1].Value

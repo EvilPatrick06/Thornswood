@@ -69,12 +69,15 @@ function liftThrough(from, anchor, to) {
   return c < 0 ? null : src.slice(a, c + to.length);
 }
 
-// The thirteen events with a fixed name: eleven read out of
+// The fifteen events with a fixed name: eleven read out of
 // skymp5-server/cpp/server_guest_lib/gamemode_events on 24 September,
-// onSpellCast, which skymp #86 added for Overcharge (#2848), and onDying,
-// which skymp #101 added to ask before a death (#1626).
-const EVENTS = ['onActivate', 'onCraft', 'onDeath', 'onDropItem', 'onDying', 'onEatItem',
-                'onPutItem', 'onReadBook', 'onRespawn', 'onSpellCast', 'onTakeItem',
+// onSpellCast, which skymp #86 added for Overcharge (#2848), onDying,
+// which skymp #101 added to ask before a death (#1626), onCraftWork, which
+// fork #115 added for the time a craft takes (#3161), and
+// onEquipItemAttempt, which the fork added to ask before an item goes on
+// (#2262). The last two came with the pin at 20bb0b88 (#4896).
+const EVENTS = ['onActivate', 'onCraft', 'onCraftWork', 'onDeath', 'onDropItem', 'onDying', 'onEatItem',
+                'onEquipItemAttempt', 'onPutItem', 'onReadBook', 'onRespawn', 'onSpellCast', 'onTakeItem',
                 'onUpdateAppearanceAttempt', 'onUpdateEquipmentAttempt'];
 // The Papyrus family: the engine calls mp['onPapyrusEvent:' + name] for each
 // of these. They are the server half of the fork's event list,
@@ -165,8 +168,13 @@ if (handlersSrc !== null) {
   // takes retain the original take-limit refusal and otherwise pass.
   const dropSrc = handlersSrc.slice(handlersSrc.indexOf('mp.onDropItem = guard('));
   const takeSrc = handlersSrc.slice(0, handlersSrc.indexOf('mp.onDropItem = guard('));
-  yes('the drop watcher only refuses bound or unverifiable quest-item identities',
-      (dropSrc.match(/\breturn\b/g)||[]).length===1 && /if\(questItemBlocked\(baseId\)\)return false;/.test(dropSrc));
+  // One more refusal is read and allowed: the pair of Prisoner's Cuffs locked on a
+  // prisoner's wrists (#2573, mayLetGo), which refuses that pair and nothing else.
+  const CUFFS_DROP = 'if (cuffsDrop && !cuffsDrop.mayLetGo(actorId, baseId, count)) { return false; }';
+  yes('the cuffs\' refusal is in the drop watcher at most once',
+      dropSrc.split(CUFFS_DROP).length <= 2);
+  yes('the drop watcher only refuses bound or unverifiable quest-item identities, and the cuffs on a prisoner',
+      (dropSrc.split(CUFFS_DROP).join('').match(/\breturn\b/g)||[]).length===1 && /if\(questItemBlocked\(baseId\)\)return false;/.test(dropSrc));
   yes('the take watcher refuses quest items and the original take limit',
       (takeSrc.match(/\breturn\b/g) || []).length === 2 &&
       /if\(questItemBlocked\(baseId\)\)return false;/.test(takeSrc) &&
@@ -177,7 +185,7 @@ if (handlersSrc !== null) {
 // ---------------------------------------------------------------- the list --
 
 if (listSrc !== null) {
-  yes('the list names all thirteen events with a fixed name',
+  yes('the list names all fifteen events with a fixed name',
       EVENTS.every(function (e) { return listSrc.indexOf(e) !== -1; }));
   yes('the list names the Papyrus family by the name the engine looks up',
       listSrc.indexOf("mp['" + PAPYRUS_PREFIX + "<Name>']") !== -1);
@@ -309,7 +317,7 @@ if (getNames === null) {
     if (lit) { literal.push(lit[1]); } else { runtime.push(g); }
   });
   literal.sort();
-  yes('the thirteen fixed names are exactly the ones the fork raises (' + literal.join(', ') + ')',
+  yes('the fifteen fixed names are exactly the ones the fork raises (' + literal.join(', ') + ')',
       JSON.stringify(literal) === JSON.stringify(EVENTS.slice().sort()));
 
   // The two families whose name is built when they fire, each checked by what

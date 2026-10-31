@@ -44,7 +44,7 @@
 # build counts and what is held). The records are then made from it as from
 # any build, with -BuiltBy naming the fork's run. Nothing is compiled here:
 # a build compiled here would be bytes no Ship machine can take, since they
-# take the fork's (#3399), and the box cannot compile at all (THE BOX, below).
+# take the fork's (#3399).
 # So a pin names a commit the fork built, a head of thornswood/engine-changes,
 # and with no fork build of the commit, or one still running, or one that
 # ended red, the run stops with its link. The fork's artifacts are read with
@@ -52,53 +52,21 @@
 # token, never to none); no secret of this repository goes near the fork,
 # and no runner here ever runs a job of the fork's.
 #
-# WHERE IT RUNS (Patrick's decision on #459, 15 Oct: C, then B): "just like
-# everything else GitHub runner are always used for everything first than if
-# it fails due to billing issues than it goes to the VPS runners". So the job
-# "engine", GitHub's hosted windows-2022, goes first, and "engine-vps" makes
-# the records on the box only when that did not succeed, the way build.yml's
-# "Launcher builds" falls back (#2407):
-#   - the repository variable BUILD_RUNNER is vps, which skips the hosted job
-#     outright (set since 12 Oct, measured 16 Oct), or
-#   - a manual run asked for runner: vps, or
-#   - the hosted job failed: a quota or billing stop fails it before any step
-#     runs (#2393). A real red fails on the box too.
-# The steps are one list, the YAML anchor engine, so the two cannot record
-# differently. windows-2022, the image the fork's own build uses.
-#
-# THE BOX (#3014; Patrick's A, 22 Oct). The runner accounts reach GitHub's
-# addresses and nothing else (#2161, Install-Runner.ps1 "WHAT A PULL REQUEST
-# JOB MAY REACH"), and a compile needs more: the one compile on the box, run
-# 39364911234 on 20 Oct before the limits went on, fetched from eight hosts
-# that are not GitHub (mirror.msys2.org, cef-builds.spotifycdn.com and six
-# more), and run 39727871475, with the limits on, stopped at vcpkg's first
-# download with Schannel's 0x80092013, the revocation server unreachable.
-# Taking the fork's build needs GitHub alone. What the box needs is yarn, for
-# the fork build's server packages:
-#   .\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeEngineTools -SkipFirewall'
-# puts it there (with the C++ half of the Build Tools and CMake, which the box
-# no longer uses).
-#
-# THE BUILD IS NOT KEPT. On the box the fork's checkout and the fork's build
-# put in its build folder are removed, whatever the run did, because every
-# runner keeping a build folder of their own would take most of the disk the
-# game servers write to; and the library cache the compile of 20 Oct left
-# beside it goes too, since nothing here compiles any more.
-#
-# HOW LONG. The four box runs of 21 Oct that took the fork's build took 38 to
-# 62 seconds each, so each job gets 30 minutes. Past that it is stuck, not
-# slow.
+# WHERE IT RUNS: GitHub's hosted windows-2022, the image the fork's own
+# build uses. From 15 Oct (Patrick's decision on #459) the box took the
+# records when the hosted job did not succeed; that fallback went at the
+# flip (#4983), when hosted minutes became free here and no runner of the
+# box stayed registered to this repository. It took the fork's build in 38
+# to 62 seconds on 21 Oct, so the job gets 30 minutes. Past that it is
+# stuck, not slow.
 #
 # WHEN. A manual run, from the Actions tab or
 #   gh workflow run engine.yml --ref main -f commit=<fork commit>
-# with no commit, the one this branch pins. A manual run only: a pull
-# request's code reaches the box through build-pr.yml alone (#1306,
-# tests\test-1306-pr-workflow.js), so a change to this file is first run by
-# hand once it is on main. A manual run on a branch runs on the build
-# runners, which never sign (#3550).
+# with no commit, the one this branch pins. A manual run only, so a change
+# to this file is first run by hand once it is on main.
 #
 # WHY THE ACTIONS ARE PINNED. Each is a full commit SHA with its tag in a
-# comment, as in build.yml and release.yml: these steps run on the VPS.
+# comment, as in build.yml and release.yml.
 # tests\test-459-engine-workflow.ps1 holds this file's shape.
 name: Engine build
 on:
@@ -108,11 +76,6 @@ on:
         description: 'The fork commit to record, 40 hex, a head of thornswood/engine-changes the fork built. Empty: the commit this branch pins engine/skymp to.'
         required: false
         default: ''
-      runner:
-        description: 'hosted (GitHub, the default) or vps (the box, the fallback)'
-        type: choice
-        options: [hosted, vps]
-        default: hosted
 permissions:
   contents: read
 # One run for one commit at a time, never cancelled by another: a second run
@@ -121,39 +84,17 @@ concurrency:
   group: engine-${{ github.event.inputs.commit || github.ref }}
   cancel-in-progress: false
 jobs:
-  # The VPS FALLBACK (header, WHERE IT RUNS). A manual run only, so nothing a
-  # pull request carries reaches the box through it.
-  engine-vps:
-    name: Engine build (VPS fallback)
-    needs: engine
-    if: ${{ !cancelled() && needs.engine.result != 'success' && needs.engine.result != 'cancelled' }}
-    # It takes one of the box's build slots, like the build check
-    # (thornswood-build, records/build-runners.json, #2994).
-    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]
+  engine:
+    name: Engine build
+    runs-on: windows-2022
     timeout-minutes: 30
-    steps: &engine
+    steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: false
 
-      # A runner keeps its folder from one job to the next, and a checkout
-      # there rewrites only the files that differ from the last job's commit,
-      # so every other file keeps the line endings the last job's
-      # .gitattributes gave it (#3029). Every tracked file is written again,
-      # the way this commit checks it out.
-      - name: Check every tracked file out again
-        if: runner.environment == 'self-hosted'
-        shell: pwsh
-        run: |
-          git rm -r -q --cached .
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          git reset -q --hard HEAD
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-
-      # The hosted image's node is whatever it has this month; the box has its
-      # own (Bootstrap-VPS.ps1), as in build.yml.
+      # The hosted image's node is whatever it has this month, as in build.yml.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        if: runner.environment == 'github-hosted'
         with:
           node-version: '24'
 
@@ -310,36 +251,3 @@ jobs:
           $bundle = New-EngineRecordsBundle .
           foreach ($l in @(Get-LogHandBackLines ('ENGINE' + '-RECORDS') $bundle)) { Write-Host $l }
           Write-Host 'Take them into a checkout whose index pins this commit with  .\scripts\release\Get-EngineRecords.ps1 -Run <this run''s id>'
-
-      # On the box only, however the run ended (header, THE BUILD IS NOT
-      # KEPT): the fork's checkout and build folder go, and the library cache
-      # of the compile of 20 Oct. !cancelled() would leave a cancelled run's
-      # build behind, so this one is always().
-      - name: Free the box's disk
-        if: always() && runner.environment == 'self-hosted'
-        shell: pwsh
-        run: |
-          git submodule deinit --force engine/skymp 2>$null | Out-Null
-          if (Test-Path -LiteralPath engine/skymp) {
-            Get-ChildItem -LiteralPath engine/skymp -Force | Remove-Item -Recurse -Force -ErrorAction Continue
-          }
-          # The fork's git folder too: the next run makes its own (Fetch the
-          # fork at that commit), and nothing else here wants a whole fork.
-          $modules = Join-Path "$(git rev-parse --git-dir)".Trim() 'modules\engine\skymp'
-          if (Test-Path -LiteralPath $modules) { Remove-Item -LiteralPath $modules -Recurse -Force -ErrorAction Continue }
-          $cache = Join-Path $env:RUNNER_WORKSPACE 'engine-vcpkg-cache'
-          if (Test-Path -LiteralPath $cache) { Remove-Item -LiteralPath $cache -Recurse -Force -ErrorAction Continue }
-          $left = @(Get-ChildItem -LiteralPath engine/skymp -Force -ErrorAction SilentlyContinue).Count
-          $free = [Math]::Round((Get-PSDrive -Name ($env:RUNNER_WORKSPACE.Substring(0, 1))).Free / 1GB, 1)
-          Write-Host ("engine/skymp holds {0} item(s) now; the library cache is {1}; {2} GB free on the runner's drive" -f $left, $(if (Test-Path -LiteralPath $cache) { 'still there' } else { 'gone' }), $free)
-          if ($left) { Write-Host '::warning::engine/skymp could not be emptied; the lines above say which file was held' }
-
-  # GitHub's hosted runner, first (header, WHERE IT RUNS). Skipped when
-  # BUILD_RUNNER is vps or a manual run asked for the box, and then the
-  # fallback above takes the fork's build.
-  engine:
-    name: Engine build
-    if: ${{ vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
-    runs-on: windows-2022
-    timeout-minutes: 30
-    steps: *engine

@@ -2,7 +2,7 @@
 
 What Thornswood keeps about you, why, and how to have it deleted.
 
-Last changed: 26 October 2026.
+Last changed: 30 October 2026.
 
 Thornswood is a free fan project run by a small team in their own time. It is
 not a company. This page is written plainly rather than legally, and it is
@@ -77,9 +77,58 @@ arrival you were against your Discord id, so the number on the welcome card
 is never handed to two people, and is yours again if you leave and come
 back.
 
-**The launcher's own log.** Sent to the site when a session ends. It is about
-the game: which mods are installed, what failed to start, which version you
-are on, and how long the launcher took to open. It is how somebody who cannot play gets helped without a conversation.
+**The logs sent when a session ends.** Every time the game closes, the
+launcher sends the site the last part of each of these files from your PC
+(or at its next start, if the site could not be reached). They are how
+somebody who cannot play gets helped without a conversation, and what a
+report or a ban about that session rests on:
+
+- **launcher.log**, the launcher's own log: what it checked, fixed,
+  downloaded and started, what failed, which version you are on and how long
+  the launcher took to open. It also names the voice server's address and
+  port, the profile number voice used and your microphone's name as Windows
+  gives it. It runs on from one session to the next, so its last part can
+  reach back into earlier ones. If Steam's window would not come to the front
+  while the launcher was setting up the game, it names the program that was
+  in front instead, by its name only and never what it showed. A copy stays
+  on your PC as well (below).
+- **crash.log**, only when the game crashed in that session: Crash Logger's
+  report of it, which can name your Windows version, processor, graphics card
+  and memory, what the game was doing when it went down and the mods it had
+  loaded. The full crash snapshot beside it stays on your PC.
+- **thornswood-front.log**, the game's menus and panels: your profile and
+  character names, the server it connected to, the names of things you
+  looked at or used, what you pressed in its panels, any error, and lines
+  other people said near you in chat.
+- **thornswood-voice.log**, voice: the names of the sound input devices on
+  your PC and which one voice used, the folder the game is in, the server,
+  and the names of the other people in your voice room with whether each was
+  connected.
+- **thornswood-emotes.log**, the emotes and quick slots you used.
+- **thornswood-input.log**, the game's keyboard and mouse: how many keys it
+  read (never which ones), the names of the input devices, whether the
+  game's window had the keyboard and, when another window had it, that
+  window's kind and process number.
+- **thornswood-loadorder.txt** and **thornswood-plugins-light.txt**: the name
+  of every plugin the game loaded, including any you added yourself.
+- **skyrim-platform.log**, Skyrim Platform's own log: a second copy of the
+  game's lines above, every message passed between the game and its pages,
+  the server it connected to, and Skyrim Platform's own lines about the
+  game's scripts and its browser.
+
+With them go the launcher's own check of your game files at that moment
+(which plugins are missing or not the server's, with the size and checksum
+the server expects) and any part of the Play page that was not ready.
+
+Before any of it leaves your PC the launcher takes out anything shaped like a
+voice join token, a sign-in ticket or a join pass, and puts a placeholder in
+place of your Windows user folder, any other account's folder under Users,
+your Windows account name where it is a folder, and your PC's name. The site
+keeps the last 256 KB of each file and at most 1 MB a session. When a log
+shows that the game crashed or threw an error, the line that shows it, up to
+300 characters, is copied onto the session's record and posted in the staff
+channel in the Discord, so staff hear about it without opening the logs.
+That post stays in the channel.
 
 **Gallery submissions.** The picture or recording, your signed-in account,
 the name for its caption and any note for staff are kept for review. A
@@ -120,7 +169,16 @@ Honesty about the things a page does by existing:
 
 - **Discord** is where sign-in happens, so signing in tells Discord that you
   signed in here.
-- **Launcher updates** are fetched from Thornswood's own site.
+- **Launcher updates and the installer** are asked for at Thornswood's own
+  site. Since the code went public on 30 October 2026, every file of a
+  release is also published on GitHub, where Thornswood's code is kept, and
+  the site sends the launcher (or your browser, for the installer) on to
+  fetch the file from there once GitHub holds the same file. GitHub then sees
+  your address and which file was fetched, and keeps its own records under
+  [GitHub's privacy statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement).
+  The file is the same either way: the launcher checks each one against the
+  sha256 the site's update list names before using it. When GitHub does not
+  hold a file, the site sends it itself.
 - **Cloudflare** carries every connection to this site, and to voice, on
   its way to our server, which answers nobody else. Like any network
   between you and us it sees your address and what you ask for, and it
@@ -169,11 +227,12 @@ until 24 September 2026, and both are served from here now.
   numbers, character names and some Discord ids, never an address. Nothing in
   them is kept past 90 days.
 - **Session records and chat** are kept for 365 days, then dropped. That is
-  the record of each session and the launcher log sent with it. The site
-  checks every hour, so nothing waits for somebody to play first. A session
-  staff mark as kept, because a report or a ban rests on it, is not dropped,
-  and neither is its launcher log. Chat on the voice service ages the same
-  way. Both numbers come from the code rather than a promise on this page; if
+  the record of each session and the logs sent with it. The site checks
+  every hour, so nothing waits for somebody to play first. A session staff
+  mark as kept, because a report or a ban rests on it, is not dropped, and
+  neither are its logs, for as long as staff keep it marked; once they let
+  it go, it goes with the rest at 365 days. Chat on the voice service ages
+  the same way. Both numbers come from the code rather than a promise on this page; if
   they change, this line changes with them.
 
 - **Your character** is kept until you ask for it to be deleted, or until a
@@ -181,8 +240,11 @@ until 24 September 2026, and both are served from here now.
   backup back leaves the characters it replaced set aside on the server for
   30 days, so it can be undone, and then deleted. The server checks every
   hour.
-- **Launcher logs** are kept for 365 days, like session records, unless staff
-  mark the session kept.
+- **The logs sent when a session ends**, every file named above and the
+  launcher's check that goes with them, are kept for 365 days, like session
+  records, unless staff mark the session kept. So is the line copied from
+  them onto the session's record.
+  Of launcher.log, the copy on your PC keeps each line for 30 days (below).
 - **A gallery submission that is removed** has its file deleted then. One
   taken down after somebody reported it is kept out of sight for 30 days, so
   staff can look into the report, then deleted. The site checks every hour.
@@ -237,6 +299,37 @@ into service. What putting a backup back replaces (the site's records and
 uploads, the bot's join numbers, characters) is set aside on the server for
 30 days, so it can be undone, and then deleted.
 
+## What the launcher keeps on your PC
+
+The launcher keeps these in the Profile folder of the folder it is installed
+in (C:\Thornswood\Profile, unless you installed it somewhere else). None of
+it leaves your PC except as this page says above.
+
+- **Its log**, launcher.log, the one described above. Each line is kept for
+  30 days, then removed: the launcher cuts the log every time it starts.
+- **Support reports**, the zips Build the report on Diagnostics makes for a
+  ticket in the Discord. Each holds a copy of the log and a short summary of
+  your machine. Nothing sends them; only you do, by posting one. Each is kept
+  for 30 days, then deleted the next time the launcher starts.
+- **Your Discord sign-in**, so you are not asked to sign in every time. The
+  sign-in itself is locked so only your Windows account can read it, and your
+  Discord name and picture are kept beside it in plain files, for the Discord
+  card at the top of the launcher. They are kept until you uninstall.
+- **The voice browser's data.** Voice runs in a small built-in browser,
+  Microsoft Edge WebView2, which keeps its cache and storage in a folder of
+  its own. It is kept until you uninstall. An older launcher ran the menu
+  music in one as well, and that folder goes the same way.
+- **Your characters, saves and settings**, and the launcher's record of what
+  it installed, kept until you uninstall.
+
+**Uninstalling** from the launcher's Settings page removes all of it. With
+"Keep this build's saves and settings" ticked, as it is unless you untick it,
+only your characters, saves and settings and the launcher's record of what it
+installed stay. The log, the Discord sign-in, name and picture, the support
+reports and the browser data go either way, and if one of them cannot be
+removed, the launcher's last message names it so you can delete it yourself.
+Deleting the install folder yourself removes everything as well.
+
 ## Deleting it
 
 Ask in the Discord, or open a ticket there with **I need help**. Say which
@@ -250,8 +343,11 @@ You can also ask what is kept about your account, request a copy, or ask to
 correct it. Use a private ticket for account details rather than a public
 Discord message. Do not send a government identity document.
 
-What deletion means here: your Discord link, your session records, your chat,
-your character, your answer to the rules, the applications and calls for
+A request covers what Thornswood keeps, not your PC: what the launcher keeps
+there is yours, and uninstalling removes it (above).
+
+What deletion means here: your Discord link, your session records and the
+logs your launcher sent with them, your chat, your character, your answer to the rules, the applications and calls for
 help you sent through the site, your gallery pictures and your join number.
 A ticket in the Discord, and the bot's lines about it in the staff ticket
 log, are not deleted by a request: each stays until its 365 days above are
@@ -259,7 +355,8 @@ up, because it is the record of what you were told. What cannot be undone is som
 else has already quoted in a report, because that now belongs to the report.
 Staff's own records stay for the same reason: a ban, a note, a character
 killed for good, a report you made or one made about you, a line in a staff
-log, and a session staff marked kept because a report rests on it. A request
+log, a session staff marked kept because a report rests on it, with its logs,
+and a log line already posted in the staff channel. A request
 does not delete them, and they still go when their time above is up. A completed request is written down
 with your Discord id and character numbers and nothing else, so that an older
 backup put back into service has you removed again first. Until every game
@@ -273,7 +370,10 @@ The Owner, the Co-Owner and the Dev rank, who run the site and the servers,
 can see all of it, chat and session records included. The other staff ranks
 see the parts their job needs: the staff who work in the world (Gamemasters
 and Loremasters) see the staff records and the gallery queue, and calls for
-help and reports reach staff in the Discord's staff channels. Nothing is sold,
+help and reports reach staff in the Discord's staff channels. The logs sent
+when a session ends are read on the site by the Owner, the Co-Owner and the
+Dev rank only; the one line from them that shows a crash or an error is
+posted where all staff can read it. Nothing is sold,
 shared or handed to anybody else, and there is nobody to hand it to.
 
 ## Children

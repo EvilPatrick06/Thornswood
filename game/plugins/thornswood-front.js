@@ -35,8 +35,9 @@
   // ours: this file does nothing at all. Unreadable: carry on, as before.
   //
   // Ours is the address in Thornswood.ini's ServerAddress line when there is
-  // one, so a server move is an ini edit, and the fixed address below when
-  // there is not.
+  // one, and the game's own name below when there is not: the launcher writes
+  // that name into server-ip, never the box's address (#3690), so a server
+  // move is a DNS record and nothing here.
   //
   // This is the one copy (issue #485). The other plugins in game/plugins hold
   // no check of their own: this file publishes it below as
@@ -45,7 +46,7 @@
   // tests/test-whose-game-gate.js holds that together.
   if (!thornswoodGame()) { return; }
   function thornswoodGame() {
-    const ours = ['192.135.112.23'];
+    const ours = ['play.thornswood.net'];
     let ip = '';
     try {
       const fs = require('fs');
@@ -96,7 +97,8 @@
                     'thornswood-skills.js', 'thornswood-party.js',
                     'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js',
                     'thornswood-repair.js', 'thornswood-treat.js', 'thornswood-maneuvers.js', 'thornswood-ride.js',
-                    'thornswood-help.js', 'thornswood-settings.js', 'thornswood-afk.js', 'thornswood-box.js', 'thornswood-ship.js', 'thornswood-furniture.js'];
+                    'thornswood-help.js', 'thornswood-settings.js', 'thornswood-afk.js', 'thornswood-box.js', 'thornswood-ship.js',
+                    'thornswood-preserve.js', 'thornswood-furniture.js', 'thornswood-stall.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -476,6 +478,15 @@
   */
   let TREAT_SELF_KEY = TRADE_KEY;
   /*
+    "Salt or smoke your food" in the inventory (#3163). THE FRIEND KEY, Y,
+    and not a new one: every letter is already Skyrim's or ours. In the
+    inventory the social keys refuse to act and Skyrim binds nothing to Y,
+    and U, H and X, the other three keys with a line there, are other keys,
+    so all four lines can be up at once. Rebinding FriendKey moves both. See
+    preservePress.
+  */
+  let PRESERVE_KEY = FRIEND_KEY;
+  /*
     A warrior's maneuvers (#1386): opens the maneuver panel. 9, scan code 10:
     1 to 8 are the game's own favourites hotkeys (and the emote slots while
     the wheel is open), and every letter is already one of ours or the game's.
@@ -537,6 +548,7 @@
   let HELP_NAME = keyName(HELP_KEY);
   let TREAT_NAME = keyName(TREAT_KEY);
   let TREAT_SELF_NAME = keyName(TREAT_SELF_KEY);
+  let PRESERVE_NAME = keyName(PRESERVE_KEY);
 
   /*
     A KEY CHANGED IN THE GAME (#3126). The Settings panel writes
@@ -565,6 +577,7 @@
     HAIR_DYE_KEY = SKILLS_KEY;
     TREAT_KEY = LOCK_KEY;
     TREAT_SELF_KEY = TRADE_KEY;
+    PRESERVE_KEY = FRIEND_KEY;
     MANEUVER_KEY = iniNumber(ini, 'ManeuverKey', SETTINGS_KEYS.ManeuverKey);
     HELP_KEY = iniNumber(ini, 'HelpKey', SETTINGS_KEYS.HelpKey);
     TALK_KEY = iniNumber(ini, 'PushToTalk', SETTINGS_KEYS.PushToTalk);
@@ -583,6 +596,7 @@
     HELP_NAME = keyName(HELP_KEY);
     TREAT_NAME = keyName(TREAT_KEY);
     TREAT_SELF_NAME = keyName(TREAT_SELF_KEY);
+    PRESERVE_NAME = keyName(PRESERVE_KEY);
     CLOSE_GAME_KEY = iniNumber(ini, 'CloseGameKey', SETTINGS_KEYS.CloseGameKey);
     CLOSE_GAME_NAME = keyName(CLOSE_GAME_KEY);
   }
@@ -677,6 +691,33 @@
   // settings hold the last one played and the real answer comes from the main
   // menu (the block below), so this is reassigned when the choice is made.
   let PROFILE = Number((client.gameData || {}).profileId) || 0;
+  // For the other plugins, which read the settings file and so had the
+  // character played last rather than the one picked (#3128): voice asks
+  // this, and follows a pick made again at the choice in the game.
+  T.profile = function () { return PROFILE; };
+
+  /*
+    Whose a join pass is: its p, or 0 (#3128). jp1.<payload>.<mac>, the
+    payload base64url JSON the site signs (readPass in gamemode.js reads the
+    same). Only read here, never trusted: the server checks the signature.
+    A pass is put in storage and sent only for the character this game is
+    now, so a character picked again at the choice in the game is never
+    offered the one before it's pass while the launcher fetches its own.
+  */
+  function passProfile(raw) {
+    const parts = String(raw || '').split('.');
+    if (parts.length !== 3 || parts[0] !== 'jp1') { return 0; }
+    const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    let bits = 0, acc = 0, text = '';
+    for (let i = 0; i < parts[1].length; i++) {
+      const v = A.indexOf(parts[1].charAt(i));
+      if (v < 0) { return 0; }
+      acc = ((acc << 6) | v) & 0xffffff;
+      bits += 6;
+      if (bits >= 8) { bits -= 8; text += String.fromCharCode((acc >> bits) & 255); }
+    }
+    try { return Number(JSON.parse(text).p) || 0; } catch (e) { return 0; }
+  }
 
   // ------------------------------------------------- the main menu choice --
   /*
@@ -1113,9 +1154,19 @@
     // starts in the place in line this game holds for the character it was.
     // Ended by the server (#1157): the slots, with the server's sentence over
     // them, and no place in line.
+    // Change character on K (#3128): the slots and nothing over them, with
+    // the character they just left lit and named, since a character made in
+    // this game has no name in the list the launcher wrote at its pick.
     if (menuAgain) {
       list.intro = false; list.music = '';
-      if (menuAgain.ended) { list.ended = String(menuAgain.ended); } else { list.away = menuAgain; }
+      if (menuAgain.ended) { list.ended = String(menuAgain.ended); }
+      else if (menuAgain.switched) {
+        list.last = menuAgain.id;
+        list.characters.forEach(function (c) {
+          if (c && Number(c.profileId) === menuAgain.id && !c.name && menuAgain.name) { c.name = menuAgain.name; }
+        });
+      }
+      else { list.away = menuAgain; }
     }
     if (has !== 'list' || menuAgain) { T.js('window.THORNSWOOD_SELECT=' + JSON.stringify(list) + ';'); }
     inject('thornswood-select.js');
@@ -1173,7 +1224,35 @@
       lineId = 0;
     }
     log('menu: chosen profile', id);
-    if (menuAgain) { relogAs(id); }
+    if (menuAgain) { pickedAgain(id); relogAs(id); }
+  }
+
+  /*
+    PICKED AGAIN AT THE CHOICE IN THE GAME, maybe as somebody else (#3128).
+
+    The page, the chat's connection and the join pass in storage all outlive
+    the world: they were the character this game was before it came back to
+    the choice (the idle check, the server ending the session, or Change
+    character on K). A pick at the menu at the start of a game is before any
+    of them exist; a pick here is not, so each is moved to the new one here.
+
+    - The chat (and voice, which rides on its socket) joins again as the
+      new character: rejoinAs closes the connection and opens it as id,
+      asking the launcher for that character's own token, and does nothing
+      for the same character.
+    - The join pass in storage, which skymp5-client answers the game
+      server's login challenge with, goes when it is another character's.
+      The client then waits for one, and the joinpass block puts this
+      character's there once the launcher has fetched it (passProfile).
+  */
+  function pickedAgain(id) {
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.rejoinAs(' + id + ',"");}catch(e){}');
+    let jp = null;
+    try { jp = sp.storage.thornswoodJoinPass; } catch (e) { jp = null; }
+    if (jp && typeof jp === 'object' && passProfile(jp.pass) !== id) {
+      try { sp.storage.thornswoodJoinPass = null; } catch (e) { }
+      log('menu: the join pass in storage was another character\'s, so the login waits for profile', id + '\'s own');
+    }
   }
 
   /*
@@ -1403,7 +1482,7 @@
     // The pass when it is new and every minute, as the world does (#937), so
     // a staff role can be seated ahead of the line and a required pass is on hand.
     const pass = readText(LINE_PASS_FILE).trim();
-    const passOk = /^jp1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(pass);
+    const passOk = /^jp1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(pass) && passProfile(pass) === lineId;
     if (passOk && (early || pass !== linePassSent || now - linePassAt >= LINE_PASS_EVERY_MS)) {
       linePassSent = pass;
       linePassAt = now;
@@ -1737,6 +1816,128 @@
     if (now - afkLastInput >= AFK_MS) { afkAsk(now); }
   }));
 
+  /*
+    ------------------------------------------------- change character (#3128)
+
+    Patrick's ask: switch to another character from inside the game, without
+    closing Skyrim and going back through the launcher, and the same screen
+    picks a slot, makes a new character and deletes one. His answer on the
+    report page, 22 Oct: any time out of combat, after a 10 s wait in place.
+
+    THE WAY OUT IS THE ONE THE IDLE CHECK TAKES. Change character on the K
+    panel says 'skills:switch'. The character has to be out of combat, and
+    then stand where it is for SWITCH_WAIT_MS, a line a second saying how long
+    is left. Moving more than SWITCH_MOVE_UNITS, getting into combat, losing
+    health, dying or leaving the world stops it and says why; the button
+    again stops it too. At the end the connection to the game server closes
+    (destroyClient, so skymp5-client does not connect again as the same
+    character), the game goes to the main menu, and the character choice
+    comes up with the slots, the one just left lit (backToChoice). A slot
+    plays that character, an empty one makes a new one and the delete icon
+    forgets one, the way the choice at the start of a game does; a pick
+    connects again (relogAs) as whoever was picked (pickedAgain).
+
+    The game server sees a connection close, as when somebody quits, so the
+    character left is put away the same way. Out of combat is this game's
+    check: closing Skyrim leaves at any moment, so a check on the server
+    would hold nobody who wanted out, and the wait is there so a switch is
+    not a way out of a fight.
+
+    In update only: quitToMainMenu and the reads of the character are
+    Papyrus, and the K panel's message arrives on tick.
+  */
+  const SWITCH_WAIT_MS = 10000;
+  const SWITCH_MOVE_UNITS = 32;
+  let switchAsked = false;   // the button was pressed, for the next update
+  let switchAt = 0;          // when the wait began, 0 while there is none
+  let switchFrom = null;     // { x, y, z, hp } when it began
+  let switchSaid = 0;        // the whole seconds left that were last said
+
+  /* What would stop a switch now, in words, or '' when nothing would. */
+  function switchHeld(pc) {
+    if (!pc) { return 'there is no character'; }
+    try { if (pc.isDead()) { return 'your character is dead'; } } catch (e) { }
+    try { if (pc.isInCombat()) { return 'you are in combat'; } } catch (e) { }
+    return '';
+  }
+
+  function switchWhere(pc) {
+    try {
+      return { x: pc.getPositionX(), y: pc.getPositionY(), z: pc.getPositionZ(),
+               hp: pc.getActorValue('Health') };
+    } catch (e) { return null; }
+  }
+
+  function switchStop(why) {
+    switchAt = 0;
+    switchFrom = null;
+    switchSaid = 0;
+    note('Change of character stopped: ' + why + '.');
+  }
+
+  function switchStart(now) {
+    if (!chooseAtMenu || !(PROFILE > 0)) {
+      note('This game does not choose its character in the game. Close Skyrim and press Play to pick another.');
+      return;
+    }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    const held = switchHeld(pc);
+    if (held) { note('You cannot change character now: ' + held + '.'); return; }
+    switchFrom = switchWhere(pc);
+    if (!switchFrom) { note('You cannot change character now: your character could not be found.'); return; }
+    switchAt = now;
+    switchSaid = 0;
+    log('change character: profile', PROFILE, 'asked; waiting', SWITCH_WAIT_MS / 1000 + 's in place');
+  }
+
+  function switchLeave() {
+    const me = PROFILE;
+    const name = myName();
+    switchAt = 0;
+    switchFrom = null;
+    log('change character: ' + SWITCH_WAIT_MS / 1000 + 's in place and out of combat, so out of the world ' +
+        'to the character choice as profile', me, '(' + (name || 'no name') + ')');
+    afkGone = true;
+    afkClose();
+    try { globalThis.__thornswoodInWorld = false; } catch (e) { }
+    try { sp.mpClientPlugin.destroyClient(); } catch (e) { log('change character: could not close the connection to the game server:', e); }
+    try { sp.Game.quitToMainMenu(); } catch (e) { log('change character: could not go to the main menu:', e); }
+    backToChoice({ id: me, name: name, switched: true });
+  }
+
+  sp.on('update', guard('change character', () => {
+    const now = Date.now();
+    if (switchAsked) {
+      switchAsked = false;
+      if (switchAt) { switchStop('as you asked'); return; }
+      switchStart(now);
+      return;
+    }
+    if (!switchAt) { return; }
+    let here = false;
+    try { here = !!globalThis.__thornswoodInWorld; } catch (e) { here = false; }
+    if (!here || afkGone) { switchStop('you left the world'); return; }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    const held = switchHeld(pc);
+    if (held) { switchStop(held); return; }
+    const at = switchWhere(pc);
+    if (!at) { switchStop('your character could not be found'); return; }
+    const dx = at.x - switchFrom.x, dy = at.y - switchFrom.y, dz = at.z - switchFrom.z;
+    if (dx * dx + dy * dy + dz * dz > SWITCH_MOVE_UNITS * SWITCH_MOVE_UNITS) { switchStop('you moved'); return; }
+    // Against the most it has been since the wait began, so health coming
+    // back first does not hide a hit after it.
+    if (at.hp < switchFrom.hp) { switchStop('you were hurt'); return; }
+    switchFrom.hp = at.hp;
+    const left = Math.ceil((SWITCH_WAIT_MS - (now - switchAt)) / 1000);
+    if (left <= 0) { switchLeave(); return; }
+    if (left !== switchSaid) {
+      switchSaid = left;
+      note('Changing character in ' + left + (left === SWITCH_WAIT_MS / 1000 ? '. Stay where you are.' : '.'));
+    }
+  }));
+
   /* The choice is on screen and this block is holding it up: asking the page
      where it is (1) or watching it (2). */
   function choiceUp() { return menuPhase === 1 || menuPhase === 2; }
@@ -1924,8 +2125,8 @@
    * name that is off by a character rather than saying it has never heard of
    * it. 'Favorites Menu' was such a name. The quick favourites menu, the one
    * on Q, is 'FavoritesMenu', so for as long as somebody had it open this file
-   * believed no menu was open at all: the chat key, the emote wheel, the stuck
-   * watchdog and the controls watchdog all treated it as open world. The magic
+   * believed no menu was open at all: the chat key, the emote wheel and the
+   * old stuck and controls watchdogs (#2620) all treated it as open world. The magic
    * menu was simply missing. Both are what skymp5-client's own isBadMenuShown
    * asks for, spelled the way it spells them.
    */
@@ -2252,10 +2453,10 @@
   */
   const CAP_CLOSES = {
     skills: 'thornswoodSkills', party: 'thornswoodParty', journal: 'thornswoodJournal',
-    board: 'thornswoodBoard', repair: 'thornswoodRepair', treat: 'thornswoodTreat',
+    board: 'thornswoodBoard', repair: 'thornswoodRepair', treat: 'thornswoodTreat', preserve: 'thornswoodPreserve',
     trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
     afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers', ride: 'thornswoodRide',
-    help: 'thornswoodHelp', settings: 'thornswoodSettings', box: 'thornswoodBox', ship: 'thornswoodShip'
+    help: 'thornswoodHelp', settings: 'thornswoodSettings', box: 'thornswoodBox', ship: 'thornswoodShip', stall: 'thornswoodStall'
   };
 
   T.claimFocus = function (who, on) {
@@ -2515,7 +2716,6 @@
   // Set while we are re-activating something, so our own call does not come
   // back through this handler and recurse.
   let reActivating = false;
-  let lastActivateAt = 0;
   const lastForced = {};
 
   /*
@@ -2662,16 +2862,11 @@
       Skyrim there has ever been. An activation with no actionRef at all
       (caster 0) is the game activating something while a cell loads, which is
       likewise not a press, so it is dropped with the rest.
-
-      lastActivateAt is set AFTER this, not before. It feeds the focus
-      watchdog's "activated something Xms ago", and a farmhand's day of work
-      is not a reason to believe the person is busy.
     */
     let casterId = 0;
     try { casterId = e.caster ? e.caster.getFormID() : 0; } catch (err) { }
     if (casterId !== 0x14) { return; }
 
-    lastActivateAt = now;
     if (reActivating) { return; }
 
     let target = 0, base = 0, type = -1, blocked = 'unknown', name = '';
@@ -2967,10 +3162,10 @@
     watcher below). This side only says which of the two it saw.
   */
   let restSent = false;
-  /* #843: chairs/benches leave controls off with no menu. The controls
-     watchdog and the stuck rescue both refuse to fight that
-     state when notOurs() says so. getFurnitureReference alone can flicker
-     null while still seated, so furnitureEnter/Exit keep a seated flag too. */
+  /* #843: chairs/benches leave controls off with no menu. ownTheCharacter,
+     holdSprintGate and holdNpcClear refuse to fight that state when
+     notOurs() says so. getFurnitureReference alone can flicker null while
+     still seated, so furnitureEnter/Exit keep a seated flag too. */
   let seatedInFurniture = false;
 
   try {
@@ -3727,30 +3922,21 @@
   }));
 
   /*
-   * Whether the game is letting the character be driven at all.
+   * The eight control flags, read for the log and nothing else (#2620).
    *
-   * This is the last way the game can ignore the keyboard, and the only one
-   * left standing. The pulse has now shown a lock with keys arriving here at
-   * six hundred every five seconds, no menu open, and browser focus off. So
-   * the keys are reaching the process, nothing is holding them, and the game
-   * is deciding to do nothing with them.
+   * Skyrim's EnablePlayerControls and DisablePlayerControls take these flags.
+   * Two timers used to sit here, the controls watchdog and the stuck rescue,
+   * that switched every control back on and took the character off the AI
+   * without knowing who had switched them off. The tester logs from 24
+   * September to 16 October say what they were catching: the mining furniture
+   * switching fighting and camera off on purpose, which #843 taught notOurs()
+   * to see, and nothing else. The keyboard lock they were written for was the
+   * engine's console idle branch, switched off in the fork. Nothing in this
+   * tree switches a control off or turns AI driven on, so both are gone.
    *
-   * Skyrim has exactly one switch for that. EnablePlayerControls and its
-   * opposite take eight flags, and with movement and looking off the character
-   * stands there ignoring you while everything else in the process carries on
-   * normally. Its cousin SetPlayerAIDriven hands the character to the AI, which
-   * is the same silence plus the character walking off on its own, which is the
-   * other half of what has been reported for days.
-   *
-   * Both are switched on by somebody and switched back off by the same
-   * somebody, so anything that throws, disconnects or is simply never told to
-   * finish leaves them stuck. There is no getter for AI driven and no way to
-   * ask who did it, so this does not try to find out. It waits five seconds,
-   * says which ones are off, and turns them back on.
-   *
-   * Five seconds because a real one is momentary. Menus are excluded outright:
-   * the game switches controls off for its own menus and race creation, and
-   * those turn themselves back on.
+   * What stays is the reading: the five second input line below names any
+   * control that is off, so a control that ever sticks again is in the log
+   * with its name, which is the trail to whatever switched it off.
    */
   const CONTROLS = [
     ['movement', 'isMovementControlsEnabled'],
@@ -3763,38 +3949,44 @@
     ['journal', 'isJournalControlsEnabled']
   ];
 
-  let controlsOffNow = [];
-  let controlsSince = 0;
+  /*
+    CONTROLS THE SERVER HOLDS OFF ON PURPOSE (#2573, #2620).
+
+    Whoever switches a control off on purpose says so in sp.storage
+    .thornswoodControlsHeld: a name per control (the names in CONTROLS) with
+    the reason. The cuffs' own property script sets 'fighting' while somebody
+    is bound and takes it off when they are freed (#2573). sp.storage, not a
+    variable here, because the property script runs outside this file.
+
+    Nothing in this file switches a held control back on, or any other: the
+    input line reads the record so the log tells a control held off on
+    purpose apart from one that is off with nobody saying why.
+  */
+  function heldOff() {
+    let h = null;
+    try { h = sp.storage.thornswoodControlsHeld || null; } catch (e) { h = null; }
+    const out = [];
+    if (h && typeof h === 'object') {
+      for (const k of Object.keys(h)) { if (h[k]) { out.push(k); } }
+    }
+    return out;
+  }
 
   /*
-    Two states where controls being off is the game doing its job.
-
-    Death, and sitting in anything. The watchdog turns every control back on
-    and takes the character off the AI after five seconds with no menu open,
-    and neither dying nor riding a carriage opens a menu, so it fought the
-    death camera and the respawn wait every time somebody was killed and it
-    stood people up out of chairs, beds and carriages.
+    Two states where controls being off is the game doing its job: death, and
+    sitting in anything (chairs, benches, beds, carts, mining, chopping).
+    Dying and sitting both switch controls off on purpose and open no menu.
+    ownTheCharacter, holdSprintGate and holdNpcClear leave both alone.
 
     Both answers are cheap and both are wrapped, because a build without one
-    of these natives must not take the watchdog down with it.
+    of these natives must not take its callers down with it. Cached at a
+    quarter second: several handlers ask every frame, and getPlayer, isDead
+    and the furniture and sit reads do not need answering thirty times a
+    frame (measured 26 September, #1033 audit).
   */
-
-  /* Same reason as the menu cache above: nine native calls a frame for an
-     answer that only matters once it has held for five seconds. Death and
-     furniture get the same rate: a five-second watchdog does not need them
-     thirty times a frame.
-
-     MEASURED 26 September after MENU_CACHE_MS and CONTROLS_CACHE_MS were
-     already 250: controls was still #1 in 11/13 heartbeats (366-736 ms per
-     ~30 s). The residual was this handler still calling getPlayer and
-     notOurs (getPlayer again, isDead, furniture/sit state) on every
-     update. The whole tick now shares that quarter-second rate. */
   const CONTROLS_CACHE_MS = 250;
-  let controlsCachedAt = 0;
-  let controlsCached = [];
   let notOursCachedAt = 0;
   let notOursCached = '';
-  let controlsTickAt = 0;
 
   function notOursNow() {
     let pc = null;
@@ -3802,10 +3994,10 @@
     if (!pc) { return ''; }
     try { if (pc.isDead()) { return 'dead'; } } catch (e) { }
     /* Chair/bench kick-out (#843). Sitting turns controls off with no menu.
-       enablePlayerControls / setPlayerAIDriven(false) stand people up. Three
+       enablePlayerControls / setPlayerAIDriven(false) stood people up. Three
        signals, any one is enough: the enter/exit flag, the furniture ref,
        and getSitState (non-zero = waiting to sit, sitting, or standing up).
-       The ref alone used to flicker null and the watchdog kicked them out. */
+       The ref alone used to flicker null and the old watchdog kicked them out. */
     try {
       if (typeof seatedInFurniture !== 'undefined' && seatedInFurniture) {
         return 'in furniture';
@@ -3844,83 +4036,16 @@
     return off;
   }
 
-  function readControls() {
-    const now = Date.now();
-    if (now - controlsCachedAt < CONTROLS_CACHE_MS) { return controlsCached; }
-    controlsCachedAt = now;
-    controlsCached = readControlsNow();
-    return controlsCached;
+  /* The input line's controls part: on, or off with the names, and what the
+     server holds off on purpose named on its own (heldOff). Asked once every
+     five seconds, by the pulse only. */
+  function pulseControls() {
+    const held = heldOff();
+    const off = readControlsNow().filter((name) => held.indexOf(name) === -1);
+    return (off.length ? ', controls off [' + off.join(', ') + ']' : ', controls on') +
+      (held.length ? ', held [' + held.join(', ') + ']' : '');
   }
 
-  function controlsTick() {
-    const now = Date.now();
-    // Happy path and stuck countdown both: four times a second is enough
-    // for a five-second threshold, and keeps getPlayer / isDead /
-    // getFurnitureReference / isMenuOpen off the every-frame path.
-    if (now - controlsTickAt < CONTROLS_CACHE_MS) { return; }
-    controlsTickAt = now;
-
-    let pc = null;
-    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
-    if (!pc || busyMenuOpen()) { controlsOffNow = []; controlsSince = 0; return; }
-    // Dying and sitting both switch controls off on purpose and open no menu.
-    const theirs = notOurs();
-    if (theirs) { controlsOffNow = []; controlsSince = 0; return; }
-
-    const off = readControls();
-    controlsOffNow = off;
-    if (!off.length) { controlsSince = 0; return; }
-
-    if (!controlsSince) { controlsSince = now; return; }
-    if (now - controlsSince < 5000) { return; }
-    controlsSince = 0;
-
-    try {
-      // Nine, not eight. Special Edition added abFastTravel to the end of both
-      // EnablePlayerControls and DisablePlayerControls, and the binding counts
-      // them. Passing eight threw every single time this ran, so the watchdog
-      // has been reporting the problem and never once fixing it.
-      sp.Game.enablePlayerControls(true, true, true, true, true, true, true, true, true);
-      try { sp.Game.setPlayerAIDriven(false); } catch (e) { }
-      say('the game had controls switched off with no menu open (' +
-          off.join(', ') + '). turned them back on.');
-    } catch (e) {
-      say('tried to turn controls back on and it threw: ' + e);
-    }
-  }
-
-  sp.on('update', guard('controls', controlsTick));
-
-  /*
-   * Keys arriving and the character not moving. The lock, finally stated as
-   * something that can be measured.
-   *
-   * Every check in this file has now come back clean during a lock: keys reach
-   * the plugin at four hundred every five seconds, no menu is open, the browser
-   * does not have focus, all eight control flags read enabled, and DirectInput
-   * reports a healthy device on every read. The console turning up is not the
-   * cause either; the log shows it appearing AFTER two pulses of four hundred
-   * keys, which is somebody mashing an unresponsive game and eventually hitting
-   * the console key themselves.
-   *
-   * What is left is SetPlayerAIDriven. It hands the character to the AI, and
-   * while it is on the character ignores every key with all eight control flags
-   * still reading enabled, because they are enabled: they are just not what is
-   * driving anybody. It is the one state in this whole search with NO getter,
-   * which is exactly why it has survived every check written so far. Anything
-   * that turns it on and then throws, disconnects, or is never told to finish
-   * leaves it on.
-   *
-   * So this measures the symptom instead of the state. Somebody pressing forty
-   * keys in five seconds while standing perfectly still, with no menu open and
-   * not typing in chat, is not playing: they are stuck. That is the moment to
-   * switch the controls back on and take the character off the AI, both of
-   * which are harmless when nothing was wrong.
-   *
-   * Cart rides are the one legitimate AI driven moment on this server, and they
-   * survive: forty key presses in five seconds is mashing, not the occasional
-   * press of somebody sitting still watching the scenery.
-   */
   /*
     ------------------------------------- three chopping blocks, taken away
 
@@ -5797,8 +5922,77 @@
     ['JKs Skyrim.esp', 0x2493e], ['JKs Skyrim.esp', 0x2493d], ['JKs Skyrim.esp', 0x2c91],
     ['JKs Skyrim.esp', 0x3274], ["JK's Whiterun's Outskirts.esp", 0x1503ff],
     ["JK's Whiterun's Outskirts.esp", 0x18d5d7], ["JK's Whiterun's Outskirts.esp", 0x141081],
-    ["JK's Whiterun's Outskirts.esp", 0x141088]
+    ["JK's Whiterun's Outskirts.esp", 0x141088],
+    // The HearthFires garden planters, plots since #3141.
+    ['HearthFires.esm', 0x1045e], ['HearthFires.esm', 0x1045f], ['HearthFires.esm', 0x10460],
+    ['HearthFires.esm', 0x110b9], ['HearthFires.esm', 0x110ba], ['HearthFires.esm', 0x110cd]
   ];
+  /*
+    A MARKET STALL (#3160). Stalls are fixed market stalls (Patrick, 22 Oct
+    2026), and a stall's counter is a static, which the crosshair never
+    names. So the line goes up by where somebody stands: within a stall's
+    reach of the point in front of its counter, in its world or cell, with
+    nothing else of the lock key's under the crosshair, the line says Market
+    stall, and the lock key sends /stall open and the stall's id. The server
+    checks again that they stand there, and its panel does the rest
+    (game/ui/thornswood-stall.js).
+  */
+  // MARKET STALL SPOTS BEGIN
+  // Built by scripts\dev\Build-MarketStallsGamemode.js out of game\data\market-stalls.json. Do not hand edit.
+  const STALL_SPOTS = [
+    ["falkreath-e0b1", 0x3c, "Skyrim.esm", -54113, -34305, -3633, 335],
+    ["falkreath-e0b2", 0x3c, "Skyrim.esm", -54413, -34602, -3620, 335],
+    ["markarth-473a0", 0x16d71, "Skyrim.esm", -174050, 5729, -3363, 183],
+    ["markarth-473a1", 0x16d71, "Skyrim.esm", -174136, 6065, -3328, 183],
+    ["markarth-7de", 0x3c, "Skyrim.esm", -168656, 6632, -4331, 183],
+    ["morthal-bc995", 0x3c, "Skyrim.esm", -85314, 57199, -11567, 254],
+    ["morthal-bc996", 0x3c, "Skyrim.esm", -85377, 57518, -11568, 254],
+    ["riften-1b1f7a", 0x16bb4, "Skyrim.esm", 176485, -98728, 11211, 260],
+    ["riften-1b1f7c", 0x16bb4, "Skyrim.esm", 176213, -99094, 11207, 202],
+    ["riften-1dd1", 0x16bb4, "Skyrim.esm", 172370, -96376, 11128, 202],
+    ["riften-1dd2", 0x16bb4, "Skyrim.esm", 172370, -96231, 11128, 202],
+    ["riften-cc524", 0x16bb4, "Skyrim.esm", 173755, -96726, 11104, 252],
+    ["riften-cc52d", 0x16bb4, "Skyrim.esm", 173079, -97352, 11104, 309],
+    ["riften-cc52e", 0x16bb4, "Skyrim.esm", 173779, -97306, 11104, 257],
+    ["solitude-1aa3b", 0x3c, "Skyrim.esm", -59552, 100648, -13958, 224],
+    ["solitude-2a11", 0x37edf, "Skyrim.esm", -61093, 105827, -8410, 224],
+    ["solitude-2a1b", 0x37edf, "Skyrim.esm", -61315, 105933, -8418, 209],
+    ["solitude-2a49", 0x37edf, "Skyrim.esm", -60786, 105792, -8410, 224],
+    ["solitude-357d", 0x37edf, "Skyrim.esm", -59225, 107632, -8021, 224],
+    ["solitude-46f5", 0x37edf, "Skyrim.esm", -60730, 104169, -8307, 224],
+    ["solitude-4725", 0x37edf, "Skyrim.esm", -61764, 104094, -8307, 224],
+    ["solitude-50c6a", 0x37edf, "Skyrim.esm", -61161, 104924, -8335, 224],
+    ["solitude-5133", 0x3c, "Skyrim.esm", -58740, 101161, -13959, 224],
+    ["solitude-64b8c", 0x37edf, "Skyrim.esm", -61200, 104536, -8334, 224],
+    ["solitude-64b8d", 0x37edf, "Skyrim.esm", -61605, 104462, -8333, 224],
+    ["whiterun-1908f", 0x1a26f, "Skyrim.esm", 21453, -7327, -3587, 254],
+    ["whiterun-5b2e4", 0x1a26f, "Skyrim.esm", 25242, -7425, -3393, 254],
+    ["whiterun-5bee6", 0x1a26f, "Skyrim.esm", 25156, -7089, -3400, 314],
+    ["whiterun-6b0b6", 0x1a26f, "Skyrim.esm", 24382, -7187, -3399, 335],
+    ["whiterun-b7f00", 0x3c, "Skyrim.esm", 12937, -10803, -4726, 238],
+    ["whiterun-fe7f", 0x1a26f, "Skyrim.esm", 24312, -6755, -3422, 270],
+    ["windhelm-383a6", 0x1691d, "Skyrim.esm", 130794, 36455, -12272, 236],
+    ["windhelm-38403", 0x1691d, "Skyrim.esm", 130808, 35750, -12276, 236],
+    ["windhelm-38404", 0x1691d, "Skyrim.esm", 130560, 36224, -12272, 236],
+    ["windhelm-80c33", 0x3c, "Skyrim.esm", 135265, 30774, -12565, 202],
+    ["windhelm-8b01e", 0x1691d, "Skyrim.esm", 134225, 39412, -12049, 236],
+    ["windhelm-8b0a", 0x1691d, "Skyrim.esm", 129842, 36459, -12272, 236],
+    ["windhelm-8b0fb", 0x3c, "Skyrim.esm", 135301, 30408, -12581, 177],
+    ["windhelm-8b6c", 0x1691d, "Skyrim.esm", 130415, 35648, -12272, 236],
+    ["windhelm-a48fc", 0x1691d, "Skyrim.esm", 137951, 38182, -12643, 208],
+    ["windhelm-b4bb", 0x1691d, "Skyrim.esm", 137721, 38748, -12660, 219],
+    ["windhelm-f3c74", 0x1691d, "Skyrim.esm", 131041, 35666, -12272, 219],
+    ["windhelm-f3c75", 0x1691d, "Skyrim.esm", 130560, 36016, -12272, 219],
+    ["winterhold-76d1", 0x3c, "Skyrim.esm", 114289, 104184, -9405, 202],
+    ["winterhold-76d3", 0x3c, "Skyrim.esm", 114562, 104038, -9392, 183],
+    ["winterhold-76e1", 0x3c, "Skyrim.esm", 114011, 103748, -9225, 202],
+    ["winterhold-76e2", 0x3c, "Skyrim.esm", 113403, 100147, -8954, 183],
+    ["winterhold-76e4", 0x3c, "Skyrim.esm", 113628, 100266, -9020, 202],
+    ["winterhold-76e5", 0x3c, "Skyrim.esm", 112678, 100814, -8953, 202],
+    ["winterhold-76e6", 0x3c, "Skyrim.esm", 112650, 100647, -8944, 202]
+  ];
+  // MARKET STALL SPOTS END
+  let stallWorlds = null;  // null not resolved yet, else { stall id: runtime world or cell id }
   const PLOT_ASK_MS = 10000;     // asked again this often while one crop is looked at
   const PLOT_LINE_MS = 30000;    // an answer older than this is not drawn
   let lockAt = 0;
@@ -5894,9 +6088,61 @@
 
   const LOCK_WORDS = { claim: 'Claim ', lock: 'Lock ', unlock: 'Unlock ' };
 
+  /** The lock key's line at a stall: what stallAt finds, with no menu over it. */
+  function stallNow() {
+    const s = stallAt();
+    if (!s || busyMenuOpenNow()) { return null; }
+    return { hex: s, verb: 'stall open', words: 'Market stall' };
+  }
+
+  /** The id of the stall somebody is standing at, by STALL_SPOTS, or ''. */
+  function stallAt() {
+    if (!STALL_SPOTS.length) { return ''; }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    if (!pc) { return ''; }
+    if (!stallWorlds) {
+      const got = {};
+      let found = 0;
+      for (let i = 0; i < STALL_SPOTS.length; i++) {
+        try {
+          const f = sp.Game.getFormFromFile(STALL_SPOTS[i][1], STALL_SPOTS[i][2]);
+          const id = f ? (f.getFormID() >>> 0) : 0;
+          if (id) { got[STALL_SPOTS[i][0]] = id; found++; }
+        } catch (e) { }
+      }
+      if (!found) { return ''; }
+      stallWorlds = got;
+      say('market stalls for the lock key: ' + found + ' of ' + STALL_SPOTS.length + ' found');
+    }
+    let where = 0, x = 0, y = 0, z = 0;
+    try {
+      const w = pc.getWorldSpace();
+      const c = pc.getParentCell();
+      where = w ? (w.getFormID() >>> 0) : (c ? (c.getFormID() >>> 0) : 0);
+      x = pc.getPositionX(); y = pc.getPositionY(); z = pc.getPositionZ();
+    } catch (e) { return ''; }
+    if (!where) { return ''; }
+    // Two stalls side by side reach over each other: the nearer one is the one at hand.
+    let best = '', bestD = Infinity;
+    for (let i = 0; i < STALL_SPOTS.length; i++) {
+      const s = STALL_SPOTS[i];
+      if (stallWorlds[s[0]] !== where) { continue; }
+      const dx = x - s[3], dy = y - s[4], dz = z - s[5];
+      const d = dx * dx + dy * dy + dz * dz;
+      if (d <= s[6] * s[6] && d < bestD) { best = s[0]; bestD = d; }
+    }
+    return best;
+  }
+
   /** What the lock key would do right now: { hex, verb, words }, or null. */
   function lockKeyNow() {
     if (anyClaim()) { return null; }
+    return lockKeyRef() || stallNow();
+  }
+
+  /** What the lock key would do at what is under the crosshair: a door, a crop or a forge. */
+  function lockKeyRef() {
     let ref = null;
     try { ref = sp.Game.getCurrentCrosshairRef(); } catch (e) { ref = null; }
     if (!ref) { return null; }
@@ -6253,6 +6499,84 @@
     catch (err) { say('treat: closeMenu threw on the inventory: ' + err); }
     tellServer('/treat');
     say('pressed ' + TREAT_SELF_NAME + ' in the inventory with a wound to tend, asked the server for the treatment panel');
+    return true;
+  }
+
+  /*
+    ------------------------------------- salting and smoking food, from the inventory
+
+    #3163. Food spoils (docs/systems/spoilage.md), and a cook keeps raw meat
+    and fish by salting or smoking it. There is no item to use for that, so
+    it is the repair kit's pattern: while the inventory is open and the
+    server says you may preserve something you carry, one line at the bottom
+    names a key, and that key shuts the inventory and asks the server for
+    the preserving panel (game/ui/thornswood-preserve.js), whose buttons
+    send the rest. /preserve is that ask; nobody is told to type it.
+
+    Whether there is anything to preserve is the server's: you have to be a
+    cook and carry raw food that spoils, and its spoilage block writes that
+    on the thornswoodPreserveLine property, whose owner's script sets
+    globalThis.thornswoodPreserveLine. Above the furniture line, so all four
+    can be up.
+  */
+  let preserveShown = false;
+  const PRESERVE_CSS = REPAIR_CSS.replace('bottom:12%', 'bottom:27%');
+
+  function preserveCan() {
+    try { return !!globalThis.thornswoodPreserveLine; } catch (e) { return false; }
+  }
+
+  /** The line up or down. Only remembered once the page has taken it. */
+  function drawPreserveLine(on) {
+    if (on === preserveShown) { return; }
+    if (!on) {
+      if (T.js('try{var d=document.getElementById("ts-preserve-line");if(d){d.style.display="none";}}catch(e){}')) {
+        preserveShown = false;
+      }
+      return;
+    }
+    const html =
+      '<span style="display:inline-block;min-width:26px;text-align:center;margin-right:12px;' +
+      'padding:1px 7px;border:1px solid rgba(233,209,155,.55);border-bottom-width:2px;' +
+      'border-radius:3px;background:rgba(0,0,0,.35);color:#e9d19b">' + PRESERVE_NAME + '</span>' +
+      'Salt or smoke your food';
+    if (T.js('(function(){try{' +
+             'var d=document.getElementById("ts-preserve-line");' +
+             'if(!d){d=document.createElement("div");d.id="ts-preserve-line";' +
+             'd.style.cssText=' + JSON.stringify(PRESERVE_CSS) + ';' +
+             'document.body.appendChild(d);}' +
+             'd.innerHTML=' + JSON.stringify(html) + ';' +
+             'd.style.display="";' +
+             '}catch(e){}})();')) {
+      preserveShown = true;
+    }
+  }
+
+  sp.on('menuOpen', guard('preserve line up', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    drawPreserveLine(!!T.ready && preserveCan());
+  }));
+  sp.on('menuClose', guard('preserve line down', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    drawPreserveLine(false);
+  }));
+
+  /*
+    The key, in the inventory. Asked again at the press: the inventory open,
+    nothing typing, something to preserve. Answers whether it was used, so
+    the key falls through when it was not.
+  */
+  function preservePress() {
+    if (!T.ready || claims.chat) { return false; }
+    let open = false;
+    try { open = !!sp.Ui.isMenuOpen(INVENTORY_MENU); } catch (e) { open = false; }
+    if (!open) { return false; }
+    if (!preserveCan()) { drawPreserveLine(false); return false; }
+    drawPreserveLine(false);
+    try { sp.TESModPlatform.closeMenu(INVENTORY_MENU); }
+    catch (err) { say('preserve: closeMenu threw on the inventory: ' + err); }
+    tellServer('/preserve');
+    say('pressed ' + PRESERVE_NAME + ' in the inventory with food to preserve, asked the server for the preserving panel');
     return true;
   }
 
@@ -6743,8 +7067,10 @@
     the same three colours your own microphone takes while you speak
     (docs/systems/voice.md): whisper pale blue, ordinary white, yell amber.
     Never the party's green, which is the name's alone. It is a round dot
-    out of DIN-Pro-bold, a font the fork ships with Skyrim Platform, because
-    the asterisk in the client's own Tavern was eleven pixels high.
+    out of Barlow-SemiBold, Thornswood's own sprite font from the OFL face
+    (game\ours, scripts\mods\Build-SpriteFont.py), because the asterisk in
+    the client's own Tavern was eleven pixels high. Until #1317 it was
+    DIN-Pro-bold, a picture of a commercial face nobody may hand on.
   */
   const HEAD_MS = 6000;
   const HEAD_COLOUR = [0.95, 0.91, 0.82, 0.95];
@@ -6753,9 +7079,9 @@
     local: [1, 1, 1, 0.95],
     yell: [0.93, 0.68, 0.22, 0.95]
   };
-  const MARK_TEXT = '\u2022';            // a bullet, in DIN-Pro-bold.spritefont
-  const MARK_FONT = 'DIN-Pro-bold';      // client-deps\common\Data\Platform\Fonts in the fork
-  const MARK_SIZE = 1.6;                 // ten pixels of dot at 1.0, so sixteen
+  const MARK_TEXT = '\u2022';            // a bullet, in Barlow-SemiBold.spritefont
+  const MARK_FONT = 'Barlow-SemiBold';   // game\ours\Data\Platform\Fonts (#1317)
+  const MARK_SIZE = 1.8;                 // nine pixels of dot at 1.0, so sixteen
   const MARK_BEAT_MS = 1150;             // twPulse's 1.15s
   const MARK_LOW = 0.58;                 // twPulse's low point
   const overheadHeads = {};
@@ -6984,109 +7310,6 @@
     }
   }));
 
-
-  let stuckKeys = 0;
-  let stuckMoveKeys = 0;
-  let stuckAt = 0;
-  let stuckPos = null;
-  let lastRescue = 0;
-
-  sp.on('update', guard('stuck', () => {
-    const now = Date.now();
-    if (!stuckAt) { stuckAt = now; stuckKeys = 0; return; }
-    if (now - stuckAt < 5000) { return; }
-
-    const keys = stuckKeys;
-    const moveKeys = stuckMoveKeys;
-    stuckKeys = 0;
-    stuckMoveKeys = 0;
-    stuckAt = now;
-
-    let pc = null;
-    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
-
-    const was = stuckPos;
-    let pos = null;
-    try {
-      pos = pc ? [pc.getPositionX(), pc.getPositionY(), pc.getPositionZ()] : null;
-    } catch (e) { pos = null; }
-    stuckPos = pos;
-
-    if (!pc || !pos || !was) { return; }
-
-    const dx0 = pos[0] - was[0];
-    const dy0 = pos[1] - was[1];
-    const dz0 = pos[2] - was[2];
-    const movedNow = Math.sqrt(dx0 * dx0 + dy0 * dy0 + dz0 * dz0);
-
-    /*
-      Say why this did not fire, every time it nearly did.
-      A run where somebody reports being stuck and this file says nothing at
-      all is a wasted run. If the conditions are wrong they can only be fixed
-      by seeing which one said no.
-    */
-    if (keys >= 40 && movedNow <= 8) {
-      const why = [];
-      if (moveKeys < 2) { why.push('only ' + moveKeys + ' movement keys'); }
-      if (now - lastActivateAt < 3000) { why.push('activated something ' + (now - lastActivateAt) + 'ms ago'); }
-      if (claims.chat) { why.push('typing in chat'); }
-      const busyName = busyMenuOpen();
-      if (busyName) { why.push(busyName + ' is open'); }
-      const why2 = notOurs();
-      if (why2) { why.push('they are ' + why2); }
-      if (lastRescue && now - lastRescue < 15000) { why.push('rescued ' + (now - lastRescue) + 'ms ago'); }
-      if (why.length) {
-        say('not calling it stuck: ' + keys + ' keys, ' + moveKeys +
-            ' movement, moved ' + movedNow.toFixed(1) + ' units, but ' +
-            why.join(' and '));
-      }
-    }
-
-    if (keys < 40) { return; }
-    // Somebody trying to walk, not somebody standing at something pressing E.
-    if (moveKeys < 2) { return; }
-    // And not somebody mid interaction: an activation in the last three
-    // seconds means the game is doing something, whatever it looks like.
-    if (now - lastActivateAt < 3000) { return; }
-    if (claims.chat) { return; }
-    if (busyMenuOpen()) { return; }
-    // Somebody dead, or sitting in something, is not stuck. They are dead or
-    // sitting in something, and standing them up is the bug.
-    const notMine = notOurs();
-    if (notMine) { return; }
-
-    const dx = pos[0] - was[0];
-    const dy = pos[1] - was[1];
-    const dz = pos[2] - was[2];
-    const moved = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    if (moved > 8) { return; }
-
-    // Not more than once every fifteen seconds, so a genuine stuck moment does
-    // not turn into something that fights the game every frame.
-    if (lastRescue && now - lastRescue < 15000) { return; }
-    lastRescue = now;
-
-    say('stuck: ' + keys + ' keys in 5s (' + moveKeys +
-        ' of them movement) and the character moved ' +
-        moved.toFixed(1) + ' units. controls ' +
-        (controlsOffNow.length ? 'off [' + controlsOffNow.join(', ') + ']' : 'on') +
-        ', browser focus ' + (function () {
-          try { return sp.browser.isFocused() ? 'yes' : 'no'; } catch (e) { return 'unknown'; }
-        })() +
-        '. Switching controls on and taking the character back off the AI.');
-
-    try {
-      sp.Game.enablePlayerControls(true, true, true, true, true, true, true, true, true);
-    } catch (e) {
-      say('enablePlayerControls threw: ' + e);
-    }
-    try {
-      sp.Game.setPlayerAIDriven(false);
-    } catch (e) {
-      say('setPlayerAIDriven threw: ' + e);
-    }
-  }));
-
   /*
    * Jump and sprint.
    *
@@ -7130,10 +7353,7 @@
    *               for everybody who is not the person playing, and that branch
    *               has no jump or sprint transition to take.
    *
-   * Both are put back where they belong on a two second heartbeat. The
-   * watchdog above already did the first one, but only after somebody had
-   * pressed forty keys in five seconds without moving, and a person who can
-   * walk and run perfectly well never looks stuck, so it never ran for this.
+   * Both are put back where they belong on a two second heartbeat.
    *
    * THAT WAS NOT IT, and this is written here rather than tidied away because
    * the next person will otherwise have the same idea. 1.1.53 shipped the two
@@ -7714,9 +7934,10 @@
       names = open.length ? (' [' + open.join(', ') + ']') : ' [none of the usual ones]';
     }
 
-    const controls = controlsOffNow.length
-      ? ', controls off [' + controlsOffNow.join(', ') + ']'
-      : ', controls on';
+    // Read now, every flag, whatever else is going on (#2620). A menu or a
+    // chair switching some off is named here like anything else; the menu
+    // part of the line says which.
+    const controls = pulseControls();
 
     /*
       Which window Windows is sending the keys to.
@@ -7791,11 +8012,10 @@
 
     And the game's journal cannot be switched off as a whole, because the
     Journal Menu is also what Escape opens, at its System page, which is where
-    people save, change settings and quit. The journal flag on
+    people change settings and quit (#3127 took saving off it). The journal flag on
     DisablePlayerControls is documented as leaving only the System page of
     the book, which takes the quest log mods still write to away from Escape
-    as well, and the controls watchdog above turns every control back on
-    after five seconds anyway.
+    as well.
 
     So the book is shut the moment it opens, when J opened it, with the same
     TESModPlatform.closeMenu that shuts the console.
@@ -8030,16 +8250,17 @@
 
     A classic SkyUI menu keeps its choices in the save, and there is no save
     here, so Apocalypse, AHZmoreHUD, atlas map markers, Skyrim Unbound and
-    chfshVariousActions started from their defaults every session. What a
-    menu writes into a GLOB record can be read from here and put back, and
-    those are the 176 below, out of scripts\mods\Audit-ModMenus.js -v: plugin,
+    chfshVariousActions started from their defaults every session (Atlas
+    leaves the collection with revision 6, #3649, and its menu is no longer
+    kept). What a menu writes into a GLOB record can be read from here and put
+    back, and those are the 78 below, out of scripts\mods\Audit-ModMenus.js -v: plugin,
     editor id, and the id inside the plugin, which does not move when the load
     order does. The gamemode keeps the same table (test-mod-settings.js checks
     the two agree) and refuses any name that is not in it.
 
     READ WHEN THE JOURNAL OPENS AND CLOSES, where the menus live, and once a
     minute for the few a hotkey flips (AHZmoreHUD's widget toggle). Never per
-    frame: a read is 176 native calls. Only what moved since the last read is
+    frame: a read is 78 native calls. Only what moved since the last read is
     sent, as /modset Name=value lines over the chat socket like /place, packed
     under the 400 characters the voice service keeps of a line.
 
@@ -8097,45 +8318,6 @@
       AHZShowInventoryCountWithZero: 0x25831, AHZShowTargetWeight: 0x155dd, AHZShowVW: 0x19112,
       AHZShowWeightClass: 0x11aa2, AHZSideWidgetScale: 0x1b15c, AHZSideWidgetXPercent: 0xdf61,
       AHZSideWidgetYPercent: 0xdf60, AHZToggleState: 0x14b17
-    },
-    'atlas map markers.esp': {
-      ATLASGroupAltarGV: 0x83f, ATLASGroupAltarVanGV: 0x89b, ATLASGroupAnimalDenGV: 0x840,
-      ATLASGroupBLK1GV: 0x841, ATLASGroupBLK2GV: 0x842, ATLASGroupBLK3GV: 0x86d,
-      ATLASGroupBLKLiftsGV: 0x89c, ATLASGroupBYOHHousesGV: 0x89d, ATLASGroupCWCampImpGV: 0x847,
-      ATLASGroupCWCampSonsGV: 0xc72, ATLASGroupCampGV: 0x843, ATLASGroupCampVanGV: 0x89e,
-      ATLASGroupCaravanCampGV: 0x844, ATLASGroupCavesGV: 0x89f, ATLASGroupCityDocksGV: 0x8a0,
-      ATLASGroupCityGV: 0x824, ATLASGroupCityInnGV: 0x845, ATLASGroupCityShopGV: 0x846,
-      ATLASGroupCityStablesGV: 0x8a1, ATLASGroupClearingsGV: 0x8a2, ATLASGroupDB1GV: 0x883,
-      ATLASGroupDB2GV: 0x884, ATLASGroupDB3GV: 0x885, ATLASGroupDB4GV: 0x886,
-      ATLASGroupDG1GV: 0x84d, ATLASGroupDG2GV: 0x84e, ATLASGroupDGFV0GV: 0x84b,
-      ATLASGroupDGFV1GV: 0x848, ATLASGroupDGFV2GV: 0x849, ATLASGroupDGFV3GV: 0x84a,
-      ATLASGroupDGMainGV: 0x8c0, ATLASGroupDGSC1GV: 0x84c, ATLASGroupDGSC2GV: 0x850,
-      ATLASGroupDGSC3GV: 0x851, ATLASGroupDaedricShrinesGV: 0x8a3, ATLASGroupDoomstonesGV: 0x8a4,
-      ATLASGroupDragonGV: 0x852, ATLASGroupDragonLairGV: 0x8a5, ATLASGroupDunExitGV: 0x853,
-      ATLASGroupDwemerRuinsGV: 0x8a6, ATLASGroupFactionCOGV: 0x854, ATLASGroupFactionDBGV: 0x8a8,
-      ATLASGroupFactionDBVanGV: 0x8a9, ATLASGroupFactionMGGV: 0x8a7,
-      ATLASGroupFactionTGVanGV: 0x8aa, ATLASGroupFarmGV: 0x827, ATLASGroupFarmVanGV: 0x8ab,
-      ATLASGroupFishingFreezingGV: 0xc74, ATLASGroupFishingLakeGV: 0xc75,
-      ATLASGroupFishingStreamGV: 0xc76, ATLASGroupFishingUndergroundGV: 0xc77,
-      ATLASGroupFortsGV: 0x8ac, ATLASGroupGiantCampsGV: 0x8ad, ATLASGroupHallDeadGV: 0x855,
-      ATLASGroupImportantGV: 0x856, ATLASGroupImportantTownGV: 0x857,
-      ATLASGroupImportantVanGV: 0x8ae, ATLASGroupInnGV: 0x858, ATLASGroupLandmarkGV: 0x859,
-      ATLASGroupLandmarkVanGV: 0x8af, ATLASGroupLumberMillGV: 0x85a,
-      ATLASGroupLumberMillVanGV: 0x8b0, ATLASGroupMainCitiesGV: 0x8b2,
-      ATLASGroupMainTownsGV: 0x8b3, ATLASGroupMakerStonesGV: 0x8b4, ATLASGroupMineGV: 0x85b,
-      ATLASGroupMineVanGV: 0x8b1, ATLASGroupMntPassesGV: 0x8b5, ATLASGroupMoreCityGV: 0x85c,
-      ATLASGroupMoreCityVanGV: 0x8b6, ATLASGroupMoreTownGV: 0x85d, ATLASGroupNordicRuinsGV: 0x8b7,
-      ATLASGroupOrcHoldsGV: 0x8b8, ATLASGroupPOIGV: 0x85f, ATLASGroupPlayerHomeGV: 0x85e,
-      ATLASGroupRuinGV: 0x860, ATLASGroupShacksGV: 0x8b9, ATLASGroupShipwreckGV: 0x861,
-      ATLASGroupShipwreckVanGV: 0x8ba, ATLASGroupShopGV: 0x862,
-      ATLASGroupShrineAdditionalGV: 0xc7d, ATLASGroupShrineCityGV: 0xc7f,
-      ATLASGroupShrineGV: 0x863, ATLASGroupShrineStepsGV: 0x864, ATLASGroupSkillBookGV: 0x867,
-      ATLASGroupSmallSettlementsGV: 0x8bb, ATLASGroupSpecialLocGV: 0x8c4,
-      ATLASGroupStructuresGV: 0x865, ATLASGroupTempleGV: 0x866, ATLASGroupToSolstheimGV: 0x8bc,
-      ATLASGroupWaterGV: 0x869, ATLAS_CCORDetected: 0x8cb, ATLAS_CorundumToCopperVal: 0x8c6,
-      ATLAS_FishingMarkersEnabled: 0xc78, ATLAS_MalachiteToGlassVal: 0x8c7,
-      ATLAS_MalachiteToMoldaviteVal: 0x8c8, ATLAS_QuicksilverToMithrilVal: 0x8c9,
-      ATLAS_USKPDetected: 0x8ca
     },
     'Skyrim Unbound.esp': {
       DelayDragonLevel1: 0x1209c, DelayDragonLevel2: 0x1209d, DelayDragonMax: 0xfae4,
@@ -8623,17 +8805,20 @@
     }
   }));
 
+  // A market stall's panel closes when you walk away from the stall (#3160).
+  let stallWatchAt = 0;
+  sp.on('update', guard('stall distance', () => {
+    if (!T.hasFocus('stall')) { return; }
+    const now = Date.now();
+    if (now - stallWatchAt < 250) { return; }
+    stallWatchAt = now;
+    if (!stallAt()) {
+      T.js('try{window.thornswoodStall&&window.thornswoodStall.close();}catch(e){}');
+    }
+  }));
+
   sp.on('buttonEvent', guard('keys', (e) => {
     keysSeen++;
-    // Before the isDown guard, not after it.
-    //
-    // The threshold on this was sized against the pulse's number, which counts
-    // every button event including the repeats a held key produces each frame.
-    // Counting only key downs here made those two numbers mean different
-    // things: the ring shows twenty key downs across twenty five seconds while
-    // the pulse was reporting three hundred in five, so forty was never once
-    // reached and the detector could not fire.
-    stuckKeys++;
     if (!e.isDown || e.isUp) return;
 
     rememberKey(e.code);
@@ -8644,12 +8829,6 @@
     // menu. See ourKeyMenu above.
     statsOnSlash.keyDown();
     magicOnP.keyDown();
-    // 17 30 31 32 are W A S D. Somebody standing at a handle pressing E is not
-    // stuck, they are using something, and that is what the one and only
-    // firing of this detector actually caught.
-    if (e.code === 17 || e.code === 30 || e.code === 31 || e.code === 32) {
-      stuckMoveKeys++;
-    }
 
     if (!sawAnyKey) {
       sawAnyKey = true;
@@ -8702,6 +8881,8 @@
     if (e.code === TREAT_KEY && treatPress()) { return; }
     // The trade key in the inventory, with a wound to tend (#1383). See TREAT_SELF_KEY.
     if (e.code === TREAT_SELF_KEY && treatSelfPress()) { return; }
+    // The friend key in the inventory, for a cook with raw food (#3163). See PRESERVE_KEY.
+    if (e.code === PRESERVE_KEY && preservePress()) { return; }
     /*
       The five social keys work in the open world, and P and J can always
       close their own panel. Djinn on dev, 24 September: "The party menu
@@ -9610,6 +9791,11 @@
       if (what.indexOf('select:alive') !== 0) { log('choice page:', what.slice(7)); }
       return;
     }
+    // The loading screen (#3130) says when it went up and down by the page's
+    // own clock, and how far the loop played. Sent during a load, so they
+    // reach this log after it: the times in them are the record, not this
+    // log's.
+    if (what.indexOf('load:') === 0) { log('loading screen:', what.slice(5)); return; }
 
     /*
       The skills panel says when it opens and closes rather than being
@@ -9643,6 +9829,10 @@
     if (what === 'ship:opened') { T.claimFocus('ship', true); return; }
     if (what === 'ship:closed') { T.claimFocus('ship', false); return; }
     if (what === 'ship:ready') { log('the trade ships panel is in'); return; }
+    // A market stall's panel (#3160): the lock key at a stall.
+    if (what === 'stall:opened') { T.claimFocus('stall', true); return; }
+    if (what === 'stall:closed') { T.claimFocus('stall', false); return; }
+    if (what === 'stall:ready') { log('the market stall panel is in'); return; }
     if (what.indexOf('board:near ') === 0) {
       const bits = what.slice('board:near '.length).trim().split(/\s+/);
       if (bits[0] === 'none' || bits.length < 3) { boardNear = null; return; }
@@ -9679,6 +9869,9 @@
     if (what === 'repair:opened') { T.claimFocus('repair', true); return; }
     if (what === 'repair:closed') { T.claimFocus('repair', false); return; }
     if (what === 'repair:ready') { log('the repair panel is in'); return; }
+    if (what === 'preserve:opened') { T.claimFocus('preserve', true); return; }
+    if (what === 'preserve:closed') { T.claimFocus('preserve', false); return; }
+    if (what === 'preserve:ready') { log('the preserving panel is in'); return; }
     if (what === 'furniture:opened') { T.claimFocus('furniture', true); return; }
     if (what === 'furniture:closed') { T.claimFocus('furniture', false); return; }
     if (what === 'furniture:ready') { log('the furniture panel is in'); return; }
@@ -9734,6 +9927,8 @@
     if (what.indexOf('skills:quit ') === 0) { log('skills:', what.slice(7)); return; }
 
     if (what === 'skills:opened') { T.claimFocus('skills', true); return; }
+    // Change character (#3128); the wait itself runs in update.
+    if (what === 'skills:switch') { switchAsked = true; return; }
     if (what === 'skills:closed') { T.claimFocus('skills', false); return; }
     if (what === 'skills:ready' || what === 'skills:refresh') {
       if (what === 'skills:ready') {
@@ -9860,48 +10055,230 @@
     log(what);
   }));
 
-  // ------------------------------------------------------ the drunk screen --
+  // ------------------------------------------------- the map's calendar --
   /*
-    docs/systems/drink.md: "Drunk, from the third ale until you sleep or the
-    45 minutes pass: the client draws a sway and a soft edge." The server
-    decides drunk (NEEDS.ale.drunkFrom in gamemode.js) and the needs HUD
-    script hands it here through globalThis.thornswoodDrunk, the one thing
-    the two scopes share, as thornswoodCatchFire is.
+    THE MAP'S CALENDAR: THE DATE, THE SEASON AND THE SERVER CLOCK (#3156).
 
-    The look is the content plugin's ThornswoodDrunkImod (IMAD 0x18020,
-    scripts/mods/Add-ContentRecords.py, Patrick's decision 3 of 12 Oct 2026
-    on #1382): a little double vision and blur, a soft radial blur at the
-    edges, and motion blur that smears into a sway as the head turns. It is
-    not animatable, so it holds for as long as it is applied: applied as the
-    cross fade modifier while drunk and taken off when that ends. Skyrim
-    keeps one cross fade modifier at a time, so it is only ever taken off
-    after this applied it.
+    Patrick, 22 Oct 2026, on his page: C, on the map menu. A strip at the top
+    of the screen while MapMenu is up, gone the moment it closes:
+
+      26th of Frostfall, 4E 252
+      Autumn, winter in 3 days
+      Server clock 9:46 AM MDT, yours 4:46 PM
+
+    THE DATE is the game's own calendar, the globals the game's map line
+    reads (GameDay 0x37, GameMonth 0x36, GameYear 0x35), which the engine's
+    TimeService writes from today's date in UTC. It is read here rather than
+    worked out again, so this line and the game's never disagree. There is
+    no day of the week: the game counts that from GameDaysPassed, which
+    TimeService never writes (#841), so it is not the same for two people.
+
+    THE SEASON AND THE SERVER CLOCK are the server's, handed over by the
+    calendar property (gamemode.js, THE DATE, THE SEASON AND THE SERVER CLOCK
+    ON THE MAP) through globalThis.thornswoodCalendar, as the drunk screen's
+    is. The server clock is the box's zone put on this machine's own clock,
+    the clock the sky already runs on. Yours shows only when your zone is not
+    the server's. Before the server has said anything, the date shows alone.
+
+    Read once a second while the map is up, and written to the page only when
+    a line changed, which is once a minute.
   */
-  const DRUNK_FILE = 'Thornswood-Content.esp';
-  const DRUNK_IMOD = 0x18020;
-  const DRUNK_FADE = 3.0;   // seconds, in and out
-  let drunkWanted = false;
-  let drunkShown = false;
-  // A content plugin older than the record: said once, and nothing drawn.
-  let drunkNoRecord = false;
+  const MAP_MENU = 'MapMenu';
+  const MAP_CAL_ID = 'ts-map-calendar';
+  const MAP_CAL_EVERY_MS = 1000;
+  // GameMonth counts from 0, Morning Star.
+  const MONTHS = ['Morning Star', 'Sun\'s Dawn', 'First Seed', 'Rain\'s Hand', 'Second Seed', 'Midyear',
+                  'Sun\'s Height', 'Last Seed', 'Hearthfire', 'Frostfall', 'Sun\'s Dusk', 'Evening Star'];
+  const GAME_DAY = 0x37;
+  const GAME_MONTH = 0x36;
+  const GAME_YEAR = 0x35;
+  let mapCalendar = null;   // what the server last handed over
+  let mapUp = false;
+  let mapCalAt = 0;
+  let mapCalShown = '';
+  let mapCalUnread = false; // the calendar could not be read, said once a map
 
-  globalThis.thornswoodDrunk = function (on) { drunkWanted = !!on; };
+  globalThis.thornswoodCalendar = function (v) { mapCalendar = v; mapCalShown = ''; };
 
-  sp.on('update', guard('drunk', () => {
-    if (drunkWanted === drunkShown || drunkNoRecord) { return; }
-    if (!drunkWanted) {
-      sp.ImageSpaceModifier.removeCrossFade(DRUNK_FADE);
-      drunkShown = false;
+  function ordinal(n) {
+    const t = n % 100;
+    if (t >= 11 && t <= 13) { return n + 'th'; }
+    if (n % 10 === 1) { return n + 'st'; }
+    if (n % 10 === 2) { return n + 'nd'; }
+    if (n % 10 === 3) { return n + 'rd'; }
+    return n + 'th';
+  }
+
+  function clock12(h, m) {
+    const hh = h % 12 === 0 ? 12 : h % 12;
+    return hh + ':' + (m < 10 ? '0' : '') + m + (h < 12 ? ' AM' : ' PM');
+  }
+
+  function gameGlobal(id) {
+    const gv = sp.GlobalVariable.from(sp.Game.getFormEx(id));
+    return gv ? Math.floor(gv.getValue()) : NaN;
+  }
+
+  function mapDateLine() {
+    let day = NaN, month = NaN, year = NaN;
+    try {
+      day = gameGlobal(GAME_DAY);
+      month = gameGlobal(GAME_MONTH);
+      year = gameGlobal(GAME_YEAR);
+    } catch (e) {
+      if (!mapCalUnread) { mapCalUnread = true; log('map calendar: the game\'s calendar could not be read: ' + e); }
+      return '';
+    }
+    if (!(day >= 1 && day <= 31) || !(month >= 0 && month <= 11) || !(year >= 1)) {
+      if (!mapCalUnread) {
+        mapCalUnread = true;
+        log('map calendar: the game\'s calendar reads day ' + day + ', month ' + month + ', year ' + year + ', so no date');
+      }
+      return '';
+    }
+    return ordinal(day) + ' of ' + MONTHS[month] + ', 4E ' + year;
+  }
+
+  function untilWords(ms) {
+    const H = 3600000;
+    if (ms >= 36 * H) { return 'in ' + Math.round(ms / (24 * H)) + ' days'; }
+    if (ms >= 90 * 60000) { return 'in ' + Math.round(ms / H) + ' hours'; }
+    return 'within the hour';
+  }
+
+  function capital(w) { return w.charAt(0).toUpperCase() + w.slice(1); }
+
+  function mapSeasonLine(cal, now) {
+    if (!cal || !cal.season) { return ''; }
+    const line = capital(cal.season);
+    if (!cal.next || !(cal.turns > now)) { return line; }
+    return line + ', ' + cal.next + ' ' + untilWords(cal.turns - now);
+  }
+
+  function mapClockLine(cal, now) {
+    if (!cal || typeof cal.off !== 'number' || !isFinite(cal.off)) { return ''; }
+    const s = new Date(now + cal.off * 60000);
+    let line = 'Server clock ' + clock12(s.getUTCHours(), s.getUTCMinutes()) + (cal.tz ? ' ' + cal.tz : '');
+    const here = new Date(now);
+    if (-here.getTimezoneOffset() !== cal.off) {
+      line += ', yours ' + clock12(here.getHours(), here.getMinutes());
+    }
+    return line;
+  }
+
+  function mapCalendarLines(now) {
+    return [mapDateLine(), mapSeasonLine(mapCalendar, now), mapClockLine(mapCalendar, now)]
+      .filter(function (l) { return !!l; });
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /*
+    The strip, in the needs HUD's own pixels (--ts, gamemode.js hudScript):
+    the screen's height over 720 or its width over 1280, whichever is smaller,
+    so it sits in the same place at every screen size. Centred at the top,
+    where the map has nothing of its own.
+  */
+  const MAP_CAL_CSS = '--ts:min(0.078125vw,0.1388889vh);' +
+    'position:fixed;left:50vw;top:calc(50vh - 350 * var(--ts));transform:translateX(-50%);' +
+    'z-index:2147483500;pointer-events:none;text-align:center;white-space:nowrap;' +
+    'font-family:Georgia,serif;font-size:calc(11 * var(--ts));line-height:1.35;color:#efe4cc;' +
+    'background:rgba(12,10,8,.62);border:calc(1 * var(--ts)) solid rgba(0,0,0,.65);' +
+    'border-radius:calc(4 * var(--ts));padding:calc(4 * var(--ts)) calc(10 * var(--ts));' +
+    'text-shadow:0 1px 3px rgba(0,0,0,.95)';
+
+  function drawMapCalendar(now) {
+    const lines = mapCalendarLines(now);
+    const text = lines.join('\n');
+    if (text === mapCalShown) { return; }
+    mapCalShown = text;
+    if (!lines.length) { hideMapCalendar(); return; }
+    const html = lines.map(function (l) { return '<div>' + escapeHtml(l) + '</div>'; }).join('');
+    T.js('(function(){try{' +
+         'var d=document.getElementById(' + JSON.stringify(MAP_CAL_ID) + ');' +
+         'if(!d){d=document.createElement("div");d.id=' + JSON.stringify(MAP_CAL_ID) + ';' +
+         'd.style.cssText=' + JSON.stringify(MAP_CAL_CSS) + ';document.body.appendChild(d);}' +
+         'd.innerHTML=' + JSON.stringify(html) + ';' +
+         '}catch(e){}})();');
+  }
+
+  function hideMapCalendar() {
+    T.js('(function(){try{var d=document.getElementById(' + JSON.stringify(MAP_CAL_ID) + ');' +
+         'if(d&&d.parentNode){d.parentNode.removeChild(d);}}catch(e){}})();');
+  }
+
+  sp.on('menuOpen', guard('map calendar open', (e) => {
+    if (!e || e.name !== MAP_MENU) { return; }
+    mapUp = true;
+    mapCalAt = 0;
+    mapCalShown = '';
+    mapCalUnread = false;
+  }));
+  sp.on('menuClose', guard('map calendar close', (e) => {
+    if (!e || e.name !== MAP_MENU) { return; }
+    mapUp = false;
+    mapCalShown = '';
+    hideMapCalendar();
+  }));
+  sp.on('update', guard('map calendar', () => {
+    if (!mapUp) { return; }
+    const now = Date.now();
+    if (now - mapCalAt < MAP_CAL_EVERY_MS) { return; }
+    mapCalAt = now;
+    drawMapCalendar(now);
+  }));
+  // ------------------------------------------------ end the map's calendar --
+
+  // ------------------------------------------------------- the screen look --
+  /*
+    docs/systems/drink.md and exhaustion.md: drunk, high, a hangover and
+    withdrawal each have a look of their own (Patrick, 12 Oct 2026, decision 3
+    on #1382 for drunk; 22 Oct 2026 on #3153 for the rest: "I also want visual
+    affects"). The server decides which one shows (lookNow in gamemode.js) and
+    the needs HUD script hands the word here through globalThis.thornswoodLook,
+    the one thing the two scopes share, as thornswoodCatchFire is.
+
+    Each look is a content plugin record of Thornswood's own
+    (scripts/mods/Add-ContentRecords.py, THE SCREEN LOOKS): drunk is double
+    vision, blur and a sway as the head turns; high is colour and light turned
+    up with a warm wash; a hangover is light too bright and colour drained;
+    withdrawal is grey, hard and cold at the edges. None is animatable, so
+    each holds for as long as it is applied: applied as the cross fade
+    modifier while the server says so, cross faded into the next when the
+    word changes, and taken off when it is nothing. Skyrim keeps one cross
+    fade modifier at a time, so it is only ever taken off after this applied
+    one.
+  */
+  const LOOK_FILE = 'Thornswood-Content.esp';
+  const LOOKS = { drunk: 0x18020, high: 0x18021, hangover: 0x18022, withdrawal: 0x18023 };
+  const LOOK_FADE = 3.0;   // seconds, in and out
+  let lookWanted = '';
+  let lookShown = '';
+  // A content plugin older than a record: said once, and nothing drawn for it.
+  const lookMissing = {};
+
+  globalThis.thornswoodLook = function (name) {
+    lookWanted = Object.prototype.hasOwnProperty.call(LOOKS, name) ? name : '';
+  };
+
+  sp.on('update', guard('look', () => {
+    const want = (lookWanted && !lookMissing[lookWanted]) ? lookWanted : '';
+    if (want === lookShown) { return; }
+    if (!want) {
+      sp.ImageSpaceModifier.removeCrossFade(LOOK_FADE);
+      lookShown = '';
       return;
     }
-    const mod = sp.ImageSpaceModifier.from(sp.Game.getFormFromFile(DRUNK_IMOD, DRUNK_FILE));
+    const mod = sp.ImageSpaceModifier.from(sp.Game.getFormFromFile(LOOKS[want], LOOK_FILE));
     if (!mod) {
-      log('drunk: no ThornswoodDrunkImod in', DRUNK_FILE, 'so nothing is drawn');
-      drunkNoRecord = true;
+      log('look: no', want, 'record in', LOOK_FILE, 'so nothing is drawn for it');
+      lookMissing[want] = true;
       return;
     }
-    mod.applyCrossFade(DRUNK_FADE);
-    drunkShown = true;
+    mod.applyCrossFade(LOOK_FADE);
+    lookShown = want;
   }));
 
   // ----------------------------------------------- what the skill tree adds --
@@ -11019,6 +11396,8 @@
     passReadAt = now;
     const raw = readText(PASS_FILE).trim();
     if (!/^jp1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(raw)) { return; }
+    // The one before's, until the launcher has this character's (#3128).
+    if (passProfile(raw) !== PROFILE) { return; }
     const keyLine = readText(PASS_KEY_FILE).trim().split(' ');
     if (keyLine.length === 2 && keyLine[0] === raw.split('.')[2] && /^[A-Za-z0-9_-]{16,128}$/.test(keyLine[1])) {
       sp.storage.thornswoodJoinPass = { pass: raw, key: keyLine[1] };

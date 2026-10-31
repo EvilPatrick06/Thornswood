@@ -102,15 +102,15 @@ it says a pool thread.
 |---|---|---|
 | 1 | `Shell.cs:192 Main()` | Takes a mutex named for this install folder (`Shell.cs:264 MutexName()`), so the main and dev builds can both be open. A second copy of the same build says so and exits. Anything thrown out of Run is appended to `Profile\launcher.log` as COULD NOT START and shown in a box. |
 | 2 | `Shell.cs:289 Run()` | Reads `-root` and `-uninstall` off the command line. |
-| 3 | `Shell.cs:297 Paths.Init` | `Paths.cs:71 Init()` works out Root, Game and every Profile path, once. Nothing recomputes them, which is why making the game folder restarts the launcher. |
+| 3 | `Shell.cs:297 Paths.Init` | `Paths.cs:71 Init()` works out Root, Game and every Profile path, once. Nothing recomputes them, which is why making the game folder restarts the launcher. Then `Shell.cs:301 LocalKeep.Tidy` cuts `Profile\launcher.log` to its last 30 days and deletes support zips in `Profile\Reports` older than that (`LocalKeep.cs:44 Tidy()`, #3679), before anything else writes the log. |
 | 4 | `Shell.cs:304 Config.Load` | Reads `<Root>\config.json` (`Config.cs:333 Load()`). Then `Stats.Load` reads `Profile\stats.txt`. |
 | 5 | `Shell.cs:315 XamlReader.Parse` | Builds the window from the embedded ui.xaml. |
 | 6 | `Shell.cs:317 Bind` | Finds the controls, and sets `Discord.Folder` to Profile. |
 | 7 | `Shell.cs:318 Themes.Apply` | Colours from config.json's theme. |
 | 8 | `Shell.cs:319 Wire` | Attaches every handler, including the Play button, calls `WirePages` and `WireOwnGame`, and starts the two second timer (`Shell.cs:2544 DispatcherTimer`). |
-| 9 | `Shell.cs:320 BuildThemeRow` | Then `Shell.cs:322 BuildDisplay`, `Shell.cs:324 BuildStatRow`, `Shell.cs:325 BuildPathRows` and `Shell.cs:326 BuildHelp`: the theme buttons and display rows on Settings, the strip of figures from `Profile\stats.txt` (time played, sessions, last played, last update), the install and game folder rows, and the Help page. They draw controls and write nothing. |
+| 9 | `Shell.cs:320 BuildThemeRow` | Then `Shell.cs:322 BuildDisplay`, `Shell.cs:324 BuildStatRow`, `Shell.cs:325 BuildPathRows`: the theme buttons and display rows on Settings, the strip of figures from `Profile\stats.txt` (time played, sessions, last played, last update), and the install and game folder rows. They draw controls and write nothing. |
 | 10 | `Shell.cs:332 OpenForUninstall` | Only when Windows sent `-uninstall`, which is what Uninstall under Installed apps runs. `ShellUninstall.cs:49 OpenForUninstall()` stops the two second timer before it has ticked, stands down the game folder check, opens on Settings with the Uninstall button in view, and runs the message loop itself. Run returns from here, so no row below this one happens: no update check, no server scan, no client repair, no voice, and the Installed apps entry is not written again. |
-| 11 | `Shell.cs:334 BuildModList` | The Mods page's list, then `Shell.cs:335 RefreshDiscord` (the Discord card) and `Shell.cs:339 ShowPage`, which opens on Play. |
+| 11 | `Shell.cs:335 RefreshDiscord` | The Discord card, then `Shell.cs:339 ShowPage`, which opens on Play. |
 | 12 | `Shell.cs:344 Register.Ensure` | Writes this install's entry under `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall` (`Register.cs:78 Ensure()`). |
 | 13 | `Shell.cs:357 Discord.SendPendingLogs` | Pool thread. A session that ended without sending its logs (`Profile\logs-pending.txt` still there) sends them now, before a new game start truncates them. |
 | 14 | `Shell.cs:363 AutoJoin.Ensure` | Makes `Game\Data\Platform\Plugins\skymp5-client-settings.txt` when there is none (`AutoJoin.cs:52 Ensure()`). |
@@ -123,7 +123,7 @@ it says a pool thread.
 | 21 | `Shell.cs:490 HealClientBackground` | Pool thread, only when the six client runtime files are not the recorded build: `ClientRuntime.cs:206 Heal()` fetches them. Then `Shell.cs:491 AutoDisplayOnce` marks `config.json` so it never runs again and, on an install that has never played, matches the game's resolution to the screen; `Shell.cs:492 StartPing` asks whether the server is up. |
 | 22 | `Shell.cs:496 CheckUpdatesBackground` | Pool thread: the update check (see Updater in section 2). Always: config.json cannot switch it off, and Play stays shut until it answers (#937). |
 | 23 | `Shell.cs:512 Voice.Prepare` | Installs the resolver that loads WebView2 out of the exe. `Shell.cs:520 Voice.Start` is queued until the window is idle on screen. |
-| 24 | `Shell.cs:557 win.ContentRendered` | Once the window has drawn, LogStartTime (declared above Run) writes one line to `Profile\launcher.log`, `Launcher start: the window was on screen <s> s after the launcher started, <s> s of it the mod check, on launcher <version>.`, timed from the process's own start and the Stopwatch around RunScan (#3534); the weekly review totals them with `scripts\vps\Read-LauncherStarts.ps1`. Then, on a pool thread, `SelfSwap.cs:192 Settle()` deletes `Launcher\Thornswood.exe.old`, the copy of the previous launcher a self update keeps; that is how the update script knows this one started (see SelfSwap in section 2). A `Thornswood.exe.bad` left by a way back is deleted too, and the log says which version failed. Every start but the first after an update finds neither. |
+| 24 | `Shell.cs:557 win.ContentRendered` | Once the window has drawn, LogStartTime (declared above Run) writes one line to `Profile\launcher.log`, `Launcher start: the window was on screen <s> s after the launcher started, <s> s of it the mod check, on launcher <version>.`, timed from the process's own start and the Stopwatch around RunScan (#3534); the weekly review totals them with `scripts\vps\Read-LauncherStarts.ps1`. Then, on a pool thread, `SelfSwap.cs:192 Settle()` deletes `Launcher\Thornswood.exe.old`, the copy of the previous launcher a self update keeps; that is how the update script knows this one started (see SelfSwap in section 2). A `Thornswood.exe.bad` left by a way back is deleted too, and the log says which version failed. Every start but the first after an update finds neither. On that first start the shortcut icons are brought up to date and then, in Thornswood's own folder, Fix runs as it does after any update (`RunFix(true)`, #3201), so the update that restarted the launcher ends the way Install now does. |
 | 25 | `Shell.cs:571 Application` | A new WPF Application with `ShutdownMode.OnMainWindowClose`, because the hidden voice window would otherwise keep the process alive. `Shell.cs:573 app.Exit` stops voice and presence and releases Hold. `Shell.cs:580 DispatcherUnhandledException` logs a fault and keeps the launcher up. `Shell.cs:618 StartStallWatch` logs when the window stops answering. |
 | 26 | `Shell.cs:643 app.Run` | The message loop. Run does not return until the window closes. |
 | 27 | `ShellOwnGame.cs:46 ContentRendered` | Once the window is on screen: `ShellOwnGame.cs:65 OwnGameAtStart()` refreshes the game folder by itself when Vortex has deployed since it was made (`OwnGame.cs:662 NeedsRefresh()`), or offers to make it in the shared shape. When Vortex deploys into a Thornswood game folder it logs why nothing is refreshed and what to do (`OwnGame.RefusedSource`). Play also asks that same test now, through `OwnGameRefreshIfDue`. |
@@ -250,7 +250,21 @@ packs and the new launcher and writes nothing into Game or the records a
 refresh reads, so it runs while the game folder is being prepared;
 `WriteUpdate` then puts them in under `OwnGame.Alone`, after any refresh
 under way, and checks again any file a refresh changed in between; the new
-launcher goes in last (`SwapIn`). `ShellUpdate.cs:51 CheckFailed()` keeps
+launcher goes in last (`SwapIn`). Install now, on the card above Play and in
+Settings, and the automatic update, go
+through `ShellUpdate.cs UpdateNow` (#3201): the update, then Fix's whole
+path on the folder the update left (`ShellScanFix.cs FixAfterUpdate`), which
+scans everything again, puts right what the scan finds and never takes the
+update it just tried a second time. A new launcher's first start runs the
+same Fix (row 24 of the startup order). The automatic update is
+`ShellUpdate.cs UpdateBySelf` (#3202), run after every update check's
+answer when `Config.AutoUpdate` is on (the default; only an explicit false
+in `config.json` turns it off): the start's check, the feed watch, Check
+now, the retry after a failed check and the check after the game closed
+for an update. It leaves the update to the in-play clock while a game the
+launcher started runs, to the card while a Skyrim it did not start is open,
+and never takes the update `RunUpdate` tried last a second time by itself.
+`RunUpdate` runs one update at a time (`updating`). `ShellUpdate.cs:51 CheckFailed()` keeps
 Play shut and asks again every thirty seconds when the source does not answer.
 Every document that was read also goes to `ShellUpdate.cs:80 ShowNotice()`, which
 asks FeedNotice what the bar above Play says and whether Play is held.
@@ -400,7 +414,7 @@ or starts the Downgrade, each of which asks first or restarts the launcher.
 
 **MadeFromGame and FromGame** (MadeFromGame.cs, FromGame.cs,
 FromGameArchive.cs, FromGameDeflate.cs, FromGameMath.cs, and the recipes
-FromGameMenu.cs, FromGameBoard.cs and FromGameModMenus.cs, #2827, #3113). The main menu with no Bethesda
+FromGameMenu.cs, FromGameBoard.cs and FromGameModMenus.cs, #2827, #3113, #3127). The main menu with no Bethesda
 logo (`Data\Interface\startmenu.swf`) and the notice board and drop box
 meshes (`Data\meshes\thornswood\noticeboard01.nif`, `dropbox01.nif`) are
 Bethesda's files edited or put together, so Thornswood ships none of them:
@@ -428,7 +442,14 @@ own archives (`SkyUI_SE.bsa`, `SkyHUD.bsa`, `AHZmoreHUD.bsa`) with the edits
 `scripts\mods\Build-ModMenus.py` wrote into FromGameModMenus.cs, each pinned
 to the sha256 of the collection's version. `Ship-Rules.ps1
 $ShipMadeFromMods` keeps them out of every pack. QuickLoot IE's columns are
-set by its own settings file instead, which ships from `game\ours`.
+set by its own settings file instead, which ships from `game\ours`. SkyUI's
+journal (`Data\Interface\quest_journal.swf`, from `SkyUI_SE.bsa`) is made the
+same way with Quick Save, Save, Load, Help and the Creation Club entries taken
+off its System page (#3127), since a character lives on the server and the
+help panel replaced Skyrim's help. The game still writes "disabled" into each
+of those entries every time the journal opens (SetSaveDisabled), so the edit
+hands it an empty object of its own in each one's place; handing it the
+missing entry crashed the game on Escape (31 Oct 2026).
 
 **GeneratedHere and GeneratedBuild** (GeneratedHere.cs, GeneratedBuild.cs,
 Generated.cs, CoveredBodies.cs, #1247, #3715). The behavior files Pandora
@@ -455,6 +476,16 @@ body, stops Play. `scripts\mods\Build-Generated.ps1` and
 them by hand, and Ship runs a dry run to ask whether the collection installed
 there can build them. `Ship-Rules.ps1 Test-ShipGenerated` keeps them out of
 every pack and off every list of removed files.
+
+**LastPlugin** (LastPlugin.cs, #2791). `Data\Thornswood-Last.esp` copies
+other authors' records out of the load order, so a release carries only its
+recipe, `Data\Thornswood-Last.recipe` (written by
+`scripts\mods\last_recipe.py`), and MadeFromGame makes the plugin from the
+plugins and string tables in `Paths.Game`'s Data, pinned by the sha256 of each
+and of the plugin, whenever a recipe is there and the plugin is missing or
+other bytes. Verify never fetches that plugin from the server, and counts it
+as ours when it puts the order right. A game folder with no recipe is left to
+the release. `tests\test-2791-last-plugin.ps1` holds it to `last_recipe.py`.
 
 **Vortex profile state** (VortexProfileState.cs). Checks and the PowerShell
 load-order scripts share this reader for the named Skyrim profile and the
@@ -659,6 +690,14 @@ Uninstall under Windows' Installed apps runs the exe with `-uninstall`, and
 the launcher opens on Settings without starting up to play (startup step 10,
 ShellUninstall.cs).
 
+**LocalKeep** (LocalKeep.cs). How long the launcher keeps its own records on
+the PC: `Profile\launcher.log` lines and the support zips for `Days` (30)
+days, cut at every start, which is what the privacy page promises. NotSaves
+lists what is in Profile that is not a save or a setting (the log, the
+reports, the Discord sign-in, name and picture from `Discord.AccountFiles`,
+and the voice browser's folder, and the old music browser's); Uninstall removes those even when
+it keeps the saves and settings, and its farewell names any it could not.
+
 **DevBuild** (DevBuild.cs). The second launcher in `<Root>-DevBuild`, made
 from the main one's files with the channel set to dev and the dev ports (game
 7787, voice 7789). It is installed and opened from the Server card on the main
@@ -671,13 +710,12 @@ from its own Settings, under Maintenance.
 **Smaller pieces.** Stats.cs (`Profile\stats.txt`), Leaks.cs (the shipped sign
 in file, and what the 28 and 29 Sep dev records handed out), Icons.cs (the shortcut icon), BrowserArgs.cs (switches for the
 launcher's WebView2 browsers, such as no mDNS in the voice browser), Stall.cs and Waiting.cs
-(section 1), Diag.cs (`Profile\Reports`), Files.cs (saves and logs for the
-pages), Secrets.cs (DPAPI and locking a file to this account), Junction.cs
+(section 1), Diag.cs (`Profile\Reports`), Files.cs (the logs and the newest crash
+for the support report), Secrets.cs (DPAPI and locking a file to this account), Junction.cs
 (making and reading junctions without cmd), Steam.cs (finding Steam and its
 Skyrim), Online.cs (the headcount the server publishes), Slots.cs (the one
 rule for moving a character's slot), Art.cs (the art inside the exe),
-Themes.cs (every colour; the setup program is drawn in its Forge too, #2851), Help.cs (the Help page's text), Links.cs (the Nexus page behind
-each mod name), Gallery.cs (the pictures the site shows from the world, read
+Themes.cs (every colour; the setup program is drawn in its Forge too, #2851), Gallery.cs (the pictures the site shows from the world, read
 from `/api/public` for Play's rotating spotlight and the Gallery page; the
 Gallery page uploads via `/api/gallery/submit` and then sends the picture's
 800 and 1600 pixel JPEG copies to `/api/gallery/copy` (#3218), reports via
@@ -735,7 +773,9 @@ is showing on the button (`playBar.Active`, see PlayProgress in section 2), and 
 feed does not hold Play (`feedNotice.Hold`, see FeedNotice in section 2). The
 button's words say which one is holding it: while work shows, what it is doing
 and how far it has got (UPDATING 41%, 310 OF 740 MB), otherwise PREPARING THE GAME FOLDER,
-INSTALL THE MODS FIRST, CHECKING..., UPDATE FIRST, NO ANSWER FROM THE UPDATE
+INSTALL THE MODS FIRST, UPDATE THE MODS FIRST, WAITING FOR THE SERVER (this
+copy's collection revision is ahead of the server's, so nothing needs
+installing, #4115), CHECKING..., UPDATE FIRST, NO ANSWER FROM THE UPDATE
 SOURCE, CLOSED FOR MAINTENANCE or UPDATE THE LAUNCHER (the feed's hold, with
 the bar above Play saying why), DOWNGRADE FIRST, or in the shared shape MAKE
 THORNSWOOD'S OWN FOLDER. `updatePending` starts true and only an answer from
@@ -767,7 +807,7 @@ configured at all, which is a developer's own build and never a tester's.
 | 17 | `ShellPlay.cs:297 ThornIni.Ensure` | The template, if the file is missing. | `Game\Data\SKSE\Plugins\Thornswood.ini` |
 | 18 | `ShellPlay.cs:300 Mics.Apply` | This machine's microphone name, the voice port and the voice address. | `Thornswood.ini` |
 | 18a | `ShellPlay.cs:315 GeneratedHere.Ensure` | Under Waiting. The behavior files and the covered bodies (#3715), built with the collection's own Pandora and BodySlide only when `generated.txt` is missing or stale: the mod list, the files the tools read, the build list compiled into the launcher, or a built file changed. A build that stops, or any body in the folder that is nude, stops Play with a message box saying why (#405). | when it builds: `Game\Data\meshes\actors\*\behaviors`, `characters`, `animationdatasinglefile.txt` and `animationsetdatasinglefile.txt`, the six bodies in `character assets`, BodySlide's own copies of its settings, presets and groups, and `Profile\OwnGame\generated.txt`; `Profile\OwnGame\build-generated` while it runs |
-| 18b | `ShellPlay.cs:338 MadeFromGame.Ensure` | The main menu, the notice board's two meshes and the collection's menus with no gold values (#3113) made from this machine's game and mod archives, only those missing or changed. A game that cannot make them still plays, and the log line says which file differs. | `Game\Data\Interface\startmenu.swf`, `Game\Data\meshes\thornswood\noticeboard01.nif` and `dropbox01.nif`; `Game\Data\Interface\skyui\config.txt` and `itemcard.swf`, `Game\Data\Interface\hudmenu.swf`, `AHZHudInfo.swf` and `exported\AHZHudInfo.swf` |
+| 18b | `ShellPlay.cs:338 MadeFromGame.Ensure` | The main menu, the notice board's two meshes and the collection's menus with no gold values (#3113) made from this machine's game and mod archives, only those missing or changed. A game that cannot make them still plays, and the log line says which file differs. | `Game\Data\Interface\startmenu.swf`, `Game\Data\meshes\thornswood\noticeboard01.nif` and `dropbox01.nif`; `Game\Data\Interface\skyui\config.txt` and `itemcard.swf`, `Game\Data\Interface\hudmenu.swf`, `AHZHudInfo.swf` and `exported\AHZHudInfo.swf`; `Game\Data\Interface\quest_journal.swf` (#3127); `Game\Data\Thornswood-Last.esp` from the release's recipe and the person's own plugins (#2791) |
 | 19 | `ShellPlay.cs:345 EnsureServer` | `ShellPlay.cs:114 EnsureServer()`: `SkyMp.Up` connects to the resources port. A server elsewhere that does not answer is asked about; one on this machine is started. | `Profile\server.pid` and `server.log`, local server only |
 | 20 | `ShellPlay.cs:352 Keep.Restore` | Last thing before the game that can still say no, so nothing is left parked by a refusal. Our Data\Platform files back from `Profile\Keep`; other servers' plugins parked. | changed files in `Game\Data\Platform`; `Profile\Parked\*` and `parked.txt` |
 | 21 | `ShellPlay.cs:354 Keep.LeaveNote` | The note that says this session is ours. The plugins idle without it. | `Game\Data\Platform\thornswood-session.txt` |

@@ -507,11 +507,21 @@ attempt('E', function () {
       !/static class (Fov|ChatFade|NeedsBars)\b/.test(displayCs));
   yes('E2 the launcher writes no key: Keys.cs only reads Thornswood.ini',
       !/Write(All)?(Lines|Text)|WriteIni|WriteJsonKey|static string Set\(/.test(keysCs) && /public static List<Binding> All\(\)/.test(keysCs));
-  yes('E2 and the Play page says where the keys are changed',
-      /Text="Every key is changed in the game, on Settings at the foot of the help panel and of the K, P and J panels\."/.test(xaml));
+  // The launcher's display settings say it, beside what stayed, and so does
+  // the Play page's In game card (E4).
+  yes('E2 and the launcher\'s Settings says where the keys are changed',
+      /<TextBlock Style="\{StaticResource Small\}" TextWrapping="Wrap" Margin="0,0,0,14"\s+Text="Every key, the field of view, the chat and the needs bars are set in the game, on Settings at the foot of the help panel and of the K, P and J panels\."\/>/.test(xaml));
   yes('E3 resolution, the display mode, the frame limit and VSync stay on the launcher (#3146)',
       /x:Name="BoxResolution"/.test(xaml) && /x:Name="BoxFrameLimit"/.test(xaml) && /x:Name="ChkVSync"/.test(xaml) &&
       /x:Name="DisplayModeRow"/.test(xaml));
+  // #3146 took the card off with the help pages, which Patrick had not asked
+  // for; it came back on 30 Oct. Each row is read out of Thornswood.ini.
+  yes('E4 the Play page\'s In game card names the emote wheel, trade, party, friend and journal keys as bound',
+      /<StackPanel x:Name="QuickKeysCard"[^>]*>\s*<TextBlock Text="In game"/.test(xaml) && /<StackPanel x:Name="QuickKeys"\/>/.test(xaml) &&
+      /keys = Keys\.All\(\);/.test(shellCs) &&
+      ['emotewheel', 'tradewith', 'party', 'friendkey', 'journal'].every(function (id) {
+        return new RegExp('AddKeyFor\\(keys, "' + id + '",').test(shellCs) && new RegExp('Dx\\("' + id + '",').test(keysCs);
+      }));
 });
 
 console.log('');

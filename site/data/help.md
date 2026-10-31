@@ -38,8 +38,10 @@ profile and running Purge Mods leaves your own Skyrim the way it was.
    **Downgrade** and Steam downloads that build under your own account. It is
    a few gigabytes, so give it a while.
 3. Install the collection in Vortex. The link is on the Downloads page and on
-   the launcher's Diagnostics page. Not optional: without it you have a launcher
-   and no mods, and the server turns you away when you press Play.
+   the launcher's Diagnostics page, and it opens the revision the server was
+   built against. Install that revision, not a newer one Nexus may show first.
+   Not optional: without it you have a launcher and no mods, and the server
+   turns you away when you press Play.
 4. Press **Connect Discord** on the launcher's Play page. Your browser opens,
    you say yes, and it closes itself. You never do this again.
 <!-- alpha -->
@@ -54,14 +56,24 @@ The mods are a collection on Nexus, and the collection has revisions. When the
 server moves to a new one, the launcher says **Your mods need updating** above
 Play and names the revision.
 
-Close the game, select the Thornswood profile in Vortex, and update the
-collection to that revision. Let Vortex finish installing and deploying it,
+Close the game, select the Thornswood profile in Vortex, and press the card's
+**Open revision** button. It opens that revision's page on Nexus; install it
+from there, not the newest one the collection's own page shows. Let Vortex
+finish installing and deploying it,
 then open the launcher and let its own update finish before you press Play.
 The collection brings the other authors' mods; the launcher brings
 Thornswood's own files.
 
 If the launcher reports a plugin mismatch after that, open **Diagnostics**,
 press **Scan**, then **Fix**.
+
+## When your mods are ahead of the server
+
+If the launcher says **The server has not caught up with you** and Play reads
+**WAITING FOR THE SERVER**, your collection is on a newer revision than the
+one the server was built against. Nothing is wrong with your install and
+nothing needs installing. Play opens once the server is rebuilt on your
+revision. Say so in the Discord if nobody has.
 
 <a id='defender'></a>
 
@@ -98,6 +110,10 @@ The game loads to its main menu and lists your characters, with an empty slot
 for a new one. Pick the empty slot to make a character. Nothing about a
 character is chosen in the launcher.
 
+Give your character a name that belongs in Skyrim: a first name and a family
+name or a byname, and not your own. That name is what other people see above
+your head, and it cannot be changed later without a new character.
+
 You arrive dressed in a plain tunic and boots in a quiet stone hall.
 The race menu opens there to make your face, with your clothes kept on as you
 change race. When you are done, the panel behind **K** opens by itself. That panel is
@@ -119,9 +135,9 @@ is handed over at the moment its pick is made.
 
 ## Keys
 
-These are the keys a fresh install has. The launcher's **Controls** page lists
-every key and changes them: press Change, then the key you want, with Skyrim
-closed.
+These are the keys a fresh install has. Every one is changed in the game, on
+**Settings** at the foot of the help panel and of the K, P and J panels: press
+Change beside it, then the key you want. It takes effect at once.
 
 - **Enter** opens the chat, and **/** opens it with the slash already typed.
 - **K** your character panel, **P** your friends and party, **J** your journals.
@@ -191,8 +207,8 @@ play.
 
 Hold **V** to talk, or press **O** to keep the microphone open for a song or a
 long speech. **B** steps between a whisper, about 7 metres, your normal voice,
-about 30, and a yell, about 85. The voice card on the launcher's Play page
-says whether it is working.
+about 30, and a yell, about 85. **Diagnostics** on the launcher says whether
+the server's voice is answering.
 
 If nobody can hear you, check that the launcher is still open and that Windows
 has not handed your microphone to something else.
@@ -222,8 +238,9 @@ using it to get out of a fight or to travel can mean a warning or a ban.
    Discord, or say in the report that you have one. Where the logs are is below.
 
 A launcher last opened before 26 September says it cannot read the update
-source, or never offers an update. Updates come only from thornswood.net now,
-and a launcher that old still looks for them where they used to be, so it
+source, or never offers an update. Updates are asked for at thornswood.net now
+(the site may send the launcher on to GitHub for the files themselves), and a
+launcher that old still looks for them where they used to be, so it
 cannot find the new place by itself. Take the installer again from the
 [Downloads](/downloads) page and run it over your install. Your characters live
 on the server and nothing is lost.
@@ -278,6 +295,10 @@ The easy way to send them: in the launcher open **Diagnostics** and press
 extender log, your plugin list and the launcher log, and opens the folder it
 is in. Drag that zip into your ticket in the Discord. **Settings**, **Open log**
 opens the launcher log on its own.
+
+You often do not need to: when the game closes, the launcher sends the site
+that session's logs on its own, so staff may already see what went wrong.
+The [privacy](/privacy) page says which files go and what is in them.
 
 ## When you die
 

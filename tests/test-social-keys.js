@@ -100,7 +100,7 @@ function rig(opts) {
     };
   };
   const prelude =
-    'let keysSeen = 0, stuckKeys = 0, stuckMoveKeys = 0, sawAnyKey = true;\n' +
+    'let keysSeen = 0, sawAnyKey = true;\n' +
     // between() keeps its start marker, so this is the declaration itself.
     menus + '\n  ];\n' +
     "const JOURNAL_MENU = 'Journal Menu';\n" +
@@ -132,6 +132,9 @@ function rig(opts) {
     // H in the inventory. Nobody is looked at and no inventory is open
     // here; test-1383-treatments.js has what they do.
     'function treatPress() { return false; }\nfunction treatSelfPress() { return false; }\n' +
+    // Salt or smoke your food (#3163), Y in the inventory. No inventory is
+    // open here; test-3163-spoilage.js has what it does.
+    'function preservePress() { return false; }\n' +
     // A warrior's maneuver key (#1386), 9, which nothing here presses.
     'function maneuverKeyPressed() { }\n' +
     // The help key (#1633), F7, which nothing here presses.

@@ -1,6 +1,6 @@
 // #1306: pull requests build on GitHub's hosted runner, in their own workflow
-// file. The VPS is the fallback for them too (Patrick, 12 Oct 2026), for a
-// branch of this repository only, never a fork.
+// file. Since #4983 (the repository is public and GitHub's runners are free)
+// every build runs there alone: no fallback on the box, no runner choice.
 // build-pr.yml is generated from build.yml and must match it.
 'use strict';
 const fs = require('fs');
@@ -20,36 +20,50 @@ const pr = read(path.join(WF, 'build-pr.yml'));
 
 yes('build.yml no longer runs on a pull request', build && triggers(build).indexOf('pull_request') < 0);
 yes('build.yml still runs a push to main and a manual run', /push:\n    branches: \[main\]/.test(build) && triggers(build).indexOf('workflow_dispatch') >= 0);
-yes('main builds default to GitHub\'s hosted runner, unless its pull request already passed the tree (#3182)', /\n  launcher:\n    name: Launcher builds\n    needs: \[tested, tested-vps\]\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && needs\.tested-vps\.outputs\.run == '' && vars\.BUILD_RUNNER != 'vps' && inputs\.runner != 'vps' \}\}\n    runs-on: windows-latest\n/.test(build));
-yes('the VPS is a fallback job, on the box\'s build runners (#2994)', /\n  launcher-vps:\n[\s\S]*?\n    runs-on: \[self-hosted, Windows, thornswood-vps, thornswood-build\]\n/.test(build));
-yes('  run only when the hosted job did not succeed (skipped by BUILD_RUNNER or a manual vps run, or failed)',
-    /\n  launcher-vps:\n    name: [^\n]*\n    needs: \[tested, tested-vps, launcher\]\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && needs\.tested-vps\.outputs\.run == '' && needs\.launcher\.result != 'success' && needs\.launcher\.result != 'cancelled' \}\}\n/.test(build));
-yes('  with the same steps as the hosted job (one anchor)', /steps: &checks\n/.test(build) && /steps: \*checks\n/.test(build));
-yes('a manual run can pick the box', /runner:\n[\s\S]*?options: \[hosted, vps\]/.test(build));
+yes('main builds on GitHub\'s hosted runner, unless its pull request already passed the tree (#3182)', /\n  launcher:\n    name: Launcher builds\n    needs: tested\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' \}\}\n    runs-on: windows-latest\n/.test(build));
+yes('  with no fallback job and nothing on a self-hosted runner (#4983)', !/\n  launcher-vps:\n|\n  tested-vps:\n/.test(build) && code(build).indexOf('self-hosted') < 0);
+yes('  and no runner to pick on a manual run', !/\n    inputs:\n/.test(build) && !/inputs\.runner|vars\.BUILD_RUNNER/.test(code(build)));
 yes('build-pr.yml exists', !!pr);
 yes('build-pr.yml runs on a pull request and nothing else', JSON.stringify(triggers(pr)) === '["pull_request"]');
 yes('on GitHub\'s hosted windows-latest', /\n    runs-on: windows-latest\n/.test(pr));
-const SAME = "github.event.pull_request.head.repo.full_name == github.repository";
-const prVps = /\n  launcher-vps:\n[\s\S]*?\n    runs-on: \[self-hosted, Windows, thornswood-pr-build\]\n/.exec(pr);
-yes('a VPS fallback job builds a pull request the hosted job did not', !!prVps &&
-    /\n  launcher-vps:\n    name: Launcher builds \(VPS fallback\)\n    needs: launcher\n    if: \$\{\{ !cancelled\(\) && needs\.launcher\.result != 'success' && needs\.launcher\.result != 'cancelled' && github\.event\.pull_request\.head\.repo\.full_name == github\.repository \}\}\n/.test(pr));
-yes('  only for a branch of this repository, never a fork', !!prVps && code(pr).split(SAME).length - 1 === 1);
-yes('  and that job is the only one on the VPS', code(pr).split('runs-on: [self-hosted').length - 1 === 1);
-yes('  so the hosted job keeps its own check, and its red stays visible', /\n  launcher:\n    name: Launcher builds\n/.test(pr));
+yes('no pull request job is on a self-hosted runner (#4983)', !!pr && code(pr).indexOf('self-hosted') < 0 && !/\n  launcher-vps:\n/.test(pr));
 yes('it takes no secrets', !!pr && !/\$\{\{\s*secrets\./.test(pr));
 yes('its check keeps the name Launcher builds', /\n    name: Launcher builds\n/.test(pr));
-yes('a pull request build has no "tested" job, and its hosted job runs as before (#3182)',
-    !/\n  tested:\n|needs\.tested|needs: \[?tested/.test(code(pr)) && /\n  launcher:\n    name: Launcher builds\n    if: \$\{\{ vars\.BUILD_RUNNER != 'vps' && inputs\.runner != 'vps' \}\}\n    runs-on: windows-latest\n/.test(pr));
-// No other workflow runs a pull request on the VPS, and none without the
-// same-repository condition.
+yes('a pull request build has no "tested" job, and its hosted job always runs (#3182)',
+    !/\n  tested:\n|needs\.tested|needs: \[?tested/.test(code(pr)) && /\n  launcher:\n    name: Launcher builds\n    runs-on: windows-latest\n/.test(pr));
+// No workflow runs a pull request on the VPS, and none runs on
+// pull_request_target.
 const others = fs.readdirSync(WF).filter(f => /\.ya?ml$/.test(f)).filter(f => {
   const t = read(path.join(WF, f));
   const tr = triggers(t);
   if (tr.indexOf('pull_request_target') >= 0) { return true; }
   if (tr.indexOf('pull_request') < 0 || !/thornswood-vps/.test(code(t))) { return false; }
-  return f !== 'build-pr.yml' || code(t).indexOf(SAME) < 0;
+  return true;
 });
-yes('no other workflow runs a pull request on the VPS (' + (others.join(', ') || 'none') + ')', others.length === 0);
+yes('no workflow runs a pull request on the VPS (' + (others.join(', ') || 'none') + ')', others.length === 0);
+// #3683, Patrick's A on q-3683-required-check: the one name main's ruleset
+// requires passes only when the build succeeded on GitHub's runner. The
+// repository is public since 30 Oct, so it no longer waits for that.
+const result = /\n  result:\n([\s\S]*)$/.exec(code(pr));
+const rj = result ? result[1] : '';
+yes('a "Build check result" job needs the build and the gate\'s shares (#3683)', /^    name: Build check result\n    needs: \[launcher, gate\]\n/.test(rj));
+yes('  runs unless cancelled', /\n    if: \$\{\{ !cancelled\(\) \}\}\n/.test(rj));
+yes('  on GitHub\'s ubuntu-latest, never the box', /\n    runs-on: ubuntu-latest\n/.test(rj) && !/self-hosted|thornswood/.test(rj));
+yes('  with no checkout, action or secret: it reads only their results', !/uses:|secrets\.|checkout/.test(rj) &&
+    /BUILD: \$\{\{ needs\.launcher\.result \}\}/.test(rj) && /GATE: \$\{\{ needs\.gate\.result \}\}/.test(rj));
+yes('  and passes only when both are success', /if \[ "\$BUILD" = success \] && \[ "\$GATE" = success \]; then exit 0; fi\n[\s\S]*exit 1/.test(rj));
+// 31 Oct 2026: the gate runs in five shares beside the launcher job, each on
+// a hosted runner of its own, and both builds have the same shares.
+for (const [what, t] of [['main\'s build', build], ['the pull request build', pr]]) {
+  // The gate job runs from its key to the next line at the jobs' indent.
+  const at = t.indexOf('\n  gate:\n');
+  const rest = at < 0 ? '' : t.slice(at + '\n  gate:\n'.length);
+  const end = rest.search(/\n  \S/);
+  const g = end < 0 ? rest : rest.slice(0, end + 1);
+  yes(what + ' runs the gate in its own job on GitHub\'s hosted Windows runner', /\n    runs-on: windows-latest\n/.test(g) && !/self-hosted/.test(code(g)));
+  yes('  in shares, every one running to its end', /\n      fail-fast: false\n      matrix:\n        shard: \[1(, \d+)+\]\n/.test(g));
+}
+yes('  main\'s own build has no such job: only a pull request is held to it', !/\n  result:\n/.test(code(build)));
 let gen = null;
 try { gen = require(path.join(REPO, 'scripts', 'dev', 'Build-PrWorkflow.js')); } catch (e) { gen = null; }
 yes('the generator is there', !!gen);
@@ -57,11 +71,11 @@ let want = '';
 try { want = gen ? gen.build(build) : ''; } catch (e) { console.log('  ' + e.message); }
 yes('build-pr.yml is exactly what build.yml generates (run node scripts/dev/Build-PrWorkflow.js)', !!want && want === pr);
 // #1306, 12 Oct: always() ignores a cancelled run, so a new push could not
-// cancel an older run whose fallback waited for a runner. The older run held
-// the concurrency group and the new run sat pending behind it. !cancelled()
-// lets cancel-in-progress take the waiting fallback down with its run.
-yes('main\'s fallback does not use always(), so a newer run cancels it', code(build).indexOf('always()') < 0);
-yes('the pull request fallback does not use always() either', code(pr).indexOf('always()') < 0);
+// cancel an older run whose job waited for a runner. The older run held the
+// concurrency group and the new run sat pending behind it. !cancelled() lets
+// cancel-in-progress take the waiting job down with its run.
+yes('main\'s build does not use always(), so a newer run cancels it', code(build).indexOf('always()') < 0);
+yes('the pull request build does not use always() either', code(pr).indexOf('always()') < 0);
 // #3874: main's build traces the gate for the pull requests after it, so a
 // newer push to main waits for the build in progress rather than cancelling
 // it; a pull request's newer push still cancels its older run.

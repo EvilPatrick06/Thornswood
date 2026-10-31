@@ -4,8 +4,11 @@
   Puts the box's GitHub admin service on the VPS (#3107, Patrick's A of 22 Oct
   2026): scripts\vps\admin\admin.js, as the task "Thornswood Admin",
   listening on 127.0.0.1:7791. It holds the key of a GitHub App made for
-  Thornswood, and makes the runners' labels on GitHub match main's runner
-  records when a run of .github\workflows\github-admin.yml on main asks
+  Thornswood, and makes the runners' labels, and the rulesets, private
+  vulnerability reporting, immutable releases and secret scanning of
+  Thornswood and the engine fork, on GitHub match main's records (records\*-runners.json, and since #3683
+  records\github-repo-settings.json) when a run of the ops repository's
+  github-admin.yml on main asks
   with its OIDC token (admin.js says how it checks that, and why nothing else
   may ask). That is how Set-BuildRunners.ps1 works from anywhere, a cloud
   thread included. Run it from a machine whose way in already works; it does
@@ -19,6 +22,15 @@
       .\scripts\deploy\Install-AdminService.ps1 -Status   what is there and its log
       .\scripts\deploy\Install-AdminService.ps1 -Forget   drop the App's key, for a new App
       .\scripts\deploy\Install-AdminService.ps1 -Remove   take it off again
+
+  From a cloud thread, which has no ssh, the deploy gate runs the first and
+  -Status with main's script (scripts\vps\gate\verbs.json):
+
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Install-AdminService'
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Install-AdminService -Status'
+
+  -Setup, -Forget and -Remove are not gate verbs: they change who holds the
+  App, which stays with a person at One.
 
   THE APP (once, by whoever owns the repository). -Setup writes
   state\setup.json, a state nobody can guess that lives an hour, and prints
@@ -464,8 +476,11 @@ if (-not `$AsSystem) {
     `$sid = Get-ThornswoodTaskSid '$TaskName'
     if (-not `$sid) { `$why = 'the task SID NT TASK\$TaskName could not be looked up' }
     else {
-        try { `$null = Grant-ThornswoodServiceFolder -Root '$Root' -Sid `$sid -Writable 'state' -Files 'admin.log', 'admin.log.*' }
-        catch { `$why = 'its folder could not be granted to it: ' + `$_.Exception.Message }
+        try {
+            `$null = Grant-ThornswoodServiceFolder -Root '$Root' -Sid `$sid -Writable 'state' -Files 'admin.log', 'admin.log.*'
+            # What it makes is its own, not every service's (#4077).
+            Set-ThornswoodTaskOwner -TaskName '$TaskName' -Sid `$sid -Roots '$Root'
+        } catch { `$why = 'its folder could not be granted to it: ' + `$_.Exception.Message }
     }
     if (`$why) { `$why + ', so the task goes on SYSTEM'; Register `$true }
     else { 'the task runs as LOCAL SERVICE, Limited, as NT TASK\$TaskName' }

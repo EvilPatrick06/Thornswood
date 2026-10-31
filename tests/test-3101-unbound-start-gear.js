@@ -18,19 +18,22 @@
 
     P  the policy sets exactly those two on SkyrimUnboundInventory's
        SkyrimUnboundModuleInventory, and says why
-    Q  the committed plugin carries the quest, and its script holds both
-       values; the manifest lists it
+    Q  the plugin carries the quest, and its script holds both values; the
+       manifest lists it
     B  the builder adds or changes the property, and its verify refuses a
        plugin that does not carry it
 
-  Reads the committed plugin, its manifest, the policy and the builder. A
-  machine with the game also rebuilds the plugin (tests/test-2468-last-plugin.js R1).
+  Reads the plugin, its manifest, the policy and the builder. No repository
+  holds the plugin since #2791 step 3, so Q1 to Q6 read it made from its
+  recipe out of the game's plugins (tests/last-plugin-made.js), and print
+  SKIP without the game; the rest still run. A machine with the game also
+  rebuilds the plugin (tests/test-2468-last-plugin.js R1).
 */
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const ROOT = path.join(__dirname, '..');
-const ESP = path.join(ROOT, 'game', 'content', 'Thornswood-Last.esp');
+const made = require('./last-plugin-made.js').made();
 const MANIFEST = JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 'last-plugin.json'), 'utf8'));
 const POLICY = JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 'last-plugin-policy.json'), 'utf8'));
 const TOOL = fs.readFileSync(path.join(ROOT, 'scripts', 'mods', 'Build-LastPlugin.py'), 'utf8');
@@ -110,41 +113,45 @@ function scriptsOf(v) {
   return { scripts: out };
 }
 
-const esp = fs.readFileSync(ESP);
-const hs = esp.readUInt32LE(4);
-const masters = subs(esp.subarray(24, 24 + hs)).filter((s) => s.t === 'MAST')
-  .map((s) => s.b.toString('latin1').replace(/\0+$/, ''));
-const ub = masters.indexOf('Skyrim Unbound.esp');
-yes('Q1 Skyrim Unbound.esp is one of the plugin\'s masters', ub >= 0);
-let quest = null;
-(function walk(s, e) {
-  let p = s;
-  while (p + 24 <= e) {
-    const tag = esp.toString('latin1', p, p + 4);
-    const size = esp.readUInt32LE(p + 4);
-    if (tag === 'GRUP') { walk(p + 24, p + size); p += size; continue; }
-    const flags = esp.readUInt32LE(p + 8), fid = esp.readUInt32LE(p + 12);
-    if (tag === 'QUST' && ub >= 0 && fid === (((ub << 24) >>> 0) + 0xbdfb6a)) {
-      let d = esp.subarray(p + 24, p + 24 + size);
-      if (flags & COMPRESSED) { d = zlib.inflateSync(d.subarray(4)); }
-      quest = subs(d);
+const esp = made.buf;
+if (!esp) {
+  console.log('SKIP  Q1 to Q6: ' + made.why);
+} else {
+  const hs = esp.readUInt32LE(4);
+  const masters = subs(esp.subarray(24, 24 + hs)).filter((s) => s.t === 'MAST')
+    .map((s) => s.b.toString('latin1').replace(/\0+$/, ''));
+  const ub = masters.indexOf('Skyrim Unbound.esp');
+  yes('Q1 Skyrim Unbound.esp is one of the plugin\'s masters', ub >= 0);
+  let quest = null;
+  (function walk(s, e) {
+    let p = s;
+    while (p + 24 <= e) {
+      const tag = esp.toString('latin1', p, p + 4);
+      const size = esp.readUInt32LE(p + 4);
+      if (tag === 'GRUP') { walk(p + 24, p + size); p += size; continue; }
+      const flags = esp.readUInt32LE(p + 8), fid = esp.readUInt32LE(p + 12);
+      if (tag === 'QUST' && ub >= 0 && fid === (((ub << 24) >>> 0) + 0xbdfb6a)) {
+        let d = esp.subarray(p + 24, p + 24 + size);
+        if (flags & COMPRESSED) { d = zlib.inflateSync(d.subarray(4)); }
+        quest = subs(d);
+      }
+      p += 24 + size;
     }
-    p += 24 + size;
-  }
-})(24 + hs, esp.length);
-yes('Q2 the plugin overrides SkyrimUnboundInventory', !!quest &&
-    quest.some((s) => s.t === 'EDID' && s.b.toString('latin1').replace(/\0+$/, '') === 'SkyrimUnboundInventory'));
-const vmad = quest && quest.find((s) => s.t === 'VMAD');
-const read = vmad ? scriptsOf(vmad.b) : { error: 'no scripts' };
-const sc = read.scripts && read.scripts.find((s) => s.name.toLowerCase() === SCRIPT.toLowerCase());
-yes('Q3 its scripts read, and ' + SCRIPT + ' is among them' + (read.error ? ' (' + read.error + ')' : ''), !!sc);
-const w = sc && sc.props.choicerandomweapons, sp = sc && sc.props.choicespellsmode;
-yes('Q4 ChoiceRandomWeapons is False on it', !!w && w.type === 5 && w.value === false);
-yes('Q5 ChoiceSpellsMode is 1 on it', !!sp && sp.type === 3 && sp.value === 1);
-const NEVER_TRUE = Buffer.from('80000000000000002f000000' + '0f000000' + '00000000' + '00000000' + '00000000' + 'ffffffff', 'hex');
-yes('Q6 the quest is not stopped: no never-true condition is put on it, and the manifest does not list it as stopped',
-    !!quest && !quest.some((s) => s.t === 'CTDA' && s.b.equals(NEVER_TRUE)) &&
-    !(MANIFEST.quests.modStopped || []).some((q) => q.quest === QUEST));
+  })(24 + hs, esp.length);
+  yes('Q2 the plugin overrides SkyrimUnboundInventory', !!quest &&
+      quest.some((s) => s.t === 'EDID' && s.b.toString('latin1').replace(/\0+$/, '') === 'SkyrimUnboundInventory'));
+  const vmad = quest && quest.find((s) => s.t === 'VMAD');
+  const read = vmad ? scriptsOf(vmad.b) : { error: 'no scripts' };
+  const sc = read.scripts && read.scripts.find((s) => s.name.toLowerCase() === SCRIPT.toLowerCase());
+  yes('Q3 its scripts read, and ' + SCRIPT + ' is among them' + (read.error ? ' (' + read.error + ')' : ''), !!sc);
+  const w = sc && sc.props.choicerandomweapons, sp = sc && sc.props.choicespellsmode;
+  yes('Q4 ChoiceRandomWeapons is False on it', !!w && w.type === 5 && w.value === false);
+  yes('Q5 ChoiceSpellsMode is 1 on it', !!sp && sp.type === 3 && sp.value === 1);
+  const NEVER_TRUE = Buffer.from('80000000000000002f000000' + '0f000000' + '00000000' + '00000000' + '00000000' + 'ffffffff', 'hex');
+  yes('Q6 the quest is not stopped: no never-true condition is put on it, and the manifest does not list it as stopped',
+      !!quest && !quest.some((s) => s.t === 'CTDA' && s.b.equals(NEVER_TRUE)) &&
+      !(MANIFEST.quests.modStopped || []).some((q) => q.quest === QUEST));
+}
 const mrow = (MANIFEST.questScriptProperties || []).find((r) => r.quest === QUEST);
 yes('Q7 the manifest lists it with the values set and the plugin it was copied from',
     !!mrow && mrow.edid === 'SkyrimUnboundInventory' && mrow.script === SCRIPT &&

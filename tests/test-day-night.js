@@ -26,7 +26,7 @@ function yes(what, cond) {
 }
 
 const from = front.indexOf('const FIRE_BASES');
-const to = front.indexOf('let stuckKeys', from);
+const to = front.indexOf('   * Jump and sprint.', from);
 const where = (from >= 0 && to > from) ? front.slice(from, to) : '';
 yes('the place block is findable', !!where);
 

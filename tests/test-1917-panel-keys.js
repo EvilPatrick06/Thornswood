@@ -317,10 +317,17 @@ const OPEN = {
   'thornswood-box.js': { name: 'thornswoodBox', open(p) { p.win.thornswoodBox.setData({ open: true, hold: 'whiterun', where: 'Whiterun', rows: [], pack: [], packGold: 5 }); } },
   'thornswood-repair.js': { name: 'thornswoodRepair', open(p) { p.win.thornswoodRepair.setData({ open: true, items: [] }); } },
   'thornswood-treat.js': { name: 'thornswoodTreat', open(p) { p.win.thornswoodTreat.setData({ open: true, needs: [] }); } },
+  // Salting and smoking (#3163): the server's view, with open, opens it.
+  'thornswood-preserve.js': { name: 'thornswoodPreserve', open(p) { p.win.thornswoodPreserve.setData({ open: true, may: true, salt: 2, wood: 1, fire: true, perWood: 5, rows: [] }); } },
   'thornswood-furniture.js': { name: 'thornswoodFurniture', open(p) { p.win.thornswoodFurniture.setData({ open: true, rows: [] }); } },
   'thornswood-merchant.js': { name: 'thornswoodMerchant', open(p) { p.win.thornswoodMerchant.setData({ open: true, trader: 'Belethor', offers: [] }); } },
   // The trade ships' dock (#2700): the server's view, with open, opens it.
   'thornswood-ship.js': { name: 'thornswoodShip', open(p) { p.win.thornswoodShip.setData({ open: true, mode: 'dock', port: { key: 'solitude', name: 'Solitude docks' }, holds: [], incoming: [], charter: { may: true, why: '' }, pack: [], people: [] }); } },
+  // A market stall (#3160), the keeper's view, which has the boxes: the server's view, with open, opens it.
+  'thornswood-stall.js': { name: 'thornswoodStall', open(p) {
+    p.win.thornswoodStall.setData({ open: true, id: 'whiterun-6b0b6', place: 'Whiterun', free: false, mine: true, keeperHere: true,
+      officer: false, lines: [], max: 24, said: '', pack: [{ base: '13982', nth: 0, count: 2, what: 'Iron Sword' }], found: [], lapseDays: 14 });
+  } },
   'thornswood-afk.js': { name: 'thornswoodAfk', open(p) { p.win.thornswoodAfk.ask(60); } },
   'thornswood-journal.js': { name: 'thornswoodJournal', open(p) { p.win.thornswoodJournal.open(); } },
   'thornswood-trade.js': { name: 'thornswoodTrade', open(p) { p.win.thornswoodTrade.open(); } },
@@ -422,6 +429,7 @@ escCloses('thornswood-box.js', 'box');
 escCloses('thornswood-ride.js', 'ride');
 escCloses('thornswood-repair.js', 'repair');
 escCloses('thornswood-treat.js', 'treat');
+escCloses('thornswood-preserve.js', 'preserve');
 escCloses('thornswood-furniture.js', 'furniture');
 escCloses('thornswood-party.js', 'party');
 escCloses('thornswood-ship.js', 'ship', function (p) {

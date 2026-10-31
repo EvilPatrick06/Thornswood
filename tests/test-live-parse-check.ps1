@@ -49,7 +49,7 @@ function LineOf([string[]]$lines, [string]$pattern) {
 # ---- Deploy-Gamemode.ps1 ------------------------------------------------------
 $g = @(Get-Content -LiteralPath (Join-Path $Repo 'scripts\deploy\Deploy-Gamemode.ps1'))
 $check = LineOf $g '^\s*& node --check \$Gamemode'
-$copy = LineOf $g "^Copy-Item -LiteralPath \`$Gamemode -Destination \(Join-Path \`$Dist 'gamemode.js'\)"
+$copy = LineOf $g "^\s*Copy-Item -LiteralPath \`$Gamemode -Destination \(Join-Path \`$Dist 'gamemode.js'\)"
 Yes 'Deploy-Gamemode runs node --check on gamemode.js' ($check -gt 0)
 Yes '  before it copies the file into the build' ($check -gt 0 -and $copy -gt $check)
 Yes '  and stops when it fails' (($g -join "`n") -match "LASTEXITCODE -ne 0\) \{ throw 'gamemode.js does not parse")
@@ -150,7 +150,7 @@ Yes 'Deploy-DevGamemode refuses with the same sentence as Deploy-Server' (
 # before it copies gamemode.js in.
 $gAst = Read-Ast 'scripts\deploy\Deploy-Gamemode.ps1'
 $gIf = @(NodeIfs $gAst)
-$gCopy = LineOf $g "^Copy-Item -LiteralPath \`$Gamemode -Destination \(Join-Path \`$Dist 'gamemode.js'\)"
+$gCopy = LineOf $g "^\s*Copy-Item -LiteralPath \`$Gamemode -Destination \(Join-Path \`$Dist 'gamemode.js'\)"
 Yes 'Deploy-Gamemode refuses before it copies the file into the build' ($gIf.Count -eq 1 -and $gCopy -gt $gIf[0].Extent.StartLineNumber)
 
 # Deploy-DevGamemode refuses before anything reaches the box: the artifact

@@ -368,8 +368,11 @@ $rulesText = RepoText 'scripts\release\Ship-Rules.ps1'
 Yes 'every pack deletes Data\ElysiumEstateSSE.esp' ($rulesText -match "(?s)\`$ShipDeleteAlways = @\(.*'Data\\ElysiumEstateSSE\.esp'")
 Yes '...and no pack carries it' ($rulesText -match "\`$rel -ieq 'Data\\ElysiumEstateSSE\.esp'")
 Yes '...and a refresh of the launcher''s game folder leaves it out' ((RepoText 'launcher\app\OwnGame.cs') -match 'rel\.Equals\("Data\\\\ElysiumEstateSSE\.esp"')
-$linksText = RepoText 'launcher\app\Links.cs'
-Yes 'the launcher links Elysium Estate by the collection''s plugin name' ($linksText -match 'A\("ElysiumEstate", 4119\)' -and -not ($linksText -match 'ElysiumEstateSSE'))
+# The mod links went with the launcher's mod list (#3146); only the refresh's
+# delete rule above may still name the old plugin.
+$oldNamed = @(Get-ChildItem -LiteralPath (Join-Path $Repo 'launcher\app') -Filter *.cs -File |
+              Where-Object { $_.Name -ne 'OwnGame.cs' -and [IO.File]::ReadAllText($_.FullName) -match 'ElysiumEstateSSE' } | ForEach-Object Name)
+Yes ('no other launcher source names ElysiumEstateSSE' + $(if ($oldNamed) { ' (' + ($oldNamed -join ', ') + ')' })) ($oldNamed.Count -eq 0)
 
 # ------------------------------------------------ Check-CleanInstall itself --
 $root = Join-Path $Scratch ('thornswood-cleaninstall-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))

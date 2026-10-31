@@ -14,8 +14,8 @@
   What it checks:
     1. the workflow is there, starts only by hand (workflow_dispatch, which
        is how Read-Board.ps1 starts it), gives its own token no permissions,
-       takes the board token from the "board" environment, runs on the VPS
-       runners board-status.yml uses, with a timeout, keeps nothing as an
+       takes the board token from the "board" environment, runs on GitHub's
+       runner as board-status.yml does, with a timeout, keeps nothing as an
        artifact (#3410: the repository's artifact storage filled on 25 Oct
        2026 and three reads in a row could not hand the board back), and
        removes board.json from the runner however the run ended;
@@ -79,7 +79,7 @@ Yes 'the board token comes from the "board" environment, which only main may use
 $runsOn = [regex]::Match($text, '(?m)^\s*runs-on:\s*(.+)$').Groups[1].Value.Trim()
 $status = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\board-status.yml'))
 $statusRunsOn = [regex]::Match($status, '(?m)^\s*runs-on:\s*(.+)$').Groups[1].Value.Trim()
-Yes ("it runs on the VPS runners board-status uses ({0})" -f $runsOn) ($runsOn -eq '[self-hosted, Windows, thornswood-vps]' -and $runsOn -eq $statusRunsOn)
+Yes ("it runs on GitHub's Windows runner, as board-status does (#4983) ({0})" -f $runsOn) ($runsOn -eq 'windows-latest' -and $runsOn -eq $statusRunsOn)
 Yes '  with a timeout' ($text -match '(?m)^\s+timeout-minutes:\s*\d+\s*$')
 
 Yes 'it keeps no artifact: the board comes back in the log (#3410)' ($text -notmatch 'upload-artifact' -and $text -notmatch '(?m)^\s+uses:')

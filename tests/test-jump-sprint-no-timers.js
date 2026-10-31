@@ -55,8 +55,10 @@ yes('the probe still reads bSprintOK', /ask\('bSprintOK'/.test(block));
 yes('presses are still recorded', /probePresses\.push\(/.test(code));
 yes('the character is fetched only for a press',
     /if \(probePresses\.length\) \{\s*try \{ pc = sp\.Game\.getPlayer\(\);/.test(code));
-yes('the stuck rescue still owns setPlayerAIDriven(false)',
-    /setPlayerAIDriven\(false\)/.test(code.slice(0, a)));
+// The stuck rescue that switched AI-driven off is gone with the controls
+// watchdog (#2620): nothing in the game turns AI-driven on, so nothing calls it.
+yes('nothing in the front plugin calls setPlayerAIDriven',
+    !/setPlayerAIDriven\(/.test(code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')));
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

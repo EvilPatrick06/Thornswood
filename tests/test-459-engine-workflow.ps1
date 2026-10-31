@@ -8,22 +8,20 @@
   Bootstrap-VPS.ps1 play in building the engine.
 
   WHY. Patrick decided on 15 Oct: the engine is built on GitHub's hosted
-  runner first, and on the VPS runners when that is refused ("C, then B"),
-  the way the build check falls back (#2407). Each piece of that is a line of
-  YAML or a line of a script that a later edit could drop without anything
-  else going red: the fallback's condition, the manual start (a pull
-  request's code reaches the box through build-pr.yml alone, #1306), the
-  image the fork's generator needs, the steps that make
-  the records a pin pull request takes, the cleanup that keeps four runners'
-  build folders off the box's disk, the CI=true the fork's CMakeLists.txt
-  reads, and the SKYRIM_DIR a runner does not have. Since Patrick's B of
+  runner first, and on the VPS runners when that is refused ("C, then B");
+  since the flip it is GitHub's runner alone (#4983). Each piece of that is a
+  line of YAML or a line of a script that a later edit could drop without
+  anything else going red: the manual start, the image the fork's generator
+  needs, the steps that make the records a pin pull request takes, the
+  CI=true the fork's CMakeLists.txt reads, and the SKYRIM_DIR a runner does
+  not have. Since Patrick's B of
   16 Oct, also the fork's own build taken first: the LF checkout, the look
   for it before anything compiles, every compile step skipped when it is in,
   and the records made from it naming the fork's run (section 3b;
   tests\test-459-fork-build.ps1 runs ForkEngineBuild.ps1 and -BuiltBy).
   Since Patrick's A on #3014 (22 Oct) the box compiles nothing, and since
   his A on #3399 (26 Oct) neither does GitHub's runner: a Ship machine takes
-  the fork's own build, so with no fork build of the commit both jobs stop
+  the fork's own build, so with no fork build of the commit the job stops
   and say why (section 3c runs that step's own text), and the records come
   back in the job's log, not as an artifact of this repository, whose
   storage was used up (section 3d; tests\test-3399-engine-records.ps1 runs
@@ -70,46 +68,39 @@ function Get-Step([string]$text, [string]$nameStart) {
 }
 
 $head = $code.Substring(0, [Math]::Max(0, $code.IndexOf("`njobs:")))
-$vps = Get-Job 'engine-vps'
-$hosted = Get-Job 'engine'
+$job = Get-Job 'engine'
 
 # ---- 1. when it runs ----------------------------------------------------------
 Yes 'it is the Engine build workflow' ($code -match '(?m)^name: Engine build$')
 Yes 'a manual run names the fork commit, empty for the pin' ($head -match '(?ms)workflow_dispatch:.*?commit:.*?default: ''''')
-Yes 'a manual run may ask for hosted or vps, hosted the default' ($head -match '(?ms)runner:.*?options: \[hosted, vps\].*?default: hosted')
-Yes 'it runs only when started by hand: no pull request, push or other trigger reaches the box through it (#1306)' (
+Yes 'a manual run has no runner to choose: GitHub''s is the only one (#4983)' ($head -notmatch '(?m)^      runner:')
+Yes 'it runs only when started by hand: no pull request, push or other trigger (#1306)' (
     @([regex]::Matches(($head -replace '(?s)^.*?\non:\n', '' -replace '(?s)\npermissions:.*$', ''), '(?m)^  (\w+):') | ForEach-Object { $_.Groups[1].Value }) -join ',' -eq 'workflow_dispatch')
 Yes 'the token reads the repository and writes nothing' ($head -match '(?m)^permissions:\n  contents: read$' -and $code -notmatch ':\s*write\b')
 Yes 'a build is never cancelled by another run for the same commit' ($head -match '(?m)^  cancel-in-progress: false$')
 
-# ---- 2. where: hosted first, the box when it did not succeed (#2407) ----------
-Yes 'the hosted job is GitHub''s windows-2022, the image with the generator the fork demands' ($hosted -match '(?m)^    runs-on: windows-2022$')
-Yes 'the hosted job is skipped when BUILD_RUNNER is vps or the run asked for the box' ($hosted -match "if: \$\{\{ vars\.BUILD_RUNNER != 'vps' && inputs\.runner != 'vps' \}\}")
-Yes 'the fallback waits on the hosted job' ($vps -match '(?m)^    needs: engine$')
-Yes 'the fallback runs when the hosted job did not succeed and was not cancelled' ($vps -match "!cancelled\(\) && needs\.engine\.result != 'success' && needs\.engine\.result != 'cancelled'")
-Yes 'the fallback is the VPS runners'' label, on a build runner (#2994)' ($vps -match '(?m)^    runs-on: \[self-hosted, Windows, thornswood-vps, thornswood-build\]$')
-Yes 'the VPS label is in the fallback alone' (([regex]::Matches($code, 'thornswood-vps')).Count -eq 1)
-Yes 'the two jobs run one list of steps (the anchor)' ($vps -match '(?m)^    steps: &engine$' -and $hosted -match '(?m)^    steps: \*engine$')
-$tv = [regex]::Match($vps, 'timeout-minutes: (\d+)'); $th = [regex]::Match($hosted, 'timeout-minutes: (\d+)')
-Yes 'each job has 30 minutes: both only take the fork''s build (#3014, #3399)' ($tv.Success -and [int]$tv.Groups[1].Value -eq 30 -and $th.Success -and [int]$th.Groups[1].Value -eq 30)
+# ---- 2. where: GitHub's runner alone (#4983) -----------------------------------
+Yes 'the job is GitHub''s windows-2022, the image with the generator the fork demands' ($job -match '(?m)^    runs-on: windows-2022$')
+Yes '  the only job: no VPS fallback, no runner of the box, no BUILD_RUNNER switch' (@([regex]::Matches(($code.Substring($code.IndexOf("`njobs:"))), '(?m)^  \S')).Count -eq 1 -and $code -notmatch 'self-hosted|thornswood-vps|BUILD_RUNNER')
+$tj = [regex]::Match($job, 'timeout-minutes: (\d+)')
+Yes 'it has 30 minutes: it only takes the fork''s build (#3014, #3399)' ($tj.Success -and [int]$tj.Groups[1].Value -eq 30)
 
 # ---- 3. what it runs, in order ------------------------------------------------
 $order = @('uses: actions/checkout@', '- name: Which fork commit', '- name: Fetch the fork at that commit', '- name: Look for the fork''s build',
-           '- name: Record the fork''s server build', '- name: Record the client', '- name: Check the records name this commit', '- name: Hand the records back in the log',
-           '- name: Free the box''s disk')
+           '- name: Record the fork''s server build', '- name: Record the client', '- name: Check the records name this commit', '- name: Hand the records back in the log')
 $at = -1; $inOrder = $true
-foreach ($o in $order) { $i = $vps.IndexOf($o); if ($i -le $at) { $inOrder = $false; Write-Host "  out of order or missing: $o" }; $at = $i }
+foreach ($o in $order) { $i = $job.IndexOf($o); if ($i -le $at) { $inOrder = $false; Write-Host "  out of order or missing: $o" }; $at = $i }
 Yes 'the steps run in the order the header gives' $inOrder
 Yes 'every action is pinned to a full commit with its tag beside it' (@([regex]::Matches($code, '(?m)^\s*(- )?uses: (\S+)') | Where-Object { $_.Groups[2].Value -notmatch '@[0-9a-f]{40}$' }).Count -eq 0 -and
                                                                     @([regex]::Matches($wf, '(?m)^\s*(- )?uses: \S+@[0-9a-f]{40}(?! # v)')).Count -eq 0)
-$which = Get-Step $vps 'Which fork commit'
+$which = Get-Step $job 'Which fork commit'
 # Named in two places only: the env line that hands it to the script, and the
 # concurrency group. Anywhere else it would be pasted into a script's text.
 $named = @($code -split "`n" | Where-Object { $_ -match 'github\.event\.inputs\.commit' })
 Yes 'the commit asked for reaches the script through env, never pasted into it' ($which -match 'INPUT_COMMIT: \$\{\{ github\.event\.inputs\.commit \}\}' -and
                                                                                 $named.Count -eq 2 -and @($named | Where-Object { $_ -match '^\s+INPUT_COMMIT: ' -or $_ -match '^  group: engine-' }).Count -eq 2)
 Yes 'with none asked, the commit is the one this branch pins' ($which -match 'git ls-tree HEAD engine/skymp')
-$fetch = Get-Step $vps 'Fetch the fork at that commit'
+$fetch = Get-Step $job 'Fetch the fork at that commit'
 # Run 39149317535: the runner reused a fork git folder nightly.yml had fetched
 # --depth 1, which follows main alone, and origin/thornswood/engine-changes
 # was never made.
@@ -120,47 +111,44 @@ Yes 'only a commit on the fork''s thornswood/engine-changes is built (One engine
 Yes 'the fork''s upstream is fetched, for the records'' upstreamBase' ($fetch -match 'skyrim-multiplayer/skymp\.git' -and $fetch -match 'fetch upstream main')
 Yes 'nothing is compiled: no vcpkg, no Actions cache, no Build-Engine, Build-Server or Write-ClientLicences step (#3014, #3399)' (
     $code -notmatch 'Build-Engine\.ps1' -and $code -notmatch 'Build-Server\.ps1' -and $code -notmatch 'VCPKG_BINARY_SOURCES' -and $code -notmatch 'actions/cache' -and $code -notmatch 'Write-ClientLicences')
-Yes 'the client is recorded from the same fork' ((Get-Step $vps 'Record the client') -match 'New-ClientBuildRecord\.ps1 -Dist engine\\skymp\\build\\dist\\client -Clone engine\\skymp')
-$rcl = Get-Step $vps 'Record the client'
+Yes 'the client is recorded from the same fork' ((Get-Step $job 'Record the client') -match 'New-ClientBuildRecord\.ps1 -Dist engine\\skymp\\build\\dist\\client -Clone engine\\skymp')
+$rcl = Get-Step $job 'Record the client'
 Yes 'the libraries in the client and their texts are recorded after the client, from the same build (#3099)' (
     $rcl -match 'New-ClientLicenceRecord\.ps1 -Licences engine\\skymp\\build\\licences -Clone engine\\skymp' -and $rcl.IndexOf('New-ClientLicenceRecord') -gt $rcl.IndexOf('New-ClientBuildRecord'))
-$check = Get-Step $vps 'Check the records name this commit'
+$check = Get-Step $job 'Check the records name this commit'
 Yes 'both records are held to their shape and to the commit recorded' ($check -match 'Check-Records\.ps1' -and $check -match 'source\.commit' -and $check -match 'forkCommit')
-$hand = Get-Step $vps 'Hand the records back in the log'
+$hand = Get-Step $job 'Hand the records back in the log'
 Yes 'the server build is made as the store keeps it, and its name printed (ServerArtifact.ps1)' ($hand -match 'New-ThornswoodServerBuildArtifact -From engine\\skymp\\build\\dist\\server -Record records\\server-build\.json' -and $hand -match 'server build \{0\}')
-$free = Get-Step $vps 'Free the box''s disk'
-Yes 'the box''s copy of the fork and its build go however the run ended, on the box only' ($free -match "if: always\(\) && runner\.environment == 'self-hosted'" -and $free -match 'submodule deinit --force engine/skymp')
-Yes 'always() is in that cleanup alone' (([regex]::Matches($code, 'always\(\)')).Count -eq 1)
+Yes 'no step cleans up after a run: GitHub''s runner is thrown away, and no job uses always()' ($code -notmatch 'Free the box' -and $code -notmatch 'always\(\)')
 Yes 'nothing is sent and nothing committed: no ssh, scp, push or Deploy' ($code -notmatch '\b(ssh|scp)\b' -and $code -notmatch 'git push' -and $code -notmatch 'Deploy-|Publish-')
-Yes 'the header names the box''s one step for the fallback' ($wf -match "Bootstrap-VPS\.ps1 -Arguments '-IncludeEngineTools -SkipFirewall'")
 
 # ---- 3b. the fork's own build first (Patrick's B, 16 Oct) -----------------------
 Yes 'the fork is checked out LF, as committed, the way One and the fork''s own build check it out' (
     $fetch -match 'git -c core\.autocrlf=false submodule update --init engine/skymp' -and $fetch -match 'git -C engine/skymp config core\.autocrlf false' -and
     $fetch.IndexOf('config core.autocrlf false') -lt $fetch.IndexOf('checkout --force --detach'))
-$look = Get-Step $vps 'Look for the fork''s build of this commit'
+$look = Get-Step $job 'Look for the fork''s build of this commit'
 Yes 'the fork''s build is looked for before anything is compiled, with ForkEngineBuild.ps1' ($look -match '(?m)^        id: fork$' -and $look -match '\. \.\\scripts\\release\\ForkEngineBuild\.ps1' -and $look -match 'Find-ForkEngineBuild \$env:COMMIT \$get')
 Yes '  read with this run''s own token, handed through env; no secret anywhere in the file' ($look -match 'GH_TOKEN: \$\{\{ github\.token \}\}' -and $code -notmatch 'secrets\.')
 Yes '  with none, one still running or one red, the run stops with its Why; nothing builds it in its place' ($look -match "if \(\`$f\.State -ne 'found'\) \{ Write-Host ""::error::\`$\(\`$f\.Why\)""; exit 1 \}" -and $look -notmatch 'found=false')
 Yes '  the build is held to the commit, the run and GitHub''s digest before it goes in the fork''s build folder' ($look -match 'Expand-ForkEngineBuild -Zip \$zip -Commit \$env:COMMIT -RunId \$f\.Run\.id -Digest \(\[string\]\$f\.Artifact\.digest\) -Fork engine\\skymp')
 Yes '  and says which run built it to the steps after' ($look -match "\('run=' \+ \`$f\.Run\.html_url\)" -and $look -match "\('manifest=' \+ \`$kept\)")
-$rf = Get-Step $vps 'Record the fork''s server build'
+$rf = Get-Step $job 'Record the fork''s server build'
 Yes 'the fork''s server build is recorded after the server''s packages from its yarn.lock' ($rf -notmatch '(?m)^        if:' -and $rf -match 'yarn install --frozen-lockfile --non-interactive' -and
     $rf.IndexOf('yarn install') -lt $rf.IndexOf('New-ServerBuildRecord.ps1'))
 Yes '  by New-ServerBuildRecord.ps1 against the fork, naming the fork''s run' ($rf -match 'New-ServerBuildRecord\.ps1 -Dist engine\\skymp\\build\\dist\\server -Clone engine\\skymp -BuiltBy \$env:FORK_RUN' -and $rf -match 'FORK_RUN: \$\{\{ steps\.fork\.outputs\.run \}\}')
-$rc = Get-Step $vps 'Record the client'
+$rc = Get-Step $job 'Record the client'
 Yes 'the client record names the fork''s run' ($rc -match 'FORK_RUN: \$\{\{ steps\.fork\.outputs\.run \}\}' -and $rc -match 'New-ClientBuildRecord\.ps1 -Dist engine\\skymp\\build\\dist\\client -Clone engine\\skymp -BuiltBy \$env:FORK_RUN')
 Yes 'the log names the fork''s run the records were made from' ($hand -match 'FORK_BUILD: \$\{\{ steps\.fork\.outputs\.manifest \}\}' -and $hand -match 'recorded from the fork''s run')
 
-# ---- 3c. no fork build: both jobs stop (#3014, 22 Oct; #3399, 26 Oct) --------
+# ---- 3c. no fork build: the job stops (#3014, 22 Oct; #3399, 26 Oct) ---------
 # The box's runner accounts reach GitHub alone (#2161), and a compile needs
 # certificate checks and download hosts outside it: run 39727871475 stopped at
 # vcpkg's first download. And a Ship machine takes the fork's own build
 # (#3399), so a build compiled on GitHub's runner would be bytes no Ship
-# machine could take. So with no fork build both jobs stop, saying why. The
+# machine could take. So with no fork build the job stops, saying why. The
 # step's own text runs here, with Find-ForkEngineBuild standing in for the
-# lookup, once as each runner.
-Yes 'the look step does not ask which kind of runner it is on: both do the same' ($look -notmatch 'RUNNER_KIND')
+# lookup.
+Yes 'the look step does not ask which kind of runner it is on' ($look -notmatch 'RUNNER_KIND')
 $runText = [regex]::Match($look, '(?ms)^        run: \|\n(.*)').Groups[1].Value
 $runText = (@($runText -split "`n" | ForEach-Object { if ($_.Length -ge 10) { $_.Substring(10) } else { $_.Trim() } }) -join "`n")
 $stub = "function Find-ForkEngineBuild(`$c, `$g) { [pscustomobject]@{ State = 'none'; Why = 'the fork has no build of a push of ' + `$c + ', so there is no build of it to record. A pin names a head of thornswood/engine-changes.' } }"
@@ -182,7 +170,7 @@ function Invoke-Look([string]$kind) {
     }
 }
 try {
-    foreach ($kind in 'self-hosted', 'github-hosted') {
+    foreach ($kind in @('github-hosted')) {
         $r = Invoke-Look $kind
         Yes "  on $kind, with no fork build, it stops (exit 1), saying why" ($r.Code -eq 1 -and $r.Said -match '::error::the fork has no build of a push of e58e67e5' -and $r.Said -match 'head of thornswood/engine-changes')
         Yes '    and hands the steps after it nothing' ($r.Out -notmatch '(?m)^(run|manifest)=')
@@ -194,7 +182,7 @@ Yes 'nothing is kept as an artifact: no upload step, no retention (#3399)' ($cod
 Yes 'the records go into the log with EngineRecords.ps1 and LogHandBack.ps1' ($hand -match '\. \.\\scripts\\release\\EngineRecords\.ps1' -and $hand -match '\$bundle = New-EngineRecordsBundle \.' -and
     $hand -match "Get-LogHandBackLines \('ENGINE' \+ '-RECORDS'\) \`$bundle" -and $hand -match 'Write-Host \$l')
 Yes '  the mark is put together, so the step''s own text never holds it' (@([regex]::Matches($code, 'ENGINE-RECORDS')).Count -eq 0)
-Yes '  after the records are checked' ($vps.IndexOf('- name: Hand the records back in the log') -gt $vps.IndexOf('- name: Check the records name this commit'))
+Yes '  after the records are checked' ($job.IndexOf('- name: Hand the records back in the log') -gt $job.IndexOf('- name: Check the records name this commit'))
 Yes '  and the log says how to take them' ($hand -match 'Get-EngineRecords\.ps1 -Run')
 
 # ---- 4. the scripts' part -----------------------------------------------------
@@ -252,7 +240,7 @@ try {
     Remove-Item -LiteralPath $empty -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-# ---- 5. the box's tools for the fallback --------------------------------------
+# ---- 5. the box's engine tools (Bootstrap-VPS.ps1) ---------------------------
 $boot = ReadLf 'scripts/vps/Bootstrap-VPS.ps1'
 Yes 'Bootstrap-VPS.ps1 takes -IncludeEngineTools' ($boot -match '\[switch\]\$IncludeEngineTools')
 Yes '  which takes -IncludeBuildTools with it' ($boot -match '(?m)^if \(\$IncludeEngineTools\) \{ \$IncludeBuildTools = \$true \}')

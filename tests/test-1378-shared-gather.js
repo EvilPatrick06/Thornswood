@@ -88,11 +88,12 @@ const RANK_OF = {
 const NOT_A_GATHER = {
   'Cabbage': 'farmer', 'Carrot': 'farmer', 'Gourds': 'farmer', 'Leek': 'farmer',
   'Potato': 'farmer', 'Wheat': 'farmer',
-  "Bashir's Clam": 'fisher', 'Fish': 'fisher',
+  "Bashir's Clam": 'nobody, a quest prop', 'Fish': 'fisher',
   'Coin Purse': 'not a harvest',
-  'Mammoth Cheese': 'off every ladder', 'Mead Barrel': 'off every ladder',
+  // #3141: the cheese is anybody's (Patrick, 21 Sep), the barrel nobody's.
+  'Mammoth Cheese': 'anybody', 'Mead Barrel': 'nobody',
   'Beehive': 'farmer verb', "Chickens' Nest": 'farmer verb', 'Churn': 'farmer verb',
-  'Horker': 'not on the gatherer page',
+  'Horker': 'the hunter',
   // Update.esm's Creation Club records: Special Edition only (#479).
   'Rot Scale': 'a Creation Club record', 'Screaming Maw': 'a Creation Club record',
   'Thorn Hook': 'a Creation Club record',
@@ -215,7 +216,7 @@ if (harvestFn && plantAtFn && HARVESTS_BY_BASE && HARVESTS) {
     const harvest = new Function(
       'classGate', 'rankStep', 'rankWord', 'RANK_LADDER', 'addItem', 'creditWork',
       'isCrop', 'plantAt', 'lastUse', 'stampCooldown', 'HARVEST_COOLDOWN_MS', 'Date', 'outOfSeason',
-      harvestFn + '\nreturn harvest;'
+      'function economyGathered() { }\n' + harvestFn + '\nreturn harvest;'
     )(
       classGate,
       rankStep,

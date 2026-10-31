@@ -256,7 +256,7 @@ function client(opt) {
     // The / and P watchers on the game's own menus (test-slash-key.js).
     'const OFF_MENU = { openedBy: function () { return ""; }, shutFor: function () { }, keyDown: function () { } };',
     'const statsOnSlash = OFF_MENU, magicOnP = OFF_MENU;',
-    'let keysSeen = 0, stuckKeys = 0, stuckMoveKeys = 0, sawAnyKey = true;',
+    'let keysSeen = 0, sawAnyKey = true;',
     'function busyMenuOpen() { return busyMenuOpenNow(); }',
     'function rememberKey() {}',
     'function wantTyping() {}',
@@ -287,6 +287,10 @@ function client(opt) {
     'const TREAT_KEY = LOCK_KEY, TREAT_SELF_KEY = 35;',
     'function treatPress() { return false; }',
     'function treatSelfPress() { return false; }',
+    // Salt or smoke your food (#3163), Y in the inventory. No inventory is
+    // open here; test-3163-spoilage.js has what it does.
+    'const PRESERVE_KEY = FRIEND_KEY;',
+    'function preservePress() { return false; }',
     PIECES_FRONT.mold,
     // The same key after the mold says no: sleeping on a person inside a
     // building you hold (#1603, SLEEP_KEY is MOLD_KEY in the plugin) and a

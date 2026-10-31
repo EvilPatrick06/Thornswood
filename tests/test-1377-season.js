@@ -100,9 +100,10 @@ yes('outdoor shifts are 0, +4, -2, -6',
   S.outdoorShift(EPOCH + 3 * WEEK) === -6);
 
 const outdoorSrc = liftFn('outdoorSeason');
+const underSrc = liftFn('underSeason');
 let outdoorSeason = null;
-if (outdoorSrc) {
-  outdoorSeason = new Function('g', outdoorSrc + '\nreturn outdoorSeason;')(global);
+if (outdoorSrc && underSrc) {
+  outdoorSeason = new Function('g', underSrc + '\n' + outdoorSrc + '\nreturn outdoorSeason;')(global);
 }
 if (S) { S.setEpoch(Date.now() - (3 * WEEK) - 1000); }
 yes('indoors and a roof ignore the season shift, and winter outdoors is -6',
@@ -273,7 +274,7 @@ if (hiveSrc && isHiveSrc) {
   const hives = src.slice(src.indexOf('const HIVES = {'), src.indexOf('function isHive('));
   hiveApi = new Function(
     'classGate', 'addItem', 'creditWork', 'cooldownLeft', 'stampCooldown', 'waitWord', 'ITEMS', 'HARVEST_COOLDOWN_MS',
-    hives + '\n' + isHiveSrc + '\n' + hiveSrc + '\nreturn { hive: hive, isHive: isHive, HIVES: HIVES };'
+    'function economyGathered() { }\n' + hives + '\n' + isHiveSrc + '\n' + hiveSrc + '\nreturn { hive: hive, isHive: isHive, HIVES: HIVES };'
   )(
     function (actorId) { return actorId === 2 ? 'Only a farmer can bring a crop in. Ask one.' : null; },
     function (actorId, desc, n) { hiveApi && hiveApi.given.push({ actorId: actorId, desc: desc, n: n }); return true; },

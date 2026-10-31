@@ -90,9 +90,7 @@ last one wins, the same reader Build-DoorTable.py uses. A plugin that names
 its master as Hearthfires.esm and one that names it HearthFires.esm mean the
 same file, so masters are matched to the load order without case: without
 that, CFTO's override of a Hearthfire carriage driver reads as a second
-driver. Thornswood-Last.esp is in the load order but its placements are not
-read: it is the deletion this list is written before, and read, it would make
-every actor the NPC catalogue cuts look switched off at the start (#3543).
+driver.
 
 WHAT IT WRITES. game\\data\\cast.json, and nothing else.
 
@@ -186,12 +184,8 @@ CRIME_HOLD = {
 }
 
 NO_HOLD = 'no hold'
-# Thornswood-Last.esp is the deletion this list comes before: it switches off
-# every placed actor the NPC catalogue cuts (#2468) and the floor items
-# (#3077). Its placements are not read, or every cut actor would read as
-# switched off at the start and the cast would lose its guards and traders
-# (#3543). Its other records are, so a cell's location is the one the game
-# puts it in, the way Build-NpcPopulation.py reads it.
+# Built from what this and Build-NpcPopulation.py read: it switches off every
+# placed actor the catalogue cuts (#2468), so its actors are never read here.
 LAST_PLUGIN = 'Thornswood-Last.esp'
 WANTED = (b'FACT', b'NPC_', b'LVLN', b'RACE', b'KYWD', b'LCTN', b'CELL', b'WRLD')
 
@@ -204,9 +198,8 @@ def edid_of(body):
     return body.rstrip(bytes([0])).decode('ascii', 'replace')
 
 
-def read(pl, t, placements=True):
-    """Every record this pass wants out of one plugin, into t, last one wins.
-    With placements False its REFRs and ACHRs are left out."""
+def read(pl, t):
+    """Every record this pass wants out of one plugin, into t, last one wins."""
     buf = pl.buf
 
     def ref(body, off=0):
@@ -231,9 +224,7 @@ def read(pl, t, placements=True):
                 continue
             flags, fid = struct.unpack_from('<II', buf, p + 8)
             d = pl.desc(fid)
-            if tag in (b'REFR', b'ACHR') and not placements:
-                pass
-            elif d and tag == b'REFR' and cell:
+            if d and tag == b'REFR' and cell:
                 # Only what decides whether a placed thing starts switched on:
                 # its own flag, and the enable parent it follows. A marker is
                 # usually the parent, which is why every REFR is looked at.
@@ -522,7 +513,21 @@ def build(data, plugins_txt, say):
             pl.strings = bsa.load_strings(data, name)
             if pl.strings:
                 tables += 1
-        read(pl, t, placements=(name != LAST_PLUGIN))
+        if name == LAST_PLUGIN:
+            # This is the cast as it stands before anything is deleted, and
+            # Thornswood-Last.esp is the deleting: read as an input it would
+            # list every cut actor as off at the start. Its places are read,
+            # as Build-NpcPopulation.py reads them (#2551): its locations over
+            # the ones before it, and of its cells only the location.
+            places = dict((k, {}) for k in t)
+            places[b'LCTN'] = t[b'LCTN']
+            read(pl, places)
+            failed += pl.failed
+            for d, row in places[b'CELL'].items():
+                if row.get('location') and d in t[b'CELL']:
+                    t[b'CELL'][d]['location'] = row['location']
+            continue
+        read(pl, t)
         failed += pl.failed
 
     cast = Cast(t)

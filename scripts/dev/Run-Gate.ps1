@@ -5,9 +5,12 @@
   built on the VPS only those its change can reach (#3114).
 
 .DESCRIPTION
-  build.yml's gate step runs this and nothing else:
+  build.yml's gate job runs this and nothing else, once in each of its
+  five shares, each on a hosted runner of its own (-Of says why):
 
-      .\scripts\dev\Run-Gate.ps1 -Throttle 6 -BudgetSeconds 1800
+      .\scripts\dev\Run-Gate.ps1 -Shard 1 -Of 5 -Throttle 6 -BudgetSeconds 1200
+
+  By hand, with no -Of, it is the whole gate on this machine, as below.
 
   THE GATE. Every harness scripts\dev\Gate-Harnesses.ps1 lists, run through
   scripts\dev\Nightly-Harnesses.ps1 -Throttle at once with this build's
@@ -68,6 +71,24 @@
   scripts\dev\Affected-Harnesses.js. tests\test-3114-run-gate.ps1 holds
   all of this.
 
+.PARAMETER Shard
+  Which share of the gate this runs, from 1, with -Of. Harness number n of
+  the gate list (from 0) is share (n mod Of) + 1, the way nightly.yml splits
+  its harnesses, so every gate harness is in exactly one share.
+
+.PARAMETER Of
+  How many shares the gate is split into. build.yml's gate job passes the
+  length of its matrix. With more than one, no map is read and no trace is
+  asked for: each share runs its part of the whole gate and says whole=true.
+
+  WHY SHARES (31 Oct 2026). Since #5119 nothing builds on the box, so no
+  main build is traced and no map is handed on (build.yml lost its
+  "Hand the traced map to runners off the box" step there), and every pull
+  request ran the whole gate, 707 harnesses and 3741 s of processor in run
+  41231641217, on one hosted runner's four cores: the gate step took 18 to
+  20 minutes of a 21 minute build. Split five ways over five hosted runners,
+  each share has about a fifth of that.
+
 .PARAMETER Throttle
   The most harnesses at once, as Nightly-Harnesses.ps1 takes it.
 
@@ -80,12 +101,14 @@
 
 .PARAMETER StartLog
   Where Nightly-Harnesses.ps1 -StartLog writes which process was which
-  harness's, for .github\workflows\trace-gate.yml, the trace taken by hand
+  harness's, for the ops repository's trace-gate.yml (#4013), the trace taken by hand
   (scripts\dev\Trace-Gate.ps1). A main build the trace task traces writes
   its own in <runner>\trace.
 #>
 [CmdletBinding()]
 param(
+    [int]$Shard = 1,
+    [int]$Of = 1,
     [int]$Throttle = 6,
     [int]$BudgetSeconds = 1800,
     [int]$AnswerSeconds = 60,
@@ -112,6 +135,7 @@ function Write-Whole([string]$file, [string]$text) {
     Move-Item -LiteralPath $tmp -Destination $file -Force
 }
 
+if ($Of -lt 1 -or $Shard -lt 1 -or $Shard -gt $Of) { Write-Host "::error::-Shard $Shard -Of $Of names no share of the gate"; exit 2 }
 $gate = @(& (Join-Path $Here 'Gate-Harnesses.ps1'))
 if ($LASTEXITCODE -ne 0) { exit 1 }
 # This build's share of the cores: the machine's cores over the builds this
@@ -232,7 +256,11 @@ function Request-Trace {
 $run = $gate
 $whole = $true
 $trace = $null
-if ($env:GITHUB_EVENT_NAME -eq 'pull_request') {
+if ($Of -gt 1) {
+    # A share of the whole gate: no map and no trace (-Of says why).
+    $run = @(for ($i = 0; $i -lt $gate.Count; $i++) { if (($i % $Of) -eq ($Shard - 1)) { $gate[$i] } })
+    Say ('Share {0} of {1} of the whole gate: {2} of its {3} harnesses.' -f $Shard, $Of, $run.Count, $gate.Count)
+} elseif ($env:GITHUB_EVENT_NAME -eq 'pull_request') {
     $picked = Select-Affected
     if ($null -ne $picked) { $run = $picked; $whole = $false }
 } elseif ($env:GITHUB_EVENT_NAME -eq 'push' -and $env:GITHUB_REF -eq 'refs/heads/main') {

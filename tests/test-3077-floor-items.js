@@ -11,12 +11,15 @@
   every game, and the gamemode answered a press on a weapon, armour, a tool,
   coin, a coin purse or a jail key with a chat line. Now
   scripts/mods/Build-LastPlugin.py (step 5) switches every placed item and
-  coin purse off in game/content/Thornswood-Last.esp, the way it switches off
+  coin purse off in Thornswood-Last.esp, the way it switches off
   a cut actor (#2468): no machine draws it, the server's reader never makes
   it, and there is nothing left to refuse.
 
-  Without the game this reads the committed plugin and holds it to the
-  builder, the manifest and the gamemode:
+  This reads the plugin and holds it to the builder, the manifest and the
+  gamemode. No repository holds the plugin since #2791 step 3, so P, N2, N3
+  and N5 read it made from its recipe out of the game's plugins
+  (tests/last-plugin-made.js), and print SKIP without the game; the rest
+  still run:
 
     T  the builder's floor types are the item types the engine reloots
        (forbiddenReloot in both deploy scripts), and its coin purses are every
@@ -47,7 +50,7 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const ROOT = path.join(__dirname, '..');
-const ESP = path.join(ROOT, 'game', 'content', 'Thornswood-Last.esp');
+const made = require('./last-plugin-made.js').made();
 const CONTENT = path.join(ROOT, 'game', 'content', 'Thornswood-Content.esp');
 const MANIFEST = path.join(ROOT, 'game', 'data', 'last-plugin.json');
 const HARVESTS = path.join(ROOT, 'game', 'data', 'harvests.json');
@@ -58,6 +61,8 @@ const COMPRESSED = 0x00040000, DISABLED = 0x800, DELETED = 0x20;
 
 let pass = 0, fail = 0;
 function yes(w, c) { if (c) { pass++; console.log('PASS  ' + w); } else { fail++; console.log('FAIL  ' + w); } }
+// A check that reads the plugin's records, only where it was made.
+function yesR(w, c) { if (made.buf) { yes(w, c()); } }
 
 function subs(d) {
   const out = [];
@@ -138,20 +143,21 @@ yes('M4 the cells copied only for them are counted by the plugin that wins each'
     !!fl && typeof fl.cellsAdded === 'number' && sum(fl.cellsAddedByWinner) === fl.cellsAdded);
 
 // ---------------------------------------------------------------- P
-const last = readPlugin(ESP, 'Thornswood-Last.esp');
+const last = made.buf ? readPlugin(made.path, 'Thornswood-Last.esp') : { recs: [], masters: [], desc: () => '' };
+if (!made.buf) { console.log('SKIP  P, N2, N3, N5: ' + made.why); }
 const gates = new Set(manifest.gatesUnlocked || []);
 const refs = last.recs.filter((r) => r.tag === 'REFR' && !gates.has(r.desc));
 const bad = refs.filter((r) => {
   const tags = r.subs.map((s) => s.t).join(',');
   return !(r.flags & DISABLED) || (r.flags & DELETED) || (tags !== 'NAME,DATA' && tags !== 'EDID,NAME,DATA');
 });
-yes('P1 every placed reference but the ' + gates.size + ' town gates is switched off: initially disabled, ' +
+yesR('P1 every placed reference but the ' + gates.size + ' town gates is switched off: initially disabled, ' +
     'keeping only its base and place, with no enable parent, script or link' +
     (bad.length ? ' (not: ' + bad.slice(0, 5).map((r) => r.desc).join(', ') + ')' : ''),
-    gates.size === 3 && bad.length === 0);
-yes('P2 there are as many as the manifest says (' + refs.length + ')', !!fl && refs.length === fl.off);
+    () => gates.size === 3 && bad.length === 0);
+yesR('P2 there are as many as the manifest says (' + refs.length + ')', () => !!fl && refs.length === fl.off);
 const hash = crypto.createHash('sha256').update(refs.map((r) => r.desc).sort().join('\n'), 'utf8').digest('hex');
-yes('P3 and they are the ones it says: their ids hash to its refsSha256', !!fl && hash === fl.refsSha256);
+yesR('P3 and they are the ones it says: their ids hash to its refsSha256', () => !!fl && hash === fl.refsSha256);
 
 // ---------------------------------------------------------------- N
 // Nothing is copied out of a plugin Patrick rules is never handed on
@@ -174,17 +180,17 @@ for (const r of last.recs) {
   const base = name ? last.desc(name.b.readUInt32LE(0)) : '';
   if ((theirs(r.desc) || theirs(base)) && !carries.has(lower(r.tag + ' ' + r.desc))) { extra.push(r.tag + ' ' + r.desc); }
 }
-yes('N2 no record in Thornswood-Last.esp is or places one of a plugin it names, but the ones its row carries' +
-    (extra.length ? ' (not: ' + extra.slice(0, 5).join(', ') + ')' : ''), never.length > 0 && extra.length === 0);
+yesR('N2 no record in Thornswood-Last.esp is or places one of a plugin it names, but the ones its row carries' +
+    (extra.length ? ' (not: ' + extra.slice(0, 5).join(', ') + ')' : ''), () => never.length > 0 && extra.length === 0);
 const needs = never.filter((n) => last.masters.some((m) => lower(m) === lower(n)));
-yes('N3 one is a master only when its row carries a record of its own (' + needs.join(', ') + ')',
-    needs.every((n) => carried.some((c) => lower(c).endsWith(':' + lower(n)))));
+yesR('N3 one is a master only when its row carries a record of its own (' + needs.join(', ') + ')',
+    () => needs.every((n) => carried.some((c) => lower(c).endsWith(':' + lower(n)))));
 yes('N4 the manifest was built with the same list and carries exactly those records (rebuild the plugin after a policy change)',
     !!manifest.notCopiedFrom && JSON.stringify(manifest.notCopiedFrom.plugins) === JSON.stringify(never.slice().sort()) &&
     JSON.stringify(manifest.notCopiedFrom.carried || []) === JSON.stringify(carried.slice().sort()));
 const carriedRefs = carried.filter((c) => c.startsWith('REFR '));
-yes('N5 every carried reference is a floor item switched off here, keeping only its base and place',
-    carriedRefs.every((c) => refs.some((r) => lower('REFR ' + r.desc) === lower(c))));
+yesR('N5 every carried reference is a floor item switched off here, keeping only its base and place',
+    () => carriedRefs.every((c) => refs.some((r) => lower('REFR ' + r.desc) === lower(c))));
 
 // ---------------------------------------------------------------- C
 const content = readPlugin(CONTENT, 'Thornswood-Content.esp');

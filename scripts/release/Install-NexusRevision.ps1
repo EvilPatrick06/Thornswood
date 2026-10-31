@@ -9,6 +9,7 @@
       .\scripts\release\Install-NexusRevision.ps1 -Revision 3 -Game <folder>
       .\scripts\release\Install-NexusRevision.ps1 -CollectionArchive <collection_3.7z> -Revision 3 -Game <folder>
       pwsh scripts/release/Install-NexusRevision.ps1 -Revision 3 -Record <folder>
+      pwsh scripts/release/Install-NexusRevision.ps1 -Revision 6 -Record <folder> -KeepPlugins
 
   WHY. Until 20 October One's Vortex deployment in the Steam copy was the only
   thing that turned a revision into files, and every release step read it:
@@ -78,6 +79,20 @@
   set); every path in the records is the Windows path the layout has on One.
   Laying files into a game folder is for Windows only, where the game runs.
 
+  -KeepPlugins, with -Record, also keeps the plugins the layout places, the
+  copy Vortex would deploy of each, in the record's plugins folder, each
+  checked against the sha256 files.txt names (#4069). A game server loads
+  those plugins and nothing else of the collection, and until 31 Oct 2026
+  One's Vortex game was the only place they came from, so no server could
+  move to a new revision without One. The box takes them this way, sealed
+  to itself, through Nexus-Run (scripts\deploy\CollectionStore.ps1).
+  It keeps what SkyUI's menu check reads as well, in the record's menus
+  folder at each file's path in the game folder: a loose
+  Data\Scripts\ski_main.pex, every loose menu (Data\Interface\...\*.swf),
+  and every archive that holds either (Check-SkyUIMenus.js --holding, so node
+  has to be there), so a release that moves the revision can run that check
+  with nothing of One's.
+
   Needs PowerShell 7 (NexusLayout.cs reads JSON with System.Text.Json), 7-Zip
   (off Windows, 7-Zip's own build, which Get-SevenZip.ps1 fetches, because
   Ubuntu's cannot unpack the collection's RAR archives),
@@ -97,6 +112,10 @@
 .PARAMETER Record
   A folder for the layout's record (layout.json, files.txt, plugins.txt,
   loadorder.txt), with no file laid out. In place of -Game.
+
+.PARAMETER KeepPlugins
+  With -Record: keeps the plugins the layout places in <Record>\plugins,
+  and what SkyUI's menu check reads in <Record>\menus.
 
 .PARAMETER Slug
   The collection. 7essxf unless said otherwise.
@@ -120,6 +139,7 @@ param(
   [string]$CollectionArchive,
   [string]$Game,
   [string]$Record,
+  [switch]$KeepPlugins,
   [string]$Slug = '7essxf',
   [string]$GameDomain = 'skyrimspecialedition',
   [string]$Cache,
@@ -151,6 +171,7 @@ function Step([scriptblock]$b) { try { return (& $b) } catch { Die $_.Exception.
 
 if ($PSVersionTable.PSVersion.Major -lt 7) { Die 'This needs PowerShell 7 (pwsh): NexusLayout.cs reads collection.json with System.Text.Json, which Windows PowerShell 5.1 does not have.' }
 . (Join-Path $Here 'Nexus.ps1')
+. (Join-Path $Here '..\mods\PluginRuleLoops.ps1')
 
 # A program run with its output kept apart from its errors.
 function Invoke-Tool([string]$exe, [string[]]$arguments) {
@@ -225,10 +246,15 @@ if ($WhatIf) { Say '  -WhatIf: downloads and works it all out, and changes nothi
 
 # ------------------------------------------------------------ refused up front ---
 if ($Game -and $Record) { Die 'Give -Game to lay the revision out, or -Record to write only its record, not both.' }
+if ($KeepPlugins -and -not $Record) { Die '-KeepPlugins keeps the plugins beside a record, so it goes with -Record. With -Game every file is laid out already.' }
+if ($KeepPlugins -and -not (Get-Command node -ErrorAction SilentlyContinue)) { Die '-KeepPlugins keeps the archives SkyUI''s menu check reads, and node says which those are (scripts\mods\Check-SkyUIMenus.js). node is not on this machine.' }
 if ($Record) {
   $Record = [IO.Path]::GetFullPath($Record).TrimEnd([IO.Path]::DirectorySeparatorChar)
   if ($WhatIf) { Die '-Record already changes nothing but its own folder; leave -WhatIf off.' }
-  if ((Test-Path -LiteralPath $Record) -and @(Get-ChildItem -LiteralPath $Record -Force | Where-Object { @('layout.json', 'files.txt', 'plugins.txt', 'loadorder.txt') -notcontains $_.Name }).Count) { Die ('-Record ' + $Record + ' holds more than a layout''s record. Give it a folder of its own.') }
+  if ((Test-Path -LiteralPath $Record) -and @(Get-ChildItem -LiteralPath $Record -Force | Where-Object { @('layout.json', 'files.txt', 'plugins.txt', 'loadorder.txt', 'plugins', 'menus') -notcontains $_.Name }).Count) { Die ('-Record ' + $Record + ' holds more than a layout''s record. Give it a folder of its own.') }
+  if (Test-Path -LiteralPath (Join-Path $Record 'plugins')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $Record 'plugins') -PathType Container) -or @(Get-ChildItem -LiteralPath (Join-Path $Record 'plugins') -Force | Where-Object { $_.PSIsContainer -or $_.Name -notmatch '\.(esp|esm|esl)$' }).Count) { Die ('-Record ' + $Record + ' has a plugins entry that holds more than plugins. Give it a folder of its own.') }
+  }
 }
 elseif (-not $Game) { Die 'Say which folder to lay the revision out in with -Game, or where to write only its record with -Record. There is no default: it is never the Steam copy or a folder Vortex deploys into.' }
 elseif (-not $IsWindows) { Die 'Laying files into a game folder is done on Windows, where the game runs. Here, write the layout''s record with -Record <folder> instead of -Game.' }
@@ -397,7 +423,7 @@ $rars = @($col.Entries | Where-Object {
 if ($rars.Count) {
   Step { Use-SevenZip }
   $t = Invoke-Tool $script:SevenZip @('t', $archives[$rars[0].Index])
-  if ($t.Code -ne 0) { Die ($rars.Count + ' of the archives are RAR (' + (($rars | Select-Object -First 3 | ForEach-Object { $_.Name }) -join ', ') + $(if ($rars.Count -gt 3) { ', ...' } else { '' }) + '), and ' + $script:SevenZip + ' could not test the first of them (exit ' + $t.Code + '), so it cannot unpack them.' + $(if (-not $IsWindows) { ' 7-Zip''s own Linux build unpacks RAR: pwsh scripts/release/Get-SevenZip.ps1 puts it where this script looks first.' } else { '' })) }
+  if ($t.Code -ne 0) { Die ([string]$rars.Count + ' of the archives are RAR (' + (($rars | Select-Object -First 3 | ForEach-Object { $_.Name }) -join ', ') + $(if ($rars.Count -gt 3) { ', ...' } else { '' }) + '), and ' + $script:SevenZip + ' could not test the first of them (exit ' + $t.Code + '), so it cannot unpack them.' + $(if (-not $IsWindows) { ' 7-Zip''s own Linux build unpacks RAR: pwsh scripts/release/Get-SevenZip.ps1 puts it where this script looks first.' } else { '' })) }
 }
 
 # ---------------------------------------------------------------- the install ---
@@ -405,6 +431,19 @@ Head 'Installing, as Vortex would'
 # Size and sha256 of each file, by its unpacked path, taken before -Record
 # deletes the unpacked copy.
 $script:Facts = @{}
+# And each plugin's TES4 header, by its unpacked path, for the plugin rules
+# check after the deploy (PluginRuleLoops.ps1), which -Record would
+# otherwise find gone.
+$script:PluginHeads = @{}
+# And with -KeepPlugins a copy of each plugin, by its unpacked path, kept in
+# the scratch folder until the deployment says which copy wins.
+$script:Kept = @{}
+# And what SkyUI's menu check reads, the same way (#4069).
+$script:KeptMenus = @{}
+$script:MenuCheck = Join-Path $PSScriptRoot '..\mods\Check-SkyUIMenus.js'
+function Test-MenuInputRel([string]$Rel) {
+  return ($Rel -match '^(?i)Scripts\\ski_main\.pex$' -or $Rel -match '^(?i)Interface\\.+\.swf$' -or $Rel -match '^(?i)[^\\]+\.bsa$')
+}
 function Remove-Unpacked($e, [string]$u) {
   [Thornswood.Layout.NexusLayout]::Forget($u)
   Remove-Tree $u
@@ -457,6 +496,32 @@ foreach ($e in $col.Entries) {
   # unpacked copy goes before the next is unpacked.
   if ($Record) {
     foreach ($s in $plan.Files.Values) { $script:Facts[$s.Full] = [pscustomobject]@{ Size = (Get-Item -LiteralPath $s.Full).Length; Sha256 = [Thornswood.Layout.NexusLayout]::Sha256Of($s.Full) } }
+    foreach ($s in $plan.Files.Values) { if ($s.Full -match '\.(esp|esm|esl)$') { $script:PluginHeads[$s.Full] = [pscustomobject]@{ Header = (Read-PluginRuleHeader $s.Full) } } }
+    if ($KeepPlugins -and $e.Type -ne 'dinput') {
+      foreach ($s in $plan.Files.Values) {
+        if ($s.Rel -notmatch '^[^\\]+\.(esp|esm|esl)$') { continue }
+        $kd = Join-Path (Join-Path $script:Work 'keep') ([string]$e.Index)
+        New-Item -ItemType Directory -Force -Path $kd | Out-Null
+        $kf = Join-Path $kd $s.Rel
+        [IO.File]::Copy($s.Full, $kf, $true)
+        $script:Kept[$s.Full] = $kf
+      }
+      $menuIn = @($plan.Files.Values | Where-Object { Test-MenuInputRel $_.Rel })
+      $bsas = @($menuIn | Where-Object { $_.Rel -match '\.bsa$' } | ForEach-Object { $_.Full })
+      $holding = @()
+      if ($bsas.Count) {
+        $global:LASTEXITCODE = 0
+        $holding = @(& node $script:MenuCheck --holding @bsas)
+        if ($LASTEXITCODE -ne 0) { Die ($e.Say() + ': Check-SkyUIMenus.js --holding ended ' + $LASTEXITCODE + ', so which of its archives SkyUI''s menu check reads is not known.') }
+      }
+      foreach ($s in $menuIn) {
+        if ($s.Rel -match '\.bsa$' -and $holding -notcontains $s.Full) { continue }
+        $kf = Join-Path (Join-Path (Join-Path $script:Work 'keep-menus') ([string]$e.Index)) $s.Rel
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $kf) | Out-Null
+        [IO.File]::Copy($s.Full, $kf, $true)
+        $script:KeptMenus[$s.Full] = $kf
+      }
+    }
     Remove-Unpacked $e $u
   }
   $plans.Add($plan)
@@ -536,6 +601,34 @@ foreach ($r in $col.PluginRules) {
   foreach ($a in $r.After) { $ak = ([string]$a).ToLowerInvariant(); if ($pos.ContainsKey($ak) -and $pos[$ak] -gt $pos[$k]) { $broken += ($r.Name + ' is to load after ' + $a) } }
 }
 if ($broken.Count) { Die ('The collection''s plugin order breaks its own plugin rules: ' + ($broken -join '; ') + '.') }
+# The list is not the game's order: the game puts every master first, and
+# LOOT holds that as hard as a rule. Revision 5's list had
+# cheddars_mashups.esl at the end, after the three plugins its rule named,
+# and the rule held to the list; on a clean install LOOT found it going round
+# with the game's own order (27 Oct). So the rules are read against the
+# plugins' headers too (PluginRuleLoops.ps1).
+# A file with no TES4 header is placed by its name alone: the game loads an
+# .esm or .esl as a master whatever is in it. A file that is not there to
+# read stops the run: -Record took the unpacked copies away mod by mod, and
+# the header read then ($script:PluginHeads) is the one used.
+$ruleHeads = @{}
+$byName = @()
+foreach ($x in $placed) {
+  if ($x.Rel -notmatch '^Data\\([^\\]+\.(esp|esm|esl))$') { continue }
+  $nm = $Matches[1]
+  if (-not $pos.ContainsKey($nm.ToLowerInvariant())) { continue }
+  if ($script:PluginHeads.ContainsKey($x.Full)) { $h = $script:PluginHeads[$x.Full].Header }
+  elseif (Test-Path -LiteralPath $x.Full -PathType Leaf) { $h = Read-PluginRuleHeader $x.Full }
+  else { Die ($x.Rel + ' was not read before its unpacked copy went, so where the game loads it is not known.') }
+  if ($null -eq $h) {
+    $byName += $nm
+    $h = [pscustomobject]@{ Master = ($nm -match '\.(esm|esl)$'); Light = ($nm -match '\.esl$'); Masters = [string[]]@() }
+  }
+  $ruleHeads[$nm] = $h
+}
+if ($byName.Count) { Say ('  no TES4 header, so placed by name alone: ' + (@($byName | Sort-Object) -join ', ')) 'Yellow' }
+$loops = @(Get-PluginRuleLoops $col.PluginRules $ruleHeads)
+if ($loops.Count) { Die ('The collection''s plugin rules go round in a circle with the order the game sets, which LOOT reports as a cyclic interaction on every install: ' + (($loops | ForEach-Object { $_.Loop + ' (' + ($_.Why -join '; ') + ')' }) -join '; ') + '.') }
 Say ('  ' + $order.Count + ' plugins: ' + @($order | Where-Object { $_.Enabled }).Count + ' enabled in the collection''s order' + $(if ($unlisted.Count) { ', ' + $unlisted.Count + ' it does not list, disabled: ' + ($unlisted -join ', ') } else { '' }))
 
 Say '  working out every file''s sha256' 'DarkGray'
@@ -594,10 +687,54 @@ function Write-LayoutRecord([string]$dir, [bool]$withFiles) {
 
 if ($Record) {
   Write-LayoutRecord $Record $true
+  if ($KeepPlugins) {
+    # The copy that wins each plugin's place, as the deployment worked it
+    # out, held to the sha256 files.txt names for it.
+    $pd = Join-Path $Record 'plugins'
+    Remove-Tree $pd
+    New-Item -ItemType Directory -Force -Path $pd | Out-Null
+    $keptCount = 0
+    foreach ($x in $placed) {
+      if ($x.Rel -notmatch '^Data\\([^\\]+\.(esp|esm|esl))$') { continue }
+      $nm = $Matches[1]
+      $src = $script:Kept[$x.Full]
+      if (-not $src -or -not (Test-Path -LiteralPath $src -PathType Leaf)) { Die ($x.Rel + ' was not kept before its unpacked copy went, so the plugins are not all here. The record is in ' + $Record + '; its plugins folder is not whole.') }
+      $to = Join-Path $pd $nm
+      [IO.File]::Copy($src, $to, $true)
+      $got = [Thornswood.Layout.NexusLayout]::Sha256Of($to)
+      if ($got -ne $x.Sha256) { Die ($nm + ' kept in ' + $pd + ' has sha256 ' + $got + ', and files.txt names ' + $x.Sha256 + ' for it.') }
+      $keptCount++
+    }
+    # What SkyUI's menu check reads, at its path in the game folder, the
+    # copy the deployment places, held to files.txt the same way.
+    $md = Join-Path $Record 'menus'
+    Remove-Tree $md
+    New-Item -ItemType Directory -Force -Path $md | Out-Null
+    $menuCount = 0
+    foreach ($x in $placed) {
+      if ($x.Rel -notmatch '^Data\\(.+)$' -or -not (Test-MenuInputRel $Matches[1])) { continue }
+      $src = $script:KeptMenus[$x.Full]
+      if (-not $src) {
+        # An archive that holds nothing the check reads was never kept.
+        if ($x.Rel -match '\.bsa$') { continue }
+        Die ($x.Rel + ' was not kept before its unpacked copy went, so what SkyUI''s menu check reads is not all here.')
+      }
+      $to = Join-Path $md $x.Rel
+      New-Item -ItemType Directory -Force -Path (Split-Path -Parent $to) | Out-Null
+      [IO.File]::Copy($src, $to, $true)
+      $got = [Thornswood.Layout.NexusLayout]::Sha256Of($to)
+      if ($got -ne $x.Sha256) { Die ($x.Rel + ' kept in ' + $md + ' has sha256 ' + $got + ', and files.txt names ' + $x.Sha256 + ' for it.') }
+      $menuCount++
+    }
+  }
   Remove-Tree $script:Work; $script:Work = ''
   Head 'Done'
   Say ('  revision ' + $Revision + ' of ' + $Slug + ': ' + $placed.Count + ' files, ' + $order.Count + ' plugins, nothing placed') 'Green'
   Say ('  ' + (Join-Path $Record 'layout.json') + ', files.txt, plugins.txt, loadorder.txt')
+  if ($KeepPlugins) {
+    Say ('  and ' + $keptCount + ' plugins, the copies the layout places, in ' + (Join-Path $Record 'plugins'))
+    Say ('  and ' + $menuCount + ' files SkyUI''s menu check reads, in ' + (Join-Path $Record 'menus'))
+  }
   Write-Host ''
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
   exit 0

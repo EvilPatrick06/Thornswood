@@ -1082,8 +1082,8 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Names the window taken for Steam's, the process that drew it, its
-        /// title and its size, the first time it is found in a run and again
+        /// Names the window taken for Steam's, the process that drew it and
+        /// its size, the first time it is found in a run and again
         /// only if another one is found. When the clipboard fallback comes up
         /// on somebody's machine, this line says whether Steam's window was
         /// found at all and which one it was.
@@ -1103,12 +1103,12 @@ namespace Thornswood
             string owner = "process " + pid;
             try { owner = Process.GetProcessById((int)pid).ProcessName + ", process " + pid; }
             catch { /* The process has gone; its number is still worth saying. */ }
-            var title = new StringBuilder(256);
-            try { GetWindowText(h, title, title.Capacity); }
-            catch { /* No title is said as an empty one. */ }
+            // Never the title (#3627): a Steam chat window is titled with a
+            // friend's name, and this line goes up with the session's logs.
+            // Which process and how big says which window it was.
             RECT r;
             string size = GetWindowRect(h, out r) ? (r.Right - r.Left) + " x " + (r.Bottom - r.Top) : "size unknown";
-            return owner + ", titled \"" + title + "\", " + size;
+            return owner + ", " + size;
         }
 
         /// <summary>
@@ -1649,7 +1649,6 @@ namespace Thornswood
         [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
         [DllImport("user32.dll")] static extern uint GetDpiForWindow(IntPtr hWnd);
         [DllImport("user32.dll", SetLastError = true)] static extern uint SendInput(uint n, INPUT[] inputs, int size);
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int max);
         [DllImport("user32.dll")] static extern bool FlashWindowEx(ref FLASHWINFO info);
 
         static void Type(string text)

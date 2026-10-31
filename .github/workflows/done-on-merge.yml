@@ -52,8 +52,8 @@
 #
 #     gh workflow run done-on-merge.yml --ref main -f merges="<sha> <sha>"
 #
-# WHERE IT RUNS. On the VPS runners, like board-status.yml. Every push to main
-# takes a few seconds of one; a push with no test task in its pull request
+# WHERE IT RUNS. On GitHub's Windows runner (#4983). Every push to main
+# takes a few seconds; a push with no test task in its pull request
 # makes one call per commit and stops.
 name: Done on merge
 on:
@@ -71,7 +71,7 @@ permissions:
 jobs:
   done:
     name: Move test-tasked issues to Done
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    runs-on: windows-latest
     environment: board
     # A call per commit and three per issue. Past this it is stuck, not slow.
     timeout-minutes: 3

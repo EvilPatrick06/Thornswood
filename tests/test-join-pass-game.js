@@ -180,6 +180,41 @@ refusedCase('a pass for the right profile sent under the wrong one', function (r
   yes('a forged pass after a good one does not undo the good one', r.kicked.length === 0);
 }
 
+// A session let in by its pass, held until then, is told to the cuffs once (#4573):
+// a guard who arrived waiting on their pass is issued their pair then.
+{
+  const r = rig({ thornswoodServer: 'dev', thornswoodRequirePass: true });
+  const shownTo = [];
+  r.box.__thornswoodCuffs = { passShown: function (pid) { shownTo.push(pid); } };
+  online(r, [[0xff000a01, 700]]);
+  r.sweep(T0);
+  r.jp.take(700, mint({ p: 700, s: 'dev', i: T0, x: T0 + 600000 }, 'forged'), T0 + 500);
+  yes('a forged pass lets nobody in, so the cuffs hear nothing', shownTo.length === 0);
+  r.jp.take(700, mint({ p: 700, s: 'dev', i: T0, x: T0 + 600000 }), T0 + 1000);
+  yes('the pass that lets a held session in tells the cuffs, once, with its profile', shownTo.join() === '700');
+  r.jp.take(700, mint({ p: 700, s: 'dev', i: T0 + 60000, x: T0 + 660000 }), T0 + 61000);
+  yes('...and the launcher\'s next pass for the same session tells them nothing more', shownTo.join() === '700');
+}
+{
+  const r = rig({ thornswoodServer: 'dev', thornswoodRequirePass: false });
+  const shownTo = [];
+  r.box.__thornswoodCuffs = { passShown: function (pid) { shownTo.push(pid); } };
+  online(r, [[0xff000a01, 700]]);
+  r.sweep(T0);
+  r.jp.take(700, mint({ p: 700, s: 'dev', i: T0, x: T0 + 600000 }), T0 + 1000);
+  yes('with the pass only watched nobody was held, so the cuffs hear nothing', shownTo.length === 0);
+}
+{
+  const r = rig({ thornswoodServer: 'dev', thornswoodRequirePass: true });
+  r.box.__thornswoodCuffs = { passShown: function () { throw new Error('boom'); } };
+  online(r, [[0xff000a01, 700]]);
+  r.sweep(T0);
+  const got = r.jp.take(700, mint({ p: 700, s: 'dev', i: T0, x: T0 + 600000 }), T0 + 1000);
+  yes('a cuffs issue that throws still takes the pass, and says so on the console',
+      got.ok === true && !r.jp.held(700, T0 + 2000) &&
+      r.logged.some(function (l) { return /join pass: the cuffs issue for profile 700 failed: Error: boom/.test(l); }));
+}
+
 {
   const r = rig({ thornswoodServer: 'dev', thornswoodRequirePass: true });
   r.jp.take(700, mint({ p: 700, s: 'dev', i: T0, x: T0 + 600000 }), T0);
@@ -320,7 +355,12 @@ door(null);
   yes('the front plugin\'s join pass sender is where this expects it', fa > 0 && fb > fa);
   const block = front.slice(fa, fb + 6);
   const f = { sent: [], logged: [], file: '', now: T0, handler: null };
+  // Whose a pass is (#3128): only this game's character's is taken.
+  const pa = front.indexOf('  function passProfile(raw) {');
+  const pb = front.indexOf('\n  }\n', pa);
+  yes('passProfile is in the front plugin', pa > 0 && pb > pa);
   const box = {
+    PROFILE: 700, String: String, Number: Number, JSON: JSON,
     Date: { now: function () { return f.now; } },
     sp: { on: function (ev, fn) { if (ev === 'update') f.handler = fn; }, storage: {} },
     guard: function (name, fn) { return fn; },
@@ -333,6 +373,7 @@ door(null);
     log: function () { f.logged.push(Array.prototype.join.call(arguments, ' ')); }
   };
   vm.createContext(box);
+  vm.runInContext(front.slice(pa, pb + 4), box);
   vm.runInContext(block, box, { filename: 'thornswood-front.js (join pass)' });
   yes('it runs on update', typeof f.handler === 'function');
   const p1 = mint({ p: 700, s: 'dev', i: T0, x: T0 + 600000 });
@@ -341,6 +382,9 @@ door(null);
   yes('no file: nothing is sent', f.sent.length === 0);
   f.now += 5000; f.file = 'not a pass\n'; f.handler();
   yes('a file that is not a pass is not sent', f.sent.length === 0);
+  f.now += 5000; f.file = mint({ p: 701, s: 'dev', i: T0, x: T0 + 600000 }) + '\r\n'; f.handler();
+  yes('another character\'s pass, left from before a change of character, is not sent or stored (#3128)',
+      f.sent.length === 0 && !box.sp.storage.thornswoodJoinPass);
   f.now += 5000; f.file = p1 + '\r\n'; f.handler();
   yes('the launcher\'s pass is sent as "/joinpass <pass>" as soon as it is there', f.sent.length === 1 && f.sent[0] === '/joinpass ' + p1);
   f.now += 1000; f.handler();

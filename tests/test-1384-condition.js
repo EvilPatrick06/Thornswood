@@ -320,11 +320,13 @@ KIT_RECIPES.forEach(function (k) {
       JSON.stringify(ins) === JSON.stringify(k.inputs) && page.indexOf(k.words) !== -1);
 });
 {
-  const rt = fs.readFileSync(path.join(REPO_DIR, 'scripts', 'dev', 'Build-RecipeTable.ps1'), 'utf8');
-  yes('the three recipes are named to their halves in $RECIPE_OWNER, so the rebuilt table gates them',
-      /'ThornswoodRecipeWeaponKit'\s*=\s*@\{ Owner = 'Smith'; Half = 'Edgewright'/.test(rt) &&
-      /'ThornswoodRecipeArmorKit'\s*=\s*@\{ Owner = 'Smith'; Half = 'Platewright'/.test(rt) &&
-      /'ThornswoodRecipeSewingKit'\s*=\s*@\{ Owner = 'Tailor'; Half = 'Haberdasher'/.test(rt));
+  // RECIPE_OWNER's entries, which Build-RecipeTable.ps1 reads from records/recipe-owners.json.
+  const named = JSON.parse(fs.readFileSync(path.join(REPO_DIR, 'records', 'recipe-owners.json'), 'utf8')).owner;
+  const is = (edid, owner, half) => !!named[edid] && named[edid].Owner === owner && named[edid].Half === half;
+  yes('the three recipes are named to their halves in records/recipe-owners.json, so the rebuilt table gates them',
+      is('ThornswoodRecipeWeaponKit', 'Smith', 'Edgewright') &&
+      is('ThornswoodRecipeArmorKit', 'Smith', 'Platewright') &&
+      is('ThornswoodRecipeSewingKit', 'Tailor', 'Haberdasher'));
   const add = fs.readFileSync(path.join(REPO_DIR, 'scripts', 'mods', 'Add-ContentRecords.py'), 'utf8');
   yes('and Add-ContentRecords.py is what adds the six records',
       ['ThornswoodMiscWeaponKit', 'ThornswoodMiscArmorKit', 'ThornswoodMiscSewingKit',
@@ -334,17 +336,28 @@ KIT_RECIPES.forEach(function (k) {
       }));
 }
 
-const EDGE = { prof: 'smith', half: 'edgewright', ranks: { edgewright: 'novice', platewright: 'novice' } };
+// A Master Edgewright: the smiths' 120% waits for Master (Patrick, 26 Oct, #3442).
+const EDGE = { prof: 'smith', half: 'edgewright', ranks: { edgewright: 'master', platewright: 'novice' } };
+const EDGE_NOVICE = { prof: 'smith', half: 'edgewright', ranks: { edgewright: 'novice', platewright: 'novice' } };
+const PLATE_EXPERT = { prof: 'smith', half: 'platewright', ranks: { platewright: 'expert', edgewright: 'novice' } };
 const PLATE = { prof: 'smith', half: 'platewright', ranks: { platewright: 'master', edgewright: 'novice' } };
 const HABER = { prof: 'tailor', half: 'haberdasher', ranks: { haberdasher: 'novice' } };
 const LIVERY = { prof: 'tailor', half: 'liverywright', ranks: { liverywright: 'master', haberdasher: 'novice' } };
 const COOK = { prof: 'cook', half: 'hearthcook', ranks: { hearthcook: 'expert' } };
 
-yes('the Edgewright mends with a Weapon Kit to 120%', D.repairTo(EDGE, 'weapon') === 120);
+yes('the Edgewright mends with a Weapon Kit to 120% at Master', D.repairTo(EDGE, 'weapon') === 120);
+yes('below Master, the Edgewright mends with it to 100%, like anybody else (#3442)',
+    D.repairTo(EDGE_NOVICE, 'weapon') === 100);
+yes('an expert Platewright mends with an Armor Kit to 100%, not 120%',
+    D.repairTo(PLATE_EXPERT, 'armour') === 100);
+yes('a smith with no ranks written down mends to 100%',
+    D.repairTo({ prof: 'smith', half: 'edgewright' }, 'weapon') === 100);
+yes('the two smith kits are the ones that wait for Master, and the Sewing Kit is not',
+    KITS.weapon.atMaster === true && KITS.armour.atMaster === true && !KITS.clothing.atMaster);
 yes('the Platewright, the other half of the same profession, to 100%, even at master',
     D.repairTo(PLATE, 'weapon') === 100);
 yes('the Platewright mends with an Armor Kit to 120%', D.repairTo(PLATE, 'armour') === 120);
-yes('the Haberdasher mends with a Sewing Kit to 120%, the Liverywright to 100%',
+yes('a novice Haberdasher mends with a Sewing Kit to 120%, the Liverywright to 100%',
     D.repairTo(HABER, 'clothing') === 120 && D.repairTo(LIVERY, 'clothing') === 100);
 yes('a Liverywright with the sister half at master under a master still mends to 100% (Patrick, 4 October)',
     D.repairTo({ prof: 'tailor', half: 'liverywright', ranks: { liverywright: 'novice', haberdasher: 'master' },
@@ -817,6 +830,10 @@ vm.runInContext(require('./fixtures/ordinary-quest-items') + onDrop, dropContext
 yes('ordinary drops return no override and never reach the durability block',
     onDrop !== '' && !/wear\.dropped\(/.test(onDrop) &&
     dropContext.mp.onDropItem(101, IRON_SWORD, 1) === undefined);
+yes('the drop watcher refuses nothing else but the locked pair of Prisoner\'s Cuffs (#2573)',
+    (onDrop.replace(/if\(questItemBlocked\(baseId\)\)return false;/, '')
+      .replace(/if \(cuffsDrop && !cuffsDrop\.mayLetGo\(actorId, baseId, count\)\) \{ return false; \}/, '')
+      .match(/\breturn\b/g) || []).length === 0);
 const onHitLines = gm.split('\n').filter(function (l) { return /^mp\['onPapyrusEvent:OnHit'\] = guard\('onPapyrusEvent:OnHit', function/.test(l); });
 yes('a hit reaches it through the one OnHit handler, under guard(), beside the warrior maneuvers, with the blocked flag',
     onHitLines.length === 1 &&

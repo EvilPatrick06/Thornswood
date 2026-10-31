@@ -45,8 +45,8 @@
 # secret. engine.yml itself keeps its read-only token: the deletes are here,
 # in a job that checks out nothing and builds nothing.
 #
-# WHERE IT RUNS. On the VPS runners, like board-status.yml: a few dozen calls
-# to GitHub.
+# WHERE IT RUNS. On GitHub's Windows runner (#4983): a few dozen calls to
+# GitHub.
 name: Engine build prune
 run-name: Engine build prune ${{ github.event_name == 'workflow_run' && format('after run {0}', github.event.workflow_run.id) || format('by {0}', github.actor) }}
 on:
@@ -64,13 +64,10 @@ concurrency:
 jobs:
   prune:
     name: Drop the engine builds nothing pins
-    # Main only (#3550): runner 3 signs release launchers and takes any job
-    # that asks for thornswood-vps alone, so a job on that label never runs a
-    # branch's code. A dispatch on a branch skips it. scripts\vps\
-    # Check-RunnerIsolation.ps1 holds every job to that, on the gate through
-    # tests\test-runner-isolation.ps1.
+    # Main only (#3550): a dispatch on a branch skips it, so only main's code
+    # runs with this job's token.
     if: github.ref == 'refs/heads/main'
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    runs-on: windows-latest
     # A few dozen calls. Past this it is stuck, not slow.
     timeout-minutes: 5
     steps:
