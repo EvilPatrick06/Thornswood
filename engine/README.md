@@ -521,10 +521,17 @@ yet, so the first Ship (through `Update-ShipRoot.ps1`) or `Go.ps1` after the
 merge fetches it, and Check-ShipReady counts a build GitHub keeps as one the
 Ship will have. No engine build on any machine is part of a release.
 
-The fork keeps its build 90 days. Past that a Ship machine that has not
-fetched it yet cannot, and the pin needs new records: run the fork's build of
-the commit again in the fork, then `engine.yml` for it, and a pull request
-with the records it hands back. `tests\test-3047-ci-engine-build.ps1` holds
+It asks the fork's package of the build first (#5152): since fork #131
+every push build is also kept as
+`ghcr.io/evilpatrick06/thornswood-engine:<commit>`, for good and readable
+with no account, so an old pin ships as well as a new one, and reverting a
+pin pull request brings its engine back. The package is held to the records
+exactly as an artifact is; one that is not the records' build (the fork's
+build was run again and the records were made from the later one), or a pin
+from before fork #131 that has none, falls to the artifacts, which the fork
+keeps 90 days. Past those, with no package, the pin needs new records: run
+the fork's build of the commit again in the fork, then `engine.yml` for it,
+and a pull request with the records it hands back. `tests\test-3047-ci-engine-build.ps1` holds
 all of it, and `tests\test-3399-engine-records.ps1` the records' way back.
 
 On the VPS the fallback needs yarn, for the fork build's server packages:

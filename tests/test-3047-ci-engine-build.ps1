@@ -71,6 +71,9 @@ param()
 
 $ErrorActionPreference = 'Stop'
 $env:THORNSWOOD_HARNESS = '1'
+# The fork's artifacts alone in 1 to 6: section 7 holds the package (#5152)
+# with a stand-in registry, so no harness asks the real one.
+$env:THORNSWOOD_ENGINE_REGISTRY = 'none'
 $Here = Split-Path -Parent $PSScriptRoot
 $utf8 = New-Object Text.UTF8Encoding($false)
 
@@ -498,6 +501,60 @@ exit $LASTEXITCODE
         }
     }
     Yes ('6. no fix in the scripts a Ship machine reads sends it to build the engine' + $(if ($sent.Count) { ': ' + ($sent -join ', ') } else { '' })) ($sent.Count -eq 0)
+
+    # ============================== 7. The fork's package of the build (#5152) ==
+    Write-Host ''; Write-Host '7. the fork''s package'
+    if (Test-Path -LiteralPath $into) { Remove-Item -LiteralPath $into -Recurse -Force }
+    $pk = New-ForkBuild (Join-Path $T 'fork-for-package')
+    $pkZip = Join-Path $T 'package.zip'
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [IO.Compression.ZipFile]::CreateFromDirectory($pk, $pkZip)
+    $zipSum = ShaFile $pkZip
+    function New-Registry([hashtable]$over = @{}) {
+        $m = [ordered]@{
+            schemaVersion = 2; mediaType = 'application/vnd.oci.image.manifest.v1+json'
+            layers = @([ordered]@{ mediaType = 'application/zip'; digest = "sha256:$zipSum"; size = (Get-Item -LiteralPath $pkZip).Length })
+            annotations = [ordered]@{ 'org.opencontainers.image.revision' = $commit; 'org.thornswood.fork-build.sha256' = (ShaFile (Join-Path $pk 'fork-build.json')) }
+        }
+        foreach ($k in $over.Keys) { & $over[$k] $m }
+        $asked = New-Object System.Collections.Generic.List[string]
+        $script:asked = $asked
+        $mText = $m | ConvertTo-Json -Depth 6
+        $zipPath = $pkZip
+        $sum = $zipSum
+        return {
+            param([string]$Url, [hashtable]$Headers, [string]$File)
+            $asked.Add($Url + ' ' + [string]$Headers['Authorization'])
+            if ($Url -like 'https://reg.test/token?*') { [IO.File]::WriteAllText($File, '{"token":"anon"}'); return 200 }
+            if ($Url -eq "https://reg.test/v2/evilpatrick06/thornswood-engine/manifests/$commit") { if ($over.ContainsKey('gone')) { return 404 }; [IO.File]::WriteAllText($File, $mText); return 200 }
+            if ($Url -eq "https://reg.test/v2/evilpatrick06/thornswood-engine/blobs/sha256:$sum") { Copy-Item -LiteralPath $zipPath -Destination $File; return 200 }
+            return 404
+        }.GetNewClosure()
+    }
+    $http = New-Registry
+    $l = Get-EnginePackageBuild -Commit $commit -Registry 'https://reg.test' -Http $http -Look
+    Yes '7. -Look finds the package by the full commit, and fetches nothing' ($l.State -eq 'found' -and $l.Artifact.name -eq "reg.test/evilpatrick06/thornswood-engine:$commit" -and @($script:asked | Where-Object { $_ -like '*/blobs/*' }).Count -eq 0)
+    $dl = Join-Path $T 'package-out'
+    $p = Get-EnginePackageBuild -Commit $commit -Registry 'https://reg.test' -Http $http -Into $dl
+    Yes '7. the build comes out of it with its run from fork-build.json' ($p.State -eq 'found' -and $p.Run.id -eq 39588485569 -and (Test-Path -LiteralPath (Join-Path $dl 'fork-build.json')))
+    Yes '7.   every manifest and blob was asked with the pull token' (@($script:asked | Where-Object { $_ -match '/(manifests|blobs)/' }).Count -eq 3 -and @($script:asked | Where-Object { $_ -match '/(manifests|blobs)/' -and $_ -notmatch 'Bearer anon$' }).Count -eq 0)
+    Yes '7.   and it is the build the records name' (@(Get-EngineArtifactProblems $dl $repo ([long]$p.Run.id)).Count -eq 0)
+    $stamp = Install-EngineArtifact -From $dl -Repo $repo -Into $into -Run $p.Run -Artifact $p.Artifact
+    Yes '7. installed, engine-artifact.json names the package and its digest' ($stamp.artifact -like '*thornswood-engine:*' -and $stamp.digest -eq "sha256:$zipSum" -and $stamp.runId -eq 39588485569)
+    Remove-Item -LiteralPath $into -Recurse -Force
+
+    $g = Get-EnginePackageBuild -Commit $commit -Registry 'https://reg.test' -Http (New-Registry @{ gone = { param($m) } }) -Look
+    Yes '7. no package (a pin from before fork #131): none, saying so' ($g.State -eq 'none' -and $g.Why -match 'keeps no package')
+    $e = Threw { Get-EnginePackageBuild -Commit $commit -Registry 'https://reg.test' -Http (New-Registry @{ rev = { param($m) $m.annotations['org.opencontainers.image.revision'] = ('e' * 40) } }) -Look }
+    Yes '7. a manifest of another commit throws' ($e -match 'names another commit')
+    $e = Threw { Get-EnginePackageBuild -Commit $commit -Registry 'https://reg.test' -Http (New-Registry @{ sum = { param($m) $m.layers[0].size = 1 } }) -Into (Join-Path $T 'package-bad1') }
+    Yes '7. a blob that is not the manifest''s zip throws, and nothing is unpacked' ($e -match 'not the zip its manifest names' -and -not (Test-Path -LiteralPath (Join-Path $T 'package-bad1')))
+    $e = Threw { Get-EnginePackageBuild -Commit $commit -Registry 'https://reg.test' -Http (New-Registry @{ fb = { param($m) $m.annotations['org.thornswood.fork-build.sha256'] = ('0' * 64) } }) -Into (Join-Path $T 'package-bad2') }
+    Yes '7. a fork-build.json the manifest does not name throws' ($e -match 'not the one its manifest names')
+    $e = Threw { Get-EnginePackageBuild -Commit $commit -Registry 'https://reg.test' -Http { param($u, $h, $f) throw 'connection refused' } -Look }
+    Yes '7. a registry that cannot be reached throws, and is not "none"' ($e -match 'connection refused')
+    $ga = [IO.File]::ReadAllText((Join-Path $Here 'scripts\release\Get-EngineArtifact.ps1'))
+    Yes '7. Get-EngineArtifact.ps1 asks the package before the artifacts, and holds it to the records' ($ga.IndexOf('Get-EnginePackageBuild') -gt 0 -and $ga.IndexOf('Get-EnginePackageBuild') -lt $ga.IndexOf('Find-EngineArtifact $commit') -and $ga -match 'Get-EngineArtifactProblems \$dl \$RepoDir \(\[long\]\$p\.Run\.id\)')
 }
 finally {
     $env:LOCALAPPDATA = $oldLad
