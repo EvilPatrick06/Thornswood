@@ -168,9 +168,15 @@ WHAT IT PUTS IN THE PLUGIN
      each person's game as before (6, 8). The copy is made on each machine
      from that machine's own copy of the plugin (#2791), so none of its
      bytes are handed on. One of a plugin whose row does not say it keeps
-     its perks and is counted (perks.notCopied). A perk test joined to another condition by OR stops
-     the build, because taking it out would change what the other one
-     means; each such recipe is decided rather than guessed. A recipe
+     its perks and is counted (perks.notCopied). Taking a perk test out
+     is counting it as passed, as nobody can hold the perk it asks for, so
+     a perk test joined to other conditions by OR makes its whole OR group
+     pass and the group comes off with it (Skyrim joins OR before AND: a OR
+     b AND c is (a OR b) AND c). Measured 31 Oct 2026 on the box: 1,935
+     recipes do this, and the twenty the table named are all tempering
+     recipes; with the group off, the server alone decides who may temper
+     what, as for everything else. A group with no perk
+     test, and the AND between groups, are left exactly as they were. A recipe
      re-costed (6), moved (8) and freed of its perks is one record carrying
      all three.
 
@@ -1756,6 +1762,11 @@ def make_recipe(plugin, made, plugins):
     return recipe, stats
 
 
+def is_perk_test(b):
+    """Whether a CTDA's bytes are a HasPerk test (#4826)."""
+    return len(b) >= 10 and struct.unpack_from('<H', b, 8)[0] == HAS_PERK
+
+
 def perk_tests(pairs):
     """The indexes of the HasPerk conditions (#4826) among a record's
     subrecords, and whether any of them is joined to another condition by
@@ -1765,7 +1776,7 @@ def perk_tests(pairs):
         if t != b'CTDA':
             continue
         is_or = len(b) > 0 and bool(b[0] & CTDA_OR)
-        if len(b) >= 10 and struct.unpack_from('<H', b, 8)[0] == HAS_PERK:
+        if is_perk_test(b):
             at.append(i)
             if is_or or prev_or:
                 joined = True
@@ -1773,13 +1784,33 @@ def perk_tests(pairs):
     return at, joined
 
 
+def perk_drops(pairs):
+    """The indexes of the conditions that come off a recipe (#4826): every
+    OR group that holds a perk test, whole, since the test counts as passed
+    and so does the group. A group is a run of conditions each joined to the
+    next by its OR flag, ended by one without it (or by the last); a lone
+    condition is a group of one. Groups are joined to each other by AND, so
+    taking one out leaves the others meaning what they meant."""
+    groups, cur = [], []
+    for i, (t, b) in enumerate(pairs):
+        if t != b'CTDA':
+            continue
+        cur.append(i)
+        if not (len(b) > 0 and b[0] & CTDA_OR):
+            groups.append(cur)
+            cur = []
+    if cur:
+        groups.append(cur)
+    return [i for g in groups if any(is_perk_test(pairs[j][1]) for j in g) for i in g]
+
+
 def without_perks(pairs, what):
-    """The recipe with every HasPerk condition taken out, and the CIS1 and
-    CIS2 that follow one, and nothing else."""
-    at, joined = perk_tests(pairs)
-    if not at or joined:
-        raise SystemExit('STOP. %s %s. Nothing was written.'
-                         % (what, 'joins a perk test to another condition by OR' if joined else 'tests no perk'))
+    """The recipe with every OR group that holds a HasPerk condition taken
+    out (perk_drops), and the CIS1 and CIS2 that follow each of those
+    conditions, and nothing else."""
+    at = set(perk_drops(pairs))
+    if not at:
+        raise SystemExit('STOP. %s tests no perk. Nothing was written.' % what)
     out, drop = [], False
     for i, (t, b) in enumerate(pairs):
         if i in at:
@@ -1811,9 +1842,11 @@ def perk_entries(plugins, win, canon, blocked, perks_off=frozenset()):
     """Every winning recipe that tests one of Skyrim's perks (#4826): the
     entries copied here to take the tests out, and what the manifest says of
     them. One a never-copied plugin has or wins keeps its tests and is only
-    counted, unless that plugin's row copies its perk recipes (perks_off);
-    one whose test is joined by OR stops the build."""
-    here, joined = [], []
+    counted, unless that plugin's row copies its perk recipes (perks_off).
+    A perk test joined by OR takes its whole OR group off (perk_drops),
+    counted under joinedGroups."""
+    here = []
+    joined_rows, joined_conditions = 0, 0
     by_plugin, perks, not_copied = collections.Counter(), collections.Counter(), collections.Counter()
     copied_anyway = collections.Counter()
     conditions = 0
@@ -1829,8 +1862,8 @@ def perk_entries(plugins, win, canon, blocked, perks_off=frozenset()):
             not_copied[src.name] += 1
             continue
         if is_joined:
-            joined.append('%s %s (won by %s)' % (desc_of(gid, canon), edid_of(plugins, e), src.name))
-            continue
+            joined_rows += 1
+            joined_conditions += len(perk_drops(pairs)) - len(at)
         here.append(e)
         by_plugin[src.name] += 1
         for n in sorted({src.name.lower(), gid[0]} & blocked):
@@ -1838,11 +1871,8 @@ def perk_entries(plugins, win, canon, blocked, perks_off=frozenset()):
         conditions += len(at)
         for i in at:
             perks[desc_of(src.gid(struct.unpack_from('<I', pairs[i][1], 12)[0]), canon)] += 1
-    if joined:
-        raise SystemExit('STOP. %d recipe(s) join a perk test to another condition by OR, so taking the perk '
-                         'out would change what the other condition means. Decide each on #4826:\n  %s\n'
-                         'Nothing was written.' % (len(joined), '\n  '.join(joined[:60])))
     stats = {'recipes': len(here), 'conditions': conditions,
+             'joinedGroups': {'recipes': joined_rows, 'otherConditions': joined_conditions},
              'byWinner': dict(sorted(by_plugin.items())),
              'tested': dict(sorted(perks.items(), key=lambda kv: (-kv[1], kv[0]))),
              'notCopied': dict(sorted(not_copied.items())),
