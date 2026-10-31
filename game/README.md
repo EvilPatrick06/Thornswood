@@ -21,19 +21,22 @@ scripts that build and ship it:
   line in `gamemode.js`; nothing reads them at run time.
 - `content\Thornswood-Content.esp`: our plugin file. People get it through
   the Nexus collection; the dev and live deploys send it to the server.
-- `content\Thornswood-Last.esp`: the light plugin that loads last (#2468).
-  It switches off every placed actor the NPC catalogue cuts and stops every
-  vanilla quest from starting, except the creature voices
-  `data\last-plugin-policy.json` keeps, and the mod quests it names with
-  gate, door or arrival talk. Built only by
+- `data\last-plugin.recipe`: the recipe for Thornswood-Last.esp, the light
+  plugin that loads last (#2468). The plugin switches off every placed actor
+  the NPC catalogue cuts and stops every vanilla quest from starting, except
+  the creature voices `data\last-plugin-policy.json` keeps, and the mod quests
+  it names with gate, door or arrival talk. Built only by
   `scripts\mods\Build-LastPlugin.py` from the installed load order, never in
   an editor; `data\last-plugin.json` is what it holds, and
-  `tests\test-2468-last-plugin.js` holds the two together. It ships from
-  here like the content plugin (#2486): the deploys send it and put it last in
-  the servers' load order, and every pack carries it with a plugin list that
-  enables it last. A release refuses it when it was built against other bytes
-  than the release's own plugins, so a new collection revision means building
-  it again.
+  `tests\test-2468-last-plugin.js` holds the two together. It copies other
+  authors' records, so since #2791 no repository holds the plugin and nothing
+  hands it on: Build-LastPlugin.py writes the recipe, every pack carries the
+  recipe with a plugin list that enables the plugin last, the launcher makes
+  the plugin from it and the person's own plugins before every Play, and the
+  deploys make the servers' copy on the box (`scripts\deploy\LastPluginOnBox.ps1`)
+  and put it last in their load order. A release refuses a recipe built
+  against other bytes than the release's own plugins, so a new collection
+  revision means building it again.
 - `required-data\`: plugins the load order names that Vortex does not yet
   deploy under that exact filename. Go.ps1 and Ship place them into `Data\`.
   Its own README says when to take one out.

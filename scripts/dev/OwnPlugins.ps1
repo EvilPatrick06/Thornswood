@@ -3,9 +3,12 @@
 
   Where a builder reads a plugin of the load order from (#2923).
 
-  Thornswood's own plugins (Thornswood-Content.esp, Thornswood-Last.esp, and
-  any other file in game\content) are made
-  and shipped from this repository's game\content. A game folder holds
+  Thornswood's own plugins (Thornswood-Content.esp and any other file in
+  game\content) are made and shipped from this repository's game\content.
+  Thornswood-Last.esp is ours too, but since #2791 no repository holds it: it
+  copies other authors' records, so it is made in the Data folder from its
+  recipe, game\data\last-plugin.recipe (Make-LastPlugin.py), and read from
+  there ($script:OwnPluginsMadeInData). A game folder holds
   whichever release last reached it, so a table read from there describes a
   plugin nobody ships. Every plugin whose name is a file in game\content is
   read from there, and every other plugin from the game's Data folder. The same
@@ -28,12 +31,19 @@
 
 $script:OwnPluginDir = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\game\content'))
 
-function Test-OwnPlugin([string]$Name) {
+# Ours, and made in the Data folder from a recipe rather than held here (#2791).
+$script:OwnPluginsMadeInData = @('Thornswood-Last.esp')
+
+function Test-RepoPlugin([string]$Name) {
     return [System.IO.File]::Exists((Join-Path $script:OwnPluginDir $Name))
 }
 
+function Test-OwnPlugin([string]$Name) {
+    return ((Test-RepoPlugin $Name) -or (@($script:OwnPluginsMadeInData) -icontains $Name))
+}
+
 function Get-PluginPath([string]$Data, [string]$Name) {
-    if (Test-OwnPlugin $Name) { return (Join-Path $script:OwnPluginDir $Name) }
+    if (Test-RepoPlugin $Name) { return (Join-Path $script:OwnPluginDir $Name) }
     return (Join-Path $Data $Name)
 }
 

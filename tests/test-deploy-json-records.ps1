@@ -87,7 +87,7 @@ try {
 # DeployedBuild.ps1 and ServerSettings.ps1 read JSON only inside text that
 # runs on the box (ServerSettings.ps1 goes up beside the installer, which has
 # no Read-JsonFile.ps1), so they are held to having no local read at all.
-foreach ($rel in 'scripts\deploy\Deploy-Gamemode.ps1', 'scripts\deploy\ServerOrder.ps1', 'scripts\deploy\MaxOnline.ps1',
+foreach ($rel in 'scripts\deploy\Deploy-Gamemode.ps1', 'scripts\deploy\ServerOrder.ps1', 'scripts\deploy\MaxOnline.ps1', 'scripts\deploy\LastPluginRecipe.ps1',
                  'scripts\deploy\DeployedBuild.ps1', 'scripts\deploy\ServerSettings.ps1') {
     Yes "$(Split-Path -Leaf $rel) runs no bare ConvertFrom-Json on this machine" ((Commands (Tree $rel) 'ConvertFrom-Json').Count -eq 0)
 }
