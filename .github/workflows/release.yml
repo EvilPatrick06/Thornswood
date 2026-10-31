@@ -363,6 +363,24 @@ jobs:
           }
           Set-Content -LiteralPath (Join-Path $out 'SHA256SUMS') -Value $lines -Encoding ascii
 
+      # THE SAME THREE FILES AS THIS RUN'S ARTIFACT (#2841). GitHub lists a
+      # draft release only to an account that can push, and the box's Ship
+      # token reads Thornswood's contents and nothing more (ship-access.js,
+      # Patrick's pick of 30 Oct). So a Ship from the deploy gate never saw
+      # the v1.2.12 draft this workflow made (31 Oct, run 41196215137) and
+      # stopped on "no verified launcher". An artifact is read with Actions
+      # read, which that token has: Ship (Get-ReleaseFiles) takes the files
+      # from the newest green run of this workflow for the tag, and the draft
+      # only when no such run still holds them. Same folder, same bytes as the
+      # draft; Ship checks them against SHA256SUMS and the signature as before.
+      - name: Keep the exe, the setup program and SHA256SUMS as the run's files
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-files
+          path: ${{ runner.temp }}/release/
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Draft a release with the exe, the setup program and their checksums
         id: draft
         shell: pwsh

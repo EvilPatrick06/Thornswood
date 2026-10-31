@@ -448,8 +448,10 @@ if (-not $NoPublish) { & (Join-Path $PSScriptRoot 'Publish-Installer.ps1') -OutD
     # (id 21), setup-stub.exe (id 22, since a main Ship with -Package takes the
     # one CI built, issue #932) and SHA256SUMS (id 23), and each asset with its
     # bytes. It computes the hashes itself, so the download always verifies and
-    # the test proves the path runs, not that a particular byte matches. Every
-    # other gh call still only logs.
+    # the test proves the path runs, not that a particular byte matches. Since
+    # #2841 Ship first asks for the green release.yml runs of the tag, whose
+    # artifact it would take; the stand-in has none, as for a tag built before
+    # then, so the draft is read as before. Every other gh call still only logs.
     $ghDl = Join-Path $bin 'gh-download.ps1'
     [IO.File]::WriteAllText($ghDl, @'
 $utf8 = New-Object Text.UTF8Encoding($false)
@@ -461,7 +463,9 @@ $sums = $utf8.GetBytes(((@(@('Thornswood.exe', $exe), @('setup-stub.exe', $stub)
     (($sha.ComputeHash([byte[]]$_[1]) | ForEach-Object { $_.ToString('x2') }) -join '') + '  ' + $_[0] }) -join "`n") + "`n")
 $files = @{ 21 = $exe; 22 = $stub; 23 = $sums }
 $target = [string]$args[$args.Count - 1]
-if ($target -match '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$') {
+if ($target -match '^repos/[^/]+/[^/]+/actions/workflows/release\.yml/runs\?') {
+    Out-Bytes ($utf8.GetBytes('{"total_count":0,"workflow_runs":[]}'))
+} elseif ($target -match '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$') {
     $list = @()
     if ($Matches[1] -eq '1') {
         $assets = @(@(21, 'Thornswood.exe'), @(22, 'setup-stub.exe'), @(23, 'SHA256SUMS') | ForEach-Object { [ordered]@{ id = $_[0]; name = $_[1]; size = $files[$_[0]].Length } })
