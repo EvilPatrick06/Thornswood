@@ -175,7 +175,7 @@ if (Test-Path -LiteralPath '$log') { ''; '--- bridge.log, last 15 ---'; Get-Cont
 # and leaves in $stopOk whether everything of ours exited and the port is
 # free: a function that returned that as well as saying lines gave its caller
 # the lines, and a stop that failed was never refused.
-$stopIt = (Get-ThornswoodHoldScript -Script 'Install-Bridge.ps1') + [IO.File]::ReadAllText((Join-Path $Here 'StopAndMove.ps1')) + "`r`n" + @"
+$stopIt = [IO.File]::ReadAllText((Join-Path $Here 'StopAndMove.ps1')) + "`r`n" + @"
 function StopIt {
     `$all = @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue)
     `$mine = @(`$all | Where-Object { `$_.CommandLine -and `$_.CommandLine -like ('*' + '$log' + '*') })
@@ -197,6 +197,8 @@ function StopIt {
     }
 }
 "@
+# The hold goes in front too (#5155), so StopIt's callers can hold and release the task.
+$stopIt = (Get-ThornswoodHoldScript -Script 'Install-Bridge.ps1') + $stopIt
 
 # ------------------------------------------------------------------ remove --
 if ($Remove) {
