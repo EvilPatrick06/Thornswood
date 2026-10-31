@@ -41,14 +41,14 @@ A rank in a half you make things in also says what it just opened,
 counted the way the recipe book on K counts it: how many recipes sit at
 that rank, their kinds, and how many of them Skyrim lists at the bench
 (Patrick, 26 October 2026, #3149). The rest each carry a condition of
-their own, a perk or a spell or something to hold first:
+their own, a spell or something to hold first:
 
 > You are now an Advanced Platewright. 1 skill point to spend, on K.
 > Advanced Platewright work opens 57 more recipes to you: armoured
 > boots, gauntlets, helmets, body armour, shields and other armour and
 > clothing. Skyrim lists 2 of them at the bench. The other 55 each
-> carry a condition of their own, a perk or a spell or something you
-> have to be holding.
+> carry a condition of their own, a spell or something you have to be
+> holding.
 
 The count leaves out what your race may not make, as the book does. A
 half with nothing at the rank reached gets the rank line alone.
@@ -322,7 +322,7 @@ parts of a warrior's maneuvers the game
 has to do itself (see [Warrior](professions/warrior.md)), the repair
 kits on [Durability](durability.md), the check of which effect a
 brew or an enchantment carries (the engine does not pass it yet),
-and the vanilla perk
-lines that still hide some recipes in the crafting menu even when the
-server would allow them. Each profession
+and Immersive Armors' recipes, whose Skyrim perk lines still hide
+them in the crafting menu because Thornswood-Last.esp copies nothing of
+that mod (every other recipe's perk lines come off there, #4826). Each profession
 page says which of those is its own.

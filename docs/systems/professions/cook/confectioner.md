@@ -18,10 +18,10 @@ one of them wants a sack of flour and butter. Flour is the Hearthcook
 mill recipe, and wheat is advanced farm work. A novice confectioner
 is buying flour, not growing it.
 
-All 28 also want two vanilla food perks. The crafting menu enforces
-those perks even though the server would allow the row. A character
-with cooking perks switched off can be told no by the menu and yes
-by the rule. The plan is the server's answer. The menu is the gap.
+All 28 used to want two vanilla food perks as well, which nobody here
+can hold, so the crafting menu hid every row the server allowed. The
+perks come off every recipe in Thornswood-Last.esp (#4826), so the
+server's answer is the only one.
 
 ## The novice eight
 
@@ -90,5 +90,5 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 ## Where this is
 
 The 28 rows and the oven gate are in the server. The vanilla perk
-lines on the menu are still there. Grand Chef's second portion is in
+lines come off the menu with the first release built after #4826. Grand Chef's second portion is in
 the server.
