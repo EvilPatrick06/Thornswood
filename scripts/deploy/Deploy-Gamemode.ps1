@@ -688,9 +688,10 @@ $paths = @($keep | ForEach-Object {
 #   python scripts\mods\Build-LastPlugin.py --data <the same Data>
 #
 # and a deploy after that holds the order the plugin's record now names.
-# Each of Thornswood's own plugins is named at its file in game\content, the
-# one every builder reads it from (own_plugins.py, #2923), never the copy a
-# game folder holds.
+# Each of Thornswood's own plugins in game\content is named at its file
+# there, the one every builder reads it from (own_plugins.py, #2923), never
+# the copy a game folder holds. Thornswood-Last.esp is not there: the box
+# makes it from its recipe (#2791), so it takes its place last in Data.
 if ($OrderOnly) {
     $ownDir = [IO.Path]::GetFullPath((Join-Path $Here '..\..\game\content'))
     $orderPaths = @($keep | ForEach-Object {

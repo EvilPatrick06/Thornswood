@@ -36,8 +36,9 @@
        second refused.
        Then -OrderOnly (#4068): over a list a collection revision moved, a
        deploy stops on a Thornswood-Last.esp built against the old order,
-       and -OrderOnly writes the new order alone, our own plugins at their
-       files in game\content, and nothing into the build.
+       and -OrderOnly writes the new order alone, Thornswood-Content.esp at
+       its file in game\content, Thornswood-Last.esp (made from its recipe)
+       last, and nothing into the build.
     4. The places full and light plugins hold among each other (#2468): a
        re-sorted list keeps each kind's order and still moves those places,
        and the same list in Thornswood-Last.esp's recorded order
@@ -366,11 +367,27 @@ function Get-CollectionState([string]$Url) { [pscustomobject]@{ Slug = 'tslight'
     # A collection revision added New Light.esp, and Thornswood-Last.esp was
     # built against the order before it: a deploy stops on that, and the
     # order the plugin is to be built against again is written alone, with
-    # our own plugins at their files in game\content and nothing in the build.
+    # Thornswood-Content.esp at its file in game\content and nothing in the
+    # build.
+    # No checkout holds Thornswood-Last.esp, only its recipe, whose first step
+    # writes the plugin's own header (#2791, LastPluginRecipe.ps1): TSLR,
+    # version 1, the plugin's size and sha256, no inputs, then that step.
     $t = New-Tree 'order-only' (ServerRecord $true)
     $own = Join-Path $t 'game\content'
     New-Plugin $own 'Thornswood-Content.esp' 0x0
-    New-Plugin $own 'Thornswood-Last.esp' 0x200
+    New-Plugin (Join-Path $t 'temp\head') 'Thornswood-Last.esp' 0x200
+    $head = [IO.File]::ReadAllBytes((Join-Path $t 'temp\head\Thornswood-Last.esp'))
+    $recipe = New-Object Collections.Generic.List[byte]
+    $recipe.AddRange([Text.Encoding]::ASCII.GetBytes('TSLR')); $recipe.Add(1)
+    $recipe.AddRange([BitConverter]::GetBytes([uint32]$head.Length))
+    $recipe.AddRange((New-Object byte[] 32))
+    $recipe.Add(0)
+    $recipe.Add(0)
+    for ($n = $head.Length; $n -ge 0x80; $n = $n -shr 7) { $recipe.Add([byte](($n -band 0x7F) -bor 0x80)) }
+    $recipe.Add([byte]$n)
+    $recipe.AddRange($head)
+    New-Item -ItemType Directory -Force -Path (Join-Path $t 'game\data') | Out-Null
+    [IO.File]::WriteAllBytes((Join-Path $t 'game\data\last-plugin.recipe'), $recipe.ToArray())
     Put (Join-Path $t 'plugins.txt') ("*Water for ENB.esm`r`n*Light Beards.esp`r`n*Expressive Facegen Morphs.esl`r`n*Thornswood-Content.esp`r`n" +
                                       "*Menu Glue.esp`r`n*Skyrim Unbound.esp`r`n*Late Light.esp`r`n*New Light.esp`r`n")
     $stale = @($masters5 + @('_ResourcePack.esl', 'Water for ENB.esm', 'Expressive Facegen Morphs.esl', 'Light Beards.esp', 'Thornswood-Content.esp', 'Menu Glue.esp', 'Skyrim Unbound.esp', 'Late Light.esp'))
@@ -387,8 +404,8 @@ function Get-CollectionState([string]$Url) { [pscustomobject]@{ Slug = 'tslight'
     $o = [IO.File]::ReadAllText($orderFile) | ConvertFrom-Json
     $oLeaves = Leaves $o
     Same '  and writes the order the game loads for this list, with the plugin last' $oLeaves ($masters5 + @('_ResourcePack.esl', 'Water for ENB.esm', 'Expressive Facegen Morphs.esl', 'Light Beards.esp', 'Thornswood-Content.esp', 'Menu Glue.esp', 'Skyrim Unbound.esp', 'Late Light.esp', 'New Light.esp', 'Thornswood-Last.esp'))
-    $ownAt = @($o.loadOrder | Where-Object { ([string]$_) -match 'Thornswood-(Content|Last)\.esp$' })
-    Yes '  naming our own plugins at their files in game\content' ($ownAt.Count -eq 2 -and @($ownAt | Where-Object { ([string]$_) -notmatch '/game/content/' }).Count -eq 0)
+    Yes '  naming Thornswood-Content.esp at its file in game\content' (@($o.loadOrder | Where-Object { ([string]$_) -match '/game/content/Thornswood-Content\.esp$' }).Count -eq 1)
+    Yes '  and Thornswood-Last.esp, which the box makes from its recipe, last in the Data folder' (([string]@($o.loadOrder)[-1]) -match '/Game/Data/Thornswood-Last\.esp$')
     Yes '  and the rest in the Data folder it read' (@($o.loadOrder | Where-Object { ([string]$_) -match '/Game/Data/Water for ENB\.esm$' }).Count -eq 1)
     Yes '  and nothing in the build: the settings as they were, no gamemode.js put there' ([IO.File]::ReadAllText((Join-Path $t 'dist\server-settings.json')) -eq $before -and -not (Test-Path -LiteralPath (Join-Path $t 'dist\gamemode.js')))
 }
