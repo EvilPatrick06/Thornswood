@@ -51,10 +51,10 @@ with no account.
 <!-- engine-pin:credits -->
 The server's engine recorded for the next release, `scam_native.node`, is
 built from one commit,
-[`b21c4eb9`](https://github.com/EvilPatrick06/skymp/tree/b21c4eb9ad7d062ae91c9392b0fa1928bf7f0b41).
+[`befb8364`](https://github.com/EvilPatrick06/skymp/tree/befb8364a491b6329e07d10c5991efa2121da1af).
 That commit starts from
 [SkyMP](https://github.com/skyrim-multiplayer/skymp) at `2849e676`, and
-[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...b21c4eb9)
+[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...befb8364)
 is the difference between the two.
 <!-- /engine-pin:credits -->
 
@@ -200,10 +200,12 @@ mod.
 Paul J. Miller and Dieter Steffmann, under the SIL Open Font License. It comes
 with SkyMP.
 
-**Bankir-Retro**, the font SkyMP's in-game interface draws its buttons and
-text boxes in, is by Gophmann A.L. (2006). **icomoon**, the small icon font
-that interface draws the dots of a hidden password with, was made with
-IcoMoon. Both come with SkyMP, in its `skymp5-front`. **Barlow SemiBold**, the
+**Big Shoulders**, the font SkyMP's in-game interface draws its buttons and
+text boxes in since 31 October 2026, is by Patric King (XO Type Co) and the
+Big Shoulders Project Authors, under the SIL Open Font License, version 1.1.
+Before it, that interface drew them in **Bankir-Retro**, by Gophmann A.L.
+(2006), and the dots of a hidden password in **icomoon**, made with IcoMoon;
+both came with SkyMP, in its `skymp5-front`. **Barlow SemiBold**, the
 font that interface draws the rest of its text in since 20 October 2026, is by
 Jeremy Tribby and the Barlow Project Authors, under the SIL Open Font License,
 version 1.1. Thornswood also draws the dot over somebody who is speaking in

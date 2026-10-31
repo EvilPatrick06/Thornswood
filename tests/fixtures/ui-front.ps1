@@ -4,10 +4,10 @@
   build.js is missing or names nothing (#1318). Font names are derived from
   the real shipped build.js's asset modules (tests/fixtures/ui-front-build.js,
   cut from the whole build in #3761), so they follow that file. They are the
-  two that build.js and the front built from the fork both still ship,
-  Bankir-Retro and icomoon: its four Futura PT and DIN Pro faces are on
-  records\ui-gone.json since #1317, so they are never ours, and a harness
-  that packed them would be testing a file no release carries.
+  two the front built from the fork ships, Big Shoulders and Barlow
+  SemiBold. The Futura PT and DIN Pro faces (#1317) and Bankir-Retro and
+  icomoon (fork #41) are on records\ui-gone.json, so they are never ours, and
+  a harness that packed them would be testing a file no release carries.
 #>
 $script:UiFrontFixtureRoot = $PSScriptRoot
 $script:UiFrontFixtureFonts = $null
@@ -33,8 +33,8 @@ function Get-UiFrontFixtureFontNames {
     $text = [IO.File]::ReadAllText($js)
     $book = $null
     $medium = $null
-    $bookRe = '\.p \+ \\"([0-9a-f]{8,32}\.ttf)\\";\\n\\n//# sourceURL=webpack://ui_webpack/\./src/fonts/Bankir-Retro\.ttf'
-    $mediumRe = '\.p \+ \\"([0-9a-f]{8,32}\.ttf)\\";\\n\\n//# sourceURL=webpack://ui_webpack/\./src/fonts/icomoon\.ttf'
+    $bookRe = '\.p \+ \\"([0-9a-f]{8,32}\.ttf)\\";\\n\\n//# sourceURL=webpack://ui_webpack/\./src/fonts/BigShoulders-Variable\.ttf'
+    $mediumRe = '\.p \+ \\"([0-9a-f]{8,32}\.ttf)\\";\\n\\n//# sourceURL=webpack://ui_webpack/\./src/fonts/Barlow-SemiBold\.ttf'
     $m = [regex]::Match($text, $bookRe)
     if ($m.Success) { $book = $m.Groups[1].Value }
     $m = [regex]::Match($text, $mediumRe)
