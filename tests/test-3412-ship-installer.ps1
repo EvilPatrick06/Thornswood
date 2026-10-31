@@ -81,6 +81,14 @@ $why = Invoke-InstallerOnGitHub -Repo 'o/r' -Gh $gh -WaitSeconds 5 -Poll 1
 Yes ("a green run on main: '' ('{0}')" -f $why) ($why -eq '')
 Yes '  it started installer.yml on main' ($calls.Count -ge 2 -and $calls[0] -eq 'workflow run installer.yml -R o/r --ref main')
 Yes '  and read the workflow_dispatch runs of installer.yml' ($calls.Count -ge 2 -and $calls[1] -match '^run list -R o/r -w installer\.yml -e workflow_dispatch ')
+$gh = New-RunGh 'success'
+$rid = ''
+$why = Invoke-InstallerOnGitHub -Repo 'o/r' -Gh $gh -WaitSeconds 5 -Poll 1 -RunId ([ref]$rid)
+Yes ("  and names the run it waited on, for its files (#5109): '{0}'" -f $rid) ($why -eq '' -and $rid -eq '41')
+$pf = [IO.File]::ReadAllText((Join-Path $Repo 'scripts\release\Publish-InstallerFromGitHub.ps1'))
+Yes 'Publish-InstallerFromGitHub.ps1 takes the run''s files first, and the draft''s only when the run holds none' (
+    $pf.Contains('-RunId ([ref]$runId)') -and $pf.Contains('$got = Save-InstallerRunFiles $api $repo $runId $OutDir') -and
+    $pf.IndexOf('Save-InstallerRunFiles $api') -lt $pf.IndexOf('Find-InstallerRelease $api') -and $pf.Contains("if (`$got -eq 'none') {"))
 $gh = New-RunGh 'failure'
 $why = Invoke-InstallerOnGitHub -Repo 'o/r' -Gh $gh -WaitSeconds 5 -Poll 1
 Yes 'a red run: refused, with the run' ($why -match 'ended failure' -and $why -match 'runs/41')
