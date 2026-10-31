@@ -145,7 +145,8 @@
         "Title": "text",
         "Detail": "text",
         "Detail2": "text",
-        "Detail3": "text"
+        "Detail3": "text",
+        "ModsOnly": "switch"
       }
     },
     "Ship-Main": {

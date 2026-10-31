@@ -379,7 +379,11 @@ function Get-SourceRepo([string]$repoDir) {
     } else {
         Write-Host '  git is not on the path, so the launcher''s draft is looked for on EvilPatrick06/Thornswood' -ForegroundColor Yellow
     }
-    if ($remote -and $remote -match 'github\.com[:/](.+?)(?:\.git)?\s*$') { return $Matches[1] }
+    # A URL's port is not part of owner/name: the deploy gate's checkout reads
+    # ssh://git@ssh.github.com:443/<owner>/<name>.git (Install-Gate.ps1), and
+    # on 31 Oct its main Ship asked gh for 443/EvilPatrick06/Thornswood, a
+    # repository on a host named 443 ("error connecting to 443").
+    if ($remote -and $remote -match 'github\.com(?::\d+(?=/))?[:/](.+?)(?:\.git)?\s*$') { return $Matches[1] }
     return 'EvilPatrick06/Thornswood'
 }
 
@@ -488,6 +492,77 @@ function Save-ReleaseAssets([string]$repo, $release, [string[]]$names, [string]$
     return ''
 }
 
+# FROM THE RUN THAT BUILT THEM, THEN THE DRAFT (#2841). GitHub lists a draft
+# release only to an account that can push. A Ship on One reads with Patrick's
+# own gh and sees the drafts; a Ship from the deploy gate reads with the box
+# admin App's token, Actions write and Contents read (ship-access.js, his pick
+# of 30 Oct), and the releases list it gets has no drafts in it. On 31 Oct the
+# gate's Ship-Main had release.yml build, sign and check v1.2.12 (run
+# 41196215137, all three files on the draft) and then stopped on "There is no
+# verified launcher for v1.2.12". release.yml keeps the same three files as its
+# run's artifact "release-files", which Actions read reaches, so they are taken
+# from the newest green run of main's release.yml titled for the tag, and from
+# the draft only when no such run still holds them all (a run before this, or
+# one past its 30 days). The checks that follow are the same either way.
+#
+# Downloads $names for $tag into $into. Returns @{ LookWhy; None; Why }:
+# LookWhy when GitHub could not be asked at all, None when neither a run nor a
+# draft holds them, Why when they were there and did not come down whole.
+function Save-ReleaseFiles([string]$repo, [string]$tag, [string[]]$names, [string]$into) {
+    New-Item -ItemType Directory -Force -Path $into | Out-Null
+    function Read-GhJson([string]$path) {
+        $ms = New-Object IO.MemoryStream
+        try {
+            $why = Invoke-GhToStream @('api', '-H', 'Accept: application/vnd.github+json', $path) $ms
+            $text = [Text.Encoding]::UTF8.GetString($ms.ToArray())
+        } finally { $ms.Dispose() }
+        if ($why) { return @{ Doc = $null; Why = $why } }
+        try { return @{ Doc = ($text | ConvertFrom-Json); Why = '' } }
+        catch { return @{ Doc = $null; Why = ('the answer did not read as JSON: ' + $_.Exception.Message) } }
+    }
+    $runs = Read-GhJson "repos/$repo/actions/workflows/release.yml/runs?branch=main&event=workflow_dispatch&status=success&per_page=50"
+    if ($runs.Why) { return @{ LookWhy = "gh could not list the release.yml runs of $repo ($($runs.Why))"; None = $false; Why = '' } }
+    $run = $null
+    foreach ($r in @($runs.Doc.workflow_runs | ForEach-Object { $_ })) {
+        if ($r -and [string]$r.display_title -ceq ('Release launcher ' + $tag) -and [string]$r.head_branch -ceq 'main' -and
+            ($null -eq $run -or [long]$r.id -gt [long]$run.id)) { $run = $r }
+    }
+    if ($null -ne $run) {
+        $arts = Read-GhJson "repos/$repo/actions/runs/$($run.id)/artifacts"
+        if ($arts.Why) { return @{ LookWhy = "gh could not list the files of release.yml run $($run.id) ($($arts.Why))"; None = $false; Why = '' } }
+        $art = $null
+        foreach ($a in @($arts.Doc.artifacts | ForEach-Object { $_ })) {
+            if ($a -and [string]$a.name -ceq 'release-files' -and -not $a.expired -and ($null -eq $art -or [long]$a.id -gt [long]$art.id)) { $art = $a }
+        }
+        if ($null -ne $art) {
+            $zip = Join-Path $into 'release-files.zip'
+            $dir = Join-Path $into 'release-files'
+            foreach ($p in $zip, $dir) { if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Recurse -Force } }
+            $fs = [IO.File]::Create($zip)
+            try { $why = Invoke-GhToStream @('api', "repos/$repo/actions/artifacts/$($art.id)/zip") $fs }
+            finally { $fs.Dispose() }
+            try {
+                if ($why) { return @{ LookWhy = ''; None = $false; Why = "could not download the files of release.yml run $($run.id) ($why)" } }
+                try { Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force -ErrorAction Stop }
+                catch { return @{ LookWhy = ''; None = $false; Why = "the files of release.yml run $($run.id) did not open as a zip ($($_.Exception.Message))" } }
+                if (@($names | Where-Object { -not (Test-Path -LiteralPath (Join-Path $dir $_) -PathType Leaf) }).Count -eq 0) {
+                    foreach ($n in $names) { Copy-Item -LiteralPath (Join-Path $dir $n) -Destination (Join-Path $into $n) -Force }
+                    Write-Host ("  from release.yml run {0}, {1}" -f $run.id, [string]$run.html_url) -ForegroundColor DarkGray
+                    return @{ LookWhy = ''; None = $false; Why = '' }
+                }
+            } finally {
+                foreach ($p in $zip, $dir) { if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Recurse -Force -ErrorAction SilentlyContinue } }
+            }
+        }
+    }
+    $look = Find-ReleaseByTag $repo $tag
+    if ($look.Why) { return @{ LookWhy = $look.Why; None = $false; Why = '' } }
+    if (-not $look.Release) { return @{ LookWhy = ''; None = $true; Why = '' } }
+    $got = Save-ReleaseAssets $repo $look.Release $names $into
+    if ($got -match '^the release has no ') { return @{ LookWhy = ''; None = $true; Why = '' } }
+    return @{ LookWhy = ''; None = $false; Why = $got }
+}
+
 # Downloads Thornswood.exe and SHA256SUMS for tag v<version> into $into and
 # checks the exe against its line in SHA256SUMS. Returns '' when the verified
 # exe is sitting in $into, or a sentence saying why not, for the caller to Die
@@ -507,15 +582,13 @@ function Get-ReleaseLauncher([string]$repo, [string]$version, [string]$into) {
                "draft release, then run this same Ship again:`r`n" +
                "    git tag $tag`r`n" +
                "    git push origin $tag")
-    $look = Find-ReleaseByTag $repo $tag
-    if ($look.Why) {
-        return ("The launcher CI built for $tag could not be looked for: $($look.Why). This is GitHub or gh, not the release; " +
+    $look = Save-ReleaseFiles $repo $tag @('Thornswood.exe', 'SHA256SUMS') $into
+    if ($look.LookWhy) {
+        return ("The launcher CI built for $tag could not be looked for: $($look.LookWhy). This is GitHub or gh, not the release; " +
                 "check gh auth status and run this same Ship again. Nothing was published.")
     }
-    if (-not $look.Release) { return $notYet }
-    $got = Save-ReleaseAssets $repo $look.Release @('Thornswood.exe', 'SHA256SUMS') $into
-    if ($got -match '^the release has no ') { return $notYet }
-    if ($got) { return ("The launcher CI built for $tag is on $repo, but $got. Run this same Ship again. Nothing was published.") }
+    if ($look.None) { return $notYet }
+    if ($look.Why) { return ("The launcher CI built for $tag is on $repo, but $($look.Why). Run this same Ship again. Nothing was published.") }
     $exe = Join-Path $into 'Thornswood.exe'
     $sums = Join-Path $into 'SHA256SUMS'
     # SHA256SUMS is "<hash>  Thornswood.exe", the sha256sum shape, so the line
@@ -559,15 +632,13 @@ function Get-ReleaseStub([string]$repo, [string]$version, [string]$into) {
     }
     $none = ("The release for $tag on $repo has no setup program (setup-stub.exe), so -Package would build an installer " +
              "with nothing to run it. Nothing was published. " + $again)
-    $look = Find-ReleaseByTag $repo $tag
-    if ($look.Why) {
-        return ("The setup program CI built for $tag could not be looked for: $($look.Why). This is GitHub or gh, not the release; " +
+    $look = Save-ReleaseFiles $repo $tag @('setup-stub.exe', 'SHA256SUMS') $into
+    if ($look.LookWhy) {
+        return ("The setup program CI built for $tag could not be looked for: $($look.LookWhy). This is GitHub or gh, not the release; " +
                 "check gh auth status and run this same Ship again. Nothing was published.")
     }
-    if (-not $look.Release) { return $none }
-    $got = Save-ReleaseAssets $repo $look.Release @('setup-stub.exe', 'SHA256SUMS') $into
-    if ($got -match '^the release has no ') { return $none }
-    if ($got) { return ("The setup program CI built for $tag is on $repo, but $got. Run this same Ship again. Nothing was published.") }
+    if ($look.None) { return $none }
+    if ($look.Why) { return ("The setup program CI built for $tag is on $repo, but $($look.Why). Run this same Ship again. Nothing was published.") }
     $stub = Join-Path $into 'setup-stub.exe'
     $sums = Join-Path $into 'SHA256SUMS'
     $want = ''
@@ -763,7 +834,18 @@ function Test-LauncherUnchanged($published, [string]$inputs) {
 #   - main's feed cannot be read at all: it cannot tell, so it refuses, before
 #     anything is built.
 # $mainPub and $devPub are what Get-PublishedLauncher returns. Returns
-# MainEquivalent, Why (one line for the screen) and Refuse ('' or the reason).
+# MainEquivalent, MainsOwn, Why (one line for the screen) and Refuse ('' or
+# the reason).
+#
+# MainEquivalent says dev carries main's number. MainsOwn says more: main's
+# feed already offers this very launcher, so dev can take that exe as it is.
+# Only the case "main published $current from these same sources" is both.
+# "Main has not published $current yet" is MainEquivalent alone: the number is
+# main's, the launcher is not built yet. On 31 Oct the gate's Ship-Dev from
+# 556471fc read MainEquivalent as "take main's feed launcher", and dev release
+# 20261031-051138-dev went out naming launcher 1.2.12 (minLauncher 1.2.12)
+# with main's 1.2.11 exe (bb01775f) under it, so every dev launcher was told
+# it was too old and was offered itself.
 function Get-DevLauncherLine([bool]$aligned, [string]$current, [string]$inputs, $mainPub, $devPub) {
     function Cmp([string]$a, [string]$b) {
         $x = @(); $y = @()
@@ -779,7 +861,7 @@ function Get-DevLauncherLine([bool]$aligned, [string]$current, [string]$inputs, 
     function SameSources($pub) {
         return ($null -ne $pub -and $pub.Inputs -and $inputs -and ([string]$pub.Inputs -eq $inputs))
     }
-    $out = [pscustomobject]@{ MainEquivalent = $false; Why = ''; Refuse = '' }
+    $out = [pscustomobject]@{ MainEquivalent = $false; MainsOwn = $false; Why = ''; Refuse = '' }
     if (-not $aligned) {
         $out.Why = 'not a clean checkout of origin/main, so the launcher takes a dev number'
         return $out
@@ -800,6 +882,7 @@ function Get-DevLauncherLine([bool]$aligned, [string]$current, [string]$inputs, 
     if ($c -eq 0) {
         if (SameSources $mainPub) {
             $out.MainEquivalent = $true
+            $out.MainsOwn = $true
             $out.Why = "this is the launcher main published as $current, so dev carries $current too"
         } else {
             $out.Why = ("main published $current from other launcher sources than these, so this launcher takes a dev number " +
@@ -1386,6 +1469,7 @@ $LauncherInputs = Get-LauncherInputHash $RepoDir
 # launcher can be kept. Worked out from main's feed and the fingerprint, before
 # anything is built, and a case it cannot tell stops here (Get-DevLauncherLine).
 $MainEquivalent = $false
+$MainsOwnLauncher = $false
 $MainLauncher = $null
 $devLine = $null
 if ($Dev -and -not $ModsOnly) {
@@ -1393,6 +1477,7 @@ if ($Dev -and -not $ModsOnly) {
     $devLine = Get-DevLauncherLine $MainSourceAligned $current $LauncherInputs $MainLauncher (Get-PublishedLauncher $ReleaseDir 'dev')
     if ($devLine.Refuse) { Die $devLine.Refuse }
     $MainEquivalent = [bool]$devLine.MainEquivalent
+    $MainsOwnLauncher = [bool]$devLine.MainsOwn
 }
 
 # What the channel's feed offers as its launcher, read here when a Ship asks
@@ -1576,8 +1661,11 @@ elseif ($Dev) {
     # A release from the feed asks release-tag.yml for the tag v<number>, and
     # a tag is never moved (#3312). One that stopped after asking left its
     # number tagged on its own commit, so a later one climbs past it rather
-    # than be refused.
-    if ($FromFeed -and -not $ModsOnly -and -not $MainEquivalent) {
+    # than be refused. Only main's own launcher, taken from main's feed, asks
+    # for no tag; main's number on a launcher not built yet does (MainsOwn,
+    # Get-DevLauncherLine), and a three part number tagged on another commit
+    # stops here rather than at release-tag.yml.
+    if ($FromFeed -and -not $ModsOnly -and -not $MainsOwnLauncher) {
         for ($k = 0; ; $k++) {
             $on = ''
             try { $on = Get-RemoteTagCommit $RepoDir ('v' + $target) }
@@ -1792,7 +1880,7 @@ if (-not $ModsOnly) {
             Die ($_.Exception.Message + ' Nothing was published.')
         }
         $hold = { param($p, $who) Get-SignedFileRefusal $p $who $RepoDir }
-        if ($MainEquivalent) {
+        if ($MainsOwnLauncher) {
             Head "Main's launcher, from main's feed"
             $why = Get-FeedLauncher $MainLauncher $buildOut $ciSigner $hold
             if ($why) {
