@@ -3,14 +3,12 @@
 # fixed (scripts/vps/Watch-Outside.ps1, whose header says what each check
 # asks and why).
 #
-# FOLDED IN FROM THE PUBLIC REPOSITORY (#3690). It ran from
-# EvilPatrick06/thornswood-watch-outside, a public repository of its own,
-# because a public repository's Actions minutes are not billed and this one
-# was private. Since the flip this one is public too, so it runs here for
-# free (Patrick, 31 Oct), and the old repository's workflow is turned off
-# once this one has run green. The job runs only while the repository
-# variable WATCH_OUTSIDE is "here", which is set in the same sitting as that
-# switch-off, so exactly one watcher posts.
+# FOLDED IN FROM ITS OWN REPOSITORY (#3690). Until 31 Oct it ran from a
+# public repository of its own, because a public repository's Actions
+# minutes are not billed and this one was private. Since the flip this one
+# is public too, so it runs here for free (Patrick, 31 Oct), and that old
+# repository is deleted. The job runs only while the repository variable
+# WATCH_OUTSIDE is "here", so exactly one watcher posts.
 #
 # ITS TWO SECRETS are in the "watch" environment, which only main may deploy
 # from (records/github-settings.json): STAFF_WEBHOOK, the Discord webhook in

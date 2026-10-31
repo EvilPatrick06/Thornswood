@@ -54,6 +54,15 @@
         "PutBack": "switch"
       }
     },
+    "Install-AdminService": {
+      "script": "scripts/deploy/Install-AdminService.ps1",
+      "timeoutMinutes": 15,
+      "fixed": ["-NoPause"],
+      "params": {
+        "Status": "switch",
+        "Wait": "^[0-9]{1,4}$"
+      }
+    },
     "Install-Voice": {
       "script": "scripts/deploy/Install-Voice.ps1",
       "timeoutMinutes": 30,
@@ -125,6 +134,12 @@
         "PutBack": "switch",
         "TaskOnly": "switch"
       }
+    },
+    "Wipe-Dev": {
+      "script": "scripts/ops/Wipe-Saves.ps1",
+      "timeoutMinutes": 15,
+      "fixed": ["-Server", "dev", "-Yes", "-NoPause"],
+      "params": {}
     },
     "Publish-Installer": {
       "script": "scripts/release/Publish-InstallerOnBox.ps1",

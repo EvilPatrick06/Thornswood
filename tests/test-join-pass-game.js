@@ -180,6 +180,41 @@ refusedCase('a pass for the right profile sent under the wrong one', function (r
   yes('a forged pass after a good one does not undo the good one', r.kicked.length === 0);
 }
 
+// A session let in by its pass, held until then, is told to the cuffs once (#4573):
+// a guard who arrived waiting on their pass is issued their pair then.
+{
+  const r = rig({ thornswoodServer: 'dev', thornswoodRequirePass: true });
+  const shownTo = [];
+  r.box.__thornswoodCuffs = { passShown: function (pid) { shownTo.push(pid); } };
+  online(r, [[0xff000a01, 700]]);
+  r.sweep(T0);
+  r.jp.take(700, mint({ p: 700, s: 'dev', i: T0, x: T0 + 600000 }, 'forged'), T0 + 500);
+  yes('a forged pass lets nobody in, so the cuffs hear nothing', shownTo.length === 0);
+  r.jp.take(700, mint({ p: 700, s: 'dev', i: T0, x: T0 + 600000 }), T0 + 1000);
+  yes('the pass that lets a held session in tells the cuffs, once, with its profile', shownTo.join() === '700');
+  r.jp.take(700, mint({ p: 700, s: 'dev', i: T0 + 60000, x: T0 + 660000 }), T0 + 61000);
+  yes('...and the launcher\'s next pass for the same session tells them nothing more', shownTo.join() === '700');
+}
+{
+  const r = rig({ thornswoodServer: 'dev', thornswoodRequirePass: false });
+  const shownTo = [];
+  r.box.__thornswoodCuffs = { passShown: function (pid) { shownTo.push(pid); } };
+  online(r, [[0xff000a01, 700]]);
+  r.sweep(T0);
+  r.jp.take(700, mint({ p: 700, s: 'dev', i: T0, x: T0 + 600000 }), T0 + 1000);
+  yes('with the pass only watched nobody was held, so the cuffs hear nothing', shownTo.length === 0);
+}
+{
+  const r = rig({ thornswoodServer: 'dev', thornswoodRequirePass: true });
+  r.box.__thornswoodCuffs = { passShown: function () { throw new Error('boom'); } };
+  online(r, [[0xff000a01, 700]]);
+  r.sweep(T0);
+  const got = r.jp.take(700, mint({ p: 700, s: 'dev', i: T0, x: T0 + 600000 }), T0 + 1000);
+  yes('a cuffs issue that throws still takes the pass, and says so on the console',
+      got.ok === true && !r.jp.held(700, T0 + 2000) &&
+      r.logged.some(function (l) { return /join pass: the cuffs issue for profile 700 failed: Error: boom/.test(l); }));
+}
+
 {
   const r = rig({ thornswoodServer: 'dev', thornswoodRequirePass: true });
   r.jp.take(700, mint({ p: 700, s: 'dev', i: T0, x: T0 + 600000 }), T0);

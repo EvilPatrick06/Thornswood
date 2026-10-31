@@ -77,13 +77,10 @@ permissions:
 jobs:
   ref:
     name: Make the tag or delete the branch
-    # Main only (#3550): runner 3 signs release launchers and takes any job
-    # that asks for thornswood-vps alone, so a job on that label never runs a
-    # branch's code. A dispatch on a branch skips it. scripts\vps\
-    # Check-RunnerIsolation.ps1 holds every job to that, on the gate through
-    # tests\test-runner-isolation.ps1.
+    # Main only (#3550): a dispatch on a branch skips it, so only main's code
+    # runs with this job's token.
     if: github.ref == 'refs/heads/main'
-    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
+    runs-on: windows-latest
     # Six calls at most, or a launcher's three files and their check. Past
     # this it is stuck, not slow.
     timeout-minutes: 10
@@ -91,20 +88,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-
-      # A runner keeps its folder from one job to the next, and a checkout
-      # there rewrites only the files that differ from the last job's commit,
-      # so every other file keeps the line endings the last job's
-      # .gitattributes gave it (#3029). Every tracked file is written again,
-      # the way this commit checks it out.
-      - name: Check every tracked file out again
-        if: runner.environment == 'self-hosted'
-        shell: pwsh
-        run: |
-          git rm -r -q --cached .
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          git reset -q --hard HEAD
-          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Make the tag or delete the branch
         shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"

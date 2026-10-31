@@ -36,7 +36,7 @@
 // Launcher builds job that ended success with its "Write down the tree these
 // checks passed on" step success, in a run of .github/workflows/build-pr.yml
 // for a pull_request whose head is this repository (a fork's run could name
-// any tree it liked, and a fork never reaches the box), for the head of a
+// any tree it liked), for the head of a
 // pull request merged as this commit. Anything less, or any answer from
 // GitHub this cannot read, is "not tested", and main builds.
 //
@@ -54,7 +54,9 @@
 'use strict';
 
 const WORKFLOW = '.github/workflows/build-pr.yml';
-const JOBS = ['Launcher builds', 'Launcher builds (VPS fallback)'];
+// One job since #4983. The box's fallback job never wrote the note (#3874),
+// so its name never counted for anything and is not read.
+const JOBS = ['Launcher builds'];
 const STEP = 'Write down the tree these checks passed on';
 const MARK = 'TESTED-TREE';
 const SHA = /^[0-9a-f]{40}$/;

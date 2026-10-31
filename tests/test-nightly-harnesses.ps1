@@ -25,7 +25,7 @@
        no others, refuses a name that is no harness before anything runs,
        and is red when a named one fails;
     6. harnesses.yml starts only by dispatch, reads the repository and
-       nothing more, runs on the VPS runners, and hands the names to -Only
+       nothing more, runs on GitHub's runner, and hands the names to -Only
        through the environment, never pasted into a script it runs;
     7. -Throttle (#3114) runs that many side by side and no more, in less
        time than one at a time, prints each as it ends; with -Share, past
@@ -144,7 +144,7 @@ try {
     $of = $(if ($calls.Count) { [int]$calls[0].Groups[1].Value } else { 0 })
     Yes ("  in a job of its own whose matrix is the shares 1 to $of (" + ($shards -join ', ') + ")") ($shards.Count -ge 2 -and (($shards -join ',') -eq ((1..$of) -join ',')))
     Yes '  where one share failing does not cancel the other' ($job -match '(?m)^\s+fail-fast:\s*false\s*$')
-    Yes '  on the VPS runners that take builds, one build slot a share (#2994), only while the repository is private, and on GitHub''s once public (#3685)' ($job -match ('(?m)^\s+runs-on: ' + [regex]::Escape("`${{ github.event.repository.private && fromJSON('[`"self-hosted`", `"Windows`", `"thornswood-vps`", `"thornswood-build`"]') || 'windows-latest' }}") + '\s*$'))
+    Yes '  on GitHub''s Windows runner, a runner a share (#4983)' ($job -match ('(?m)^\s+runs-on: ' + [regex]::Escape('windows-latest') + '\s*$'))
     $minutes = [int][regex]::Match($job, '(?m)^\s+timeout-minutes:\s*(\d+)').Groups[1].Value
     $budget = $(if ($calls.Count) { [int]$calls[0].Groups[2].Value } else { 0 })
     Yes ("  with a budget ($budget s) that leaves room inside the job's $minutes minutes for the rest of it") ($budget -gt 0 -and $minutes -gt 0 -and $budget -le ($minutes * 60 - 180))
@@ -170,7 +170,7 @@ try {
     $h = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\harnesses.yml'))
     Yes 'harnesses.yml starts only when somebody dispatches it' ($h -match '(?m)^on:\s*\r?\n  workflow_dispatch:' -and $h -notmatch '(?m)^  (push|pull_request|pull_request_target|schedule):')
     Yes '  reads the repository and nothing more' ($h -match '(?m)^permissions:\s*\r?\n  contents: read\s*\r?\n(?!  )')
-    Yes '  on the VPS build runners, the same as the nightly''s shares, never the one that signs (#3550), only while the repository is private, and on GitHub''s once public (#3685)' ($h -match ('(?m)^\s+runs-on: ' + [regex]::Escape("`${{ github.event.repository.private && fromJSON('[`"self-hosted`", `"Windows`", `"thornswood-vps`", `"thornswood-build`"]') || 'windows-latest' }}") + '\s*$'))
+    Yes '  on GitHub''s Windows runner, as the nightly''s shares are (#4983)' ($h -match ('(?m)^\s+runs-on: ' + [regex]::Escape('windows-latest') + '\s*$'))
     Yes '  hands the names to Nightly-Harnesses.ps1 -Only through the environment' ($h -match 'HARNESSES: \$\{\{ inputs\.harnesses \}\}' -and $h -match 'Nightly-Harnesses\.ps1 -Only \$env:HARNESSES')
     $runs = @([regex]::Matches($h, '(?ms)^\s+run: \|\s*\r?\n(.*?)(?=^\s+- |\z)') | ForEach-Object { $_.Groups[1].Value })
     Yes '  and never pastes them into a script it runs' ($runs.Count -ge 1 -and -not @($runs | Where-Object { $_ -match '\$\{\{\s*inputs\.' }).Count)

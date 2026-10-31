@@ -17,9 +17,9 @@
 # it once all four agree. A number it cannot read changes no issue and turns
 # the run red, so a check that could not look is never a quiet green.
 #
-# WHERE IT RUNS. On the VPS runners, like expire-claims.yml: GitHub's own
-# runners have no minutes (#437), and this is four reads and at most a few
-# REST calls. The run's own token can read and edit issues and nothing else.
+# WHERE IT RUNS. On GitHub's Windows runner (#4983), like expire-claims.yml:
+# this is four reads and at most a few REST calls. The run's own token can
+# read and edit issues and nothing else.
 name: Collection revision check
 on:
   schedule:
@@ -34,25 +34,14 @@ concurrency:
 jobs:
   check:
     name: Hold Nexus, the record and both feeds to one revision
-    # Main only (#3550): runner 3 signs release launchers and takes any job
-    # that asks for thornswood-vps alone, so a job on that label never runs a
-    # branch's code. A dispatch on a branch skips it.
+    # Main only (#3550): a dispatch on a branch skips it, so only main's code
+    # runs with this job's token.
     if: github.ref == 'refs/heads/main'
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    runs-on: windows-latest
     # Four reads and a few calls to GitHub. Past this it is stuck, not slow.
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      # The runner keeps its folder between jobs, so every tracked file is
-      # written again with this checkout's line ends (#3029).
-      - name: Check every tracked file out again
-        if: runner.environment == 'self-hosted'
-        shell: pwsh
-        run: |
-          git rm -r -q --cached .
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          git reset -q --hard HEAD
-          if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: Read the four revisions and keep the rebuild issue
         shell: pwsh
         env:

@@ -11,8 +11,8 @@
 
   What it checks:
     1. the workflow is there, runs on an issue closing and on nothing else,
-       with a token that can only edit issues, on the VPS runners the other
-       workflows use (#437), with a timeout, and only when the issue carries
+       with a token that can only edit issues, on GitHub's runner (#4983),
+       with a timeout, and only when the issue carries
        a claimed label;
     2. it checks out nothing and runs no action, and the label names reach
        the script through the environment: no ${{ }} inside the script, so a
@@ -67,11 +67,7 @@ Yes ("its token can edit issues and nothing else ({0})" -f ($grants -join ', '))
 Yes '  and no job widens it' (@([regex]::Matches($text, '(?m)^\s+permissions:')).Count -eq 0)
 
 $runsOn = [regex]::Match($text, '(?m)^\s*runs-on:\s*(.+)$').Groups[1].Value.Trim()
-$build = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\build.yml'))
-# Any job of build.yml: its first job asks GitHub's hosted runner since #3551.
-$buildRunsOn = @([regex]::Matches($build, '(?m)^\s*runs-on:\s*(.+)$') | ForEach-Object { $_.Groups[1].Value.Trim() } | Where-Object { $_.StartsWith('[self-hosted, Windows, thornswood-vps') })
-Yes ("it runs on the VPS runners the build check uses while the repository is private, and on GitHub's once public, since anyone can close their own issue then (#3685) ({0})" -f $runsOn) ($runsOn -eq "`${{ github.event.repository.private && fromJSON('[`"self-hosted`", `"Windows`", `"thornswood-vps`"]') || 'windows-latest' }}" -and $buildRunsOn.Count -gt 0)
-Yes '  on any of them, not only the build runners, so a few seconds of work never waits behind a build (#2994)' ($runsOn -notmatch 'thornswood-build')
+Yes ("it runs on GitHub's Windows runner, never the box, since anyone can close their own issue (#3685, #4983) ({0})" -f $runsOn) ($runsOn -eq 'windows-latest')
 Yes '  with a timeout' ($text -match '(?m)^\s+timeout-minutes:\s*\d+\s*$')
 Yes '  and only when the closed issue carries a claimed label, so a close with none takes no runner' (
     $text -match [regex]::Escape("if: `${{ contains(join(github.event.issue.labels.*.name, '|'), 'claimed') }}"))

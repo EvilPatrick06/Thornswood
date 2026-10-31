@@ -34,6 +34,19 @@
   be returned to them; it stays aboard for the world to settle (a piece can
   still be taken, and staff can narrate what became of it).
 
+  TAKEN, AND LEFT AFTER SO MANY DAYS (Patrick, 22 Oct 2026, #511). Anyone who
+  opens a docked hold can take from it, and the out names their character
+  with how 'taken'; whether it was a robbery or a seizure is roleplay. A hold
+  at sea cannot be opened: begin() refuses every way out while it sails.
+  Cargo still aboard so many real days after landing goes into the port's
+  hold drop box under the recipient's name, as how 'left'. landed is when a
+  ship last docked at the end of a voyage, null while it sails and before
+  its first voyage, and uncollected() lists what is due; how many days is
+  the staff list's uncollectedDays. A hold carries as many lines as it may
+  that still have something aboard or being handed out, so a hold whose
+  cargo has all gone out, by any way, is free again. A cart keeps no landed:
+  goods for somebody who is not at the stop wait on the cart (#3158).
+
   WHAT IT NEVER DECIDES. Thornswood is a player-driven RP server (Patrick,
   17 Oct 2026, 10:13 PM MT): a trade ship is a tool, and the players decide
   what happens with it in the world. So nothing here says who sails, where,
@@ -143,6 +156,14 @@ function createTradeCargo(opts) {
     return h;
   }
 
+  /* The lines of a hold still carrying something, aboard or being handed out. */
+  function inUse(h) {
+    var open = {};
+    Object.keys(h.lines).forEach(function (k) { if (h.lines[k].aboard > 0) { open[k] = true; } });
+    h.outs.forEach(function (o) { if (o.receipt === null) { open[String(o.line)] = true; } });
+    return Object.keys(open).length;
+  }
+
   function useReceipt(state, receipt) {
     if (!text(receipt, 200)) { throw new Error('A receipt cannot be verified.'); }
     if (has(state.receipts, receipt)) { throw new Error('That receipt was already used.'); }
@@ -179,9 +200,13 @@ function createTradeCargo(opts) {
         }
         sailing++;
       }
+      // A ship always says when it landed (null at sea and before its first
+      // voyage); a cart never does.
+      if (driven ? has(h, 'landed') : !has(h, 'landed') || (h.landed !== null && (!time(h.landed) || h.sailing !== null))) {
+        throw new Error('Hold ' + id + '\'s landing cannot be verified.');
+      }
       var left = {};
       var lines = Object.keys(h.lines);
-      if (lines.length > maxLines) { throw new Error('Hold ' + id + ' carries more lines than it may.'); }
       lines.forEach(function (k) {
         var l = h.lines[k];
         if (!isObj(l) || String(l.seq) !== k || !Number.isInteger(l.seq) || l.seq < 1 || l.seq > state.seq || seen[l.seq] ||
@@ -208,6 +233,7 @@ function createTradeCargo(opts) {
       Object.keys(left).forEach(function (k) {
         if (left[k] !== 0) { throw new Error('Hold ' + id + ' does not add up.'); }
       });
+      if (inUse(h) > maxLines) { throw new Error('Hold ' + id + ' carries more lines than it may.'); }
     });
     Object.keys(state.receipts).forEach(function (r) {
       if (!used[r]) { throw new Error('A receipt is not on the manifest.'); }
@@ -231,6 +257,7 @@ function createTradeCargo(opts) {
       if (has(s.holds, id)) { throw new Error('There is already a hold ' + id + '.'); }
       if (!ports[port]) { throw new Error('No port ' + port + '.'); }
       s.holds[id] = { port: port, sailing: null, lines: {}, outs: [] };
+      if (!driven) { s.holds[id].landed = null; }
       return id;
     });
   }
@@ -248,7 +275,7 @@ function createTradeCargo(opts) {
       var by = partyOf(piece.by, 'Who loaded it');
       var to = partyOf(piece.for, 'Who it is for');
       var e = entryOf(piece.entry);
-      if (Object.keys(h.lines).length >= maxLines) { throw new Error('The hold is full.'); }
+      if (inUse(h) >= maxLines) { throw new Error('The hold is full.'); }
       useReceipt(s, piece.receipt);
       var seq = ++s.seq;
       h.lines[seq] = { seq: seq, by: by, for: to, from: h.port, receipt: piece.receipt, entry: e, aboard: e.count };
@@ -272,7 +299,7 @@ function createTradeCargo(opts) {
       if (!carrying) { throw new Error('The hold is empty.'); }
       if (h.outs.some(function (o) { return o.receipt === null; })) { throw new Error('Something is still being handed out.'); }
       h.sailing = { from: h.port, to: to, at: at, arriveAt: arriveAt };
-      if (driven) { h.sailing.driver = who; }
+      if (driven) { h.sailing.driver = who; } else { h.landed = null; }
       return h.sailing;
     });
   }
@@ -298,7 +325,7 @@ function createTradeCargo(opts) {
     });
   }
 
-  /* Every hold whose voyage is over by now is docked at its destination. */
+  /* Every hold whose voyage is over by now is docked at its destination, landed now. */
   function arrive(state, now) {
     if (driven) { throw new Error('A cart comes in only with its driver.'); }
     if (!time(now)) { throw new Error('The time cannot be verified.'); }
@@ -309,6 +336,7 @@ function createTradeCargo(opts) {
         if (h.sailing && h.sailing.arriveAt <= now) {
           h.port = h.sailing.to;
           h.sailing = null;
+          h.landed = now;
           landed.push(id);
         }
       });
@@ -340,12 +368,62 @@ function createTradeCargo(opts) {
   }
 
   /*
+    What nobody collected, due to go into the drop box: every line aboard a
+    hold that landed at least waitMs before now, away from the port it was
+    loaded in, whose recipient is still on the manifest. A line whose
+    recipient was released stays aboard for the world to settle.
+    Answers [{ hold, line, count, port, for }], oldest landing first.
+  */
+  function uncollected(state, now, waitMs) {
+    if (driven) { throw new Error('Goods on a cart wait on the cart.'); }
+    if (!time(now) || !time(waitMs)) { throw new Error('The time cannot be verified.'); }
+    var due = [];
+    Object.keys(state.holds).sort().forEach(function (id) {
+      var h = state.holds[id];
+      var landed = h.landed;
+      if (h.sailing !== null || landed === null || now - landed < waitMs) { return; }
+      Object.keys(h.lines).map(Number).sort(function (a, b) { return a - b; }).forEach(function (k) {
+        var l = h.lines[String(k)];
+        if (l.aboard > 0 && l.for !== null && l.from !== h.port) {
+          due.push({ hold: id, line: l.seq, count: l.aboard, port: h.port, for: copy(l.for), landed: landed });
+        }
+      });
+    });
+    due.sort(function (a, b) { return a.landed - b.landed; });
+    return due.map(function (d) { delete d.landed; return d; });
+  }
+
+  /*
+    When the next line comes due for the drop box, or null when none will.
+    after, when given, is a time: only what comes due later than it counts,
+    so what was already looked at then is not named again.
+  */
+  function nextUncollected(state, waitMs, after) {
+    if (driven) { throw new Error('Goods on a cart wait on the cart.'); }
+    if (!time(waitMs) || (after !== undefined && !time(after))) { throw new Error('The time cannot be verified.'); }
+    var next = null;
+    Object.keys(state.holds).forEach(function (id) {
+      var h = state.holds[id];
+      if (h.sailing !== null || h.landed === null) { return; }
+      var due = h.landed + waitMs;
+      if (after !== undefined && due <= after) { return; }
+      var waiting = Object.keys(h.lines).some(function (k) {
+        var l = h.lines[k];
+        return l.aboard > 0 && l.for !== null && l.from !== h.port;
+      });
+      if (waiting && (next === null || due < next)) { next = due; }
+    });
+    return next;
+  }
+
+  /*
     Takes count of a line off the hold and holds it as pending, then hands
     back what the caller must put into one pack or drop box. how is
     delivered (to the recipient), left (in the drop box under the
     recipient's name), returned (to the loader, at the port it was loaded
-    in) or taken (by whoever opened it; when that is allowed is the
-    caller's rule, not this file's). who is the character receiving it.
+    in) or taken (by whoever opened it, Patrick's A of 22 Oct 2026). Nothing
+    leaves a ship at sea, by any way; a cart on the road can only be taken
+    from, the raid. who is the character receiving it.
   */
   function begin(state, id, line, n, how, who, at) {
     return change(state, function (s) {
@@ -356,7 +434,9 @@ function createTradeCargo(opts) {
       var to = partyOf(who, 'Who receives it');
       if (!count(n) || n > l.aboard) { throw new Error('There is not that much aboard.'); }
       if (!time(at)) { throw new Error('The time cannot be verified.'); }
-      if (how !== 'taken' && h.sailing) { throw new Error('The hold is at sea.'); }
+      // A ship at sea opens for nobody (#511). A cart on the road is raided:
+      // taken, and only taken, while it is driven (#3158).
+      if (h.sailing && !(driven && how === 'taken')) { throw new Error(driven ? 'The cart is on the road.' : 'The hold is at sea.'); }
       if ((how === 'delivered' || how === 'left') && (!same(to, l.for) || h.port === l.from)) {
         throw new Error('Only the person it is for receives it, at the far end.');
       }
@@ -462,6 +542,8 @@ function createTradeCargo(opts) {
   return {
     empty: empty, audit: audit, open: open, load: load, depart: depart, amend: amend, arrive: arrive, pullIn: pullIn,
     begin: begin, finish: finish, undo: undo, release: release, aboard: aboard, save: save, parse: load_,
+    uncollected: uncollected, nextUncollected: nextUncollected,
+    used: function (state, id) { return inUse(holdOf(state, id)); },
     PORTS: Object.keys(ports), MAX_LINES: maxLines, DRIVEN: driven
   };
 }
@@ -473,7 +555,8 @@ function createTradeCargo(opts) {
 
     { v: 1,
       ports:  [{ key, name, hold, world, pos: [x, y, z], crate: '<ref>' }],
-      routes: [{ from, to, minutes, crew: ['<ref>', ...] }] }
+      routes: [{ from, to, minutes, crew: ['<ref>', ...] }],
+      uncollectedDays: 7 }
 
   A port is a place a hold can stand: its key, the name people read, the hold
   whose drop box takes what nobody collects, and where it stands. crate is
@@ -485,6 +568,9 @@ function createTradeCargo(opts) {
   its own row, so staff can make it longer, shorter or absent. crew is the
   references of any NPCs or special characters staff have stood up for it;
   empty is a route nobody crews. An empty list is a world with no ships.
+  uncollectedDays is how many real days cargo waits aboard after landing
+  before it goes into the port's hold drop box (Patrick, 22 Oct 2026: 7,
+  a staff setting); a list without it is 7.
 
   checkRoutes() refuses the whole list on the first thing wrong, so a bad edit
   never half applies. proposeRoutes() compares the list in force with an edit
@@ -497,11 +583,18 @@ var REF_RE = /^[0-9a-f]{1,8}:[^:\s][^:]{0,95}$/i;
 var MAX_ROUTE_MINUTES = 7 * 24 * 60;
 var NO_ROUTES = { v: 1, ports: [], routes: [] };
 var PORT_KEYS = ['key', 'name', 'hold', 'world', 'pos', 'crate'];
+var LIST_KEYS = ['v', 'ports', 'routes', 'uncollectedDays'];
+var UNCOLLECTED_DAYS = 7;
+var MAX_UNCOLLECTED_DAYS = 60;
 
 function checkRoutes(cfg) {
   if (!isObj(cfg) || cfg.v !== 1 || !Array.isArray(cfg.ports) || !Array.isArray(cfg.routes) ||
-      Object.keys(cfg).some(function (k) { return k !== 'v' && k !== 'ports' && k !== 'routes'; })) {
+      Object.keys(cfg).some(function (k) { return LIST_KEYS.indexOf(k) < 0; })) {
     throw new Error('The ship routes cannot be verified.');
+  }
+  var days = cfg.uncollectedDays === undefined ? UNCOLLECTED_DAYS : cfg.uncollectedDays;
+  if (!Number.isInteger(days) || days < 1 || days > MAX_UNCOLLECTED_DAYS) {
+    throw new Error('The days cargo waits must be a whole number from 1 to ' + MAX_UNCOLLECTED_DAYS + '.');
   }
   var keys = {}, pairs = {}, crates = {};
   var ports = cfg.ports.map(function (p, i) {
@@ -528,7 +621,7 @@ function checkRoutes(cfg) {
     pairs[r.from + '>' + r.to] = true;
     return { from: r.from, to: r.to, minutes: r.minutes, crew: crew.slice() };
   });
-  return { v: 1, ports: ports, routes: routes };
+  return { v: 1, ports: ports, routes: routes, uncollectedDays: days };
 }
 
 /*
@@ -555,6 +648,9 @@ function proposeRoutes(current, next, state) {
     }
   });
   Object.keys(ra).forEach(function (k) { if (!rb[k]) { lines.push('Remove the route ' + ra[k].from + ' to ' + ra[k].to + '.'); } });
+  if (a.uncollectedDays !== b.uncollectedDays) {
+    lines.push('Cargo nobody collects goes to the drop box after ' + b.uncollectedDays + ' days, not ' + a.uncollectedDays + '.');
+  }
   if (state && isObj(state.holds)) {
     Object.keys(state.holds).sort().forEach(function (id) {
       var h = state.holds[id];
@@ -637,5 +733,6 @@ function countsOf(reg) {
 module.exports = {
   createTradeCargo: createTradeCargo, checkRoutes: checkRoutes, proposeRoutes: proposeRoutes,
   openRegister: openRegister, saveRegister: saveRegister, adoptRoutes: adoptRoutes, countsOf: countsOf,
-  GOLD_BASE: GOLD_BASE, MAX_LINES_DEFAULT: MAX_LINES_DEFAULT
+  GOLD_BASE: GOLD_BASE, MAX_LINES_DEFAULT: MAX_LINES_DEFAULT,
+  UNCOLLECTED_DAYS: UNCOLLECTED_DAYS, MAX_UNCOLLECTED_DAYS: MAX_UNCOLLECTED_DAYS
 };

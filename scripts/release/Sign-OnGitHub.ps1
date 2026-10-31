@@ -28,9 +28,9 @@
   site serves the launcher the release names and launcher\app\Signature.cs,
   gzipped and base64. The job first fetches that launcher from the site,
   holds it to the sha256 release.json lists and runs the launcher's own
-  check on it, in a job of its own with no Azure token, so a launcher signed
-  on the box (release.yml's VPS fallback) is checked off the box before the
-  release that names it is signed. Then it makes the catalog over
+  check on it, in a job of its own with no Azure token, so a launcher is
+  checked by a job that cannot sign before the release that names it is
+  signed (it was written for release.yml's VPS fallback, gone since #4013). Then it makes the catalog over
   release.json the way New-ReleaseManifestFiles does, signs it with the
   ThornswoodRelease profile, reads it back, and keeps it as the artifact
   release-cat-<request> for a day. Nothing secret goes either way.

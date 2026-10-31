@@ -1556,33 +1556,27 @@ The short form of the rules. The same decisions, with the dates they were made, 
   issue #1343) and the count of silent catches, and builds the launcher with
   MSBuild from its project files, held to its sources
   (`tests\test-498-msbuild.ps1`, issue #498).
-- The check has two names, and either one passing is the merge bar.
-  **Launcher builds** is the job on GitHub's hosted Windows runner, tried
-  first. **Launcher builds (VPS fallback)** runs the same steps on a build
-  runner on the VPS, when the hosted job did not succeed, when the repository
-  variable `BUILD_RUNNER` is `vps` (then Launcher builds shows skipped), or
-  when a manual run of build.yml asks for `runner: vps`. A pull request from a
-  fork never gets the fallback. While the month's hosted minutes are used up,
-  `BUILD_RUNNER` is `vps` and the fallback is the one that goes green. A push
+- The check is **Launcher builds**, on GitHub's hosted Windows runner, and on
+  a pull request **Build check result** passes only when it did (#3683).
+  The repository is public since 30 Oct 2026, so hosted minutes are free, and
+  nothing builds on the VPS any more: no fallback job and no `BUILD_RUNNER`
+  switch (#4983). A push
   to main whose tree a green pull request build already passed stops green at
   "Already tested in its pull request" instead of building again (#3182).
   Red means the branch would stop Ship at the build step; fix that, and merge
-  once one of the two is green and you are confident in the change; a merge
+  once it is green and you are confident in the change; a merge
   gets no line in #staff-updates. Nothing in GitHub's settings is required. Run the
   test harnesses your change touches yourself. All
   ~410 of them (tests/, bot, and voice), and a look for stray pull requests
-  and branches run every night on the VPS (.github/workflows/nightly.yml,
+  and branches run every night on GitHub's runner (.github/workflows/nightly.yml,
   03:00 Mountain); a failure there opens an issue on the board, "Nightly
   checks failed", and whoever broke it fixes it next. The harnesses run in
   shares, a job each on a runner of its own with 45 minutes of its own
   (`scripts\dev\Nightly-Harnesses.ps1`, #2357); a share that runs out of
-  time names the harnesses it did not get to, and the cure is another share. It runs on the VPS, on the runners
-  `.\scripts\deploy\Install-Runner.ps1` puts there (issue #437), because
-  GitHub's own runners were blocked on billing from 25 Sep. Several since
-  4 Oct, so checks run side by side: `-Number 2` and up puts each one after
-  the first beside it. `.\scripts\deploy\Install-Runner.ps1 -Status` (with
-  `-Number` for the others) says whether GitHub sees one, and `-Lock` locks
-  every runner's folder again without stopping a job.
+  time names the harnesses it did not get to, and the cure is another share. It
+  ran on the VPS from 25 Sep, when GitHub's own runners were blocked on
+  billing (issue #437), and runs on GitHub's runner since the repository went
+  public (#4013, #4983).
 - An edit to Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or
   Publish-Update.ps1 that blocks others' work gets a line in #dev-coordination first, from a Dev; every machine touches those.
 
@@ -2907,7 +2901,7 @@ says **not enforced** where nothing checks it.
 | Discord bot token | `discord.botToken` in `C:\Thornswood-Docs\config.json` and `DISCORD_TOKEN` in `C:\Thornswood-Bot\bot.env.json`, the same token in both | Everything the bot may do in the Discord, and the site's reading of who holds which role, which is what decides who may play. | The application's owner resets it in the developer portal (Bot, Reset Token). Then `.\scripts\deploy\Rotate-BotToken.ps1`, one command: it asks at a prompt, writes both files or neither, restarts the bot and the site, and `-Check` afterwards says whether each file holds a token without showing it. `Install-Bot.ps1` and `Set-DiscordLogin.ps1` write it through the same writer, `scripts\vps\Write-BotToken.ps1`, so either one also updates both. Every backup made before the reset still holds the old token: the nightly ones in `C:\Thornswood-Backup` on the VPS and anything brought down to `local\backups` in the repository folder. |
 | #news webhook | `C:\Thornswood-Bot\webhooks\news.txt` on the VPS, read over ssh by every machine that ships (`Discord-Hook.ps1`); `bot\news-webhook.txt` on a machine only as the fallback when the VPS cannot be asked | Posting in #news as the bot, for anybody holding the URL. | Delete the webhook called Thornswood in #news (Edit Channel, Integrations, Webhooks), make a new one, and put its URL in that file. |
 | Dev updates webhook | `C:\Thornswood-Bot\webhooks\dev.txt` on the VPS, read the same way; `bot\dev-webhook.txt` only as the fallback | Posting in the dev updates channel as the bot, for anybody holding the URL. | Delete it in that channel's Integrations, Webhooks, make a new one, and give its URL to `Set-DevNews.ps1`, which checks it points at the dev channel before it saves anything. |
-| Watchdog alerts webhook | `C:\Thornswood-Watch\alerts-webhook.txt` on the VPS, readable by SYSTEM and Administrators only, and the `STAFF_WEBHOOK` secret of the outside watcher's public repository on GitHub (issue #2755) | Posting in #staff-updates, for anybody holding the URL. The watchdog uses it only when the bot is down or silent. | Delete it in #staff-updates' Integrations, Webhooks, make a new one there, and give its URL to `.\scripts\vps\Watch-Services.ps1 -SetWebhook`, which asks at a prompt, refuses a webhook in any other channel and posts a test message (the report it prints with no switch says where the one on the box posts), and put the same URL in the outside watcher's repository as the `STAFF_WEBHOOK` secret (Settings, Secrets and variables, Actions), then run its workflow by hand with "test" ticked, which refuses a webhook in any other channel and posts a test message (issues #448, #2755). |
+| Watchdog alerts webhook | `C:\Thornswood-Watch\alerts-webhook.txt` on the VPS, readable by SYSTEM and Administrators only, and the `STAFF_WEBHOOK` secret in this repository's `watch` environment, which `watch-outside.yml` posts through (issues #2755, #3690) | Posting in #staff-updates, for anybody holding the URL. The watchdog uses it only when the bot is down or silent. | Delete it in #staff-updates' Integrations, Webhooks, make a new one there, and give its URL to `.\scripts\vps\Watch-Services.ps1 -SetWebhook`, which asks at a prompt, refuses a webhook in any other channel and posts a test message (the report it prints with no switch says where the one on the box posts), and put the same URL in this repository as the `STAFF_WEBHOOK` secret of the `watch` environment (Settings, Environments, watch), then run the Watch outside workflow by hand with "test" ticked, which refuses a webhook in any other channel and posts a test message (issues #448, #2755). |
 | Voice join token key | `token-key.txt` in `C:\Thornswood-Voice` on the VPS. `C:\Thornswood-Voice-Dev` has its own, which dev voice makes itself; `vps-dev-instance.ps1` never copies live's (#1083) | Signs the token that says which profile a voice connection belongs to. Enforced: a connection that cannot prove itself with one is refused, and the service mints one only when the site says the Discord ticket owns that profile (#1303, #1315). Holding the key is being able to join voice as anybody. | The service makes it itself. Delete the file and run `Install-Voice.ps1 -Restart`; tokens already issued stop working, and the launcher's voice page and the game's chat each ask for a new one when they connect again (one token, one connection, two minutes: #1322). |
 | TURN relay key, not in use yet | `turn-key.txt` in `C:\Thornswood-Voice` on the VPS, put there by hand, and its own in `C:\Thornswood-Voice-Dev`, put there by hand too; `vps-dev-instance.ps1` never copies the live one (#1083). Neither is there yet: no relay has been stood up, so the service offers STUN only | Nothing yet. Once a relay is up, the voice service makes each browser a credential from it, and a credential lets whoever holds it send traffic through the relay until it expires. **Not enforced** as to who gets one: `/ice` answers anybody who asks. | Whoever runs the relay changes its shared secret there, puts the same value in `turn-key.txt`, and runs `Install-Voice.ps1 -Restart`. Credentials already handed out stop working at once. |
 | Backup passphrase | `C:\Thornswood-Backup\key.txt` on the VPS and `Documents\thornswood-backup-key.txt` on Patrick's machine, one copy in each on purpose | The nightly backups, which hold the site's `config.json`, `bot.env.json` and the live game server's `private` folder: every VPS secret above except the voice service's files. | `Install-Backup.ps1` sends the Documents copy up when the box has no `key.txt` (a new box, issue #454), makes one when neither has it, and copies it down when the Documents copy is missing. Keep the old one until the backups made with it have aged out. |

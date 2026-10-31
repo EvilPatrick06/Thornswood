@@ -16,6 +16,8 @@
     - Every deposit and take is recorded with the character's name.
     - A Trading Company drop off left for somebody away is handed out by a
       steward.
+    - Trade ship cargo nobody collected goes in under the recipient's name,
+      put in by the ship, and a steward hands it out (#511, 22 Oct).
 
   The real property block runs over a pretend engine, with Whiterun's and
   Riften's boards placed, a guard of each, Whiterun's Steward and Court,
@@ -323,6 +325,35 @@ yes('  and Whiterun\'s guard everything, with the total and a Records button',
 const pb = drawn(box(BOB, ['open']).view);
 yes('  and Bob nothing of anybody else\'s', /Nothing of yours/.test(pb.html) && !/Alice/.test(pb.html));
 yes('  the panel closes on open false', (function () { pa.win.thornswoodBox.setData({ open: false }); return !pa.win.thornswoodBox.isOpen(); })());
+
+// ------------------------------------------- cargo nobody collected off a ship
+// #511, Patrick 22 Oct 2026 (B): after the days at the dock it goes into that
+// port's hold box under the recipient's name, put in by the ship.
+const shipN = inDir(function () { return W.boxShipped('whiterun', { baseId: SWORD, count: 2, worn: true }, 'Dagny', 'Whiterun docks, off ship-1'); });
+const shipItem = W.dropbox().whiterun.items.filter(function (x) { return x.n === shipN; })[0];
+yes('D13 cargo nobody collected goes in as a row of its own, for the recipient, put in by the ship',
+    shipN > 0 && !!shipItem && shipItem.kind === 'shipped' && shipItem.by === 0 && shipItem.forName === 'Dagny' &&
+    shipItem.count === 2 && shipItem.entry.count === undefined && shipItem.entry.worn === undefined && shipItem.what === 'Iron Sword');
+const boxWas = JSON.stringify(W.dropbox());
+yes('  a hold not of the ten, no name, a name too long, no count, or gold, is refused and changes nothing',
+    inDir(function () {
+      return W.boxShipped('skyrim', { baseId: SWORD, count: 1 }, 'Dagny', 'x') === 0 &&
+        W.boxShipped('whiterun', { baseId: SWORD, count: 1 }, '  ', 'x') === 0 &&
+        W.boxShipped('whiterun', { baseId: SWORD, count: 1 }, new Array(62).join('a'), 'x') === 0 &&
+        W.boxShipped('whiterun', { baseId: SWORD, count: 0 }, 'Dagny', 'x') === 0 &&
+        W.boxShipped('whiterun', { baseId: GOLD, count: 5 }, 'Dagny', 'x') === 0;
+    }) && JSON.stringify(W.dropbox()) === boxWas);
+r = box(BOB, ['open']);
+yes('  Bob does not see it, and may not take it', !rowOf(r.view, function (x) { return x.n === shipN; }) &&
+    /not yours to take/.test(box(BOB, ['take', String(shipN)]).view.said) && swords(BOB) === 0);
+r = box(STEWARD, ['open']);
+const shipRow = rowOf(r.view, function (x) { return x.n === shipN; });
+yes('  the steward sees it, from the ship, for Dagny', !!shipRow && shipRow.who === 'Whiterun docks, off ship-1' && shipRow.forName === 'Dagny' && shipRow.kind === 'shipped');
+const stewardSwords = swords(STEWARD);
+box(STEWARD, ['take', String(shipN)]);
+yes('  and takes it out to hand to Dagny', swords(STEWARD) === stewardSwords + 2 && !W.dropbox().whiterun.items.some(function (x) { return x.n === shipN; }));
+r = box(GUARD_W, ['records']);
+yes('  and the records say where it came from', (r.view.records || []).some(function (x) { return x.who === 'Whiterun docks, off ship-1' && x.act === 'in' && x.forName === 'Dagny' && /Not collected/.test(x.note || ''); }));
 
 // ------------------------------------------------------------------ the wiring
 const words = /^const WORDS = (\[[\s\S]*?\]);$/m.exec(gm);
