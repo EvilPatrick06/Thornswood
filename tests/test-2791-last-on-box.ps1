@@ -207,7 +207,26 @@ $lastStep = @($chain.steps | Where-Object { $_.tool -eq 'scripts/mods/Build-Last
 Yes 'D6 the content chain''s Build-LastPlugin.py step writes the recipe and manifest, not the plugin' ($lastStep -and @($lastStep.writes) -contains 'game/data/last-plugin.recipe' -and -not (@($lastStep.writes) -match 'Thornswood-Last\.esp').Count)
 $pub = Read-Text 'scripts\release\Publish-Server.ps1'
 Yes 'D8 Publish-Server.ps1 -FromStore makes it on the box when the running server''s is not this recipe''s, and does not stop' ($pub -match [regex]::Escape('$script:LastMake = $lastWant') -and $pub -notmatch [regex]::Escape('the deploy makes it on the box first'))
-Yes '    from our plugins as the payload carries them, read before the server''s own' ($pub -match [regex]::Escape("-Reads @((`$lastBox.Run + '\reads'), `$VpsRoot.TrimEnd('\') + '\plugins') -Into (`$lastBox.Run + '\made') -Want `$script:LastMake"))
+Yes '    from our plugins as the payload carries them, read before the server''s own' ($pub -match [regex]::Escape("-Reads @((`$lastBox.Run + '\reads'), (`$VpsRoot.TrimEnd('\') + '\plugins')) -Into (`$lastBox.Run + '\made') -Want `$script:LastMake"))
+# What it reads, worked out the way the call works it out, not read off the
+# text: on 31 Oct a list written as @((a), $b + '\plugins') was three folders,
+# the last of them '\plugins', and the box refused to make it.
+$pubAst = [Management.Automation.Language.Parser]::ParseFile((Join-Path $Repo 'scripts\release\Publish-Server.ps1'), [ref]$null, [ref]$null)
+$makeCall = @($pubAst.FindAll({ param($n) $n -is [Management.Automation.Language.CommandAst] -and $n.GetCommandName() -eq 'Invoke-ThornswoodLastPluginMake' }, $true))[0]
+$readsArg = $null
+if ($makeCall) {
+    $els = $makeCall.CommandElements
+    for ($i = 0; $i -lt $els.Count - 1; $i++) { if ($els[$i] -is [Management.Automation.Language.CommandParameterAst] -and $els[$i].ParameterName -eq 'Reads') { $readsArg = $els[$i + 1].Extent.Text } }
+}
+$readsGot = $null
+if ($readsArg) {
+    $readsGot = & {
+        $lastBox = [pscustomobject]@{ Run = 'C:\Windows\Temp\thornswood-onbox-000000000000' }
+        $VpsRoot = 'C:\Thornswood-Server-Dev\'
+        @(Invoke-Expression $readsArg)
+    }
+}
+Yes '    and those are two folders: the run''s reads, then the server''s plugins' ($readsGot -and @($readsGot).Count -eq 2 -and $readsGot[0] -eq 'C:\Windows\Temp\thornswood-onbox-000000000000\reads' -and $readsGot[1] -eq 'C:\Thornswood-Server-Dev\plugins')
 Yes '    and hands the installer the plugin with the sha256 the box made' ($pub -match [regex]::Escape("-LastPlugin '") -and $pub -match [regex]::Escape("-LastSha256 `" + `$made.Sha"))
 Yes '    and lets its folder on the box go after the install, whatever the install did' ($pub -match [regex]::Escape('finally { if ($lastBox) { $null = Close-ThornswoodOnBoxFolder $lastBox } }'))
 $inst = Read-Text 'scripts\deploy\Install-ThornswoodServer.ps1'
