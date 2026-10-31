@@ -69,6 +69,9 @@
 # comment, as in build.yml and release.yml.
 # tests\test-459-engine-workflow.ps1 holds this file's shape.
 name: Engine build
+# Its title names the commit, so engine-pin.yml (#5148) finds the run that
+# recorded a fork head by that title alone.
+run-name: Engine build of ${{ inputs.commit || 'the pin' }}
 on:
   workflow_dispatch:
     inputs:

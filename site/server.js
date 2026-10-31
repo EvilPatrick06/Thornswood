@@ -1466,7 +1466,10 @@ function findPageVersion(sha) {
    alpha wording with <!-- alpha --> ... <!-- /alpha --> lines and its open
    wording with <!-- open --> ... <!-- /open -->, and only the one that
    applies is served. bot/content.py reads join.md through the same markers
-   for #start-here, so the site and the Discord cannot disagree. */
+   for #start-here, so the site and the Discord cannot disagree.
+   A page's <!-- engine-pin:<name> --> and <!-- /engine-pin:<name> --> lines
+   say where scripts/release/Write-EnginePinText.ps1 writes the engine pin
+   (#5148); they are for that script, so they are left out the same way. */
 function playRoles(play, open) {
   const list = Array.isArray(play) ? play.slice() : [];
   if (open === true && list.indexOf('Member') < 0) list.push('Member');
@@ -1478,7 +1481,8 @@ function forMode(md, open) {
   return String(md)
     .replace(new RegExp('^<!-- ' + drop + ' -->[ \\t]*\\r?\\n[\\s\\S]*?^<!-- /' + drop +
                         ' -->[ \\t]*(?:\\r?\\n|$)', 'gm'), '')
-    .replace(/^<!-- \/?(?:alpha|open) -->[ \t]*(?:\r?\n|$)/gm, '');
+    .replace(/^<!-- \/?(?:alpha|open) -->[ \t]*(?:\r?\n|$)/gm, '')
+    .replace(/^[ \t]*<!-- \/?engine-pin:[a-z]+ -->[ \t]*(?:\r?\n|$)/gm, '');
 }
 /* What somebody in the Discord without a play role is told, by the launcher's
    door, the join pass and the sign in page. In the alpha that is an

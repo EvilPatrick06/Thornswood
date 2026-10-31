@@ -8,6 +8,7 @@
 name: Build check (pull requests)
 on:
   pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 # One run per branch at a time. On main a newer push waits for the run in
