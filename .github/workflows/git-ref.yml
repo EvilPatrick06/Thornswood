@@ -18,6 +18,7 @@
 #   pwsh scripts/ops/Set-Ref.ps1 -DeleteTag <tag> -Commit <sha>
 #   pwsh scripts/ops/Set-Ref.ps1 -DeleteDraft <release id>
 #   pwsh scripts/ops/Set-Ref.ps1 -PublishLauncher v<version>
+#   pwsh scripts/ops/Set-Ref.ps1 -RetagLauncher v<version>
 #
 # which starts this on main with what to do, waits for the run, and prints
 # the answer this run left as an annotation titled Set-Ref. Ship.ps1 does
@@ -40,7 +41,7 @@
 # Every action here is named by a full length commit SHA with its tag in the
 # comment, for the reason build.yml gives.
 name: Tag or branch
-run-name: ${{ inputs.tag && format('Tag {0}', inputs.tag) || inputs.delete_branch && format('Delete branch {0}', inputs.delete_branch) || inputs.delete_tag && format('Delete tag {0}', inputs.delete_tag) || inputs.delete_draft && format('Delete draft {0}', inputs.delete_draft) || format('Publish launcher {0}', inputs.publish_launcher) }} by ${{ github.actor }}
+run-name: ${{ inputs.tag && format('Tag {0}', inputs.tag) || inputs.delete_branch && format('Delete branch {0}', inputs.delete_branch) || inputs.delete_tag && format('Delete tag {0}', inputs.delete_tag) || inputs.delete_draft && format('Delete draft {0}', inputs.delete_draft) || inputs.publish_launcher && format('Publish launcher {0}', inputs.publish_launcher) || format('Put launcher draft {0} back on its tag', inputs.retag_launcher) }} by ${{ github.actor }}
 on:
   workflow_dispatch:
     inputs:
@@ -58,6 +59,9 @@ on:
         required: false
       publish_launcher:
         description: 'Or the v<version> tag whose launcher draft to publish'
+        required: false
+      retag_launcher:
+        description: 'Or the v<version> tag whose launcher draft GitHub took off it, to put back'
         required: false
       commit:
         description: 'The commit the tag goes on, or the commit the branch or tag has to be at (not for a draft or a launcher)'
@@ -111,6 +115,7 @@ jobs:
           REF_DELETE_TAG: ${{ inputs.delete_tag }}
           REF_DELETE_DRAFT: ${{ inputs.delete_draft }}
           REF_PUBLISH_LAUNCHER: ${{ inputs.publish_launcher }}
+          REF_RETAG_LAUNCHER: ${{ inputs.retag_launcher }}
           REF_COMMIT: ${{ inputs.commit }}
           REF_MESSAGE: ${{ inputs.message }}
           REF_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
