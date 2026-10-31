@@ -85,7 +85,7 @@ $sb = [scriptblock]::Create(
     '$current = $a.Current; $MainSourceAligned = $a.Aligned; $LauncherInputs = $a.Inputs;' +
     '$ReleaseDir = $a.ReleaseDir; $MainReleaseDir = $a.MainReleaseDir;' +
     $stubs + "`n" + $prelude + "`n" + $region +
-    "`nreturn [pscustomobject]@{ Target = `$target; Builds = (-not `$ModsOnly) }")
+    "`nreturn [pscustomobject]@{ Target = `$target; Builds = (-not `$ModsOnly); MainsOwn = `$MainsOwnLauncher }")
 
 # The launcher's own comparison, ported from Updater.cs IsNewer.
 function Parts([string]$v) {
@@ -186,6 +186,7 @@ try {
     Yes ("2 clean main that is main's 1.2.3, already on dev, keeps 1.2.3 with no rebuild: " + (Said $r)) (Chose $r '1.2.3' $false)
     $r = Run @{ Aligned = $true; Current = '1.2.3'; Inputs = $M; Main = "1.2.3|$M"; DevFeed = "1.2.2.4|$E"; Ever = @('1.2.2.4') }
     Yes ("2 not on dev yet, it goes to dev as 1.2.3: " + (Said $r)) (Chose $r '1.2.3' $true)
+    Yes '2 and it is main''s own launcher, so a Ship from the feed takes main''s exe' ($r -isnot [string] -and $r.MainsOwn)
     $r = Run @{ Aligned = $true; Current = '1.2.3'; Inputs = $M; Main = "1.2.3|$M"; DevFeed = "1.2.3|$D"; Ever = @('1.2.3') }
     Yes ("2 main's launcher cannot go to dev as 1.2.3 while dev's 1.2.3 is another launcher, so it stops: " + (Said $r)) ($r -is [string] -and $r -like 'STOP.*1.2.3 is already out*Bump-Version*')
     $r = Run @{ Aligned = $true; Current = '1.2.3'; Inputs = $M; Main = "1.2.3|$M"; DevFeed = "1.2.3.1|$D"; Ever = @('1.2.3.1') }
@@ -207,6 +208,10 @@ try {
     $r = Run @{ Aligned = $true; Current = '1.2.4'; Inputs = $G; Main = "1.2.3|$M"; DevFeed = "1.2.3.2|$D"; Ever = @('1.2.3.1', '1.2.3.2') }
     Yes ("4 clean main on 1.2.4 before main ships it goes to dev as 1.2.4: " + (Said $r)) (Chose $r '1.2.4' $true)
     Yes '4 and a dev launcher on 1.2.3.2 is offered it' (IsNewer '1.2.4' '1.2.3.2')
+    # 31 Oct, dev 20261031-051138-dev: main's number on a launcher main has not
+    # published is not main's launcher, so a Ship from the feed builds it on
+    # GitHub and never puts main's older exe under the new number.
+    Yes '4 and it is not main''s own launcher, so a Ship from the feed does not take main''s exe' ($r -isnot [string] -and -not $r.MainsOwn)
     $r = Run @{ Aligned = $true; Current = '1.2.4'; Inputs = $G; Main = "1.2.4|$G"; DevFeed = "1.2.4|$G"; Ever = @('1.2.3.2', '1.2.4') }
     Yes ("4 once main ships that 1.2.4, dev keeps it with no rebuild: " + (Said $r)) (Chose $r '1.2.4' $false)
     $r = Run @{ Aligned = $true; Current = '1.2.4'; Inputs = $E; Main = "1.2.3|$M"; DevFeed = "1.2.4|$G"; Ever = @('1.2.3.2', '1.2.4') }

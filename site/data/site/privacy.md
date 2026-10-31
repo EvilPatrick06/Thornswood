@@ -169,7 +169,16 @@ Honesty about the things a page does by existing:
 
 - **Discord** is where sign-in happens, so signing in tells Discord that you
   signed in here.
-- **Launcher updates** are fetched from Thornswood's own site.
+- **Launcher updates and the installer** are asked for at Thornswood's own
+  site. Since the code went public on 30 October 2026, every file of a
+  release is also published on GitHub, where Thornswood's code is kept, and
+  the site sends the launcher (or your browser, for the installer) on to
+  fetch the file from there once GitHub holds the same file. GitHub then sees
+  your address and which file was fetched, and keeps its own records under
+  [GitHub's privacy statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement).
+  The file is the same either way: the launcher checks each one against the
+  sha256 the site's update list names before using it. When GitHub does not
+  hold a file, the site sends it itself.
 - **Cloudflare** carries every connection to this site, and to voice, on
   its way to our server, which answers nobody else. Like any network
   between you and us it sees your address and what you ask for, and it
