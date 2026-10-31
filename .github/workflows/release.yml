@@ -439,8 +439,13 @@ jobs:
             # Its notes were written by the run that made it, and this run's
             # files replace that run's: a draft built unsigned and rebuilt
             # signed kept saying UNSIGNED. The notes say how THESE files were
-            # built, so they are written again with them.
-            $patch = @{ body = $notes } | ConvertTo-Json
+            # built, so they are written again with them. The tag and commit
+            # go with them: since immutable releases (31 Oct 2026), GitHub
+            # drops a draft's tag when an edit does not name it, and the
+            # v1.2.13 draft read untagged-<hex> after a second run wrote its
+            # notes alone, so Ship and installer.yml could not find it by its
+            # tag (scripts\ops\Set-Ref.ps1 -RetagLauncher puts one back).
+            $patch = @{ body = $notes; tag_name = $tag; target_commitish = $env:RELEASE_COMMIT } | ConvertTo-Json
             $release = Invoke-RestMethod -Method Patch -Uri "$api/releases/$($release.id)" -Headers $headers -ContentType 'application/json' -Body $patch -ErrorAction Stop
           }
           if (-not $release) {
