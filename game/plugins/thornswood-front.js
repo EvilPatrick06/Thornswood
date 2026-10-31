@@ -9854,6 +9854,13 @@
     if (what === 'help:opened') { T.claimFocus('help', true); return; }
     if (what === 'help:closed') { T.claimFocus('help', false); return; }
     if (what === 'help:ready') { log('the help panel is in'); helpToPage(); return; }
+    // Report a problem (#3155): to the game server as /problem, which takes
+    // where the character stands itself and sends it on to the site.
+    if (what.indexOf('help:problem ') === 0) {
+      const text = what.slice(13).replace(/\s+/g, ' ').trim().slice(0, 1000);
+      if (text) { log('help: a problem report sent,', text.length, 'characters'); tellServer('/problem ' + text); }
+      return;
+    }
     // The Settings panel (#3126): opened from Settings on the help, K, P and
     // J panels; every change it asks for is checked and written here.
     if (what === 'settings:opened') { T.claimFocus('settings', true); settingsToPage(''); return; }
