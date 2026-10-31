@@ -198,6 +198,10 @@ try {
     }
     Put (Join-Path $inst 'Profile\OwnGame\loadorder.txt') "ours.esp`r`n"
     . (Join-Path $repo 'tests\fixtures\ui-front.ps1')
+    # The collection revision record, and a Vortex on it (#3597).
+    . (Join-Path $repo 'tests\fixtures\collection-revision.ps1')
+    $roaming = Join-Path $inst 'roaming'
+    $null = Install-CollectionRevisionFixture -From $repo -RepoCopy $fake -AppData $roaming
     Install-UiFrontFixture (Join-Path $inst 'Game')
     $node = Get-Command node -ErrorAction SilentlyContinue
     Yes 'node is on PATH, for the stand-in game server''s manifest' ($null -ne $node)
@@ -231,8 +235,9 @@ try {
     Put (Join-Path $site 'feed\published.json') ('{"Data\\Platform\\UI\\thornswood-ours.esp":"5:0000000000000000000000000000000000000000000000000000000000000000","Data\\Thornswood-Content.esp":"' + $v1Entry + '"}')
     $Shell = (Get-Process -Id $PID).Path
     function Publish([string[]]$extra) {
-        $oldA = $env:LOCALAPPDATA; $oldE = $ErrorActionPreference
+        $oldA = $env:LOCALAPPDATA; $oldR = $env:APPDATA; $oldE = $ErrorActionPreference
         $env:LOCALAPPDATA = Join-Path $inst 'appdata'
+        $env:APPDATA = $roaming
         $ErrorActionPreference = 'Continue'
         try {
             $pu = Join-Path $fake 'scripts\release\Publish-Update.ps1'
@@ -242,7 +247,7 @@ try {
             $cmd = "`$global:ThornswoodPublishedRelease = ''; `$rc = 1; try { & $(Q $pu) $argText; `$rc = `$LASTEXITCODE } " +
                    "finally { 'PUBLISHED=[' + `$global:ThornswoodPublishedRelease + ']' }; exit `$rc"
             $out = (& $Shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command $cmd 2>&1 | Out-String); $code = $LASTEXITCODE
-        } finally { $env:LOCALAPPDATA = $oldA; $ErrorActionPreference = $oldE }
+        } finally { $env:LOCALAPPDATA = $oldA; $env:APPDATA = $oldR; $ErrorActionPreference = $oldE }
         $said = [regex]::Match($out, 'PUBLISHED=\[([^\]]*)\]')
         return [pscustomobject]@{ Code = $code; Out = $out; Published = $(if ($said.Success) { $said.Groups[1].Value } else { '?' }) }
     }
