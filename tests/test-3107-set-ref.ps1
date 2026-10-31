@@ -11,9 +11,8 @@
 
   WHAT IT HOLDS THEM TO.
     1. git-ref.yml: started by hand only; a token that can write refs and
-       read pull requests and nothing else; on the VPS runners with a
-       timeout; no token kept by the checkout, and every file written again
-       after it (#3029); main's Set-Ref.ps1 -OnGitHub under pwsh with no
+       read pull requests and nothing else; on GitHub's runner with a
+       timeout; no token kept by the checkout; main's Set-Ref.ps1 -OnGitHub under pwsh with no
        profile; the inputs reach it through the environment, nothing pasted
        into its script.
     2. Set-Ref.ps1 -OnGitHub, the workflow's half, against a stand-in for
@@ -105,11 +104,10 @@ Yes 'it is started by hand and by nothing else' ($on -match '^\s{2}workflow_disp
 $perm = [regex]::Match($code, '(?ms)^permissions:\n(.*?)^\S').Groups[1].Value.Trim()
 Yes ("its token writes refs, reads pull requests and starts release-files.yml (#3686), nothing else ($($perm -replace '\s+', ' '))") ($perm -eq "contents: write`n  pull-requests: read`n  actions: write")
 Yes '  and no job asks for more' ($code -notmatch '(?m)^    permissions:')
-Yes 'it runs on the VPS runners only while the repository is private, and on GitHub''s once public (#3685)' ($code -match ('(?m)^    runs-on: ' + [regex]::Escape("`${{ github.event.repository.private && fromJSON('[`"self-hosted`", `"Windows`", `"thornswood-vps`"]') || 'windows-latest' }}") + '$'))
+Yes 'it runs on GitHub''s Windows runner (#3685, #4983)' ($code -match ('(?m)^    runs-on: ' + [regex]::Escape('windows-latest') + '$'))
 Yes '  with a timeout' ($code -match '(?m)^    timeout-minutes: \d+$')
 Yes '  in no environment, so it holds no secret' ($code -notmatch '(?m)^\s+environment:' -and $code -notmatch 'secrets\.')
 Yes 'the checkout keeps no token' ($code -match 'uses: actions/checkout@[0-9a-f]{40}[^\n]*\n\s+with:\n\s+persist-credentials: false')
-Yes '  and every file is written again after it (#3029)' ($code -match '- name: Check every tracked file out again')
 $step = [regex]::Match($code, '(?ms)- name: Make the tag or delete the branch\n(.*?)(?=^\s+- name: |\z)').Groups[1].Value
 Yes 'the step is pwsh with no profile' ($step -match "shell: pwsh -NoProfile -NonInteractive -Command `". '\{0\}'`"")
 $run = [regex]::Match($step, '(?ms)run: \|\n(.*)$').Groups[1].Value

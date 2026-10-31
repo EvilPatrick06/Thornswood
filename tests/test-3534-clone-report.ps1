@@ -72,7 +72,7 @@ $on = [regex]::Match($code, '(?ms)^on:\n(.*?)^\S').Groups[1].Value
 Yes 'started by hand only' ($on -match '(?m)^  workflow_dispatch:' -and @([regex]::Matches($on, '(?m)^  \S')).Count -eq 1)
 Yes '  with one required string input, report' ($on -match '(?ms)inputs:\n\s+report:\n\s+description:[^\n]*\n\s+required: true\n\s+type: string\s*$')
 Yes 'its token is given no permissions' ($code -match '(?m)^permissions:\s*\{\}\s*$' -and $code -notmatch '(?m)^\s+permissions:')
-Yes 'on GitHub''s runner once public, a VPS runner only while private, with a timeout' ($code.Contains("    runs-on: `${{ github.event.repository.private && fromJSON('[`"self-hosted`", `"Windows`", `"thornswood-vps`"]') || 'windows-latest' }}") -and $code -match '(?m)^    timeout-minutes: \d+$')
+Yes 'on GitHub''s Windows runner (#4983), with a timeout' ($code.Contains("    runs-on: windows-latest`n") -and $code -match '(?m)^    timeout-minutes: \d+$')
 Yes '  and main only' ($code -match "(?m)^    if: github\.ref == 'refs/heads/main'$")
 Yes 'no checkout, no action, no environment, no secret' ($code -notmatch 'uses:' -and $code -notmatch '(?m)^\s+environment:' -and $code -notmatch 'secrets\.')
 Yes 'the report comes in through the environment' ($code.Contains('CLONE_REPORT: ${{ inputs.report }}'))

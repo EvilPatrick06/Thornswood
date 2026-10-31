@@ -1,28 +1,27 @@
-# Runs the test harnesses somebody names, on the VPS's Windows runners, the
-# way the nightly runs them (#2970).
+# Runs the test harnesses somebody names, on GitHub's Windows runner, the way
+# the nightly runs them (#2970, #4983).
 #
 # Why. A cloud session runs on Linux, and a harness that needs Windows
 # PowerShell (a deploy swap, a scheduled task, a Windows path) was run by
 # logging in to the box and typing it there. On 21 Oct the safety check
 # refused that from the #2952 thread ("Remote Shell Writes"), and a harness
 # has no business on the live box anyway. This workflow runs it where the
-# nightly already runs every harness: a runner account that reaches none of
-# the live server's folders (records\runner-isolation.json, #2161).
+# nightly already runs every harness, a machine of GitHub's that reaches none
+# of the live server's folders.
 #
 # How. Dispatch it on main, or on a branch to try that branch's harnesses,
-# with the names as the nightly prints them, split by spaces or commas. It
-# runs on the build runners, which never sign (#3550):
+# with the names as the nightly prints them, split by spaces or commas:
 #
 #   gh workflow run harnesses.yml --ref main -f harnesses='test-deploy-swaps.ps1 voice/test-most.js'
 #
 # A name that is no harness in that commit fails the run before anything
 # runs. The names reach the script through the environment, never pasted into
-# the script's text, so nothing typed into the box can run as code.
+# the script's text, so nothing typed in can run as code.
 #
 # The word gate in place of names runs the pull request gate's own list, the
 # one scripts\dev\Gate-Harnesses.ps1 prints, and throttle runs that many side
 # by side, the way build.yml runs them (#3114). That is how a throttle is
-# measured on the box without a pull request:
+# measured without a pull request:
 #
 #   gh workflow run harnesses.yml --ref main -f harnesses=gate -f throttle=3
 #
@@ -44,29 +43,11 @@ permissions:
 jobs:
   harnesses:
     name: Named harnesses
-    # On a build runner (records\build-runners.json), never on any VPS runner
-    # (#3550): this runs a branch's harnesses, and runner 3, which takes any
-    # job asking for thornswood-vps alone, signs the release launchers. Nine
-    # runs of claude/* branches landed there from 22 to 26 Oct. A share of
-    # harnesses, or the whole gate, is a build runner's kind of work anyway.
-    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps", "thornswood-build"]') || 'windows-latest' }}
+    # It runs a branch's harnesses, so never on a machine of ours (#3550).
+    runs-on: windows-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      # A runner keeps its folder from one job to the next, and a checkout
-      # there rewrites only the files that differ from the last job's commit,
-      # so every other file keeps the line endings the last job's
-      # .gitattributes gave it (#3029). Every tracked file is written again,
-      # the way this commit checks it out.
-      - name: Check every tracked file out again
-        if: runner.environment == 'self-hosted'
-        shell: pwsh
-        run: |
-          git rm -r -q --cached .
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          git reset -q --hard HEAD
-          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Install the eslint the lint harness copies
         if: ${{ contains(inputs.harnesses, 'test-eslint-amp-path') }}

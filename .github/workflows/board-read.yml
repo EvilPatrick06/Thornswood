@@ -40,7 +40,7 @@
 # "board" environment, which only main may use. The run's own token is given
 # no permissions at all.
 #
-# WHERE IT RUNS. On the VPS runners, like board-status.yml. The read is a few
+# WHERE IT RUNS. On GitHub's Windows runner (#4983). The read is a few
 # GraphQL pages. It runs no action, so there is nothing in it to pin.
 name: Read the board
 run-name: Board read by ${{ github.actor }}
@@ -50,7 +50,7 @@ permissions: {}
 jobs:
   read:
     name: Read every card
-    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
+    runs-on: windows-latest
     environment: board
     # A dozen calls to GitHub. Past this it is stuck, not slow.
     timeout-minutes: 5

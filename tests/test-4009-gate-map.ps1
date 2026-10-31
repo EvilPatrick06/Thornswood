@@ -21,8 +21,9 @@
        why; with nothing usable, or no token, it exits 1; it takes the
        token from GATE_MAP_TOKEN and leaves none in the environment, and
        nothing hands it one on a command line (#4079);
-    4. build.yml runs -Hand only on main's push builds on the box, after the
-       gate, and gives the gate step the token only on a pull request.
+    4. build.yml no longer runs -Hand: only a main build on the box could,
+       and none runs there since #4983. Its gate step still reads the maps
+       main's builds handed on, with the job's token.
 
   Writes only its scratch folder, in the system's temp folder, and deletes it.
 #>
@@ -170,12 +171,9 @@ try {
 
 # ---- 4. build.yml
 $b = [IO.File]::ReadAllText((Join-Path (Join-Path (Join-Path $repo '.github') 'workflows') 'build.yml')).Replace("`r`n", "`n")
-$gateAt = $b.IndexOf("        id: gate`n")
-$handAt = $b.IndexOf('      - name: Hand the traced map to runners off the box')
-Yes 'build.yml hands the map on after the gate step' ($gateAt -gt 0 -and $handAt -gt $gateAt)
-Yes '  on the box, where Gate-Map.ps1 itself keeps it to main''s push builds' ($b.Contains("if: `${{ !cancelled() && runner.environment == 'self-hosted' }}`n        shell: pwsh`n        run: .\scripts\dev\Gate-Map.ps1 -Hand"))
+Yes 'build.yml no longer hands a map on, since no build of it runs on the box (#4983)' (-not $b.Contains('Gate-Map.ps1 -Hand') -and $b.IndexOf("        id: gate`n") -gt 0)
 Yes '  and gives the gate step the job''s token' ($b.Contains('GATE_MAP_TOKEN: ${{ github.token }}'))
-Yes '  and both build jobs may read another run''s job logs' (([regex]::Matches($b, '(?m)^    permissions:\n      actions: read\n      contents: read\n')).Count -ge 2)
+Yes '  and the build job may read another run''s job logs' (([regex]::Matches($b, '(?m)^    permissions:\n      actions: read\n      contents: read\n')).Count -ge 1)
 $rg = [IO.File]::ReadAllText((Join-Path (Join-Path (Join-Path $repo 'scripts') 'dev') 'Run-Gate.ps1'))
 Yes 'Run-Gate.ps1 hands Gate-Map.ps1 no token on its command line (#4079)' ($rg.Contains("& (Join-Path `$Here 'Gate-Map.ps1') -Fetch `$maps 2>&1") -and -not ($rg -match '-Token\b'))
 Yes 'Run-Gate.ps1 takes the token out of the environment before any harness starts' ($rg.IndexOf('Remove-Item -LiteralPath Env:GATE_MAP_TOKEN') -gt 0 -and $rg.IndexOf('Remove-Item -LiteralPath Env:GATE_MAP_TOKEN') -lt $rg.IndexOf("& (Join-Path `$Here 'Nightly-Harnesses.ps1')"))

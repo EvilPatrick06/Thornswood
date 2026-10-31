@@ -62,9 +62,9 @@
 # which only main may use, so a workflow on a pull request branch cannot read
 # it. Missing or refused, the run goes red and says which.
 #
-# WHERE IT RUNS. On the VPS runners, [self-hosted, Windows, thornswood-vps],
-# like drop-claims.yml. The job starts only for a label that begins "board:"
-# or "order:", so every other label takes no runner slot.
+# WHERE IT RUNS. On GitHub's Windows runner (#4983). The job starts only for
+# a label that begins "board:" or "order:", so every other label starts no
+# job.
 name: Board card from a label
 on:
   issues:
@@ -75,7 +75,7 @@ jobs:
   status:
     name: Set the card's Status or Order
     if: ${{ startsWith(github.event.label.name, 'board:') || startsWith(github.event.label.name, 'order:') }}
-    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
+    runs-on: windows-latest
     environment: board
     # On the job, not the workflow: the job's if is read first, so a run for
     # some other label never joins the queue and cannot push a board run out.
