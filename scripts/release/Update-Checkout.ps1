@@ -43,6 +43,19 @@
 
   Then it asks what Ship asks (Fresh-Checkout.ps1) and prints the answer.
 
+  AFTER A HISTORY REWRITE (#3684). On 30 Oct 2026 this repository's and the
+  fork's histories were rewritten and force-pushed, so every commit got a new
+  id. The shared clone then sat at the old main, which no branch held any
+  more, and step 1 refused it with an archive branch as the way out: a
+  branch that keeps the old history, the files the rewrite took out with it,
+  in the clone. A commit the rewrite gave a new id is not work only this
+  clone has. -RewriteMap names the rewrite's commit maps (git filter-repo's
+  commit-map: a header, then one "old new" pair per line); a HEAD or a
+  submodule commit that no branch holds moves on when a map gives it a new
+  id that a branch here or on GitHub holds, and no archive branch is made.
+  A commit no map names, or one whose new id nothing holds, is refused as
+  before.
+
   It never deletes, resets, stashes or forces anything, and changes nothing
   outside the checkout and its submodules.
 
@@ -57,9 +70,18 @@
 .PARAMETER NoPause
   Exits without waiting for Enter.
 
+.PARAMETER RewriteMap
+  The commit maps of a history rewrite (#3684), one for this repository and
+  one for the fork. A commit no branch holds moves on when one of them gives
+  it a new id a branch holds.
+
 .EXAMPLE
   .\scripts\release\Update-Checkout.ps1
   Moves the shared clone to the newest origin/main, engine\skymp with it.
+
+.EXAMPLE
+  .\scripts\release\Update-Checkout.ps1 -RewriteMap <ops>\issues\3684\after\commit-map.txt, <ops>\issues\3684\after\fork-commit-map.txt
+  Moves a clone that was on the history before #3684's rewrite to the new main.
 
 .EXAMPLE
   .\scripts\release\Update-Checkout.ps1 -Check
@@ -69,7 +91,8 @@
 param(
     [string]$RepoDir,
     [switch]$Check,
-    [switch]$NoPause
+    [switch]$NoPause,
+    [string[]]$RewriteMap = @()
 )
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
@@ -100,6 +123,27 @@ function First($r) { if ($r.Out.Count) { return ([string]$r.Out[0]).Trim() } ret
 function Test-Held([string]$Dir, [string]$Sha) {
     $r = Invoke-Git $Dir @('for-each-ref', '--count=1', '--format=%(refname)', '--contains', $Sha, 'refs/heads', 'refs/remotes')
     return ($r.Code -eq 0 -and $r.Out.Count -gt 0)
+}
+
+# The rewrite's old id to new id, from every -RewriteMap (#3684). A map that
+# cannot be read stops the run: a refusal it was meant to lift would read as
+# work being lost.
+$Rewritten = @{}
+foreach ($m in $RewriteMap) {
+    if (-not (Test-Path -LiteralPath $m)) { Die "-RewriteMap $m is not there." }
+    foreach ($l in [IO.File]::ReadAllLines($m)) {
+        $p = $l.Trim() -split '\s+'
+        if ($p.Count -eq 2 -and $p[0] -match '^[0-9a-f]{40}$' -and $p[1] -match '^[0-9a-f]{40}$') { $Rewritten[$p[0]] = $p[1] }
+    }
+}
+
+# Whether a commit no branch holds was only given a new id by a history
+# rewrite, the new one held: then moving off it leaves no work behind.
+function Test-RewrittenHeld([string]$Dir, [string]$Sha) {
+    $new = $Rewritten[$Sha]
+    if (-not $new) { return '' }
+    if (Test-Held $Dir $new) { return $new }
+    return ''
 }
 
 # The submodules the checkout names in .gitmodules, and whether each is
@@ -145,8 +189,12 @@ if ($other.Count) {
          'Put them on a branch in a worktree through a pull request, or put them back.')
 }
 if ($detached -and $head -and -not (Test-Held $Top $head)) {
-    Die ("HEAD is at $(Get-FreshShort $head), which no branch here or on GitHub holds, so after a move it would be in the reflog only. " +
-         "git branch archive/$(Get-FreshShort $head) $head keeps it.")
+    $new = Test-RewrittenHeld $Top $head
+    if (-not $new) {
+        Die ("HEAD is at $(Get-FreshShort $head), which no branch here or on GitHub holds, so after a move it would be in the reflog only. " +
+             "git branch archive/$(Get-FreshShort $head) $head keeps it. After a history rewrite, -RewriteMap names the map that gives it its new id.")
+    }
+    Say "  HEAD at $(Get-FreshShort $head) is $(Get-FreshShort $new) since the history rewrite, which a branch holds, so nothing is left behind" 'DarkGray'
 }
 
 $subs = @(Get-Submodules $Top)
@@ -161,8 +209,15 @@ foreach ($s in $subs) {
     }
     $at = First (Invoke-Git $s.Dir @('rev-parse', 'HEAD'))
     if ($at -and -not (Test-Held $s.Dir $at)) {
-        Die ("$($s.Path) is at $(Get-FreshShort $at), which no branch of the fork here or on GitHub holds, so after a move it would be in the reflog only. " +
-             "git -C $($s.Path) branch archive/$(Get-FreshShort $at) $at keeps it.")
+        # The new id is fetched by the submodule update in step 3, so a map's
+        # new commit is held when the fork's own branches hold it once fetched.
+        $null = Invoke-Git $s.Dir @('fetch', '--quiet', 'origin')
+        $new = Test-RewrittenHeld $s.Dir $at
+        if (-not $new) {
+            Die ("$($s.Path) is at $(Get-FreshShort $at), which no branch of the fork here or on GitHub holds, so after a move it would be in the reflog only. " +
+                 "git -C $($s.Path) branch archive/$(Get-FreshShort $at) $at keeps it. After a history rewrite, -RewriteMap names the map that gives it its new id.")
+        }
+        Say "  $($s.Path) at $(Get-FreshShort $at) is $(Get-FreshShort $new) since the history rewrite, which a branch of the fork holds" 'DarkGray'
     }
 }
 
