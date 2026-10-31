@@ -361,6 +361,48 @@ Yes '  and the installer no longer puts a verbs.json beside the broker, and take
     (Text 'scripts/deploy/Install-Gate.ps1') -notmatch "\$Files = @\([^)]*verbs\.json" -and (Text 'scripts/deploy/Install-Gate.ps1').Contains('Remove-Item -LiteralPath (Join-Path `$root ''verbs.json'') -Force'))
 Yes 'what runs is the tip of main: fetched into origin/main and checked out from it' (
     $brokerCode.Contains("'+refs/heads/main:refs/remotes/origin/main'") -and $brokerCode.Contains("'--detach', 'refs/remotes/origin/main'") -and $brokerCode.Contains("'clean', '-ffdxq'"))
+Yes '  and each fetched submodule is brought to main''s pin after the checkout, never left at the old one' (
+    $brokerCode.Contains("'submodule', 'update', '--checkout', '--force', '--depth', '1'") -and -not $brokerCode.Contains("'submodule', 'update', '--init'") -and
+    $brokerCode.IndexOf("'submodule', 'update'") -gt $brokerCode.IndexOf("'--detach', 'refs/remotes/origin/main'"))
+# The same steps, run with git on a checkout whose submodule main moved
+# (31 Oct: the gate's engine\skymp stayed at b21c4eb9 when main pinned
+# befb8364, and every verb's freshness check refused the checkout).
+$gitExe = (Get-Command git -ErrorAction SilentlyContinue)
+if (-not $gitExe) { Write-Host 'SKIP: the submodule move needs git' -ForegroundColor Yellow } else {
+    $sm = Join-Path ([IO.Path]::GetTempPath()) ('tw-2841-sub-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+    New-Item -ItemType Directory -Path $sm -Force | Out-Null
+    function SmGit([string]$dir) { $a = @('-c', 'protocol.file.allow=always', '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'init.defaultBranch=main', '-C', $dir) + $args; $o = & git @a 2>&1; return [pscustomobject]@{ Code = $LASTEXITCODE; Out = @($o | ForEach-Object { [string]$_ }) } }
+    try {
+        $fork = Join-Path $sm 'fork'; $up = Join-Path $sm 'up'
+        New-Item -ItemType Directory -Path $fork, $up -Force | Out-Null
+        [void](SmGit $fork init -q); [void](SmGit $fork config uploadpack.allowAnySHA1InWant true)
+        Set-Content -LiteralPath (Join-Path $fork 'a.txt') -Value 'one'; [void](SmGit $fork add -A); [void](SmGit $fork commit -qm one)
+        $pinA = ((SmGit $fork rev-parse HEAD).Out -join '').Trim()
+        [void](SmGit $up init -q); [void](SmGit $up submodule add -q $fork engine/skymp); [void](SmGit $up commit -qm pinA)
+        $gate = Join-Path $sm 'gate'
+        [void](SmGit $sm clone -q --depth 1 --no-tags --branch main ('file://' + $up.Replace('\', '/')) $gate)
+        [void](SmGit $gate submodule update --init --depth 1)
+        Set-Content -LiteralPath (Join-Path $fork 'a.txt') -Value 'two'; [void](SmGit $fork commit -qam two)
+        $pinB = ((SmGit $fork rev-parse HEAD).Out -join '').Trim()
+        [void](SmGit (Join-Path $up 'engine/skymp') fetch -q origin); [void](SmGit (Join-Path $up 'engine/skymp') checkout -q $pinB)
+        [void](SmGit $up add engine/skymp); [void](SmGit $up commit -qm pinB)
+        $steps = @(
+            @('fetch', '--quiet', '--depth', '1', '--no-tags', 'origin', '+refs/heads/main:refs/remotes/origin/main'),
+            @('checkout', '--quiet', '--force', '--detach', 'refs/remotes/origin/main'),
+            @('clean', '-ffdxq'))
+        foreach ($st in $steps) { [void](SmGit $gate @st) }
+        $before = ((SmGit (Join-Path $gate 'engine/skymp') rev-parse HEAD).Out -join '').Trim()
+        Yes '  (without the move, the submodule stays at the old pin, as the gate''s did)' ($before -eq $pinA -and $pinA -ne $pinB)
+        $r = SmGit $gate submodule update --checkout --force --depth 1
+        $after = ((SmGit (Join-Path $gate 'engine/skymp') rev-parse HEAD).Out -join '').Trim()
+        $status = (SmGit $gate status --porcelain).Out -join ' '
+        Yes '  the move takes the fetched submodule to the new pin, and leaves no change behind' ($r.Code -eq 0 -and $after -eq $pinB -and -not $status.Trim())
+        $bare = Join-Path $sm 'gate2'
+        [void](SmGit $sm clone -q --depth 1 --no-tags --branch main ('file://' + $up.Replace('\', '/')) $bare)
+        $r2 = SmGit $bare submodule update --checkout --force --depth 1
+        Yes '  and a submodule never fetched stays unfetched' ($r2.Code -eq 0 -and -not (Test-Path -LiteralPath (Join-Path $bare 'engine/skymp/a.txt')))
+    } finally { Remove-Item -LiteralPath $sm -Recurse -Force -ErrorAction SilentlyContinue }
+}
 Yes 'a live verb runs only when main is at the build it named, checked after the fetch' ($brokerCode.Contains('if ($req.Build -and $req.Build -cne $commit)') -and
     $brokerCode.IndexOf('if ($req.Build -and $req.Build -cne $commit)') -gt $brokerCode.IndexOf('$commit = Update-Checkout') -and
     $brokerCode.IndexOf('if ($req.Build -and $req.Build -cne $commit)') -lt $brokerCode.IndexOf('Invoke-Child ([string]$Cfg.pwsh)'))

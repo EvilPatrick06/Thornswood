@@ -191,7 +191,13 @@ function Update-Checkout {
     foreach ($step in @(
         @('-C', $Repo, 'fetch', '--quiet', '--depth', '1', '--no-tags', 'origin', '+refs/heads/main:refs/remotes/origin/main'),
         @('-C', $Repo, 'checkout', '--quiet', '--force', '--detach', 'refs/remotes/origin/main'),
-        @('-C', $Repo, 'clean', '-ffdxq'))) {
+        @('-C', $Repo, 'clean', '-ffdxq'),
+        # A checkout moves its submodules only when told to, so a fetched
+        # engine\skymp stayed at the pin before and every verb's freshness
+        # check refused the checkout once main moved the pin (31 Oct, b21c4eb9
+        # left behind by befb8364). This brings each fetched submodule to the
+        # commit main pins; one never fetched here stays unfetched.
+        @('-C', $Repo, 'submodule', 'update', '--checkout', '--force', '--depth', '1'))) {
         $c = Invoke-Child $git $step $Root 10
         if ($c -ne 0) { Send ('| git ' + $step[2] + ' ended ' + $c + ', so main could not be read'); return '' }
     }
