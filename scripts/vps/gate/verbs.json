@@ -115,6 +115,7 @@
       "params": {
         "GamemodeOnly": "switch",
         "FromStore": "switch",
+        "FromRecord": "switch",
         "PutBack": "switch",
         "RequirePass": "^(on|off)$",
         "Minutes": "^[0-9]{1,2}(\\.[0-9]{1,2})?$",
