@@ -236,8 +236,9 @@ using it to get out of a fight or to travel can mean a warning or a ban.
    Discord, or say in the report that you have one. Where the logs are is below.
 
 A launcher last opened before 26 September says it cannot read the update
-source, or never offers an update. Updates come only from thornswood.net now,
-and a launcher that old still looks for them where they used to be, so it
+source, or never offers an update. Updates are asked for at thornswood.net now
+(the site may send the launcher on to GitHub for the files themselves), and a
+launcher that old still looks for them where they used to be, so it
 cannot find the new place by itself. Take the installer again from the
 [Downloads](/downloads) page and run it over your install. Your characters live
 on the server and nothing is lost.
