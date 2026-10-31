@@ -17,9 +17,11 @@
   which shares the chat's socket and can start listening after the room
   has already offered to it (3).
 
-  1. The service, over raw sockets. A socket that has stopped reading is
-     backed up with a heavy position feed, two people join (so its roster is
-     held, newest only), and the second sends it an offer and a candidate.
+  1. The service, over raw sockets. A socket that has stopped reading
+     (tests/fixtures/voice-stalled-reader.py, whose receive window is fixed,
+     #5090) is backed up with a heavy position feed, two people join (so its
+     roster is held, newest only), and the second sends it an offer and a
+     candidate.
      When it reads again, the roster naming the sender comes before both,
      and the older roster never comes at all. So no socket is sent anything
      from somebody before the roster that names them.
@@ -79,7 +81,7 @@ const net = require('net');
 const path = require('path');
 const vm = require('vm');
 const crypto = require('crypto');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 
 const REPO = path.join(__dirname, '..');
 const CR = String.fromCharCode(13);
@@ -169,8 +171,8 @@ async function health() { return (await fetch(BASE + '/health')).json(); }
 
 // ------------------------------------------------- raw sockets, for part 1 --
 const raw = [];
-/* The handshake by hand, so a socket can be left paused, which is a
-   machine that has stopped reading. */
+/* The handshake by hand, for the two that join while the one that stopped
+   reading is backed (the reader that stops is openStalled, below). */
 function openRaw(pid) {
   return new Promise((resolve, reject) => {
     const key = crypto.randomBytes(16).toString('base64');
@@ -619,47 +621,83 @@ function feed() {
   return fetch(BASE + '/positions', { method: 'POST', body: JSON.stringify({ who: who }) }).catch(() => { });
 }
 
+/*
+  The machine that stops reading (#5090): tests/fixtures/voice-stalled-reader.py
+  joins, says each message it reads as a line, and stops reading once the
+  room's roster has come, until it is told to read again. Its receive window
+  is fixed before it connects, so the service's socket to it stays backed
+  until it reads. A node socket left paused was not that: its kernel took
+  more as the window grew, and on GitHub's hosted Windows runner the service
+  saw it drain a second after the feed stopped.
+*/
+const STALLED = path.join(__dirname, 'fixtures', 'voice-stalled-reader.py');
+function pythonExe() {
+  for (const exe of ['python', 'py', 'python3']) {
+    const p = spawnSync(exe, ['--version'], { encoding: 'utf8' });
+    if (!p.error && p.status === 0) { return exe; }
+  }
+  return null;
+}
+function openStalled(exe, pid, name) {
+  const p = spawn(exe, [STALLED, String(PORT), 'thornswood, ' + tokenFor(pid), String(pid), name],
+                  { stdio: ['pipe', 'pipe', 'pipe'] });
+  const out = { proc: p, got: [], stalled: false, err: '' };
+  let line = '';
+  p.stdout.on('data', (d) => {
+    line += d;
+    let at;
+    while ((at = line.indexOf('\n')) >= 0) {
+      const one = line.slice(0, at).trim();
+      line = line.slice(at + 1);
+      let m = null;
+      try { m = JSON.parse(one); } catch (e) { }
+      if (!m) { continue; }
+      if (m.stalled) { out.stalled = true; } else { out.got.push(m); }
+    }
+  });
+  p.stderr.on('data', (d) => { out.err += d; });
+  p.stdin.on('error', () => { });
+  return out;
+}
+
 async function partOne() {
   console.log('1. the service, on a socket that has stopped reading:');
-  const E = await openRaw(100000);
-  const got = [];
-  readRaw(E, (m) => got.push(m));
-  sendRaw(E, { t: 'join', profileId: 100000, name: 'stops reading' });
-  await until(() => got.some((m) => m.t === 'peers'));
+  const exe = pythonExe();
+  yes('a Python to run the reader that stops (python, py or python3)', !!exe);
+  if (!exe) { return; }
+  // Only somebody in the world holds a voice place and is sent the roster
+  // (#3570), so the one that stops reading stands among the walkers first.
+  await fetch(BASE + '/positions', { method: 'POST', body: JSON.stringify({ who: [
+    { profileId: 100000, pos: [12345, -2345, 1234], angleZ: 90, cell: '0x0001a26f', name: 'Walker 0' }] }) });
+  const S = openStalled(exe, 100000, 'stops reading');
+  const got = S.got;
+  const stopped = await until(() => S.stalled, 15000);
+  yes('it joins, has the room\'s roster, and stops reading', stopped);
+  if (!stopped) { console.log('      the reader said: ' + JSON.stringify(got) + ' ' + S.err); S.proc.kill(); return; }
   const eId = (got.find((m) => m.t === 'welcome') || {}).peer;
-  E.pause();
   const before = got.length;
 
-  // Backed (#2144) is only "a write the kernel has not taken yet": one tick of
-  // 1500 rows is past the socket's high-water mark the moment it is written,
-  // so health says backed until the kernel takes it, even while the reader's
-  // kernel buffers still have room. Seen once is not enough. On the build
-  // runner the feed stopped on such a moment, the kernel then took the tick,
-  // drain cleared backed, and the joins were measured on a socket that was not
-  // backed. So the feed stops only once backed has held for a whole second
-  // with nothing being fed, which is a socket whose kernel buffers are full.
-  // voice/test-backpressure.js waits the same way (two probes in a row).
+  // Backed (#2144) is a write the kernel has not taken. One tick of 1500 rows
+  // is past the socket's high-water mark the moment it is written, and the
+  // reader's fixed window takes only a few kilobytes of it, so the feed stops
+  // the moment health says backed, and it holds with nothing fed.
   const t0 = Date.now();
-  const timeline = [];
-  let feeding = setInterval(feed, 200);
-  let backed = false;
-  while (!backed && Date.now() - t0 < 30000) {
-    await sleep(200);
-    if ((await health()).backed < 1) continue;
-    timeline.push('backed at ' + (Date.now() - t0) + ' ms');
-    clearInterval(feeding);
-    backed = true;
-    for (let k = 0; k < 5 && backed; k++) {
-      await sleep(200);
-      const hh = await health();
-      if (hh.backed < 1) { backed = false; timeline.push('drained at ' + (Date.now() - t0) + ' ms (queue was a tick in flight)'); }
-    }
-    if (!backed) feeding = setInterval(feed, 200);
+  const feeding = setInterval(feed, 200);
+  let backedAt = false;
+  while (!backedAt && Date.now() - t0 < 30000) {
+    await sleep(100);
+    backedAt = (await health()).backed >= 1;
   }
   clearInterval(feeding);
-  console.log('      the feed: ' + timeline.join(', ') + (backed ? ', held for 1 s with nothing fed' : ', never held'));
-  yes('a socket that does not read is backed up, so what follows is measured on one', backed);
-  if (!backed) { return; }
+  yes('a socket that does not read is backed up (' + (Date.now() - t0) + ' ms of feed)', backedAt);
+  if (!backedAt) { S.proc.kill(); return; }
+  let held = true;
+  for (let k = 0; k < 5 && held; k++) {
+    await sleep(200);
+    if ((await health()).backed < 1) held = false;
+  }
+  yes('  and it stays backed for a second with nothing fed, so what follows is measured on one', held);
+  if (!held) { S.proc.kill(); return; }
   const skipped0 = (await health()).skippedRosters;
 
   const N1 = await openRaw(100001);
@@ -677,13 +715,7 @@ async function partOne() {
   const n2Id = (n2.find((m) => m.t === 'welcome') || {}).peer;
   // skippedRosters moves only inside sendLatest while the socket is backed,
   // so it rising is the proof the second roster replaced the first on a
-  // backed socket. Whether health says backed at the instant after is not:
-  // backed is a write the kernel has not taken yet, and a reader that has
-  // stopped still has its kernel take more as the receive window grows (seen
-  // on GitHub's hosted Windows runner, 11 Oct: 0 to 1, backed 0 here, backed
-  // again 300 ms later). A drain there flushes the newest roster, which the
-  // order checks below still hold to, so asking for backed at this instant
-  // only measured the kernel's timing.
+  // backed socket.
   const h = await health();
   yes('two people join while it is backed, and the first roster is replaced unsent (skippedRosters ' +
       skipped0 + ' to ' + h.skippedRosters + ', backed ' + h.backed + ' just after)', h.skippedRosters > skipped0);
@@ -692,13 +724,9 @@ async function partOne() {
   const theirs = n2.find((m) => m.t === 'peers');
   yes('the newcomer\'s roster names the backed socket, which is who it offers to',
       !!theirs && theirs.peers.some((p) => p.peer === eId));
-  // What matters is the socket's state when the service relays them: the
-  // roster it holds has to go out ahead of the offer (send). Whether health
-  // says backed a moment later is the kernel's timing again: on GitHub's
-  // hosted Windows runner, 31 Oct, it said 1 just after the joins and 0 300
-  // ms after the relay. So the service counts a held roster written ahead of
-  // a message, where it happens, and a drain that sent it first is not
-  // counted.
+  // The roster it holds has to go out ahead of the offer (send). The
+  // service counts a held roster written ahead of a message where that
+  // happens, and a drain that sent it first is not counted.
   const ahead0 = h.rostersAhead;
   sendRaw(N2, { t: 'sdp', to: eId, sdp: { type: 'offer', sdp: 'measured offer' } });
   sendRaw(N2, { t: 'ice', to: eId, candidate: { candidate: 'candidate:1 1 udp 1 192.0.2.9 50000 typ host', sdpMid: '0', sdpMLineIndex: 0 } });
@@ -707,7 +735,7 @@ async function partOne() {
   yes('and the roster it held goes out ahead of the offer relayed to it (rostersAhead ' + ahead0 + ' to ' +
       hr.rostersAhead + ', backed ' + hr.backed + ' after)', hr.rostersAhead === ahead0 + 1);
 
-  E.resume();
+  S.proc.stdin.write('read\n');
   const heard = await until(() => got.slice(before).some((m) => m.t === 'ice' && m.from === n2Id), 15000);
   yes('when it reads again, the offer and the candidate reach it', heard);
   const after = got.slice(before).filter((m) => m.t === 'peers' || m.t === 'sdp' || m.t === 'ice');
@@ -721,7 +749,8 @@ async function partOne() {
   yes('and before its candidate', rosterAt >= 0 && iceAt > rosterAt);
   yes('and the roster that named only the first newcomer never comes at all, as sendLatest says',
       !after.some((m) => names(m, n1Id) && !names(m, n2Id)));
-  for (const s of [E, N1, N2]) { try { s.destroy(); } catch (e) { } }
+  try { S.proc.stdin.end(); S.proc.kill(); } catch (e) { }
+  for (const s of [N1, N2]) { try { s.destroy(); } catch (e) { } }
   await sleep(300);
 }
 
