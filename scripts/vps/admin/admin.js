@@ -59,13 +59,15 @@
     repo-settings   records/github-repo-settings.json on main (#3683,
                     Patrick's answers of 26 Oct 2026), { repositories: [{
                     repository, rulesets: [...],
-                    private_vulnerability_reporting }] }, for Thornswood and
+                    private_vulnerability_reporting, secret_scanning,
+                    secret_scanning_push_protection }] }, for Thornswood and
                     the engine fork, EvilPatrick06/skymp, and no other
                     repository: each ruleset an entry names is on GitHub
                     with exactly its target, enforcement, conditions, rules
                     and bypass list, made or put back by name, and private
-                    vulnerability reporting is on or off as the entry says
-                    (left as it is when the entry does not say). A ruleset
+                    vulnerability reporting, secret scanning and its push
+                    protection are each on or off as the entry says (left
+                    as they are when the entry does not say). A ruleset
                     GitHub has that the record does not name is never
                     deleted here; it stops the run, named, so a protection
                     nobody wrote down is a pull request to the record or a
@@ -187,6 +189,8 @@ const SETTINGS_FILE = 'records/github-repo-settings.json';
 // The App reaches only those it is installed on, and this stops a record
 // naming any other even then.
 const SETTINGS_REPOS = [REPO, OWNER + '/skymp'];
+// security_and_analysis keys the record may switch, each true or false.
+const SCANNING_KEYS = ['secret_scanning', 'secret_scanning_push_protection'];
 // What repo-settings' token for each repository may do: Thornswood's reads
 // main's record too; the fork's only needs its settings.
 const HOME_PERMISSIONS = { administration: 'write', contents: 'read' };
@@ -367,7 +371,11 @@ function checkSettings(doc) {
     if (SETTINGS_REPOS.indexOf(repo) < 0) throw new Error(SETTINGS_FILE + ' names ' + (repo || 'a repository with no name') + ', and the only ones this changes are ' + SETTINGS_REPOS.join(' and '));
     if (seen[repo]) throw new Error(SETTINGS_FILE + ' names ' + repo + ' twice');
     seen[repo] = true;
-    if (e.private_vulnerability_reporting !== undefined && typeof e.private_vulnerability_reporting !== 'boolean') throw new Error(SETTINGS_FILE + ', ' + repo + ': private_vulnerability_reporting is true or false, not ' + JSON.stringify(e.private_vulnerability_reporting));
+    for (const k of ['private_vulnerability_reporting'].concat(SCANNING_KEYS)) {
+      if (e[k] !== undefined && typeof e[k] !== 'boolean') throw new Error(SETTINGS_FILE + ', ' + repo + ': ' + k + ' is true or false, not ' + JSON.stringify(e[k]));
+    }
+    // GitHub has no push protection without the scanning it protects.
+    if (e.secret_scanning_push_protection === true && e.secret_scanning !== true) throw new Error(SETTINGS_FILE + ', ' + repo + ': secret_scanning_push_protection is on only with secret_scanning on too');
     checkRulesets(repo, e.rulesets);
   }
 }
@@ -607,6 +615,34 @@ async function reporting(token, repo, want, check) {
   return { ok: true, lines: [repo + ': private vulnerability reporting switched ' + word], changed: 1, differs: 1 };
 }
 
+// Makes a repository's secret scanning and push protection on or off as its
+// entry says (only the keys it gives), in one PATCH, or with check says only
+// which differ.
+async function scanning(token, repo, e, check) {
+  const keys = SCANNING_KEYS.filter(k => typeof e[k] === 'boolean');
+  const auth = { Authorization: 'Bearer ' + token };
+  const word = k => (e[k] ? 'on' : 'off');
+  const name = k => (k === 'secret_scanning' ? 'secret scanning' : 'push protection');
+  const read = async () => {
+    const a = await call('GET', API + '/repos/' + repo, auth);
+    const sa = a.body && a.body.security_and_analysis;
+    if (a.status !== 200 || !sa) throw new Error('GitHub would not say whether secret scanning is on for ' + repo + ' (' + said(a) + ')');
+    return keys.filter(k => ((sa[k] && sa[k].status) === 'enabled') !== e[k]);
+  };
+  const off = await read();
+  const lines = keys.filter(k => off.indexOf(k) < 0).map(k => repo + ': ' + name(k) + ' is ' + word(k) + ', as the record says');
+  if (!off.length) return { ok: true, lines, changed: 0, differs: 0 };
+  if (check) return { ok: true, lines: lines.concat(off.map(k => repo + ': ' + name(k) + ' would be switched ' + word(k))), changed: 0, differs: off.length };
+  const body = { security_and_analysis: {} };
+  for (const k of off) body.security_and_analysis[k] = { status: e[k] ? 'enabled' : 'disabled' };
+  const a = await call('PATCH', API + '/repos/' + repo, auth, body);
+  if (a.status !== 200) return { ok: false, lines: lines.concat(['STOP ' + repo + ': GitHub did not switch ' + off.map(name).join(' and ') + ' (' + said(a) + ')']), changed: 0, differs: off.length };
+  // Read back rather than trust the call.
+  const still = await read();
+  if (still.length) return { ok: false, lines: lines.concat(still.map(k => 'STOP ' + repo + ': GitHub still has ' + name(k) + ' ' + (e[k] ? 'off' : 'on'))), changed: off.length - still.length, differs: off.length };
+  return { ok: true, lines: lines.concat(off.map(k => repo + ': ' + name(k) + ' switched ' + word(k))), changed: off.length, differs: off.length };
+}
+
 // Makes every repository main's settings record names match its entry, or
 // with check says only what differs. One repository's stop does not keep
 // the others from being matched. { ok, lines, changed, differs }.
@@ -627,6 +663,7 @@ async function repoSettings(held, now, check) {
       }
       add(await rulesets(token, e.repository, e.rulesets, check));
       if (typeof e.private_vulnerability_reporting === 'boolean') add(await reporting(token, e.repository, e.private_vulnerability_reporting, check));
+      if (SCANNING_KEYS.some(k => typeof e[k] === 'boolean')) add(await scanning(token, e.repository, e, check));
     } catch (err) {
       add({ ok: false, lines: ['STOP ' + e.repository + ': ' + err.message + '; nothing more was changed there'], changed: 0, differs: 0 });
     }
@@ -1095,5 +1132,5 @@ function serve() {
   return server;
 }
 
-module.exports = { verifyOidc, appJwt, planPublic, publicStops, PUBLIC_DROPS, OPS_COPIES, PUBLIC_KEEPS, planLabels, planLeftovers, checkRecords, checkAbout, planAbout, runnerNumber, checkRulesets, checkSettings, planRulesets, rulesetBody, says, manifest, RULES, ASKS, REPO, RUNNERS_REPO, SETTINGS_REPOS, SETTINGS_PERMISSIONS, SETTINGS_EXTRA, serve };
+module.exports = { verifyOidc, appJwt, planPublic, publicStops, PUBLIC_DROPS, OPS_COPIES, PUBLIC_KEEPS, planLabels, planLeftovers, checkRecords, checkAbout, planAbout, runnerNumber, checkRulesets, checkSettings, planRulesets, rulesetBody, says, manifest, RULES, ASKS, REPO, RUNNERS_REPO, SETTINGS_REPOS, SCANNING_KEYS, SETTINGS_PERMISSIONS, SETTINGS_EXTRA, serve };
 if (require.main === module) serve();
