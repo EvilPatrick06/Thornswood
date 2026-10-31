@@ -404,6 +404,35 @@ Yes 'a deploy key goes into the gate account''s authorized_keys, and stops witho
 Yes 'its proof needs a refused command and GATE READY' ($grant.Contains("@('echo THORNSWOOD_OK', 'ping')") -and $grant.Contains("'^\| GATE READY'") -and $grant.Contains('($NoticesOnly -or $Deploy) -and @($proof | Where-Object { $_ -match ''THORNSWOOD_OK'' }).Count'))
 Yes 'it goes into DESK_KEY_B64 of a main-only environment' ($grant.Contains("if (`$Deploy) { 'DESK_KEY_B64' }") -and $grant.Contains('gh secret set $SecretName --env $ToEnvironment'))
 
+# ShipAccess.ps1 against a stand-in ship-access.js, run by the real node.
+if (Get-Command node -ErrorAction SilentlyContinue) {
+    . (Join-Path $Repo 'scripts/vps/admin/ShipAccess.ps1')
+    $fake = Join-Path ([IO.Path]::GetTempPath()) ('tw-2841-access-' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path ([IO.Path]::Combine($fake, 'scripts', 'vps', 'admin')) -Force | Out-Null
+    [IO.File]::WriteAllText([IO.Path]::Combine($fake, 'scripts', 'vps', 'admin', 'ship-access.js'), @'
+const c = process.env.TW_FAKE_ACCESS;
+if (c === 'long') { process.stdout.write('ghs_' + 'A1.b-'.repeat(60) + '\n'); }
+else if (c === 'refused') { process.stderr.write('ship-access: GitHub gave the App no token (HTTP 403: no)\n'); process.exit(1); }
+else if (c === 'silent') { process.exit(3); }
+else if (c === 'nothing') { }
+'@)
+    function Try-Access([string]$case) {
+        $env:TW_FAKE_ACCESS = $case
+        try { return @{ Token = (Get-ThornswoodShipAccess -Repo $fake -AdminState $fake); Why = '' } }
+        catch { return @{ Token = $null; Why = $_.Exception.Message } }
+        finally { Remove-Item -LiteralPath Env:\TW_FAKE_ACCESS -ErrorAction SilentlyContinue }
+    }
+    $r = Try-Access 'long'
+    Yes 'ShipAccess.ps1 takes the token by the stream it comes on, whatever its shape' ($r.Token -eq ('ghs_' + ('A1.b-' * 60)))
+    $r = Try-Access 'refused'
+    Yes '  a refusal throws with the exit code and what ship-access.js said' (-not $r.Token -and $r.Why -match '^ship-access\.js ended 1: ship-access: GitHub gave the App no token')
+    $r = Try-Access 'silent'
+    Yes '  an exit with nothing said throws saying so' ($r.Why -eq 'ship-access.js ended 3 and said nothing')
+    $r = Try-Access 'nothing'
+    Yes '  and an exit 0 with no token throws saying how many lines came' ($r.Why -match '^ship-access\.js ended 0 but printed 0 line')
+    Remove-Item -LiteralPath $fake -Recurse -Force -ErrorAction SilentlyContinue
+} else { Write-Host 'SKIP  ShipAccess.ps1 against a stand-in: there is no node here' }
+
 # ---- 8. box-run.yml, in the ops repository (#4013) ---------------------------
 Yes 'box-run.yml is not in this repository, which has no VPS runner once public' (-not (Test-Path -LiteralPath ([IO.Path]::Combine($Repo, '.github', 'workflows', 'box-run.yml'))))
 $br = Text 'scripts/vps/Box-Run.ps1'
