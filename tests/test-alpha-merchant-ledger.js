@@ -7,7 +7,8 @@ const before=JSON.stringify([roster,population]),doc=createAlphaMerchantLedger(r
 assert.equal(JSON.stringify([roster,population]),before);
 assert.equal(Object.keys(doc.entries).length,249);assert.equal(Object.values(doc.entries).filter(Boolean).length,60);
 assert.equal(Object.values(doc.entries).filter(Boolean).reduce((sum,row)=>sum+row.purse,0),15000);
-assert.equal(doc.sha256,crypto.createHash('sha256').update(JSON.stringify([1,doc.entries])).digest('hex'));
+assert.equal(doc.version,2,'the generated ledger is the one-shape version from #2870');
+assert.equal(doc.sha256,crypto.createHash('sha256').update(JSON.stringify([2,doc.entries])).digest('hex'));
 const source=fs.readFileSync(path.join(__dirname,'../game/gamemode.js'),'utf8'),context={Map,Set,Number,JSON,require};
 vm.createContext(context);vm.runInContext(source.slice(source.indexOf('// NPC MERCHANT PURSES BEGIN'),source.indexOf('// NPC MERCHANT PURSES END')),context);
 const ids=new Map(roster.history.map(([ref],index)=>[ref,index+1]));
@@ -30,7 +31,7 @@ assert.equal(writes,60);assert.deepEqual(copy(service.pendingRecords()),[],'disc
 assert.equal(service.stats().initialized,0,'reset is not a recurring grant');service.shutdown();
 {
   const alpha=copy(data);alpha.merchantRoster.worldMode='alpha';
-  let saved=0,ledger={version:1,entries:Object.fromEntries(roster.history.map(([ref])=>[ref,null]))};
+  let saved=0,ledger={version:2,entries:Object.fromEntries(roster.history.map(([ref])=>[ref,null]))};
   mirrors.clear();
   const storage={load:()=>copy(ledger),durable:true,namespace:{},save:next=>{saved++;ledger=copy(next);return true;}};
   const admitted=context.createNpcMerchantPurses(native,alpha,storage);

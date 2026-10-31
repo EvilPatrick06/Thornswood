@@ -75,7 +75,7 @@ for(const defect of ['gold','purse','metadata','inventory','wrapper','attempt'])
  assert.equal(f.calls.length,0);assert.equal(JSON.stringify(Array.from(f.states)),before);
 }
 for(const defect of ['foreign','same-owner','unchanged','sell-change']) {
- const f=ctx.fixture(),own='["10",7,"iron ingot"]',foreign=defect==='same-owner'?'["10",7,"silver ingot"]':'["20",8,"silver ingot"]';
+ const f=ctx.fixture(),own='[4278190096,7,"iron ingot"]',foreign=defect==='same-owner'?'[4278190096,7,"silver ingot"]':'[4278190112,8,"silver ingot"]';
  f.states.get(1).supply={[foreign]:1};
  const offer=f.offer();offer.next.supply={[foreign]:1};
  if(defect!=='sell-change'){offer.kind='supply';offer.next.supply[own]=100;}
@@ -108,9 +108,9 @@ function compactSaved(f) {
  assert.equal(f.states.get(1).pending.phase,'credit');assert.equal(f.states.get(1).pending.creditAttempt,undefined);
 }
 for(const phase of ['debit','credit'])for(const label of [null,123,'']) {
- const f=ctx.fixture(),offer=f.offer(),s=f.make();offer.kind='supply';offer.next.supply={'["10",7,"iron ingot"]':100};s.begin(offer);f.save();s.shutdown();
+ const f=ctx.fixture(),offer=f.offer(),s=f.make();offer.kind='supply';offer.next.supply={'[4278190096,7,"iron ingot"]':100};s.begin(offer);f.save();s.shutdown();
  if(phase==='credit')compactSaved(f);
- const state=f.states.get(1),p=state.pending;p.version=2;delete p.terms;p.next.supply={[JSON.stringify(['10',7,label])]:100};
+ const state=f.states.get(1),p=state.pending;p.version=2;delete p.terms;p.next.supply={[JSON.stringify([0xff000010,7,label])]:100};
  if(phase==='credit')state.supply=copy(p.next.supply);
  const before=JSON.stringify(state);f.calls.length=0;assert.throws(()=>f.make().tick(),/owner.*verified/i);
  assert.equal(JSON.stringify(f.states.get(1)),before);assert.equal(f.calls.length,0);

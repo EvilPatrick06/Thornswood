@@ -299,6 +299,31 @@ acts only on the profiles a list names, and a server on this machine does
 not start under `server-log.js` at all, so the writer marks `saves` done
 whenever the list it writes names no profile.
 
+Every one of these names a character by one shape of form id, the runtime
+id, `0xff000000 | local` (`game\form-id.js`, issue #2870): the list's
+`actors`, and in `merchant-ledger.json` (version 2, its `sha256` over the
+rest) the supply waits' keys and the commission owners. Nothing converts
+the old shape: in the alpha there is no compatibility code, carry-over or
+migration for any data (Patrick, 31 Oct). The gamemode, `server-log.js`,
+`Release-List.ps1` and `Delete-Person.ps1` refuse a list holding a local
+id and leave it as it is. The merchant code refuses a version 1 ledger, so
+on one the NPCs and merchants do not start (the log says `NPC server
+runtime failed to start`). On the deploy that carries #2870, do this on
+each server, with that game server stopped:
+
+1. Run `node scripts\ops\Verify-FormIdShape.js --server <folder>`. It
+   writes nothing, and prints what each register holds by shape.
+2. If it prints `merchants` `version` 1, replace that server's
+   `merchant-ledger.json` with what `node
+   scripts\ops\New-AlphaMerchantLedger.js --confirm-discard-alpha` prints.
+   This is the alpha reset: merchant stock and purses start fresh, and
+   nothing of the old ledger is carried over.
+3. If it prints `list` `actors` `local` above 0, the release list is not
+   converted and not deleted. It waits for a person, because it may hold
+   deletion requests the privacy page promises to finish: until then the
+   gamemode lets nothing on it go and `Delete-Person.ps1` will not add to
+   it.
+
 ## Generated tables
 
 Never hand edit these. Each script writes its json in `game\data` and then
