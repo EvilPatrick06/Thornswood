@@ -625,8 +625,9 @@ $CONDITION_FUNCTIONS_THE_SERVER_HAS = @{
 # Thornswood-Last.esp's own copy of a recipe is never read for its
 # conditions: the ones below it are, the way its bench is (#3120), so the
 # table is the same whether the box's last plugin is from before this or
-# after. A perk test joined to another condition by OR fails the build, as it
-# stops Build-LastPlugin.py.
+# after. A perk test counts as passed, so one joined to other conditions by
+# OR makes its whole OR group pass, and none of that group is a need either,
+# the same OR groups Build-LastPlugin.py takes off (perk_drops there).
 #
 # Gourmet makes many dishes twice over, the plain recipe asking
 # MAG_FoodUpgradePerk03 == 0 and one that makes two portions asking it == 1.
@@ -3406,7 +3407,7 @@ function PerksComeOff($r) {
 
 # How many perk tests a recipe carries, and Joined when one is joined to
 # another condition by OR (its own OR flag, or the one of the condition
-# before it), which taking it out would change the meaning of.
+# before it).
 function PerkTestsOf($r) {
     $n = 0; $joined = $false; $prevOr = $false
     foreach ($c in $r.Conditions) {
@@ -3417,6 +3418,26 @@ function PerkTestsOf($r) {
         $prevOr = [bool]$c.Or
     }
     return [pscustomobject]@{ Count = $n; Joined = $joined }
+}
+
+# The positions in a recipe's conditions that come off with its perks
+# (#4826): every OR group holding a perk test, whole, as perk_drops in
+# Build-LastPlugin.py takes them. A group is a run of conditions each joined
+# to the next by OR, ended by one that is not; groups are joined by AND.
+function PerkDropsOf($r) {
+    $drop = @{}
+    $group = New-Object 'System.Collections.Generic.List[int]'
+    $hasPerk = $false
+    $conds = @($r.Conditions)
+    for ($i = 0; $i -lt $conds.Count; $i++) {
+        $group.Add($i)
+        if ($conds[$i].Func -eq $CONDITION_VANILLA_PERK) { $hasPerk = $true }
+        if (-not $conds[$i].Or -or $i -eq $conds.Count - 1) {
+            if ($hasPerk) { foreach ($j in $group) { $drop[$j] = $true } }
+            $group.Clear(); $hasPerk = $false
+        }
+    }
+    return $drop
 }
 
 # Can a new character get past every condition on a row. No condition at all
@@ -3457,24 +3478,19 @@ $namelessOut = @{}
 $outTypeCount = @{}
 $script:lightRows = 0
 
-# The perks come off (#4826): the perk tests joined by OR, which fail the
-# build, and the count of what comes off.
-$perkJoined = New-Object 'System.Collections.Generic.List[string]'
-$perkRows = 0; $perkConds = 0; $perkKeptRows = 0
+# The perks come off (#4826): the count of what comes off, and of the
+# recipes whose perk test takes an OR group off with it.
+$perkRows = 0; $perkConds = 0; $perkKeptRows = 0; $perkJoinedRows = 0; $perkGroupConds = 0
 foreach ($desc in $recipes.Keys) {
     $r = $recipes[$desc]
     $pt = PerkTestsOf $r
     if ($pt.Count -eq 0) { continue }
     if (-not (PerksComeOff $r)) { $perkKeptRows++; continue }
     $perkRows++; $perkConds += $pt.Count
-    if ($pt.Joined) { $perkJoined.Add(('{0} ({1})' -f $r.Edid, $desc)) }
+    if ($pt.Joined) { $perkJoinedRows++; $perkGroupConds += (PerkDropsOf $r).Count - $pt.Count }
 }
 if ($PERKS_OFF_IN_LAST_PLUGIN) {
-    if ($perkJoined.Count -gt 0) {
-        Bad ("{0} recipe(s) join a perk test to another condition by OR, which Build-LastPlugin.py refuses to take out; decide each on #4826: {1}" -f $perkJoined.Count, (($perkJoined | Select-Object -First 20) -join ', '))
-    } else {
-        Ok ("{0} perk test(s) on {1} recipe(s) come off in Thornswood-Last.esp; {2} recipe(s) of a plugin it never copies from keep theirs" -f $perkConds, $perkRows, $perkKeptRows)
-    }
+    Ok ("{0} perk test(s) on {1} recipe(s) come off in Thornswood-Last.esp, {2} of them joined by OR, which take {3} other condition(s) of their OR groups off with them; {4} recipe(s) of a plugin it never copies from keep theirs" -f $perkConds, $perkRows, $perkJoinedRows, $perkGroupConds, $perkKeptRows)
 }
 
 foreach ($desc in $recipes.Keys) {
@@ -3764,8 +3780,11 @@ foreach ($desc in $recipes.Keys) {
     # these were read.
     $needs = New-Object 'System.Collections.Generic.List[object]'
     $perksOff = PerksComeOff $r
+    $perkDrops = if ($perksOff) { PerkDropsOf $r } else { @{} }
+    $ci = 0
     foreach ($c in $r.Conditions) {
-        if ($perksOff -and $c.Func -eq $CONDITION_VANILLA_PERK) { continue }
+        $at = $ci; $ci++
+        if ($perkDrops.ContainsKey($at)) { continue }
         $needs.Add((ConditionRead $c $r.CondMasters $r.CondIn))
     }
     $behindPerk = $false

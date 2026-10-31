@@ -14,15 +14,18 @@ made here, without the game:
      by its own OR flag or the one of the condition before it;
   2  taking the tests out leaves every other subrecord as it was, in order,
      and takes the CIS1 and CIS2 that follow a test with it;
-  3  a record that tests no perk, or joins one by OR, is refused;
+  3  a perk test joined by OR takes its whole OR group off, and nothing
+     of the groups around it (Skyrim joins OR before AND); a record that
+     tests no perk is refused;
   4  over a load order: a winning recipe that tests a perk is chosen, a
      deleted one, one that tests none, and one of a never-copied plugin are
      not (that one is counted), unless that plugin's row says
      perkRecipesCopied, as Immersive Armors' does, and one joined by OR
-     stops the build, named;
+     is chosen too and counted under joinedGroups;
   5  the recipe table reads the same end state: it takes the policy's
      never-copied plugins, reads conditions from below the last plugin, and
-     fails on a perk test joined by OR.
+     its PerkDropsOf, run under pwsh where there is one, drops the same
+     OR groups.
 
     python tests/perks-off-cases.py
 
@@ -105,8 +108,23 @@ yes('2 a CIS1 after a condition that stays is kept',
 
 # 3
 yes('3 a record that tests no perk is refused', 'tests no perk' in stops(bl.without_perks, recipe[:4], 't'))
-yes('3 a record that joins a perk test by OR is refused',
-    'by OR' in stops(bl.without_perks, [(b'CTDA', ctda(bl.HAS_PERK, PERK, or_=True)), (b'CTDA', ctda(OTHER))], 't'))
+# Tempering's shape: (not enchanted OR a perk) AND a perk, then a group
+# with no perk: (a OR b) AND c, so the first group and the lone perk go and
+# the last group stays, its OR flags and its CIS1 untouched.
+enchanted = ctda(OTHER, value=0.0, or_=True)
+arcane = ctda(bl.HAS_PERK, PERK + 1)
+smith = ctda(bl.HAS_PERK, PERK)
+keep_a, keep_b = ctda(OTHER + 1, or_=True), ctda(OTHER + 2)
+temper = [(b'EDID', b'Temper\x00'), (b'CTDA', enchanted), (b'CTDA', arcane), (b'CIS2', b'x\x00'),
+          (b'CTDA', smith), (b'CTDA', keep_a), (b'CIS1', b'k\x00'), (b'CTDA', keep_b)]
+yes('3 an OR group holding a perk test comes off whole, with its strings',
+    bl.perk_drops(temper) == [1, 2, 4] and
+    bl.without_perks(temper, 't') == [temper[0], temper[5], temper[6], temper[7]])
+yes('3 a perk test first in its group takes the rest of the group with it',
+    bl.without_perks([(b'CTDA', ctda(bl.HAS_PERK, PERK, or_=True)), (b'CTDA', ctda(OTHER)), (b'CTDA', ctda(OTHER + 1))], 't')
+    == [(b'CTDA', ctda(OTHER + 1))])
+yes('3 a last condition carrying OR ends its group',
+    bl.perk_drops([(b'CTDA', ctda(OTHER)), (b'CTDA', ctda(bl.HAS_PERK, PERK, or_=True))]) == [1])
 
 
 # 4: a small load order, the way build() hands it over.
@@ -173,8 +191,10 @@ yes('4 a recipe kept by one blocked plugin stays kept even when the other copies
                       frozenset({'hothtrooper44_armorcompilation.esp'})))
 sky.records[0x15] = ored
 win[(b'COBJ', ('skyrim.esm', 0x15))] = entry(0x15, 0)
-said = stops(bl.perk_entries, plugins, win, canon, blocked)
-yes('4 a winning recipe that joins a perk test by OR stops the build, named', '1 recipe(s) join' in said and '15:Skyrim.esm Ored' in said)
+here, stats = bl.perk_entries(plugins, win, canon, blocked)
+yes('4 a winning recipe that joins a perk test by OR is chosen and counted under joinedGroups',
+    0x15 in [e.fid for e in here] and stats['joinedGroups'] == {'recipes': 1, 'otherConditions': 1} and
+    stops(bl.perk_entries, plugins, win, canon, blocked) == '')
 
 # 5: the recipe table's half, read from the script, since it runs only
 # against the game's plugins on a machine that has them.
@@ -185,9 +205,40 @@ yes('5 it keeps the perk tests only of a never-copied plugin whose row does not 
     '$row.perkRecipesCopied -ne $true' in table)
 yes('5 it reads a recipe\'s conditions from below Thornswood-Last.esp',
     '$pl -eq $LAST_PLUGIN -and $recipes.Contains($desc)' in table and '$condList = $recipes[$desc].Conditions' in table)
-yes('5 a perk test on a recipe whose perks come off is not one of its needs',
-    'if ($perksOff -and $c.Func -eq $CONDITION_VANILLA_PERK) { continue }' in table)
-yes('5 it fails on a perk test joined by OR', 'join a perk test to another condition by OR' in table)
+yes('5 a condition that comes off with the perks is not one of a row\'s needs',
+    '$perkDrops = if ($perksOff) { PerkDropsOf $r } else { @{} }' in table and
+    'if ($perkDrops.ContainsKey($at)) { continue }' in table)
+yes('5 it no longer fails on a perk test joined by OR', 'join a perk test to another condition by OR' not in table)
+# PerkDropsOf itself, lifted out of the script and run under pwsh, against
+# the same shapes perk_drops was given above.
+import re
+import shutil
+import subprocess
+fn = re.search(r'^function PerkDropsOf\(\$r\) \{.*?^\}', table, re.S | re.M)
+pw = shutil.which('pwsh')
+if not fn:
+    yes('5 the table has a PerkDropsOf', False)
+elif not pw:
+    print('SKIP  5 PerkDropsOf under pwsh: there is no pwsh here')
+else:
+    script = '$CONDITION_VANILLA_PERK = 448\n' + fn.group(0) + '''
+function C($f, $or) { [pscustomobject]@{ Func = $f; Or = $or } }
+$cases = @(
+  @(@((C 659 $true), (C 448 $false), (C 448 $false), (C 660 $true), (C 661 $false)), '0,1,2'),
+  @(@((C 448 $true), (C 659 $false), (C 660 $false)), '0,1'),
+  @(@((C 659 $false), (C 448 $true)), '1'),
+  @(@((C 659 $true), (C 660 $false)), ''),
+  @(@(), '')
+)
+foreach ($c in $cases) {
+  $got = ((PerkDropsOf ([pscustomobject]@{ Conditions = $c[0] })).Keys | Sort-Object) -join ','
+  if ($got -ne $c[1]) { "BAD $got want $($c[1])" } else { 'GOOD' }
+}
+'''
+    r = subprocess.run([pw, '-NoProfile', '-NonInteractive', '-Command', script], capture_output=True, text=True, timeout=120)
+    lines = r.stdout.split()
+    yes('5 PerkDropsOf drops the same OR groups as perk_drops (%s)' % ' '.join(lines),
+        r.returncode == 0 and lines == ['GOOD'] * 5)
 yes('5 no half is still named as nobody can start because of the perks',
     "'Cook/Confectioner'     =" not in table)
 
