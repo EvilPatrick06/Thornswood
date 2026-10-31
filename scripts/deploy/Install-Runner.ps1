@@ -405,13 +405,6 @@ if (-not $PSBoundParameters.ContainsKey('Label')) {
   $takesPr = $(if ($OffBox) { $prRecord.PSObject.Properties['offBox'] -and @($prRecord.offBox) -contains $RunnerName } else { @($prRecord.runners | ForEach-Object { [int]$_ }) -contains $Number })
   if ($takesPr) { $registerLabels = $registerLabels + ',' + $prRecord.label }
 }
-# THE CHECK RUNNERS (#3956, #4914). A VPS runner records\check-runners.json
-# lists is registered with its label, so the nightly's bot harnesses, which
-# ask for it while the repository is private, can run on it.
-if (-not $OffBox -and -not $PSBoundParameters.ContainsKey('Label')) {
-  $checkRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\check-runners.json') -Raw | ConvertFrom-Json
-  if (@($checkRecord.runners | ForEach-Object { [int]$_ }) -contains $Number) { $registerLabels = $registerLabels + ',' + $checkRecord.label }
-}
 # On the box, the folders records\runner-isolation.json says no runner may
 # reach that are not C:\Thornswood-* (C:\ProgramData\ssh, the
 # administrator's profile) are denied with the Thornswood ones, at every
