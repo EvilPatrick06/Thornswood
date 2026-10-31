@@ -2493,6 +2493,10 @@ namespace Thornswood
                 if (!playing)
                 {
                     if (Checks.SteamStillRunning() != steamShown) DrawStatus();
+                    // A collection update finished in Vortex takes the card
+                    // down and asks for the updates that waited on it, with
+                    // nothing pressed (#5136, ShellVortexWatch.cs).
+                    WatchVortex();
                     return;
                 }
                 // Asks the game processes the last look found whether they are
@@ -2840,6 +2844,10 @@ namespace Thornswood
                     InstallShown(Visibility.Collapsed);
                 }
             }
+            // What the card or note was just drawn from, for the tick's look at
+            // Vortex (ShellVortexWatch.cs, #5136), which draws it again only
+            // when Vortex's answer moves away from this.
+            collectionDrawn = CollectionKey(collectionRevision, CollectionProblem(collectionRevision));
 
             // Wrong Skyrim build: the one thing on this page with a button that
             // fixes it. Below the update bar in priority, because an update can
