@@ -143,6 +143,23 @@
       "fixed": ["-Server", "dev", "-Yes", "-NoPause"],
       "params": {}
     },
+    "Reset-Npcs-Dev": {
+      "script": "scripts/ops/Reset-Npcs.ps1",
+      "timeoutMinutes": 15,
+      "fixed": ["-Server", "dev", "-Yes", "-NoPause"],
+      "params": {
+        "Survey": "switch"
+      }
+    },
+    "Reset-Npcs-Main": {
+      "script": "scripts/ops/Reset-Npcs.ps1",
+      "timeoutMinutes": 15,
+      "build": true,
+      "fixed": ["-Server", "main", "-Yes", "-NoPause"],
+      "params": {
+        "Survey": "switch"
+      }
+    },
     "Publish-Installer": {
       "script": "scripts/release/Publish-InstallerOnBox.ps1",
       "timeoutMinutes": 45,
