@@ -82,6 +82,14 @@ function yes(what, cond) {
 
 const TOOL = process.env.CAST_TOOL || path.join(REPO_DIR, 'scripts', 'dev', 'Build-CastTable.py');
 yes('scripts/dev/Build-CastTable.py is in the repo', fs.existsSync(TOOL));
+// #3543: Thornswood-Last.esp switches off every actor the catalogue cuts. The
+// cast is the list written before that deletion, so its placements are not
+// read, and its other records are, as Build-NpcPopulation.py reads them.
+const toolText = fs.existsSync(TOOL) ? fs.readFileSync(TOOL, 'utf8') : '';
+yes('Thornswood-Last.esp\'s placements are not read, and its other records are',
+  /LAST_PLUGIN = 'Thornswood-Last\.esp'/.test(toolText) &&
+  /read\(pl, t, placements=\(name != LAST_PLUGIN\)\)/.test(toolText) &&
+  /if tag in \(b'REFR', b'ACHR'\) and not placements:/.test(toolText));
 
 // ------------------------------------------------------------ plugin bytes
 function u32(n) { const b = Buffer.alloc(4); b.writeUInt32LE(n >>> 0, 0); return b; }

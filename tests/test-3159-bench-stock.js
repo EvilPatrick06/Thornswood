@@ -294,12 +294,16 @@ function craftRig(state, stockAnswer) {
   const body = [pieces.grades, fuelLine[0], pieces.hafted, pieces.handle, pieces.tools, pieces.key, pieces.quality]
     .concat(pieces.fns).join('\n') + '\n' + pieces.onCraft + '\nreturn mp.onCraft;';
   const onCraft = new Function('mp', 'globalThis', 'ITEMS', 'RECIPES_BY_ID', 'KEPT_SMELT', 'guard', 'notify', 'say', 'log',
-    'setTimeout', 'recipelessCraft', 'craftAnswer', 'creditWork', body)(
+    'setTimeout', 'recipelessCraft', 'craftAnswer', 'creditWork',
+    // The trade's tool (#3162): the crafter holds it, so the craft goes on to the
+    // chests this harness checks. test-3162-bench-tools holds the refusal and the wear.
+    'benchToolKey', 'toolGate', 'toolFor', 'wearTool', body)(
     mp, g, ITEMS, RECIPES, KEPT, function (n, f) { return f; }, function () {},
     function (a, t) { said.push(t); }, function () {},
     function () { return 0; }, function () { return undefined; },
     function () { return { refusal: null, note: null, credit: '' }; },
-    function () { return ''; });
+    function () { return ''; },
+    function () { return 'smith'; }, function () { return null; }, function () { return { name: 'hammer' }; }, function () { return null; });
   const A = 0xff000001;
   function count(holder, desc) {
     return (packs[holder] || []).filter(function (e) { return e.baseId === id(desc); }).reduce(function (t, e) { return t + e.count; }, 0);

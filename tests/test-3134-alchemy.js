@@ -172,6 +172,9 @@ function server(store, opts) {
   };
   const gate = new Function('globalThis', 'mp', 'log', 'notify', 'say', 'setTimeout', 'creditWork', 'raceGate',
     'idOf', 'addItem', 'wovenMark', 'RANK_LADDER', 'NO_PROFESSION_AT_A_BENCH', 'BENCH_BY_BASE', 'RECIPES_BY_ID',
+    // The alembic (#3162): this person holds one, so the brew goes on to the
+    // rules this harness checks. test-3162-bench-tools holds the refusal and the wear.
+    'toolGate', 'wearTool',
     parts.join('\n') + '\n' + listsSrc + '\nreturn recipelessCraft;')(
     g, mp,
     function () { logs.push(Array.prototype.join.call(arguments, ' ')); },
@@ -181,7 +184,8 @@ function server(store, opts) {
     function (id, half) { credited.push(half); return null; },
     function () { return ''; },
     idOf, function () { return true; }, function () { return 0; },
-    ['novice', 'advanced', 'expert', 'master'], noProfM[1], {}, {});
+    ['novice', 'advanced', 'expert', 'master'], noProfM[1], {}, {},
+    function () { return null; }, function () { return null; });
   return {
     A: A, mp: mp, made: made, said: said, logs: logs, credited: credited,
     at: function (t) { clock = t; },

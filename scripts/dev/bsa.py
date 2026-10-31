@@ -70,7 +70,23 @@ def read(path, wanted_folder=None):
         buf.close()
 
 
-def _read(buf, path, wanted_folder):
+def names(path):
+    """Every file path in the archive, as 'folder/name', and none of the data.
+
+    For a question about which files an archive holds (List-ToolRecords.py
+    asks which models Skyrim's mesh archives carry, #3162), where inflating
+    every mesh of a 1 GB archive in pure Python to read its name would take
+    minutes and answer nothing more.
+    """
+    with open(path, 'rb') as fh:
+        buf = mmap.mmap(fh.fileno(), 0, access=mmap.ACCESS_READ)
+    try:
+        return _read(buf, path, None, names_only=True)
+    finally:
+        buf.close()
+
+
+def _read(buf, path, wanted_folder, names_only=False):
     if len(buf) < HEADER or buf[:4] != b'BSA\x00':
         raise ValueError('%s is not a BSA' % path)
     (version, offset, flags, folder_count, file_count,
@@ -115,6 +131,10 @@ def _read(buf, path, wanted_folder):
             raise ValueError('%s ends inside its file names' % path)
         names.append(buf[p:e].decode('ascii', 'replace'))
         p = e + 1
+
+    if names_only:
+        return ['%s/%s' % (folder.replace('\\', '/').lower(), fname.lower())
+                for (folder, _size, _foff, _take), fname in zip(order, names)]
 
     for (folder, size, foff, take), fname in zip(order, names):
         if not take:
