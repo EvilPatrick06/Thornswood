@@ -625,10 +625,10 @@ function feed() {
   The machine that stops reading (#5090): tests/fixtures/voice-stalled-reader.py
   joins, says each message it reads as a line, and stops reading once the
   room's roster has come, until it is told to read again. Its receive window
-  is fixed before it connects, so the service's socket to it stays backed
-  until it reads. A node socket left paused was not that: its kernel took
-  more as the window grew, and on GitHub's hosted Windows runner the service
-  saw it drain a second after the feed stopped.
+  is fixed before it connects, so it takes nothing more until it reads. A
+  node socket left paused was not that: its kernel took more as the window
+  grew, and on GitHub's hosted Windows runner the service saw it drain a
+  second after the feed stopped.
 */
 const STALLED = path.join(__dirname, 'fixtures', 'voice-stalled-reader.py');
 function pythonExe() {
@@ -678,25 +678,35 @@ async function partOne() {
   const before = got.length;
 
   // Backed (#2144) is a write the kernel has not taken. One tick of 1500 rows
-  // is past the socket's high-water mark the moment it is written, and the
-  // reader's fixed window takes only a few kilobytes of it, so the feed stops
-  // the moment health says backed, and it holds with nothing fed.
+  // is past the socket's high-water mark the moment it is written, so health
+  // says backed at once, but that is not yet a socket that stays backed: the
+  // service's own kernel can still take the tick into its send buffer, which
+  // Windows sizes as it goes (on GitHub's hosted Windows runner, 31 Oct, it
+  // took one in under a second with the reader's window fixed). So the feed
+  // goes on until backed holds for a second with nothing fed. With the
+  // reader's window fixed and both kernels' buffers full, nothing moves after
+  // that until the reader reads, so what follows is measured on a socket
+  // that stays backed.
   const t0 = Date.now();
-  const feeding = setInterval(feed, 200);
-  let backedAt = false;
-  while (!backedAt && Date.now() - t0 < 30000) {
+  const timeline = [];
+  let feeding = setInterval(feed, 200);
+  let held = false;
+  while (!held && Date.now() - t0 < 30000) {
     await sleep(100);
-    backedAt = (await health()).backed >= 1;
+    if ((await health()).backed < 1) continue;
+    clearInterval(feeding);
+    timeline.push('backed at ' + (Date.now() - t0) + ' ms');
+    held = true;
+    for (let k = 0; k < 5 && held; k++) {
+      await sleep(200);
+      if ((await health()).backed < 1) { held = false; timeline.push('taken by the kernel at ' + (Date.now() - t0) + ' ms'); }
+    }
+    if (!held) feeding = setInterval(feed, 200);
   }
   clearInterval(feeding);
-  yes('a socket that does not read is backed up (' + (Date.now() - t0) + ' ms of feed)', backedAt);
-  if (!backedAt) { S.proc.kill(); return; }
-  let held = true;
-  for (let k = 0; k < 5 && held; k++) {
-    await sleep(200);
-    if ((await health()).backed < 1) held = false;
-  }
-  yes('  and it stays backed for a second with nothing fed, so what follows is measured on one', held);
+  const queued = (await health()).largestQueueBytes;
+  console.log('      the feed: ' + timeline.join(', ') + (held ? ', then held for 1 s with nothing fed, ' + queued + ' bytes waiting' : ', never held'));
+  yes('a socket that does not read is backed up, and stays backed with nothing fed, so what follows is measured on one', held);
   if (!held) { S.proc.kill(); return; }
   const skipped0 = (await health()).skippedRosters;
 

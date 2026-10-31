@@ -147,6 +147,12 @@ param(
     [switch]$FromStore,
     # The store's server folder, for -FromStore.
     [string]$Store = 'C:\Thornswood-Deploys\server',
+    # With -FromStore: Thornswood-Last.esp, made on the box from this commit's
+    # recipe by the publish (#2791, LastPluginOnBox.ps1), and its sha256 as
+    # game\data\last-plugin.json names it. It goes into the stage in place of
+    # the running server's, held to that sha256 here.
+    [string]$LastPlugin = '',
+    [string]$LastSha256 = '',
     # Register the task as SYSTEM, Highest, the way it was before #2578, and
     # grant nothing. The way back if the server will not run as LOCAL SERVICE
     # (ServiceAccount.ps1 says what it is given).
@@ -1767,9 +1773,20 @@ if (-not $PutBack) {
     # -FromStore (#459): the running server's plugins, by its own order, into
     # the stage where the payload did not bring one (ours), and none of ours
     # that the order does not name.
+    if ($LastPlugin -and -not $FromStore) { Refuse @('-LastPlugin goes with -FromStore: a whole payload carries its own Thornswood-Last.esp.') }
     if ($FromStore) {
         $plugDir = Join-Path $stageDir 'plugins'
         $null = [IO.Directory]::CreateDirectory($plugDir)
+        # Thornswood-Last.esp made on the box for this commit (#2791), the one
+        # plugin no payload carries, in place of the running server's.
+        if ($LastPlugin) {
+            if ($LastSha256 -notmatch '^[0-9a-fA-F]{64}$') { Refuse @('-LastPlugin came with no sha256 to hold it to.') }
+            if (-not (Test-Path -LiteralPath $LastPlugin -PathType Leaf)) { Refuse @("there is no $LastPlugin, the Thornswood-Last.esp the publish made on the box.") }
+            $lastSum = (Get-FileHash -LiteralPath $LastPlugin -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($lastSum -ne $LastSha256.ToLowerInvariant()) { Refuse @("$LastPlugin has sha256 $lastSum, and game\data\last-plugin.json names $($LastSha256.ToLowerInvariant()).") }
+            Copy-Item -LiteralPath $LastPlugin -Destination (Join-Path $plugDir 'Thornswood-Last.esp') -Force
+            Say "Thornswood-Last.esp made on the box for this commit, sha256 $lastSum, into the stage" 'Cyan'
+        }
         $named = @{}
         $taken = 0
         foreach ($p in @($s.loadOrder)) {
