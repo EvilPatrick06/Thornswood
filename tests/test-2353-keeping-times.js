@@ -237,12 +237,15 @@ async function sweep() {
     srv.stdout.on('data', (d) => { out += d; });
     srv.stderr.on('data', (d) => { out += d; });
     let up = false;
-    for (let i = 0; i < 100 && !up; i++) {
-      if (out.indexOf('listening on ') >= 0) { up = true; break; }
+    /* Up once the site says ready or NOT READY: it says that right after its
+       first retention sweep, in the same callback, so the sweep's files are
+       all written by then however busy the machine is (#4082). The minute
+       only bounds a site that never comes up. */
+    for (let i = 0; i < 1200 && !up; i++) {
+      if (/\[thornswood-docs\] (ready|NOT READY): /.test(out)) { up = true; break; }
       if (srv.exitCode !== null) break;
       await wait(50);
     }
-    await wait(300);
     await new Promise((ok) => {
       srv.on('exit', ok);
       try { srv.kill(); } catch (e) { ok(); }
@@ -293,6 +296,11 @@ async function sweep() {
   }
   try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { }
 
+  const up = site.indexOf("console.log('[thornswood-docs] listening on '");
+  const first = site.indexOf('retentionSweep();', up);
+  const said = site.indexOf("'ready: bans", up);
+  yes('the first sweep runs before the site says ready, which the harnesses wait for (#4082)',
+      up > 0 && first > up && said > first && site.indexOf("'NOT READY: '", up) > first);
   const rs = grab(site, 'retentionSweep');
   yes('the hourly sweep runs every new store',
       ['sweepInbox(now)', 'sweepStaffRecords(now)', 'sweepModLog(now)', 'sweepGalleryReports(now)', 'expirePending(now)']

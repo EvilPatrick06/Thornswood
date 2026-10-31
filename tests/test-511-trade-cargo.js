@@ -177,10 +177,8 @@ try {
   const l15 = JSON.parse(Lsave); l15.holds['ship-5'].sailing = { from: 'windhelm', to: 'solitude', at: 30, arriveAt: 40 };
   throws('L15 a hold at sea that says it landed is refused', function () { ships.parse(JSON.stringify(l15)); }, /landing/);
   const l16 = JSON.parse(Lsave); delete l16.holds['ship-5'].landed;
-  const old = ships.parse(JSON.stringify(l16));
-  yes('L16 a save from before landings were kept still reads', !!old.holds['ship-5']);
-  yes('L17 and its docked holds get a landing at a start, once', JSON.stringify(ships.clockDocked(old, 500)) === '["ship-5"]' && old.holds['ship-5'].landed === 500 &&
-      ships.clockDocked(old, 600).length === 0 && old.holds['ship-5'].landed === 500);
+  throws('L16 a ship that does not say when it landed is refused, never read as never landed (alpha: nothing is carried over)', function () { ships.parse(JSON.stringify(l16)); }, /landing/);
+  yes('L17 nothing gives a docked ship a landing time at a start', ships.clockDocked === undefined);
 
   const F = ships.empty();
   ships.open(F, 'ship-6', 'solitude');
@@ -198,6 +196,22 @@ try {
   l20.holds['ship-6'].lines['999'] = Object.assign({}, l20.holds['ship-6'].lines[open1], { seq: 999, receipt: 'f999' });
   l20.receipts.f999 = true; l20.seq = 999;
   throws('L20 a save carrying more open lines than a hold may is refused', function () { ships.parse(JSON.stringify(l20)); }, /more lines/);
+
+  // The carts (#3158) share the manifest, and keep their own rules.
+  const carts = T.createTradeCargo({ ports: ['solitude', 'windhelm', 'dawnstar'], routes: ROUTES.routes, driven: true });
+  const C = carts.empty();
+  carts.open(C, 'cart-1', 'solitude');
+  const cl = carts.load(C, 'cart-1', { by: BRYNJA, for: ONUND, receipt: 'c1', entry: { baseId: IRON, count: 3 } });
+  yes('L20a a cart keeps no landing', !Object.prototype.hasOwnProperty.call(C.holds['cart-1'], 'landed'));
+  carts.depart(C, 'cart-1', 'windhelm', 10, 20, BRYNJA);
+  throws('L20b a cart on the road gives nothing out but the raid', function () { carts.begin(C, 'cart-1', cl, 1, 'returned', BRYNJA, 11); }, /on the road/);
+  const raid = carts.begin(C, 'cart-1', cl, 1, 'taken', ONUND, 12);
+  carts.finish(C, 'cart-1', raid.out, 'cr1');
+  yes('L20c and the raid takes from it while it is driven', C.holds['cart-1'].lines[String(cl)].aboard === 2);
+  carts.pullIn(C, 'cart-1', 30, BRYNJA);
+  throws('L20d goods on a cart wait on the cart: no drop box', function () { carts.uncollected(C, 30 * DAY, 7 * DAY); }, /wait on the cart/);
+  const c20 = JSON.parse(carts.save(C)); c20.holds['cart-1'].landed = 30;
+  throws('L20e a cart that says it landed is refused', function () { carts.parse(JSON.stringify(c20)); }, /landing/);
 
   yes('L21 the staff list waits 7 days unless it says', T.checkRoutes(ROUTES).uncollectedDays === 7 && T.UNCOLLECTED_DAYS === 7);
   yes('L22 it keeps the days it says', T.checkRoutes(Object.assign({}, ROUTES, { uncollectedDays: 3 })).uncollectedDays === 3);

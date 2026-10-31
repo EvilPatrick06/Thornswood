@@ -47,12 +47,13 @@ const STUN_ONLY = '{"iceServers":[{"urls":"stun:stun.l.google.com:19302"}]}';
 // with the keepalive's other half (voice/test-keepalive.js), each separately
 // from the relay key. chatRetention came with the chat prune's own report
 // (voice/test-chat-retention.js, #2191), and captions with voice shown as
-// words (tests/test-2475-voice-captions.js, #2475).
+// words (tests/test-2475-voice-captions.js, #2475), and rostersAhead with the
+// relay to a backed socket measured where it happens (tests/test-1869-voice-negotiation.js).
 // deploy is the artifact record Install-Voice.ps1 leaves beside the service (#459).
 const HEALTH_FIELDS = ['ok', 'build', 'deploy', 'auth', 'uptimeSeconds', 'startedAt', 'bind', 'turn',
                        'chatRange', 'peers', 'tracked', 'most', 'people', 'refusedFull', 'queuedCommands',
                        'backed', 'largestQueueBytes', 'droppedPositions', 'skippedRosters',
-                       'closedBacklogged', 'closedSilent', 'chatRetention', 'captions'];
+                       'closedBacklogged', 'closedSilent', 'chatRetention', 'captions', 'rostersAhead'];
 // The two lines every start wrote, with nothing configured, on the port that
 // start was given. Loopback with nothing configured since #1304.
 const startLog = (port) => '[voice] listening on 127.0.0.1:' + port + ' (loopback only, so something must be proxying to it)\n' +

@@ -17,7 +17,8 @@
     X  DATA.cellToHold agrees with the table on every building it names, or
        the table says which is right and why
     B  the table was built against the collection's own bytes and the
-       repository's own plugins, so a new revision or a content change
+       repository's own plugins (Thornswood-Last.esp as its manifest names
+       it, #2791), so a new revision or a content change
        without a rebuild turns this red
     S  the real eviction and rent over every building in the table: whoever
        keeps its hold (its Steward or its Jarl, isStewardOf, which
@@ -54,8 +55,8 @@ const COLLECTION = path.join(ROOT, 'records', 'collection-plugins.json');
 const LAST = path.join(ROOT, 'game', 'data', 'last-plugin.json');
 const TOOL = path.join(ROOT, 'scripts', 'dev', 'Build-BuildingHolds.py');
 const gm = read(path.join(ROOT, 'game', 'gamemode.js'));
-const OURS = ['Thornswood-Content.esp', 'Thornswood-Last.esp', 'Thornswood-WoodworkerTrail.esp'];
-const AFTER = ['Thornswood-Last.esp', 'Thornswood-WoodworkerTrail.esp'];
+const OURS = ['Thornswood-Content.esp', 'Thornswood-Last.esp'];
+const AFTER = ['Thornswood-Last.esp'];
 const HOLDS = ['whiterun', 'solitude', 'riften', 'markarth', 'windhelm',
                'falkreath', 'morthal', 'dawnstar', 'winterhold', 'ravenrock'];
 const TOWN_OF_HOLD = {
@@ -175,12 +176,16 @@ const other = built.filter((r) => OURS.indexOf(r.name) < 0 &&
   !(rec[r.name.toLowerCase()] && rec[r.name.toLowerCase()].sha256.toLowerCase() === r.sha256 && rec[r.name.toLowerCase()].size === r.size));
 yes('B2 every plugin but ours is the collection\'s own bytes, revision ' + record.revision +
     (other.length ? ' (not: ' + other.slice(0, 4).map((r) => r.name).join(', ') + '; rebuild the table)' : ''), other.length === 0);
+// Thornswood-Last.esp is in no repository since #2791 step 3: its bytes are
+// the ones its manifest names, which its recipe makes.
+const lastNamed = JSON.parse(read(LAST)).plugin;
 const stale = OURS.filter((n) => {
   const row = built.find((r) => r.name === n);
+  if (n === lastNamed.name) { return !row || row.sha256 !== lastNamed.sha256 || row.size !== lastNamed.size; }
   const p = path.join(ROOT, 'game', 'content', n);
   return !row || !fs.existsSync(p) || row.sha256 !== crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
 });
-yes('B3 and ours are the repository\'s (after a content change, run scripts/mods/Rebuild-ContentTables.ps1)' +
+yes('B3 and ours are the repository\'s, Thornswood-Last.esp the one its manifest names (after a content change, run scripts/mods/Rebuild-ContentTables.ps1)' +
     (stale.length ? ' (not: ' + stale.join(', ') + ')' : ''), stale.length === 0);
 
 // ---------------------------------------------------------------- S
@@ -224,13 +229,16 @@ function steward(keeps, staff) {
   };
   const make = new Function('BUILDING_HOLD', 'BUILDING_NAME', 'claims', 'here', 'isSteward', 'isStewardOf',
     'holderOf', 'save', 'pushAll', 'plog', 'redrawPanel', 'rentDue', 'globalThis', 'g', 'personName',
+    // What an evicted holder owed stays theirs (#3950): tests/test-3893-rent-arrears.js; no rent here.
+    'keepOwed',
     holdTown + '\n' + officeAtDoor[0] + '\n' + lifted.join('\n') + '\nreturn { evict: evict, rentCmd: rentCmd };');
   const f = make(inBlock, NAME, claims, function () { return at; },
     function (pid) { return pid === STEW && keeps.length > 0; },
     function (pid, hold) { return pid === STEW && keeps.indexOf(hold) !== -1; },
     function (b) { return claims[b] || null; }, function () { }, function () { },
     function () { plogged.push(Array.prototype.join.call(arguments, ' ')); }, function () { },
-    function () { }, {}, g, function (actorId) { return actorId === 1 ? 'Hadvar' : 'somebody'; });
+    function () { }, {}, g, function (actorId) { return actorId === 1 ? 'Hadvar' : 'somebody'; },
+    function () { });
   return {
     at: function (b) { at = b; claims[b] = { by: OWNER, name: 'Alice', at: 1, touched: Date.now() }; said.length = 0; },
     evict: function (pid, cmd) {
@@ -447,7 +455,7 @@ yes('L5 the line a press arrives on reaches evict and rentCmd: handle, the chara
     prop.indexOf("if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile, cmd); }") !== -1);
 const bot = read(path.join(ROOT, 'bot', 'bot.py'));
 yes('L6 the bot has a sentence for each, so the staff channel says it (bot/test-moderation.py, M14)',
-    ['evict', 'rent', 'norent'].every((d) => new RegExp("\\n    '" + d + "': '[^']+%s'").test(bot)));
+    ['evict', 'rent', 'norent', 'rentpaid'].every((d) => new RegExp("\\n    '" + d + "': '[^']+%s'").test(bot)));
 
 // ---------------------------------------------------------------- rebuild
 function python(args) {

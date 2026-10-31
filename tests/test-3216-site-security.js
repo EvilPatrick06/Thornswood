@@ -209,6 +209,9 @@ function sourceChecks() {
     const days = (exp - Date.now()) / 86400000;
     yes('security.txt is there, as plain text', r.status === 200 && /^text\/plain/.test(r.headers['content-type'] || ''));
     yes('its contact is the report page on the public address', field('Contact') === 'https://thornswood.net/report');
+    // #3683: the same routes SECURITY.md gives, the Discord after the report page.
+    yes('  then the Discord, for a message to the owner, as SECURITY.md says',
+        lines.filter((l) => /^Contact: /.test(l)).join('|') === 'Contact: https://thornswood.net/report|Contact: https://thornswood.net/discord');
     yes('it expires inside the year RFC 9116 asks for, and not soon (' + Math.round(days) + ' days)',
         /^\d{4}-\d\d-\d\dT00:00:00\.000Z$/.test(field('Expires')) && days > 150 && days < 366);
     yes('it names its canonical address and its language',

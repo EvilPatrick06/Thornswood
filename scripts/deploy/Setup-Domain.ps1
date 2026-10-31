@@ -86,6 +86,9 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here '..\vps\Lock-Folder.ps1')
 . (Join-Path $Here 'ServiceAccount.ps1')
+# Where the box keeps its firewall rules, and the refresh that makes the
+# firewall take a change to them (#3896).
+. (Join-Path $Here '..\vps\BoxFirewall.ps1')
 . (Join-Path $Here 'CloudflareRanges.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
@@ -137,17 +140,34 @@ Write-Host 'Setting up Caddy on the VPS...'
 # The Caddyfile is scripts\deploy\Caddyfile, the tracked copy of the live one, and not
 # one written here. This used to write its own four line file that proxied the
 # domain to 3001 and nothing else, so a full run on a new box, as
-# MOVING-THE-SERVER.md says to do, would have taken the /voice and /voice-dev
+# MOVING-THE-SERVER.md (in the ops repo) says to do, would have taken the /voice and /voice-dev
 # routes off the site and voice from everybody (issue #543). -Domain and
-# -Email still apply: the tracked file names thornswood.net and its own
-# address, and those two are swapped for what was asked.
+# -Email still apply: the tracked file names thornswood.net, which is swapped
+# for what was asked, and no contact address (#3838), so -Email goes in as
+# the first line of the global options block, or replaces an email line that
+# is there.
 $tracked = Join-Path $Here 'Caddyfile'
 if (-not (Test-Path -LiteralPath $tracked)) { throw "not found: $tracked. The site's Caddyfile is kept in the repository, and nothing is sent without it." }
 $caddyfile = [IO.File]::ReadAllText($tracked, [Text.Encoding]::UTF8)
 if ($Domain -ne 'thornswood.net') { $caddyfile = $caddyfile.Replace('thornswood.net', $Domain) }
-if ($Email) { $caddyfile = [regex]::Replace($caddyfile, '(?m)^(\s*email\s+)\S+', { param($m) $m.Groups[1].Value + $Email }) }
+if ($Email) {
+  if ($caddyfile -match '(?m)^\s*email\s+\S+') {
+    $caddyfile = [regex]::Replace($caddyfile, '(?m)^(\s*email\s+)\S+', { param($m) $m.Groups[1].Value + $Email })
+  } else {
+    $open = [regex]::Match($caddyfile, '(?m)^\{(\r?\n)')
+    if (-not $open.Success) { throw "scripts\deploy\Caddyfile has no global options block ('{' on a line of its own) for -Email to go in. Nothing was sent." }
+    $caddyfile = $caddyfile.Insert($open.Index + $open.Length, "`temail $Email" + $open.Groups[1].Value)
+  }
+}
 foreach ($need in @('handle_path /voice/*', 'handle_path /voice-dev/*', 'handle_path /box/*', 'handle_path /github-app/*', 'reverse_proxy 127.0.0.1:3001')) {
   if ($caddyfile.IndexOf($need) -lt 0) { throw "scripts\deploy\Caddyfile has no '$need' line, so it would take part of the site away. Nothing was sent." }
+}
+# The headers every answer from the name carries are set at the door (#2762),
+# so a Caddyfile without them would send voice, the box bridge and the admin
+# App's answers out bare again.
+foreach ($need in @('Strict-Transport-Security', 'X-Content-Type-Options', 'Referrer-Policy', 'Permissions-Policy')) {
+  # A line that sets it, not a comment that names it.
+  if (-not [regex]::IsMatch($caddyfile, '(?m)^\s*' + [regex]::Escape($need) + '\s')) { throw "scripts\deploy\Caddyfile sets no $need header, so what Caddy carries would go out without it (#2762). Nothing was sent." }
 }
 $cfg64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($caddyfile))
 
@@ -199,14 +219,21 @@ if (Test-Path -LiteralPath `$cf) {
 [IO.File]::WriteAllBytes(`$cf, `$bytes)
 'Caddyfile written, from scripts\deploy\Caddyfile'
 
+# The web rules live in the box's own policy store, the only one the firewall
+# takes rules from, and Group Policy is refreshed after a change
+# (scripts\vps\BoxFirewall.ps1, #3896).
+$(Get-ThornswoodFirewallScript)
+`$fwMade = 0
 foreach (`$p in 80,443) {
   `$n = 'Thornswood Web ' + `$p
-  if (-not (Get-NetFirewallRule -DisplayName `$n -EA SilentlyContinue)) {
-    New-NetFirewallRule -DisplayName `$n -Direction Inbound -Protocol TCP ``
+  if (-not (Get-NetFirewallRule -PolicyStore localhost -DisplayName `$n -EA SilentlyContinue)) {
+    New-NetFirewallRule -PolicyStore localhost -DisplayName `$n -Direction Inbound -Protocol TCP ``
       -LocalPort `$p -Action Allow | Out-Null
+    `$fwMade++
     'opened ' + `$p + ' to any address. Once the name is behind Cloudflare, Set-WebFirewall.ps1 takes it to Cloudflare''s ranges only (#2995)'
   }
 }
+if (`$fwMade) { Sync-ThornswoodFirewall }
 "@ | ForEach-Object { "  $_" }
 
 # The docs site moves to loopback, so 3001 is no longer a plain HTTP way in.
@@ -214,15 +241,15 @@ Write-Host ''
 Write-Host 'Closing port 3001 to the outside...'
 Remote @"
 `$ErrorActionPreference = 'Continue'
-Get-NetFirewallRule -DisplayName 'Thornswood Docs' -EA SilentlyContinue |
-  Remove-NetFirewallRule -EA SilentlyContinue
-
-`$t = Get-ScheduledTask -TaskName 'Thornswood Docs' -EA SilentlyContinue
-if (`$t) {
-  `$node = (Get-Command node -EA SilentlyContinue).Source
-  `$a = New-ScheduledTaskAction -Execute `$node -Argument '$rootWin\server.js' -WorkingDirectory '$rootWin'
-  Set-ScheduledTask -TaskName 'Thornswood Docs' -Action `$a | Out-Null
+$(Get-ThornswoodFirewallScript)
+if (Get-NetFirewallRule -PolicyStore localhost -DisplayName 'Thornswood Docs' -EA SilentlyContinue) {
+  Remove-NetFirewallRule -PolicyStore localhost -DisplayName 'Thornswood Docs'
+  Sync-ThornswoodFirewall
 }
+
+# The docs task's action is Deploy-Docs.ps1's, which starts it through the
+# launcher that makes what the site writes its own (#4077); a plain action
+# set here took that off at every run.
 [Environment]::SetEnvironmentVariable('THORNSWOOD_DOCS_LOCAL','1','Machine')
 
 Get-CimInstance Win32_Process |
@@ -348,12 +375,15 @@ if (-not `$asSystem) {
   `$sid = Get-ThornswoodTaskSid 'Thornswood Web'
   if (-not `$sid) { `$why = 'the task SID NT TASK\Thornswood Web could not be looked up' }
   else {
-    try { Grant-ThornswoodServiceFolder -Root `$dir -Sid `$sid -Writable 'data' }
-    catch { `$why = 'its folder could not be granted to it: ' + `$_.Exception.Message }
+    try {
+      Grant-ThornswoodServiceFolder -Root `$dir -Sid `$sid -Writable 'data'
+      # What it makes is its own, not every service's (#4077).
+      Set-ThornswoodTaskOwner -TaskName 'Thornswood Web' -Sid `$sid -Action `$a -Roots `$dir
+    } catch { `$why = 'its folder could not be granted to it: ' + `$_.Exception.Message }
   }
   if (`$why) {
     `$why + ', so the task goes back on SYSTEM'
-    Set-ScheduledTask -TaskName 'Thornswood Web' -Principal (New-ThornswoodServicePrincipal -AsSystem) | Out-Null
+    Set-ScheduledTask -TaskName 'Thornswood Web' -Action `$a -Principal (New-ThornswoodServicePrincipal -AsSystem) | Out-Null
   } else { 'the task runs as LOCAL SERVICE, Limited, as NT TASK\Thornswood Web' }
 }
 

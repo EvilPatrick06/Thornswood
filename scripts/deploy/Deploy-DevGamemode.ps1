@@ -372,7 +372,9 @@ if (-not $PutBack) {
 $alsoSends = @('records/most-online.json', 'records/server-build.json')
 # Every plugin of ours, held to the commit like the gamemode: the names in
 # RepoPlugins.ps1 (#2486), written out so tests\test-deploy-artifact.ps1 can read them.
-if ($LoadOrder) { $alsoSends += 'game/content/Thornswood-Content.esp', 'game/content/Thornswood-Last.esp' }
+# Thornswood-Last.esp is made on the box from the recipe (#2791,
+# LastPluginOnBox.ps1), which goes up with the make's own tools.
+if ($LoadOrder) { $alsoSends += 'game/content/Thornswood-Content.esp', 'game/data/last-plugin.recipe', 'game/data/last-plugin.json' }
 $artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here '..\..') -Paths 'game/gamemode.js' -AlsoSends $alsoSends
 Write-Host ('  artifact ' + (Format-ThornswoodArtifact $artifact))
 $Gamemode = Join-Path $artifact.Folder 'game\gamemode.js'
@@ -515,16 +517,20 @@ if ($LoadOrder) {
   }
   # ==== end thornswood dev load order source ====
 
-  # THE PLUGIN THAT LOADS LAST (#2468). Sent from the repository like the
-  # content plugin (RepoPlugins.ps1, #2486), and the dev server's last plugin
-  # whatever order it had: every cut actor it switches off and every quest it
-  # stops is only right with nothing after it. When this moves the order, the
-  # order goes up the way a build's does (-Dist), so a plain -LoadOrder puts
-  # it there.
-  $lastName = 'Thornswood-Last.esp'
-  $lastRepo = Join-Path $Here ('..\..\game\content\' + $lastName)
+  # THE PLUGIN THAT LOADS LAST (#2468). Made on the box from this commit's
+  # recipe (#2791, LastPluginOnBox.ps1), never sent, and the dev server's last
+  # plugin whatever order it had: every cut actor it switches off and every
+  # quest it stops is only right with nothing after it. When this moves the
+  # order, the order goes up the way a build's does (-Dist), so a plain
+  # -LoadOrder puts it there. It is made when the dev server does not hold
+  # the bytes game\data\last-plugin.json names (#2308, by sha256), into the
+  # stage below, after the plugins this sends are in it.
+  . (Join-Path $Here 'LastPluginOnBox.ps1')
+  $lastName = $ThornswoodLastPlugin
+  $lastWant = Get-ThornswoodLastPluginWant (Join-Path $Here '..\..')
+  $makeLast = $false
   $orderMoved = $false
-  if (Test-Path -LiteralPath $lastRepo) {
+  if ($lastWant) {
     $wantNames = @(@($pluginNames | Where-Object { $_ -ine $lastName }) + $lastName)
     if ((@($pluginNames) -join '|') -ne ($wantNames -join '|')) {
       $orderMoved = $true
@@ -556,6 +562,15 @@ if ($LoadOrder) {
   }
 
   foreach ($n in $pluginNames) {
+    if ($lastWant -and $n -ieq $lastName) {
+      $boxLast = Get-ThornswoodServerPlugin $boxContent $n
+      if (-not (Test-ThornswoodContentSame $boxLast $lastWant.Bytes $lastWant.Sha)) {
+        $makeLast = $true
+        $changed += ('{0}  {1:N0} -> {2:N0} bytes, sha256 {3} -> {4}, made on the box from the recipe' -f $n, $boxLast.Bytes, $lastWant.Bytes,
+                     $(if ($boxLast.Sha) { $boxLast.Sha.Substring(0, 12) } else { 'none' }), $lastWant.Sha.Substring(0, 12))
+      }
+      continue
+    }
     # Combine, not Join-Path: a machine with no game folder (a cloud one, #2903)
     # has no C: drive, and Join-Path refuses a path on a drive that is not
     # there. The path then just is not there, which is the case handled below.
@@ -606,9 +621,10 @@ if ($LoadOrder) {
   Assert-ThornswoodCollectionPlugins -RecordPath (Join-Path $Here '..\..\records\collection-plugins.json') -Files $sendPlugins -Exempt $ThornswoodRepoPlugins -What 'this deploy'
   Write-Host ''
   Write-Host ('  load order: {0} plugins, paths rewritten to {1}' -f $pluginNames.Count, $remotePlugins) -ForegroundColor DarkGray
-  if ($sendPlugins.Count) {
+  if ($sendPlugins.Count -or $makeLast) {
     Write-Host ('  {0} plugin(s) will go up before the restart:' -f $sendPlugins.Count) -ForegroundColor Yellow
     foreach ($p in $sendPlugins) { Write-Host ('    ' + (Split-Path $p -Leaf)) -ForegroundColor Yellow }
+    if ($makeLast) { Write-Host ('  and {0} will be made on the box from the recipe' -f $lastName) -ForegroundColor Yellow }
     foreach ($c in $changed) { Write-Host ('    changed: ' + $c) -ForegroundColor Yellow }
   } else {
     Write-Host '  every plugin the load order names is on the dev server at the same bytes' -ForegroundColor DarkGray
@@ -888,6 +904,15 @@ Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\s
     Write-Host "  $rel"
   }
   $hashes = Get-SwapHashes $send
+  # Thornswood-Last.esp, made into the stage from the plugins just sent and
+  # then the dev server's own (#2791); the stage check holds it to the
+  # manifest's sha256 like a file that was sent.
+  if ($LoadOrder -and $makeLast) {
+    $lastMade = Invoke-ThornswoodLastPluginMake -Target "$User@$Vps" -SshArgs $ssh -RepoDir (Join-Path $Here '..\..') `
+      -Reads @("$stageWin\plugins", "$rootWin\plugins") -Into "$stageWin\plugins" -Want $lastWant
+    Write-Host ('  plugins/{0}, made on the box: {1:N0} bytes, sha256 {2}' -f $lastName, $lastMade.Bytes, $lastMade.Sha.Substring(0, 12))
+    $hashes['plugins/' + $lastName] = $lastMade.Sha
+  }
 
   Write-Host ''
   Write-Host 'Pointing the dev server at the dev voice service...'
@@ -1016,7 +1041,7 @@ Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\s
     'npcAllowCrimeFaction', 'npcAllowEssential', 'thornswoodLoadOrderRefuse',
     'thornswoodRequirePass', 'thornswoodServer', 'npcEnabled', 'thornswoodVoicePort',
     'equipmentSlotCheckEnabled', 'equipmentSpellCheckEnabled', 'equipmentInventoryCheckEnabled',
-    'forbiddenReloot', 'forbiddenBaseContainer'
+    'equipItemAttemptEnabled', 'forbiddenReloot', 'forbiddenBaseContainer'
   )
   # The counting function (#2011) and the light rule (#2947) the block below
   # takes up, both from ServerOrder.ps1.
@@ -1044,6 +1069,9 @@ foreach (`$k in 'equipmentSlotCheckEnabled','equipmentSpellCheckEnabled','equipm
   if (`$s.PSObject.Properties.Name -notcontains `$k) { `$wantEquip = `$true }
   elseif (`$s.`$k -ne `$false) { `$wantEquip = `$true }
 }
+# The one equipment switch that is on, the engine asking before it puts an
+# item on (#2262, written out in Deploy-Gamemode.ps1).
+if (`$s.PSObject.Properties.Name -notcontains 'equipItemAttemptEnabled' -or `$s.equipItemAttemptEnabled -ne `$true) { `$wantEquip = `$true }
 `$wantOrder = `$false
 `$newOrder = @()
 `$orderWire = '$orderWire'
@@ -1162,6 +1190,7 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
   `$s | Add-Member -NotePropertyName equipmentSlotCheckEnabled  -NotePropertyValue `$false -Force
   `$s | Add-Member -NotePropertyName equipmentSpellCheckEnabled -NotePropertyValue `$false -Force
   `$s | Add-Member -NotePropertyName equipmentInventoryCheckEnabled -NotePropertyValue `$false -Force
+  `$s | Add-Member -NotePropertyName equipItemAttemptEnabled -NotePropertyValue `$true -Force
   # Nothing in the world comes back except FLOR and TREE, which is the hanging
   # meat, the garlic, the elves ears, every plant and every crop. The argument
   # and the census behind the exception are written out in Deploy-Gamemode.ps1;

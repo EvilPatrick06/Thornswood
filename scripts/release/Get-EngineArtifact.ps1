@@ -1,37 +1,41 @@
 <#
 .SYNOPSIS
-  Fetches CI's engine build of the pin (engine.yml's artifact), holds every
-  file in it to records\client-build.json and records\server-build.json, and
-  makes it this machine's engine build.
+  Fetches CI's engine build of the pin (the public fork's own build of it),
+  holds every file in it to records\client-build.json and
+  records\server-build.json, and makes it this machine's engine build.
 
 .DESCRIPTION
   Issue #3047. A rebuild is never the same bytes (engine\README.md,
   "Rebuilding the same commit"), so the only client and server that match a
-  record CI made are the ones in CI's artifact, engine-<fork commit 12>. This
-  takes that artifact for the commit this checkout pins and puts it, held to
-  the records, at Where.ps1 EngineArtifact, a folder of this machine's own
-  data named for the commit. A machine that records {"ci": true} as its
-  engine build (Setup-ShipMachine.ps1 -EngineBuild ci) reads ClientDist and
-  ServerDist there, so a pin move needs a fetch here and no engine build.
-  EngineArtifact.ps1 says which artifact is taken and what is held: when
-  engine.yml keeps more than one for the pin, each is fetched and held in
-  turn, newest first, and the first whose records are the checkout's is
-  taken.
+  record CI made are the ones in the build CI recorded: the fork's own build
+  of the commit, which the public fork EvilPatrick06/skymp keeps as
+  thornswood-engine-<fork commit> for 90 days, and which engine.yml records
+  (since #3399 it is taken from there, not from this repository's artifact
+  storage, which filled on 25 Oct). This takes that build for the commit this
+  checkout pins and puts it, held to the records, at Where.ps1
+  EngineArtifact, a folder of this machine's own data named for the commit. A
+  machine that records {"ci": true} as its engine build
+  (Setup-ShipMachine.ps1 -EngineBuild ci) reads ClientDist and ServerDist
+  there, so a pin move needs a fetch here and no engine build.
+  EngineArtifact.ps1 says which build is taken and what is held: when the
+  fork keeps more than one for the pin, each is fetched and held in turn,
+  newest first, and the first whose files are the ones the checkout records
+  is taken.
 
   Sync-Client.ps1 runs this when it needs the client from that folder and the
   folder is not there yet, so a Ship and Go do not need it run by hand.
 
-  It reads GitHub through gh, signed in as somebody who can read this
-  repository's Actions, and writes nothing but the folder and its own scratch
-  under the repository's temp folder, which it removes. It sends nothing,
-  starts nothing and never builds the engine.
+  It reads GitHub through gh, signed in as anybody (the fork is public, and
+  GitHub serves its artifacts to any account), and writes nothing but the
+  folder and its own scratch under the repository's temp folder, which it
+  removes. It sends nothing, starts nothing and never builds the engine.
 
   Exit 0: CI's build of the pin is this machine's EngineArtifact (it was
   there, or it is now). 2: -Check, and it is on GitHub to fetch. 1: it is not
   there and cannot be, and the last line says why.
 
 .PARAMETER Check
-  Says whether the folder is there and whether GitHub keeps the artifact.
+  Says whether the folder is there and whether the fork keeps the build.
   Nothing is fetched or written.
 
 .PARAMETER Gh
@@ -42,7 +46,7 @@
 
 .EXAMPLE
   .\scripts\release\Get-EngineArtifact.ps1
-  Fetches engine-<pin 12> and makes it this machine's CI engine build.
+  Fetches thornswood-engine-<pin> and makes it this machine's CI engine build.
 
 .EXAMPLE
   .\scripts\release\Get-EngineArtifact.ps1 -Check
@@ -81,7 +85,7 @@ if (Test-Path -LiteralPath $into) {
 }
 
 # gh api through the gh this was given. Its error is the answer, not "none".
-if (-not (Get-Command $Gh -ErrorAction SilentlyContinue)) { Stop-Here "gh is not here. winget install --id GitHub.cli -e, then gh auth login (an account that is a collaborator on $EngineArtifactRepo)." }
+if (-not (Get-Command $Gh -ErrorAction SilentlyContinue)) { Stop-Here "gh is not here. winget install --id GitHub.cli -e, then gh auth login (any GitHub account: $EngineArtifactRepo is public)." }
 function Invoke-Gh([string[]]$GhArgs) {
   $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
   try { $out = @(& $Gh @GhArgs 2>&1); $code = $LASTEXITCODE } finally { $ErrorActionPreference = $old }
@@ -90,7 +94,7 @@ function Invoke-Gh([string[]]$GhArgs) {
   return $text
 }
 $get = { param($path) (Invoke-Gh @('api', $path)) | ConvertFrom-Json }
-try { $f = Find-EngineArtifact $commit $get } catch { Stop-Here ('GitHub could not be asked which artifact engine.yml keeps: ' + $_.Exception.Message) }
+try { $f = Find-EngineArtifact $commit $get } catch { Stop-Here ('GitHub could not be asked which build of the pin the fork keeps: ' + $_.Exception.Message) }
 Say ('  ' + $f.Why) $(if ($f.State -eq 'found') { 'Gray' } else { 'Yellow' })
 if ($f.State -ne 'found') { Stop-Here $f.Why }
 if ($Check) {
@@ -98,10 +102,10 @@ if ($Check) {
   exit 2
 }
 
-# Every green run of the pin keeps its own artifact, and only the one that
-# made this checkout's records holds the same record text (EngineArtifact.ps1,
-# WHICH ARTIFACT). So each is held in turn, newest first, and the first that
-# passes is taken; the ones passed over are named with why.
+# Every green fork build of the pin keeps its own artifact, and only the one
+# this checkout's records were made from holds the same bytes
+# (EngineArtifact.ps1, WHICH BUILD). So each is held in turn, newest first,
+# and the first that passes is taken; the ones passed over are named with why.
 $scratch = [string](& (Join-Path $PSScriptRoot 'Get-ScratchDir.ps1') ('Thornswood-engine-artifact-' + [Guid]::NewGuid().ToString('N')))
 try {
   $null = New-Item -ItemType Directory -Force -Path $scratch
@@ -111,14 +115,14 @@ try {
     $dl = Join-Path $scratch ([string]$n)
     try { $null = Invoke-Gh @('run', 'download', [string]$c.Run.id, '--name', $name, '--dir', $dl, '--repo', $EngineArtifactRepo) }
     catch { Stop-Here ("$name of run $($c.Run.id) could not be fetched: " + $_.Exception.Message) }
-    $why = @(Get-EngineArtifactProblems $dl $RepoDir)
+    $why = @(Get-EngineArtifactProblems $dl $RepoDir ([long]$c.Run.id))
     if (-not $why.Count) { $taken = $c; break }
     $passedOver += ("run {0}: {1}" -f $c.Run.id, ($why -join '; '))
-    Say ("  run {0}'s {1} is not CI's build of what this checkout records ({2}), so it is passed over" -f $c.Run.id, $name, ($why -join '; ')) 'Yellow'
+    Say ("  run {0}'s {1} is not the build this checkout records ({2}), so it is passed over" -f $c.Run.id, $name, ($why -join '; ')) 'Yellow'
     Remove-Item -LiteralPath $dl -Recurse -Force
   }
   if (-not $taken) {
-    Stop-Here ("no $name engine.yml keeps is CI's build of what this checkout records, and nothing was put in place. " + ($passedOver -join ' | ') + ". The run that made the checkout's records keeps it no longer (#3243 says why a new run does not match them).")
+    Stop-Here ("no $name the fork keeps is the build this checkout records, and nothing was put in place. " + ($passedOver -join ' | ') + ". The records name another build of the commit: the one engine.yml recorded is gone, so the pin needs records of one the fork keeps (engine.yml for the commit hands them back, engine\README.md).")
   }
   if ($n -gt 1) { Say ("  run {0}'s {1} is this checkout's" -f $taken.Run.id, $name) 'Gray' }
   try { $stamp = Install-EngineArtifact -From $dl -Repo $RepoDir -Into $into -Run $taken.Run -Artifact $taken.Artifact }

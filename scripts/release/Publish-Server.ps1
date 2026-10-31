@@ -106,7 +106,7 @@
   the order; a new order is Deploy-Gamemode.ps1 and a publish with -Dist.
   A build CI made and the store does not hold yet goes there first, held to
   the record here and again on the box:
-      .\scripts\release\Publish-Server.ps1 -Channel dev -FromStore -ServerBuild <engine.yml's server-<...>.zip>
+      .\scripts\release\Publish-Server.ps1 -Channel dev -FromStore -ServerBuild <the pin's server-<...>.zip>
   A machine that takes CI's engine build (Setup-ShipMachine.ps1 -EngineBuild
   ci, #3047) has no built server to pack, only the files the record names
   and the zip they came in, so there a publish that names no -Dist does this
@@ -218,8 +218,8 @@ param(
     # store, with no engine build on this machine (#459, FROM THE STORE in the
     # header).
     [switch]$FromStore,
-    # A server build zip (engine.yml's server-<...>.zip, with its .json beside
-    # it) to send to the store first, for -FromStore.
+    # A server build zip (server-<...>.zip, with its .json beside it, as
+    # Get-EngineArtifact.ps1 makes it) to send to the store first, for -FromStore.
     [string]$ServerBuild = '',
     # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
     [switch]$AllowStaleCheckout
@@ -357,9 +357,12 @@ foreach ($t in 'ssh', 'scp') {
 . (Join-Path $Here '..\deploy\DeployedBuild.ps1')
 $committedOnly = @('scripts/deploy/Install-ThornswoodServer.ps1', 'scripts/deploy/ServerSettings.ps1', 'scripts/deploy/ServerBuild.ps1', 'scripts/deploy/ServerReadyWait.ps1', 'scripts/vps/Server-Log.js', 'scripts/release/Read-JsonFile.ps1', 'scripts/release/RecordShape.ps1')
 if (-not $PutBack -and -not $TaskOnly) { $committedOnly += 'game/gamemode.js', 'records/most-online.json', 'records/server-build.json' }
-# -FromStore sends our plugins from game\content (#459).
+# -FromStore sends our plugins from game\content (#459), all but
+# Thornswood-Last.esp, which no machine sends: it is made on the box from its
+# recipe (#2791), and the manifest names the bytes the server must hold.
 . (Join-Path $Here 'RepoPlugins.ps1')
-if ($FromStore) { $committedOnly += @($ThornswoodRepoPlugins | ForEach-Object { 'game/content/' + $_ }) }
+. (Join-Path $Here '..\deploy\LastPluginRecipe.ps1')
+if ($FromStore) { $committedOnly += @($ThornswoodRepoPlugins | Where-Object { $_ -ine $ThornswoodLastPlugin } | ForEach-Object { 'game/content/' + $_ }) + 'game/data/last-plugin.json' }
 try { Assert-ThornswoodCommitted -RepoDir (Join-Path $Here '..\..') -Paths $committedOnly -What 'this publish' }
 catch { Die $_.Exception.Message }
 
@@ -445,7 +448,7 @@ function Save-ServerRecords([switch]$PutBack) {
         Die ("the server is installed and answering, but the box's record of what it runs was not written, so its data\thornswood-deploy.json " +
              "and the store's current record still name what ran before. The lines above say why. Put that right, then run this again.")
     }
-    $null = Save-ThornswoodDeployedBuild $target $ssh $VpsRoot
+    $null = Save-ThornswoodDeployedBuild $target $ssh $VpsRoot (Get-ThornswoodDocsRootBeside $VpsRoot)
 }
 
 # The installer and the files it loads, sent alone, before a run that
@@ -722,12 +725,34 @@ function New-StorePayload {
     Set-MaxPlayers $st $mostOnline
     [IO.File]::WriteAllText((Join-Path $dir 'server-settings.json'), ($st | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding($false)))
     $ours = @()
+    # Thornswood-Last.esp is never sent (#2791): it is made on the box from
+    # this commit's recipe. When the running server's is that one, -FromStore
+    # keeps it. When it is not, this publish makes it on the box after the
+    # copy, from our plugins as this payload carries them and then the
+    # server's own, and the installer takes it into the stage held to
+    # game\data\last-plugin.json. Waiting for a deploy to make it first could
+    # never end when the pin moved too: Deploy-DevGamemode.ps1 sends a
+    # gamemode only to a server that already runs this commit's build (#2076).
+    $script:LastMake = $null
+    $script:LastReads = @()
+    $lastWant = Get-ThornswoodLastPluginWant (Join-Path $Here '..\..')
+    if ($lastWant -and (@($box.Order) -icontains $ThornswoodLastPlugin)) {
+        $boxLast = Get-ThornswoodServerPlugin $box $ThornswoodLastPlugin
+        if (-not (Test-ThornswoodContentSame $boxLast $lastWant.Bytes $lastWant.Sha)) {
+            $script:LastMake = $lastWant
+            Say (("  the $Channel server holds a $ThornswoodLastPlugin of {0:N0} bytes, sha256 {1}, and this commit's recipe makes {2:N0} bytes, sha256 {3}: it will be made on the box" -f $boxLast.Bytes, $(if ($boxLast.Sha) { $boxLast.Sha.Substring(0, 12) } else { 'none' }), $lastWant.Bytes, $lastWant.Sha.Substring(0, 12))) 'Yellow'
+        } else {
+            Say ("  $ThornswoodLastPlugin is the running server's, the one this commit's recipe makes") 'DarkGray'
+        }
+    }
     foreach ($n in $ThornswoodRepoPlugins) {
+        if ($n -ieq $ThornswoodLastPlugin) { continue }
         $src = Get-ThornswoodRepoPluginPath (Join-Path $Here '..\..') $n
         if (-not (Test-Path -LiteralPath $src)) { continue }
         if (-not (@($box.Order) -icontains $n)) { Say "  $n is ours and the $Channel server's load order does not name it, so it stays out" 'DarkGray'; continue }
         Copy-Item -LiteralPath $src -Destination (Join-Path $dir ('plugins\' + $n))
         $ours += $n
+        $script:LastReads += $src
     }
     Say ('  the gamemode artifact and its stamp, the record, how many it holds, and ' + $(if ($ours.Count) { 'our ' + ($ours -join ', ') } else { 'none of our plugins' }) +
          '; the running server keeps its ' + @($box.Order).Count + ' plugins and their order') 'Green'
@@ -770,6 +795,10 @@ $zipWhy = ''
 # box once it answers will say came from the artifact (#459).
 $zipGmSum = ''
 $zipStamp = $null
+# And Thornswood-Last.esp, when a full payload carries it from this machine's
+# game folder (Export-ServerPayload.ps1), is the one this commit's recipe
+# makes (#2791): the launcher made it there, from that machine's plugins.
+$zipLastSum = ''
 function Get-EntrySum($entry) {
     $zs = $entry.Open()
     $sha = [Security.Cryptography.SHA256]::Create()
@@ -798,6 +827,7 @@ try {
                 try { $zipStamp = ($stampText -replace '^\uFEFF', '') | ConvertFrom-Json } catch { $zipStamp = $null }
             }
             elseif (Test-ThornswoodServerForkFile $rel) { $zipSums[$rel] = Get-EntrySum $ze }
+            elseif ($rel -ieq ('plugins/' + $ThornswoodLastPlugin)) { $zipLastSum = Get-EntrySum $ze }
         }
     } finally { $za.Dispose() }
 } catch { $zipWhy = $_.Exception.Message }
@@ -826,6 +856,11 @@ if ($zipBuild.Count) {
 if ($zipRecSum -ne (Get-FileHash -LiteralPath $Record -Algorithm SHA256).Hash.ToLowerInvariant()) {
     Die ("the payload carries " + $(if ($zipRecSum) { "a server-build.json that is not $Record" } else { 'no server-build.json' }) +
          ", so the installer could not hold the server files to the record. Nothing was sent. Run it again without -SkipBuild.")
+}
+$lastWant = Get-ThornswoodLastPluginWant (Join-Path $Here '..\..')
+if ($zipLastSum -and $lastWant -and $zipLastSum -ne $lastWant.Sha) {
+    Die ("the payload's $ThornswoodLastPlugin (sha256 " + $zipLastSum.Substring(0, 12) + ") is not the one this commit's recipe makes (sha256 " + $lastWant.Sha.Substring(0, 12) +
+         "), so the server would load another than every launcher makes. Nothing was sent. A full payload takes its plugins from this machine's game folder, and this one holds another copy; -FromStore keeps the server's, which the deploys make on the box.")
 }
 if ($FromStore) { Say ("payload carries the record of " + ([string]$recObj.source.commit).Substring(0, 8) + " and no server file; the build comes out of the store") 'Green' }
 else { Say ("payload server files are the recorded build of " + ([string]$recObj.source.commit).Substring(0, 8) + ", " + $zipSums.Count + " files, and it carries the record") 'Green' }
@@ -869,7 +904,7 @@ if (-not $FromStore) {
     if (-not $stored.Name) {
         Die ('the store on the box keeps no server build of ' + $stored.Commit.Substring(0, 8) + ' with the record this commit holds' +
              $(if (@($stored.Others).Count) { ' (it has ' + (@($stored.Others) -join ', ') + ', from that commit with another record)' } else { '' }) +
-             '. Put it there with a publish from a machine that has that build (-Dist), or with -ServerBuild and the zip engine.yml made. Nothing was sent.')
+             '. Put it there with a publish from a machine that has that build (-Dist), or with -ServerBuild and the pin''s server zip (Where.ps1 EngineArtifact, artifact\server). Nothing was sent.')
     }
     Say ('{0,-22} {1}, in the store on the box' -f 'server build', $stored.Name) 'Green'
 }
@@ -919,7 +954,30 @@ if ($FreshWorld) {
     Say 'starting with no world, as asked; the old one stays in the previous folder' 'Yellow'
     $instArgs += ' -FreshWorld'
 }
-Invoke-Installer $instArgs
+# Thornswood-Last.esp, made on the box for this commit (#2791, New-StorePayload
+# says when): into a folder the box holds for this run, from our plugins as the
+# payload carries them, read first, and then the running server's own.
+$lastBox = $null
+if ($FromStore -and $script:LastMake) {
+    Head "Making $ThornswoodLastPlugin on the box"
+    . (Join-Path $Here '..\deploy\LastPluginOnBox.ps1')
+    $lastBox = Open-ThornswoodOnBoxFolder -Target $target -SshArgs $ssh
+    if (-not $lastBox.Made) { Die ('could not make a folder on the box to make ' + $ThornswoodLastPlugin + ' in: ' + (($lastBox.Said | Select-Object -Last 3) -join ' | ') + '. The server up there was not touched.') }
+    $made = $null
+    try {
+        $null = Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script ("New-Item -ItemType Directory -Force -Path '" + $lastBox.Run + "\reads', '" + $lastBox.Run + "\made' | Out-Null")
+        foreach ($src in $script:LastReads) { Send-ThornswoodArtifactFile $src $target $ssh ($lastBox.Far + '/reads/' + (Split-Path -Leaf $src)) }
+        $made = Invoke-ThornswoodLastPluginMake -Target $target -SshArgs $ssh -RepoDir (Join-Path $Here '..\..') `
+            -Reads @(($lastBox.Run + '\reads'), ($VpsRoot.TrimEnd('\') + '\plugins')) -Into ($lastBox.Run + '\made') -Want $script:LastMake
+    } catch {
+        $null = Close-ThornswoodOnBoxFolder $lastBox
+        Die ($_.Exception.Message + '. The server up there was not touched.')
+    }
+    Say ('  {0}, made on the box: {1:N0} bytes, sha256 {2}' -f $ThornswoodLastPlugin, $made.Bytes, $made.Sha.Substring(0, 12)) 'Green'
+    $instArgs += (" -LastPlugin '" + $lastBox.Run + '\made\' + $ThornswoodLastPlugin + "' -LastSha256 " + $made.Sha)
+}
+try { Invoke-Installer $instArgs }
+finally { if ($lastBox) { $null = Close-ThornswoodOnBoxFolder $lastBox } }
 
 Head 'Recording what it runs'
 Save-ServerRecords
@@ -959,7 +1017,7 @@ Save-ServerRecords
   which belong to the dev world, and a door.json with the live address, which
   gives the dev door the live list. The dev door asks
   https://thornswood.net/dev, whose list is only the people the dev build is
-  for (docs\SERVER.md, "The door"); on 28 Sep that took the dev list from 46
+  for (SERVER.md in the ops repo, "The door"); on 28 Sep that took the dev list from 46
   to 28, which is right.
 
   So now: door.json is live's key and join pass key with the address ending
@@ -1080,7 +1138,7 @@ if ($outside.Answered) {
     # inbound rule for it, or something between, and the previous folder would
     # not change it: the new server stays. The rule is what to look at.
     Say ("  The box's inbound rule for TCP {0} is not letting it in. What the box holds for it:" -f $ResPort) 'Red'
-    Say ("  .\scripts\vps\Remote.ps1 `"Get-NetFirewallPortFilter -Protocol TCP | Where-Object LocalPort -eq {0} | Get-NetFirewallRule | Format-Table DisplayName,Enabled,Action,Profile`"" -f $ResPort) 'DarkGray'
+    Say ("  .\scripts\vps\Remote.ps1 `"Get-NetFirewallPortFilter -PolicyStore ActiveStore -Protocol TCP | Where-Object LocalPort -eq {0} | Get-NetFirewallRule | Format-Table DisplayName,Enabled,Action,Profile`"" -f $ResPort) 'DarkGray'
     Write-Host ''
     if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
     exit 1

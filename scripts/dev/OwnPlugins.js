@@ -2,9 +2,13 @@
 //
 // Where a builder reads a plugin of the load order from (#2923).
 //
-// Thornswood's own plugins (Thornswood-Content.esp, Thornswood-Last.esp,
-// Thornswood-WoodworkerTrail.esp, and any other file in game/content) are made
-// and shipped from this repository's game/content. A game folder holds
+// Thornswood's own plugins (Thornswood-Content.esp and any other file in
+// game/content) are made and shipped from this repository's game/content.
+// Thornswood-Last.esp is ours too, but since #2791 no repository holds it: it
+// copies other authors' records, so it is made in the Data folder from its
+// recipe, game/data/last-plugin.recipe (Make-LastPlugin.py), and read from
+// there (MADE_IN_DATA). isOwn still names it, so MerchantLoadOrderPin.js
+// leaves its bytes out of the pin (#613). A game folder holds
 // whichever release last reached it: on 20 Oct One's held a Content plugin
 // from 12 Oct, 146,941 bytes against the repository's 117,274 the day before
 // #2911 changed it. A table read from there describes a plugin nobody ships,
@@ -34,12 +38,19 @@ const path = require('path');
 
 const OWN_DIR = path.join(__dirname, '..', '..', 'game', 'content');
 
-function isOwn(name) {
+// Ours, and made in the Data folder from a recipe rather than held here (#2791).
+const MADE_IN_DATA = ['Thornswood-Last.esp'];
+
+function inRepo(name) {
   return fs.existsSync(path.join(OWN_DIR, name));
 }
 
+function isOwn(name) {
+  return inRepo(name) || MADE_IN_DATA.some((m) => m.toLowerCase() === String(name).toLowerCase());
+}
+
 function pluginPath(dataDir, name) {
-  return isOwn(name) ? path.join(OWN_DIR, name) : path.join(dataDir, name);
+  return inRepo(name) ? path.join(OWN_DIR, name) : path.join(dataDir, name);
 }
 
 // The five masters load before the game reads plugins.txt, and are never
@@ -84,4 +95,12 @@ function loadedOrder(file, dataDir) {
   return order;
 }
 
-module.exports = { OWN_DIR, MASTERS, isOwn, pluginPath, loadOrder, switchedOff, loadedOrder };
+// What a table says it was read from: how many plugins and the first twelve
+// hex of the sha256 of their names in order, one per line. Never the plugin
+// list's path, which names one machine (#3105).
+function loadOrderName(order) {
+  const hex = require('crypto').createHash('sha256').update(order.join('\n'), 'utf8').digest('hex').slice(0, 12);
+  return order.length + ' plugins in load order (names sha256 ' + hex + ')';
+}
+
+module.exports = { OWN_DIR, MASTERS, MADE_IN_DATA, inRepo, isOwn, pluginPath, loadOrder, switchedOff, loadedOrder, loadOrderName };

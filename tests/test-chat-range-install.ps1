@@ -81,6 +81,9 @@ Yes 'the install here-string is there' $remote.Success
 # stands in as nothing. Without it the expansion threw before any check after
 # it ran (found while checking the voice line for #2166).
 function Get-ThornswoodServiceAccountScript { return '' }
+# It also pastes in scripts\vps\BoxFirewall.ps1's Sync-ThornswoodFirewall
+# (#3896), loaded here the way Install-Voice.ps1 loads it.
+. (Join-Path (Split-Path -Parent $InstallPath) '..\vps\BoxFirewall.ps1')
 <# What the outer script has set by the time the here-string is built, as
    Check-VoiceInstall.ps1 sets them, with the range under test. #>
 function Expand([string]$range) {

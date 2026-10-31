@@ -161,8 +161,9 @@ function world(opts) {
     'burnCharcoal', 'isChoppingBlock', 'chopWood', 'SHRINES', 'bless', 'isCrop',
     'farmActivate', 'isFish', 'fish', 'isGame', 'game', 'isChickenNest', 'collectEgg',
     'isPlant', 'harvest', 'ALLOW',
-    'isVein', 'mineOre', 'loot', 'log', 'ITEMS', 'floraHanded', 'isChurn', 'churn', 'isHive', 'hive'];
-  const body = "'use strict';\n" +
+    'isVein', 'mineOre', 'loot', 'log', 'ITEMS', 'floraHanded', 'isChurn', 'churn', 'isHive', 'hive',
+    'isWorldProduce', 'worldProduce'];
+  const body = "'use strict';\n" + 'function economyGathered() { }\n' +
     [parts.coolBlock, parts.waitLine, parts.cowsLine,
      parts.waitWord, parts.isMilkCow, parts.milk].filter(Boolean).join('\n') + '\n' +
     'const onActivate = ' + (parts.handler || 'null') + ';\n' +
@@ -189,7 +190,8 @@ function world(opts) {
       function () { return false; },
       never, function () { return null; },
       function () { return false; },
-      function () { return null; }
+      function () { return null; },
+      never, tag('worldProduce')
     ]);
   } catch (e) {
     console.log('      the world would not build: ' + e.message);

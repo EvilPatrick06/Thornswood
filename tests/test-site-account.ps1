@@ -25,7 +25,7 @@
 
   It had a default of SYSTEM at first, and review found on 24 Sep that this
   undid the switch: once -RunAs 'LOCAL SERVICE' had been run, the next plain
-  deploy or -Site, which is what CLAUDE.md, Install-Bot and Set-Vps tell
+  deploy or -Site, which is what the ops repo's CLAUDE.md, Install-Bot and Set-Vps tell
   people to run, put the task back on SYSTEM at Highest and the read-back
   said so as if nothing were wrong. So there is no default, and the account
   block reads the account off the task when -RunAs is not given.
@@ -73,8 +73,8 @@
       after each. Not elevated, that part says SKIP.
 
   Writes only under its own temp folder and, when elevated, one scheduled
-  task whose action is cmd.exe /c exit. That task is never started and is
-  removed before this ends. Never connects to anything.
+  task whose program is a stand-in that is not there. That task is never
+  started and is removed before this ends. Never connects to anything.
 #>
 [CmdletBinding()]
 param([string]$RepoPath)
@@ -90,6 +90,10 @@ if (-not $RepoPath) { $RepoPath = $Here }
 # The principal and the fail-safe the account block calls (#2578, #2613).
 # Deploy-Docs sends these up as text in front of the setup script.
 . (Join-Path $RepoPath 'scripts\deploy\ServiceAccount.ps1')
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+# Deploy-Docs also loads BoxFirewall.ps1 and puts Sync-ThornswoodFirewall in
+# the setup script (#3896).
+. (Join-Path $RepoPath 'scripts\vps\BoxFirewall.ps1')
 # The places no service may read, swapped for scratch ones the test sets, so
 # the fail-safe never reads this machine's own C:\Thornswood-* folders.
 $script:neverReach = @()
@@ -154,12 +158,12 @@ $remote = $remotes[0]
 # ServiceAccount.ps1 functions sent up in front of it (#2613). Anything else would be
 # built from a variable this does not set, and the test would be testing a
 # different script from the one that goes up.
-$known = @('Task', 'Port', 'rootWin', 'boxWin', 'RunAs', 'siteAccountHelpers')
+$known = @('Task', 'Port', 'rootWin', 'boxWin', 'RunAs', 'siteAccountHelpers', '$(Get-ThornswoodFirewallScript)')
 $used = @($remote.NestedExpressions | ForEach-Object {
     if ($_ -is [System.Management.Automation.Language.VariableExpressionAst]) { $_.VariablePath.UserPath } else { $_.Extent.Text }
 } | Sort-Object -Unique)
 $strangers = @($used | Where-Object { $known -notcontains $_ })
-Yes ('the script is filled in from $Task, $Port, $rootWin, $boxWin, $RunAs and $siteAccountHelpers and nothing else' +
+Yes ('the script is filled in from $Task, $Port, $rootWin, $boxWin, $RunAs, $siteAccountHelpers and BoxFirewall.ps1''s function (#3896) and nothing else' +
      $(if ($strangers.Count) { ' (also ' + ($strangers -join ', ') + ')' } else { '' })) ($strangers.Count -eq 0)
 
 # The here-string, evaluated exactly as Deploy-Docs evaluates it. An empty
@@ -181,11 +185,24 @@ function Build([string]$account, [string]$docsRoot, [string]$taskName = 'Thornsw
 
 $open  = '# ==== thornswood site account ===='
 $close = '# ==== end thornswood site account ===='
-function BlockOf([string]$text) {
-    $a = $text.IndexOf($open)
-    $b = $text.IndexOf($close)
+$grantsOpen  = '# ==== thornswood site grants ===='
+$grantsClose = '# ==== end thornswood site grants ===='
+function Between([string]$text, [string]$from, [string]$to) {
+    $a = $text.IndexOf($from)
+    $b = $text.IndexOf($to)
     if ($a -lt 0 -or $b -le $a) { return $null }
-    return $text.Substring($a, $b + $close.Length - $a)
+    return $text.Substring($a, $b + $to.Length - $a)
+}
+# The account block alone: who the task runs as, and its SID.
+function AccountOf([string]$text) { return (Between $text $open $close) }
+# The account block and then the grants. In the script that goes up the task
+# is registered or updated between the two, because Windows maps the task's
+# SID only once it is (#4973); run here with stand-ins, nothing is between.
+function BlockOf([string]$text) {
+    $a = AccountOf $text
+    $g = Between $text $grantsOpen $grantsClose
+    if ($null -eq $a -or $null -eq $g) { return $null }
+    return $a + "`n" + $g
 }
 function CallsOf($scriptAst, [string]$name) {
     return @($scriptAst.FindAll({ param($n)
@@ -459,11 +476,49 @@ try {
     Yes 'SYSTEM: the SID it compares the read-back with is SYSTEM''s' ($r.sid -eq 'S-1-5-18')
 
     # -- LOCAL SERVICE, with the real icacls on the scratch folders -------------
+    # The grants name the site's task, NT TASK\Thornswood Docs (#4077). Windows
+    # maps a task's SID only where that task is registered, which is the box.
+    # Anywhere else (One's runners, GitHub's hosted runners, a person's PC)
+    # icacls refuses every grant with "No mapping between account names and
+    # security IDs", so the checks that need a grant made say SKIP there, and
+    # one check makes sure that was the only reason a grant was refused (#4968).
+    $script:taskMaps = $false
+    try {
+        $null = (New-Object Security.Principal.SecurityIdentifier(Get-ThornswoodTaskSidFromName 'Thornswood Docs')).Translate([Security.Principal.NTAccount])
+        $script:taskMaps = $true
+    } catch { }
+    function Granted([string]$what, [bool]$cond) {
+        if ($script:taskMaps) { Yes $what $cond }
+        else { Write-Host "SKIP  $what (no Thornswood Docs task on this machine, so its SID cannot be granted here; the box runs it, #4968)" }
+    }
+    # The read every deploy before #4077 gave LOCAL SERVICE on the server folder.
+    $null = & icacls $server /grant '*S-1-5-19:(OI)(CI)R' 2>&1
     $block = BlockOf (Build 'LOCAL SERVICE' $docs)
     # The scratch box itself can be under C:\Thornswood-RunnerN (#3117), so
     # its own paths are taken out before looking for a real folder.
     Yes 'LOCAL SERVICE: every folder in the block was swapped for a scratch one' ($block.Replace("'" + $tmp, "'<scratch>") -notmatch "'C:\\Thornswood-")
-    $r = Run $block
+    # With no Thornswood Docs task here, every grant is refused, and since
+    # #4973 a refused grant stops the setup script before LOCAL SERVICE's old
+    # rules come off. That is run first, with the real icacls. Then, so the
+    # rest of the block can be run here at all, icacls is given a SID that
+    # maps (INTERACTIVE, S-1-5-4) in place of the task's; the checks of what
+    # the task's SID was granted say SKIP, as before.
+    $runBlock = $block
+    if (-not $script:taskMaps) {
+        $r = Run $block
+        $said = $r.said -join "`n"
+        # icacls' two lines can come in either order, so count rather than pair them.
+        $refusedHere = @([regex]::Matches($said, 'COULD NOT GRANT')).Count
+        $noMapping = @([regex]::Matches($said, 'No mapping between account names and security IDs')).Count
+        Yes ('with no Thornswood Docs task here, every grant refused was refused only because its SID has no mapping (' + $refusedHere + ' refused, ' + $noMapping + ' for that, #4968)') (
+            $refusedHere -gt 0 -and $noMapping -ge $refusedHere -and $said -notmatch 'Access is denied')
+        Yes 'and the setup script stops there, saying what was refused, with LOCAL SERVICE''s old rules left on (#4973)' (
+            $said -match 'GRANTS REFUSED to NT TASK\\Thornswood Docs' -and $said -notmatch 'LOCAL SERVICE no longer has a rule' -and
+            (RulesFor $server 'S-1-5-19').Count -ge 1)
+        $taskSid = Get-ThornswoodTaskSidFromName 'Thornswood Docs'
+        $runBlock = 'function icacls { $a = @($args | ForEach-Object { ([string]$_).Replace(''*' + $taskSid + ':'', ''*S-1-5-4:'') }); & ''' + (Get-WindowsPath 'System32\icacls.exe') + ''' @a }' + "`n" + $block
+    }
+    $r = Run $runBlock
     $said = $r.said -join "`n"
     Yes 'LOCAL SERVICE: the task runs as LOCAL SERVICE' ($r.principal -and $r.principal.UserId -match 'LOCAL SERVICE$')
     $resolved = ''
@@ -480,36 +535,45 @@ try {
         @($r.principal.RequiredPrivilege) -notcontains 'SeAssignPrimaryTokenPrivilege')
     Yes 'LOCAL SERVICE: with the token SID type Unrestricted' ($r.principal -and "$($r.principal.ProcessTokenSidType)" -eq 'Unrestricted')
     Yes 'LOCAL SERVICE: as a service account, so no password is kept' ($r.principal -and "$($r.principal.LogonType)" -eq 'ServiceAccount')
-    Yes 'LOCAL SERVICE: it says what it granted' ($said -match [regex]::Escape("granted LOCAL SERVICE (OI)(CI)M on $docs"))
+    Granted 'LOCAL SERVICE: it says what it granted, to the site''s task (#4077)' ($said -match [regex]::Escape("granted NT TASK\Thornswood Docs (OI)(CI)M on $docs"))
     Yes 'LOCAL SERVICE: a folder that is not there is said and skipped, not failed' (
         $said -match [regex]::Escape("not here, nothing granted: $dev") -and $said -notmatch 'COULD NOT GRANT')
     Yes 'LOCAL SERVICE: no folder was made that was not there' (-not (Test-Path -LiteralPath $dev))
 
-    $ls = 'S-1-5-19'
+    # The grants and the denies name the site's task, not LOCAL SERVICE, which
+    # every box service runs as (#4077). $ls is the account they are for.
+    $ls = Get-ThornswoodTaskSidFromName 'Thornswood Docs'
     $own = RulesFor $docs $ls
-    Yes 'its own folder: LOCAL SERVICE may change it' (Modifies $own)
-    Yes 'its own folder: a file that was already there, config.json, inherits it' (Modifies (RulesFor (Join-Path $docs 'config.json') $ls))
-    Yes 'its own folder: and one a folder down, data\board.json' (Modifies (RulesFor (Join-Path $docs 'data\board.json') $ls))
+    Granted 'its own folder: the site''s task may change it' (Modifies $own)
+    Yes 'and LOCAL SERVICE has no rule on its folder, the deploy records or the chat' (
+        (RulesFor $docs 'S-1-5-19').Count -eq 0 -and (RulesFor (Join-Path $docs 'config.json') 'S-1-5-19').Count -eq 0 -and
+        (RulesFor (Join-Path $deploys 'thornswood-docs.json') 'S-1-5-19').Count -eq 0 -and
+        (RulesFor (Join-Path $voice '2026-09-24.jsonl') 'S-1-5-19').Count -eq 0)
+    Yes 'the read LOCAL SERVICE had on the server folder before #4077 comes off' (
+        (RulesFor $server 'S-1-5-19').Count -eq 0 -and (RulesFor (Join-Path $server 'server.log') 'S-1-5-19').Count -eq 0)
+    Yes 'and it says so' ($said -match [regex]::Escape("LOCAL SERVICE no longer has a rule on $server"))
+    Granted 'its own folder: a file that was already there, config.json, inherits it' (Modifies (RulesFor (Join-Path $docs 'config.json') $ls))
+    Granted 'its own folder: and one a folder down, data\board.json' (Modifies (RulesFor (Join-Path $docs 'data\board.json') $ls))
     Put (Join-Path $docs 'site.log') 'new'
-    Yes 'its own folder: site.log made afterwards inherits it, so the roll can rename it' (Modifies (RulesFor (Join-Path $docs 'site.log') $ls))
+    Granted 'its own folder: site.log made afterwards inherits it, so the roll can rename it' (Modifies (RulesFor (Join-Path $docs 'site.log') $ls))
 
     # server.log is deleted and made again at every server start. The grant has
     # to survive that, which a grant on the file would not.
     Remove-Item -LiteralPath (Join-Path $server 'server.log') -Force
     Put (Join-Path $server 'server.log') 'after a restart'
-    Yes 'the deploy records: LOCAL SERVICE reads them and changes nothing (#459)' (ReadsOnly (RulesFor (Join-Path $deploys 'thornswood-docs.json') $ls))
-    Yes 'server.log made again after the grant can still be read' (ReadsOnly (RulesFor (Join-Path $server 'server.log') $ls))
-    Yes 'online.json can be read' (ReadsOnly (RulesFor (Join-Path $server 'data\online.json') $ls))
-    Yes 'the chat can be read' (ReadsOnly (RulesFor (Join-Path $voice '2026-09-24.jsonl') $ls))
+    Granted 'the deploy records: the site''s task reads them and changes nothing (#459)' (ReadsOnly (RulesFor (Join-Path $deploys 'thornswood-docs.json') $ls))
+    Granted 'server.log made again after the grant can still be read' (ReadsOnly (RulesFor (Join-Path $server 'server.log') $ls))
+    Granted 'online.json can be read' (ReadsOnly (RulesFor (Join-Path $server 'data\online.json') $ls))
+    Granted 'the chat can be read' (ReadsOnly (RulesFor (Join-Path $voice '2026-09-24.jsonl') $ls))
     # The dev voice service writes its own chat folder, and a dev session on
     # /sessions reads it since main's #298.
-    Yes 'the dev chat can be read' (ReadsOnly (RulesFor (Join-Path $voiceDev '2026-09-24.jsonl') $ls))
-    Yes 'and none of those four can be written' (
+    Granted 'the dev chat can be read' (ReadsOnly (RulesFor (Join-Path $voiceDev '2026-09-24.jsonl') $ls))
+    Granted 'and none of those four can be written' (
         -not (Modifies (RulesFor (Join-Path $server 'server.log') $ls)) -and
         -not (Modifies (RulesFor (Join-Path $server 'data\online.json') $ls)) -and
         -not (Modifies (RulesFor (Join-Path $voice '2026-09-24.jsonl') $ls)) -and
         -not (Modifies (RulesFor (Join-Path $voiceDev '2026-09-24.jsonl') $ls)))
-    Yes 'the world data under the server folder is not reached' (
+    Granted 'the world data under the server folder is not reached' (
         (RulesFor (Join-Path $server 'world\changeForms.json') $ls).Count -eq 0 -and
         (RulesFor (Join-Path $server 'world') $ls).Count -eq 0)
 
@@ -526,10 +590,10 @@ try {
         Yes "$f`: and the deny leaves out SYNCHRONIZE and every read right, so the site still serves it" (
             $d.Count -eq 1 -and ($d[0].FileSystemRights -band ($fsr::Synchronize -bor $fsr::ReadData -bor $fsr::ReadAttributes)) -eq 0)
         Yes "$f`: and reaches what is inside it" ($d.Count -eq 1 -and "$($d[0].InheritanceFlags)" -eq 'ContainerInherit, ObjectInherit')
-        Yes "$f`: it says so" ($said -match [regex]::Escape("denied LOCAL SERVICE writing and deleting in " + (Join-Path $docs $f)))
+        Yes "$f`: it says so" ($said -match [regex]::Escape("denied NT TASK\Thornswood Docs writing and deleting in " + (Join-Path $docs $f)))
     }
     $vj = RulesFor (Join-Path $docs 'feed\version.json') $ls
-    Yes 'feed\version.json inherits the deny and still the read under it' (
+    Granted 'feed\version.json inherits the deny and still the read under it' (
         (DeniesOf $vj).Count -eq 1 -and (Modifies @($vj | Where-Object { "$($_.AccessControlType)" -eq 'Allow' })))
     Yes 'feed\assets inherits the deny too' (
         (DeniesOf (RulesFor (Join-Path $docs 'feed\assets\0000000000000000000000000000000000000000000000000000000000000000') $ls)).Count -eq 1)
@@ -552,7 +616,7 @@ try {
     $meSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
     Yes 'whoever ran it keeps what they had there (Administrators on the box)' (
         (Modifies (RulesFor $docs $meSid)) -or (Modifies (RulesFor $docs 'S-1-5-32-544')))
-    Yes 'and the site account keeps Modify on its folder' (Modifies (RulesFor (Join-Path $docs 'config.json') $ls))
+    Granted 'and the site account keeps Modify on its folder' (Modifies (RulesFor (Join-Path $docs 'config.json') $ls))
     Yes 'it says Users was taken off' ($said -match 'BUILTIN\\Users no longer reaches')
     # What it said instead, so a red on the build runner shows why in the log.
     foreach ($l in @(($said -split "`n") | Where-Object { $_ -match 'COULD NOT' })) { Write-Host ('      ' + $l) }
@@ -560,17 +624,17 @@ try {
     # The grants are given again at every deploy while the site is not SYSTEM,
     # so a second run has to leave the same rules, not a second copy of each.
     $before = @($docs, $server, (Join-Path $server 'data'), $voice, $voiceDev | ForEach-Object { (RulesFor $_ $ls).Count })
-    $r = Run $block
+    $r = Run $runBlock
     $after = @($docs, $server, (Join-Path $server 'data'), $voice, $voiceDev | ForEach-Object { (RulesFor $_ $ls).Count })
-    Yes ('a second run grants again without doubling a rule (' + ($before -join ',') + ' then ' + ($after -join ',') + ')') (
+    Granted ('a second run grants again without doubling a rule (' + ($before -join ',') + ' then ' + ($after -join ',') + ')') (
         ($before -join ',') -eq ($after -join ',') -and @($after | Where-Object { $_ -ne 1 }).Count -eq 0)
     Yes 'a second run leaves one deny on each feed folder, not two' (
         (DeniesOf (RulesFor (Join-Path $docs 'feed') $ls)).Count -eq 1 -and
         (DeniesOf (RulesFor (Join-Path $docs 'feed-dev') $ls)).Count -eq 1)
     Yes 'and BUILTIN\Users is still off, with nothing refused' (
         (RulesFor $docs $u).Count -eq 0 -and ($r.said -join "`n") -notmatch 'COULD NOT (DENY|TAKE)')
-    Yes 'and the second run still says what it granted, with nothing refused' (
-        ($r.said -join "`n") -match [regex]::Escape("granted LOCAL SERVICE (OI)(CI)M on $docs") -and
+    Granted 'and the second run still says what it granted, with nothing refused' (
+        ($r.said -join "`n") -match [regex]::Escape("granted NT TASK\Thornswood Docs (OI)(CI)M on $docs") -and
         ($r.said -join "`n") -notmatch 'COULD NOT GRANT')
 
     # -- icacls refusing: said, and the rest still tried ------------------------
@@ -584,6 +648,11 @@ try {
     Yes 'a grant that fails does not throw' (-not $threw)
     Yes 'each one that fails is said, with what icacls said, and the rest are still tried' (
         $refused -eq 6 -and $said -match 'Access is denied')
+    # #4973: and then the setup script stops, naming each, before LOCAL
+    # SERVICE's old rules come off and before SETUP DONE.
+    Yes 'then it stops, naming what was refused, and takes nothing off' (
+        $said -match 'GRANTS REFUSED' -and $said -match [regex]::Escape("  (OI)(CI)M on $docs`: Access is denied.") -and
+        $said -notmatch 'LOCAL SERVICE no longer has a rule' -and $said -notmatch 'BUILTIN\\Users no longer reaches')
 
     # -- an account this box does not have: nothing is stopped ------------------
     $script:icaclsCalls = 0
@@ -763,8 +832,8 @@ try {
     # everything from the settings to the read-back of the account are cut
     # from the script that goes up and run against one scratch task, through
     # every change of account a deploy makes, and the task is read back after
-    # each. Its action is cmd.exe /c exit. Nothing here starts it, and it is
-    # removed before this ends.
+    # each. Its program is a stand-in named for the deploy, which is not
+    # there. Nothing here starts it, and it is removed before this ends.
     $elevated = $false
     try {
         $elevated = (New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole(
@@ -802,14 +871,24 @@ try {
             $makeOrUpdate -notmatch 'Start-ScheduledTask' -and $makeOrUpdate -notmatch 'Stop-Process')
 
         # One deploy against the scratch task: the account block with the
-        # scratch folders and icacls standing in, an action that does nothing,
-        # then the real register-or-update and read-back, with Continue as the
-        # far end has it. Hands back what it said and the task as it is after.
+        # scratch folders and icacls standing in, then the real
+        # register-or-update and read-back, with Continue as the far end has
+        # it. Hands back what it said and the task as it is after.
+        #
+        # The program stands in for node, named for the deploy, so each one's
+        # action can be told from the last one's. When the site is on its own
+        # SID the part cut from the script builds the action again from it,
+        # to start through the owner launcher (#4077); the launcher stands in
+        # too, in the scratch folder rather than Program Files. Neither is run.
+        $launcherStandIn = Join-Path $tmp 'thornswood-owner-harness.exe'
+        function NodeOf([int]$n) { return (Join-Path $tmp ('node-{0}.exe' -f $n)) }
         function OnTask([string]$given, [int]$n) {
             $code = '$ErrorActionPreference = ''Continue''' + "`n" +
                     'function icacls { $script:icaclsCalls++; $global:LASTEXITCODE = 0 }' + "`n" +
-                    (BlockOf (Build $given $docs $scratchTask)) + "`n" +
-                    ('$a = New-ScheduledTaskAction -Execute ''cmd.exe'' -Argument ''/c exit {0}''' -f $n) + "`n" +
+                    ('function Install-ThornswoodOwnerLaunch {{ return ''{0}'' }}' -f $launcherStandIn) + "`n" +
+                    (AccountOf (Build $given $docs $scratchTask)) + "`n" +
+                    ('$node = ''{0}''' -f (NodeOf $n)) + "`n" +
+                    '$a = New-ScheduledTaskAction -Execute $node -Argument ''server.js''' + "`n" +
                     $makeOrUpdate
             $script:icaclsCalls = 0
             # A cmdlet that fails in there can still end this script, because
@@ -823,7 +902,22 @@ try {
             return @{ said = ($ran.said -join "`n"); task = $task; p = $p }
         }
         function PrivsOf($p) { return ((@($p.RequiredPrivilege) | Where-Object { $_ }) -join ',') }
-        function ArgsOf($task) { if (-not $task) { return '' }; return [string](@($task.Actions)[0].Arguments) }
+        # The program the task runs, with the owner launcher taken off.
+        function ProgramOf($task) {
+            if (-not $task) { return '' }
+            try { return [string](Get-ThornswoodPlainAction @($task.Actions)[0]).Execute }
+            catch { return 'UNREADABLE: ' + $_.Exception.Message }
+        }
+        # True when the task starts through the owner launcher, with the SID
+        # the deploy said it owns as (its OWNER line).
+        function Launched($r) {
+            if (-not $r.task) { return $false }
+            $act = @($r.task.Actions)[0]
+            $m = [regex]::Match($r.said, '(?m)^OWNER (S-1-5-87-[0-9-]+)\s*$')
+            return [bool]($m.Success -and [string]$act.Execute -eq $launcherStandIn -and
+                ([string]$act.Arguments).StartsWith($m.Groups[1].Value + ' '))
+        }
+        function Direct($r) { return [bool]($r.task -and [string]@($r.task.Actions)[0].Execute -ne $launcherStandIn) }
         # The start-up trigger it was registered with, and the ten restarts.
         function Kept($task) {
             return [bool]($task -and @($task.Triggers | Where-Object { $_ }).Count -eq 1 -and $task.Settings.RestartCount -eq 10)
@@ -843,7 +937,8 @@ try {
                 Yes 'real task: no -RunAs and no task yet registers one' ($r.said -match 'scheduled task created' -and $null -ne $r.task)
                 Yes 'real task: on LOCAL SERVICE at Limited, SeChangeNotifyPrivilege only, token SID type Unrestricted (#2613)' (IsCut $r.p)
                 Yes 'real task: with its start-up trigger, ten restarts and the action it was given' (
-                    (Kept $r.task) -and (ArgsOf $r.task) -eq '/c exit 1')
+                    (Kept $r.task) -and (ProgramOf $r.task) -eq (NodeOf 1))
+                Yes 'real task: started through the owner launcher with its own SID (#4077)' (Launched $r)
                 Yes 'real task: and the read-back says LOCAL SERVICE' ($r.said -match 'task runs as LOCAL SERVICE, run level Limited')
 
                 # Put on SYSTEM first, so the next one moves it as a SYSTEM task on the box would be.
@@ -858,14 +953,14 @@ try {
                 }
                 Yes 'real task: it is now LOCAL SERVICE at Limited, SeChangeNotifyPrivilege only, token SID type Unrestricted' (IsCut $r.p)
                 Yes 'real task: the trigger and settings kept, and this deploy''s action on it' (
-                    (Kept $r.task) -and (ArgsOf $r.task) -eq '/c exit 2')
+                    (Kept $r.task) -and (ProgramOf $r.task) -eq (NodeOf 2) -and (Launched $r))
                 Yes 'real task: and the read-back says LOCAL SERVICE with the cut' (
                     $r.said -match 'task runs as LOCAL SERVICE, run level Limited' -and
                     $r.said -match 'task privileges: SeChangeNotifyPrivilege only, token SID type Unrestricted')
 
                 $r = OnTask '' 3
                 Yes 'real task: a deploy without -RunAs after that reads LOCAL SERVICE off the task and keeps it, cut' (
-                    $r.said -match 'keeps the account it has: LOCAL SERVICE' -and (IsCut $r.p) -and (ArgsOf $r.task) -eq '/c exit 3')
+                    $r.said -match 'keeps the account it has: LOCAL SERVICE' -and (IsCut $r.p) -and (ProgramOf $r.task) -eq (NodeOf 3) -and (Launched $r))
 
                 # The finding. Before the fix this said "scheduled task
                 # updated" and left the task on LOCAL SERVICE with the last
@@ -874,13 +969,14 @@ try {
                 Yes 'real task: -RunAs SYSTEM on the LOCAL SERVICE task updates it without an error' (
                     $r.said -match 'scheduled task updated' -and $r.said -notmatch 'COULD NOT UPDATE' -and $r.said -notmatch 'unexpected node')
                 Yes 'real task: -RunAs SYSTEM puts it back on SYSTEM at Highest, with no privilege list left over' (IsSystem $r.p)
-                Yes 'real task: with this deploy''s action on it, not the last one''s' ((Kept $r.task) -and (ArgsOf $r.task) -eq '/c exit 4')
+                Yes 'real task: with this deploy''s action on it, not the last one''s, and not through the launcher' (
+                    (Kept $r.task) -and (ProgramOf $r.task) -eq (NodeOf 4) -and (Direct $r))
                 Yes 'real task: and the read-back says SYSTEM' (
                     $r.said -match 'task runs as SYSTEM, run level Highest' -and $r.said -notmatch 'THE TASK RUNS AS')
 
                 $r = OnTask '' 5
                 Yes 'real task: and a deploy without -RunAs after that moves it back to LOCAL SERVICE, cut (#2613)' (
-                    $r.said -match 'it moves to LOCAL SERVICE' -and (IsCut $r.p) -and (ArgsOf $r.task) -eq '/c exit 5' -and
+                    $r.said -match 'it moves to LOCAL SERVICE' -and (IsCut $r.p) -and (ProgramOf $r.task) -eq (NodeOf 5) -and (Launched $r) -and
                     $r.said -notmatch 'COULD NOT UPDATE')
             }
             finally {

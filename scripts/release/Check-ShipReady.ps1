@@ -65,7 +65,6 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\deploy\ServerBuild.ps1')
-. (Join-Path $Here '..\mods\Generated.ps1')
 . (Join-Path $Here '..\deploy\Fresh-Checkout.ps1')
 . (Join-Path $Here '..\mods\LoadOrder.ps1')
 . (Join-Path $Here 'Find-MSBuild.ps1') -Load
@@ -181,22 +180,6 @@ function Get-ClientRows([string]$SyncClient, [string]$Record, [string]$Game, [st
   }
   $rows += New-Row 'the recorded client is in the game folder, or here to copy in' $ok $detail $fix
   return $rows
-}
-
-# WHETHER THE GENERATED FILES ARE CURRENT (issue #1247). Ship stops, on both
-# channels, when the record scripts\mods\Build-Generated.ps1 writes of the
-# behavior and BodySlide files it made in the game folder is missing, or no
-# longer matches the mod list, the files the tools read, records\generated.json
-# or the files themselves (Get-GeneratedState, scripts\mods\Generated.ps1).
-# $RootArg is ' -Root "<folder>"' when Check-ShipReady was given -Root, so the
-# command builds in the folder this checked and not the recorded one.
-function Get-GeneratedRows([string]$Root, [string]$ListPath, [string]$Channel, [string]$RootArg = '') {
-  $what = 'Thornswood''s animation and body files are built for this mod list'
-  $fix = '.\scripts\mods\Build-Generated.ps1 -Channel ' + $Channel + $RootArg + '     with the game and the launcher closed; it builds them in Thornswood''s own folder'
-  $st = $null
-  try { $st = Get-GeneratedState $Root $ListPath } catch { return @(New-Row $what $false $_.Exception.Message $fix) }
-  if ($st.Current) { return @(New-Row $what $true ('{0} files, as built' -f $st.Record.Files.Count) $null) }
-  return @(New-Row $what $false ($st.Why -join '; ') $fix)
 }
 
 # WHAT ONLY A MAIN RELEASE ASKS FOR (issue #932), as a warning: it does not
@@ -498,11 +481,11 @@ try { $vpDir = Get-VortexProfileDir 'Thornswood' } catch { $vpDir = $null }
 Ready 'Vortex has a profile named Thornswood' ([bool]$vpDir) $(if ($vpDir) { $vpDir } else { '' }) `
   'In Vortex: Profiles, add one named Thornswood, switch to it, install the Thornswood collection and let it deploy'
 # A ship root's launcher is never started (#2603), so the folder is made the
-# way a Ship makes it first, by Update-ShipRoot.ps1. A Ship that makes it then
-# stops at the animation and body files, which are built in it afterwards.
-Ready 'it has its own game folder' $hasGame $(if ($hasGame) { $GameDir } else { $GameDir + ' is not there yet; a Ship makes it and then stops at the animation and body files' }) `
+# way a Ship makes it first, by Update-ShipRoot.ps1. The animation and body
+# files are not built there: no release carries them (#3715).
+Ready 'it has its own game folder' $hasGame $(if ($hasGame) { $GameDir } else { $GameDir + ' is not there yet; a Ship makes it first' }) `
   ('.\scripts\release\Update-ShipRoot.ps1 -Channel ' + $Channel + $rootArg + '   makes it from what Vortex has deployed, as a Ship does first' +
-   ' (add -SkyrimFrom <a folder holding Skyrim 1.6.1170''s own files> where the Steam copy is not on 1.6.1170); then .\scripts\mods\Build-Generated.ps1 -Channel ' + $Channel + $rootArg)
+   ' (add -SkyrimFrom <a folder holding Skyrim 1.6.1170''s own files> where the Steam copy is not on 1.6.1170)')
 
 if ($hasGame) {
   $record = Join-Path $Root 'Profile\OwnGame\files.txt'
@@ -629,14 +612,6 @@ if (Test-Path -LiteralPath (Join-Path $fork '.git')) {
   Say '        only an engine change is, and its build is CI''s (engine\README.md, The engine built in CI).' 'DarkGray'
 }
 
-# ------------------------------------------------ the generated files --
-Head 'The animation and body files'
-if ($hasGame) {
-  foreach ($r in @(Get-GeneratedRows $Root (Join-Path $RepoDir 'records\generated.json') $Channel $rootArg)) { Show-Row $r }
-} else {
-  Say '  skip  no own game folder, so there are none to check' 'DarkGray'
-}
-
 # ------------------------------------------------ what only main asks for --
 if (-not $Dev) {
   Head 'For -Package and the live deploys'
@@ -667,7 +642,7 @@ if ($NoVps) {
     $sshOk = ($out -match 'THORNSWOOD_OK')
   } catch { $sshOk = $false }
   Ready 'ssh to the VPS works without a password' $sshOk $script:VpsAddress `
-    '.\scripts\vps\Setup-SshKey.ps1        then Patrick runs .\scripts\vps\Grant-BoxAccess.ps1 with the line it prints (docs\BOX-ACCESS.md)' 'either'
+    '.\scripts\vps\Setup-SshKey.ps1        then Patrick runs .\scripts\vps\Grant-BoxAccess.ps1 with the line it prints (BOX-ACCESS.md in the ops repo)' 'either'
   Say '  note  a Ship needs ssh: the feed, its baseline and every download go to the VPS (#897, #907).' 'DarkGray'
   # The feed store beside the feed the site serves (Feed-Store.ps1, #907).
   # Read only: asks what is there, sends nothing.

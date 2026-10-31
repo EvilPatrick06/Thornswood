@@ -25,7 +25,8 @@ key does not take it off them.
 The claim lapses 14 real days after the last time the holder opened one
 of its doors. Living there keeps it. When it lapses, the register drops
 the claim and the doors unlock. What is in the chests stays in the
-chests.
+chests. Rent owed on it, counted up to the day it lapsed and no further,
+stays owed by the holder (#3950, see Stewards and rent).
 
 When somebody's account is deleted at their request, the game lets go of
 what their characters held at its next start (#2351): a building or a farm
@@ -46,8 +47,13 @@ on it is a farm claim of its own.
 
 Claiming hands you a deed there and then, and the building's master
 key with it (see The master key, below). Every building uses one book.
-The name on that copy is the building: Deed to Breezehome is not Deed
-to Honeyside.
+The name on that copy is the building and its hold: Deed to Breezehome,
+Whiterun is not Deed to Honeyside, Riften. Some names are carried by more
+than one building (six Halls of the Dead), so the hold is what tells them
+apart, and where two in one hold share a name a number follows it, as on
+a master key: Warehouse, Windhelm, no. 2. Keys and key molds are named the
+same way, and a key, mold or deed opens and hands over only the one
+building its name says.
 
 What you hold is on the property page of the K panel: each building,
 whether it is locked, the rent owed on it, and your farm with the days
@@ -59,6 +65,16 @@ one of the building's doors is presenting it: the building is the
 carrier's from then on, sold, given or stolen alike, and the server
 does not tell those apart. A book somebody renamed by hand is not a
 deed, because the server never issued it.
+
+A deed changing hands keeps the rent and the debt (Patrick, 27 Oct,
+#3893). The building keeps the rent its steward set, at the same amount
+and on the same clock, so the next rent falls due on the day it would
+have. The new holder starts at nothing owed. What the old holder owed
+stays theirs: the steward sees it at the door on the Office page, the
+old holder sees it on their property page of K and at the door with
+the rent, and it is paid the same ways as any rent (see Stewards and
+rent). So handing the deed to another of your characters, or to a
+friend, does not clear a debt.
 
 ## Locks and keys
 
@@ -143,17 +159,42 @@ hold settle it as its steward, like anybody who keeps it.
 
 Eviction ends the claim. It does not empty the house. It does not
 take a key back, so a tenant who kept one can still walk in. That is a
-person's problem, handled like a person.
+person's problem, handled like a person. It does not end the debt
+either: rent the tenant owed stays theirs (#3950).
+
+A claim ending never ends a debt (Patrick, 27 Oct, #3893 and #3950).
+When the deed goes to somebody else, a steward evicts, or the claim
+lapses, whatever its holder owed, counted up to that moment, stays
+owed by them. Rent is never counted past the day a claim lapses. The
+steward sees it at that door on the Office page, the person sees it on
+their property page of K, and it is paid like any rent, below. A
+steward who forgives it marks it paid.
 
 Rent is optional. A steward opens the door, then on the Office page
 sets 50 and the place owes 50 gold every 7 real days, or presses No
-rent and it owes nothing. The page shows the steward what is owed
-there.
+rent and it owes nothing. Setting a new amount on a place that already
+pays rent changes what the coming weeks cost: what is owed stays owed,
+and the clock goes on. The page shows the steward who owes what there:
+the holder, and anybody who held it before and still owes from then.
 
 The server counts the debt. It does not take the gold out of a pack.
 Rent is handed to a steward, or put in the hold's drop box. Gold put in
-the drop box pays rent owed by that person first. Taking it back out
-makes that rent owed again.
+the drop box pays rent owed by that person first, what they owe on a
+place they no longer hold before the rest. Taking it back out makes
+that rent owed again, by them.
+
+Rent handed to a steward in person is counted with Rent paid (Patrick,
+27 Oct, #3895). On the Office page, beside each person who owes at
+that door, the steward types how much they were handed, or leaves it
+empty for all of it, and presses Rent paid. What that person owes goes
+down by it, never below nothing. It is one line in the hold's drop box
+record, beside the box's own payments: who was handed it, by whom, how
+much and for which building. Staff who press it at a door are in the
+staff log too.
+
+Paying never moves the rent clock (#3891, #3895). The next rent falls
+due 7 days after the last one did, however early or late it was paid,
+and taking gold back out of the box does not move it either.
 
 ## The hold's box
 
@@ -226,6 +267,14 @@ Chests and barrels in the building are storage. A claim does not add
 slots. The server already owns containers. When a claim ends, the
 containers stay as they are for the next holder.
 
+A crafting bench in a building you hold draws from its chests (#3159,
+Patrick, 22 Oct). Every chest and barrel in the building counts,
+furniture chests you set down included, and only for the holder: a
+guest or a partner with the master key works from their own pack. If
+the building changes hands while you are at the bench, a craft that
+needs the chests is refused and the bench has only what you carry.
+[Professions](professions.md) says how a craft takes from them.
+
 An outhouse or a pot would be relief for the optional meter on
 [The body](body.md). That meter is not built unless a vote after the
 server is fully live says to add it. Until then the server does not
@@ -271,6 +320,10 @@ A shop is a claimed building and a notice on the hold's board. No rank
 mints a vendor, and the guild does not own the counter. Prices are
 what the two people agree when they trade. Coin moves as
 [Gold](gold.md) says.
+
+A stall in a town's market is claimed the same way, for nothing, and
+its keeper names the prices on it; it sells only while they stand at it.
+That is [Market stalls](stalls.md).
 
 ## What is not a house
 
@@ -319,7 +372,8 @@ transfer. All of these numbers are staff data.
 
 Claims, deeds, the 14 day lapse, locks, molds, keys, master keys,
 stewards, eviction, rent, the hold's drop box and furniture are in the server. The register
-is `private/property.json`, and the furniture's is `private/furniture.json`, which
+is `private/property.json`, with the rent still owed by somebody who no longer holds the place
+under `arrears` (#3893), and the furniture's is `private/furniture.json`, which
 names no person (the furniture block in `game/gamemode.js`). Eviction and the rent are
 the Office page of the K panel, for a steward (the Steward or the Jarl
 of a hold, by the Discord role); see
@@ -348,9 +402,9 @@ steward of the building's hold acts as its steward, and anybody else
 must be staff by the chat block's `isStaff` (`__thornswoodIsStaff`) and
 pass the staff block's `unproven` on the line the press arrived on.
 `staffRecord` writes the press through the staff block's `record`:
-thornswood.log, and `for-bot\moderation.log` with `did` evict, rent or
-norent, `by`, `byName`, `who`, `whoName`, `why` (the building and its
-hold, and the rent set), `building`, `buildingName`, `hold` and `at`.
+thornswood.log, and `for-bot\moderation.log` with `did` evict, rent,
+norent or rentpaid, `by`, `byName`, `who`, `whoName`, `why` (the building and its
+hold, and the rent set or paid), `building`, `buildingName`, `hold` and `at`.
 A press is refused when that log cannot be reached.
 `tests\test-2551-building-holds.js` drives it at all 850 buildings.
 

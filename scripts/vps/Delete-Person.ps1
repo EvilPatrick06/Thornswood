@@ -21,7 +21,7 @@
   what had been done. Patrick decided on 12 October 2026 (option A on #2351): a
   staff script that finds, shows counts, deletes with a dry run first, and
   records each request so a restore reapplies it. "Deletion requests" in
-  docs\WEBSITE-OPERATIONS.md is the procedure around it.
+  the ops repo's WEBSITE-OPERATIONS.md is the procedure around it.
 
   A DRY RUN IS THE DEFAULT. Without -Delete nothing is changed or written.
   It prints, for every store, how many of the person's records are there and
@@ -63,8 +63,14 @@
                     voice starts, and the record keeps each day's line count
                     when the request was made
     the bot         their join number (joins.json; the last number given out
-                    stays, so nobody is handed theirs again) and their open
-                    ticket (open-tickets.json)
+                    stays, so nobody is handed theirs again), and in the
+                    joins.json-before-restore-<stamp> copies a restore set
+                    aside beside it, and their open ticket (open-tickets.json).
+                    Their ticket threads in the
+                    Discord and the bot's lines about them in the staff
+                    ticket log stay until their 365 days are up (Patrick's B
+                    on #3634: the record of what they were told), which the
+                    privacy page says
 
   WHAT IT LEAVES, counted and said:
     - staff's records about them: bans, PKs and notes (bans.json, pk.json,
@@ -98,7 +104,10 @@
   and takings in beds.json; the embassy and remnant rolls in embassy.json; a
   dungeon chest's reservation in dungeon-rewards-ledger.json; a faction or
   business book's members, chat and owner in books.json; a line or a hand
-  out on the trade ships' manifest in trade-cargo.json (#511); a guild
+  out on the trade ships' manifest in trade-cargo.json (#511); a market
+  stall they keep, and what is laid out on it, in market-stalls.json
+  (#3160); a line, a hand out or a journey on the trade carts' manifest in
+  trade-carts.json (#3158); a guild
   trader's supply waits, commission promises and a trade waiting on them in
   merchant-ledger.json (#2652). This script never
   edits those: what happens to a house or a post held by somebody who is gone
@@ -137,7 +146,7 @@
   its own, after a crash and after a reboot, which in October 2026 was about
   a day for the game servers and the site and up to a week for voice and the
   bot (#2758 has the count). Until it does, its copy still holds the records;
-  the procedure (docs\WEBSITE-OPERATIONS.md) says when the person is told.
+  the procedure (the ops repo's WEBSITE-OPERATIONS.md) says when the person is told.
   A copy set aside with an unfinished save (.pending-batch in changeForms)
   is refused: the engine would replay it if that copy were put back, and
   could write a deleted character back. Every file is read and checked
@@ -157,7 +166,7 @@
   -Reapply reads that record and asks for every request in it again, the same
   way: after a backup is put back and before anything starts, so each service
   takes them at the start that puts it back in service (Restore-Box.ps1 runs
-  it, and docs\RESTORING.md says when by hand). -Merge names other copies of
+  it, and RESTORING.md in the ops repo says when by hand). -Merge names other copies of
   the record (the one in the backup being put back, or one from a newer
   backup); lines the box's record does not have are added to it first.
   -Reapply never adds a line of its own.
@@ -495,6 +504,15 @@ function serverSets(s) {
     if (l.indexOf(leaf + '.') !== 0 || !/^\.(prev|undone|failed)-\d{8}-\d{6}$/.test(l.slice(leaf.length))) continue;
     if (isDir(path.join(parent, n))) out.push({ tag: s.tag + ' game server, set aside as ' + n, root: path.join(parent, n), writer: null });
   }
+  // Restore-Server.ps1 moves the world and private it replaces into
+  // world-before-restore-<stamp> inside the server's folder, a folder of the
+  // same shape as the server's own, which a world-before-* match never read
+  // into (#3620).
+  for (const n of names(s.root).sort()) {
+    if (/^world-before-restore-\d{8}-\d{6}$/i.test(n) && isDir(path.join(s.root, n))) {
+      out.push({ tag: s.tag + ' game server, restore set aside as ' + n, root: path.join(s.root, n), writer: null });
+    }
+  }
   return out;
 }
 
@@ -765,14 +783,19 @@ for (const person of people) {
                  'and which could write a character back. Delete that copy, or put it back and start it once, then run this again. Nothing was changed');
           }
           for (const f of fl) {
-            if (!/\.json$/i.test(f) || f[0] === '.') continue;
+            // <id>.json.bak-<stamp> is Reset-Appearance.ps1's whole copy of a
+            // character (#3620), which the engine never loads but which holds
+            // them just the same. Nothing runs from it, so it goes now even in
+            // a live server's folder.
+            const bak = /\.json\.bak-\d{8}-\d{6}$/i.test(f);
+            if ((!bak && !/\.json$/i.test(f)) || f[0] === '.') continue;
             const p = path.join(dir, f);
             if (!P.size) continue;
             let o = null;
             try { o = JSON.parse(fs.readFileSync(p, 'utf8').replace(/^\uFEFF/, '')); } catch (e) { left(T + ': change forms that would not parse, so were not read', 1); continue; }
             if (isObj(o) && Number(o.profileId) > 0 && hasP(o.profileId) && !unlinks.has(p)) {
-              unlink(p, live ? g.writer : null);
-              removed(T + ': characters' + (w === 'world' && dir === forms ? '' : ' in ' + path.relative(R, dir)), 1);
+              unlink(p, live && !bak ? g.writer : null);
+              removed(T + ': characters' + (bak ? ' in copies an appearance reset kept' : w === 'world' && dir === forms ? '' : ' in ' + path.relative(R, dir)), 1);
               // A character made in the world has a form id of its own, no plugin (FormDesc::ToString).
               if (/^[0-9a-f]{1,8}$/i.test(String(o.formDesc || ''))) A.add(parseInt(o.formDesc, 16));
             }
@@ -826,7 +849,7 @@ for (const person of people) {
         left: the old copies in data.
       */
       const LIST = 'deleted-characters.json';
-      const RELEASED = /^(property|law|beds|farm-claims|embassy|books|dungeon-rewards-ledger|trade-cargo|merchant-ledger)\.json$/i;
+      const RELEASED = /^(property|law|beds|farm-claims|embassy|books|dungeon-rewards-ledger|trade-cargo|market-stalls|trade-carts|merchant-ledger)\.json$/i;
       handled.add(path.join(priv, LIST).toLowerCase());
       let theirs = 0;
       if (P.size) {
@@ -911,6 +934,17 @@ for (const person of people) {
   if (want(joins, 'object')) {
     for (const gv of Object.values(joins.value)) {
       if (isObj(gv) && isObj(gv.members) && has(gv.members, id)) { delete gv.members[id]; dirty(joins); removed('bot: join number', 1); }
+    }
+  }
+  // A restore moves the joins.json it replaces to
+  // joins.json-before-restore-<stamp>[-n] beside it (vps-restore-services.ps1),
+  // kept 30 days and written by nobody, so edited here at once (#3620).
+  for (const n of names(bd).sort()) {
+    if (!/^joins\.json-before-restore-\d{8}-\d{6}(-\d+)?$/.test(n)) continue;
+    const old = json(path.join(bd, n), null);
+    if (!want(old, 'object')) continue;
+    for (const gv of Object.values(old.value)) {
+      if (isObj(gv) && isObj(gv.members) && has(gv.members, id)) { delete gv.members[id]; dirty(old); removed('bot: join number in a copy a restore set aside', 1); }
     }
   }
   const tickets = json(path.join(bd, 'open-tickets.json'), 'bot');
@@ -1055,7 +1089,9 @@ function Show([string[]]$lines, [string]$verb) {
         if (-not $any) { Say '  nothing of theirs on this box' }
     }
     Say ''
-    Say '  Not on this box, so not done here: their Discord tickets (staff delete those in the Discord),'
+    Say '  Left on purpose: their tickets in the Discord and the bot''s lines about them in #ticket-log,'
+    Say '  the record of what they were told; the bot deletes each 365 days after it closed (#3634).'
+    Say '  Not on this box, so not done here:'
     Say '  gallery pictures approved before the site kept the sending account (remove theirs in the hub by name),'
     Say '  and the encrypted backups (they expire on their schedule; the record reapplies this after a restore).'
 }

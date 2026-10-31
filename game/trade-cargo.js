@@ -40,10 +40,12 @@
   at sea cannot be opened: begin() refuses every way out while it sails.
   Cargo still aboard so many real days after landing goes into the port's
   hold drop box under the recipient's name, as how 'left'. landed is when a
-  hold last docked, null while it sails, and uncollected() lists what is due;
-  how many days is the staff list's uncollectedDays. A hold carries as many
-  lines as it may that still have something aboard or being handed out, so a
-  hold whose cargo has all gone out, by any way, is free again.
+  ship last docked at the end of a voyage, null while it sails and before
+  its first voyage, and uncollected() lists what is due; how many days is
+  the staff list's uncollectedDays. A hold carries as many lines as it may
+  that still have something aboard or being handed out, so a hold whose
+  cargo has all gone out, by any way, is free again. A cart keeps no landed:
+  goods for somebody who is not at the stop wait on the cart (#3158).
 
   WHAT IT NEVER DECIDES. Thornswood is a player-driven RP server (Patrick,
   17 Oct 2026, 10:13 PM MT): a trade ship is a tool, and the players decide
@@ -57,6 +59,24 @@
   Ownership of who may run a ship, contracts and freight belong to #512 (the
   Free Skyrim Trading Company). Prices, purses and trading belong to #1373.
   Nothing here calls either.
+
+  CARTS ARE THE SAME MANIFEST, DRIVEN (#3158). Patrick, 22 Oct 2026: people
+  drive the carts that move goods between holds, and a shipment is lost only
+  when people raid it, never by chance. createTradeCargo({ driven: true }) is
+  a manifest of carts: a "port" is a cart stop and a "route" a road. Every
+  rule above holds the same, and three differ:
+
+  - A cart leaves only with a driver, the character who drives it, kept on
+    the journey as sailing.driver. A ship never has one.
+  - A cart never arrives on a clock. pullIn() brings it in at its stop when
+    its driver is there and the road's least time has passed, or when staff
+    bring in one whose driver is gone. arrive() refuses a driven manifest.
+  - A driver deleted, reset, wiped or replaced comes off the journey the way
+    a loader does; the cart stays on the road for staff to bring in.
+
+  Taking from a cart on the road, the raid, is begin() with how 'taken',
+  which this file already allows at sea. Who may raid, and where, is the
+  caller's rule (game\trade-carts.js).
 */
 
 var GOLD_BASE = 15;
@@ -125,6 +145,8 @@ function createTradeCargo(opts) {
   }
   var maxLines = opts.maxLines === undefined ? MAX_LINES_DEFAULT : opts.maxLines;
   if (!Number.isInteger(maxLines) || maxLines < 1 || maxLines > 256) { throw new Error('The line limit cannot be verified.'); }
+  if (opts.driven !== undefined && typeof opts.driven !== 'boolean') { throw new Error('Whether it is driven cannot be verified.'); }
+  var driven = opts.driven === true;
 
   function empty() { return { v: 1, seq: 0, holds: {}, receipts: {} }; }
 
@@ -172,14 +194,15 @@ function createTradeCargo(opts) {
       holds++;
       if (h.sailing !== null) {
         var s = h.sailing;
-        if (!isObj(s) || s.from !== h.port || !ports[s.to] || s.to === s.from || !time(s.at) || !time(s.arriveAt) || s.arriveAt <= s.at) {
+        if (!isObj(s) || s.from !== h.port || !ports[s.to] || s.to === s.from || !time(s.at) || !time(s.arriveAt) || s.arriveAt <= s.at ||
+            (driven ? !has(s, 'driver') || !named(s.driver) : has(s, 'driver'))) {
           throw new Error('Hold ' + id + '\'s voyage cannot be verified.');
         }
         sailing++;
       }
-      // A register written before landed was kept has none: read as null.
-      var landed = has(h, 'landed') ? h.landed : null;
-      if (landed !== null && (!time(landed) || h.sailing !== null)) {
+      // A ship always says when it landed (null at sea and before its first
+      // voyage); a cart never does.
+      if (driven ? has(h, 'landed') : !has(h, 'landed') || (h.landed !== null && (!time(h.landed) || h.sailing !== null))) {
         throw new Error('Hold ' + id + '\'s landing cannot be verified.');
       }
       var left = {};
@@ -233,7 +256,8 @@ function createTradeCargo(opts) {
       if (typeof id !== 'string' || !ID_RE.test(id)) { throw new Error('A hold needs a plain name.'); }
       if (has(s.holds, id)) { throw new Error('There is already a hold ' + id + '.'); }
       if (!ports[port]) { throw new Error('No port ' + port + '.'); }
-      s.holds[id] = { port: port, sailing: null, landed: null, lines: {}, outs: [] };
+      s.holds[id] = { port: port, sailing: null, lines: {}, outs: [] };
+      if (!driven) { s.holds[id].landed = null; }
       return id;
     });
   }
@@ -259,9 +283,13 @@ function createTradeCargo(opts) {
     });
   }
 
-  function depart(state, id, to, at, arriveAt) {
+  /* driver is the character driving a cart, and is never given for a ship. */
+  function depart(state, id, to, at, arriveAt, driver) {
     return change(state, function (s) {
       var h = holdOf(s, id);
+      var who = null;
+      if (driven) { who = partyOf(driver, 'Who drives it'); }
+      else if (driver !== undefined) { throw new Error('A ship has no driver.'); }
       if (h.sailing) { throw new Error('The hold is already at sea.'); }
       if (!ports[to] || to === h.port || (routes && !routes[h.port + '>' + to])) {
         throw new Error('No voyage from ' + h.port + ' to ' + to + '.');
@@ -271,7 +299,7 @@ function createTradeCargo(opts) {
       if (!carrying) { throw new Error('The hold is empty.'); }
       if (h.outs.some(function (o) { return o.receipt === null; })) { throw new Error('Something is still being handed out.'); }
       h.sailing = { from: h.port, to: to, at: at, arriveAt: arriveAt };
-      h.landed = null;
+      if (driven) { h.sailing.driver = who; } else { h.landed = null; }
       return h.sailing;
     });
   }
@@ -299,6 +327,7 @@ function createTradeCargo(opts) {
 
   /* Every hold whose voyage is over by now is docked at its destination, landed now. */
   function arrive(state, now) {
+    if (driven) { throw new Error('A cart comes in only with its driver.'); }
     if (!time(now)) { throw new Error('The time cannot be verified.'); }
     return change(state, function (s) {
       var landed = [];
@@ -316,19 +345,25 @@ function createTradeCargo(opts) {
   }
 
   /*
-    A hold docked before landed was kept has no landing time, so its days
-    would never start. This gives every docked hold without one the time
-    now, once, at a start. Answers the holds it gave a time.
+    A cart comes in at the stop it was driven to. who is the character at the
+    stop: only the driver, and only once the road's least time has passed.
+    who null is staff bringing in a cart, at any time, whether or not its
+    driver is still named. Answers the stop.
   */
-  function clockDocked(state, now) {
+  function pullIn(state, id, now, who) {
+    if (!driven) { throw new Error('A ship docks on its own.'); }
     if (!time(now)) { throw new Error('The time cannot be verified.'); }
     return change(state, function (s) {
-      var given = [];
-      Object.keys(s.holds).sort().forEach(function (id) {
-        var h = s.holds[id];
-        if (h.sailing === null && (!has(h, 'landed') || h.landed === null)) { h.landed = now; given.push(id); }
-      });
-      return given;
+      var h = holdOf(s, id);
+      if (!h.sailing) { throw new Error('The cart is not on the road.'); }
+      if (who !== null) {
+        var me = partyOf(who, 'Who brings it in');
+        if (!same(me, h.sailing.driver)) { throw new Error('Only its driver brings a cart in.'); }
+        if (now < h.sailing.arriveAt) { throw new Error('The road is not done yet.'); }
+      }
+      h.port = h.sailing.to;
+      h.sailing = null;
+      return h.port;
     });
   }
 
@@ -340,11 +375,12 @@ function createTradeCargo(opts) {
     Answers [{ hold, line, count, port, for }], oldest landing first.
   */
   function uncollected(state, now, waitMs) {
+    if (driven) { throw new Error('Goods on a cart wait on the cart.'); }
     if (!time(now) || !time(waitMs)) { throw new Error('The time cannot be verified.'); }
     var due = [];
     Object.keys(state.holds).sort().forEach(function (id) {
       var h = state.holds[id];
-      var landed = has(h, 'landed') ? h.landed : null;
+      var landed = h.landed;
       if (h.sailing !== null || landed === null || now - landed < waitMs) { return; }
       Object.keys(h.lines).map(Number).sort(function (a, b) { return a - b; }).forEach(function (k) {
         var l = h.lines[String(k)];
@@ -357,19 +393,25 @@ function createTradeCargo(opts) {
     return due.map(function (d) { delete d.landed; return d; });
   }
 
-  /* When the next line comes due for the drop box, or null when none will. */
-  function nextUncollected(state, waitMs) {
-    if (!time(waitMs)) { throw new Error('The time cannot be verified.'); }
+  /*
+    When the next line comes due for the drop box, or null when none will.
+    after, when given, is a time: only what comes due later than it counts,
+    so what was already looked at then is not named again.
+  */
+  function nextUncollected(state, waitMs, after) {
+    if (driven) { throw new Error('Goods on a cart wait on the cart.'); }
+    if (!time(waitMs) || (after !== undefined && !time(after))) { throw new Error('The time cannot be verified.'); }
     var next = null;
     Object.keys(state.holds).forEach(function (id) {
       var h = state.holds[id];
-      var landed = has(h, 'landed') ? h.landed : null;
-      if (h.sailing !== null || landed === null) { return; }
+      if (h.sailing !== null || h.landed === null) { return; }
+      var due = h.landed + waitMs;
+      if (after !== undefined && due <= after) { return; }
       var waiting = Object.keys(h.lines).some(function (k) {
         var l = h.lines[k];
         return l.aboard > 0 && l.for !== null && l.from !== h.port;
       });
-      if (waiting && (next === null || landed + waitMs < next)) { next = landed + waitMs; }
+      if (waiting && (next === null || due < next)) { next = due; }
     });
     return next;
   }
@@ -380,7 +422,8 @@ function createTradeCargo(opts) {
     delivered (to the recipient), left (in the drop box under the
     recipient's name), returned (to the loader, at the port it was loaded
     in) or taken (by whoever opened it, Patrick's A of 22 Oct 2026). Nothing
-    leaves a hold at sea, by any way. who is the character receiving it.
+    leaves a ship at sea, by any way; a cart on the road can only be taken
+    from, the raid. who is the character receiving it.
   */
   function begin(state, id, line, n, how, who, at) {
     return change(state, function (s) {
@@ -391,7 +434,9 @@ function createTradeCargo(opts) {
       var to = partyOf(who, 'Who receives it');
       if (!count(n) || n > l.aboard) { throw new Error('There is not that much aboard.'); }
       if (!time(at)) { throw new Error('The time cannot be verified.'); }
-      if (h.sailing) { throw new Error('The hold is at sea.'); }
+      // A ship at sea opens for nobody (#511). A cart on the road is raided:
+      // taken, and only taken, while it is driven (#3158).
+      if (h.sailing && !(driven && how === 'taken')) { throw new Error(driven ? 'The cart is on the road.' : 'The hold is at sea.'); }
       if ((how === 'delivered' || how === 'left') && (!same(to, l.for) || h.port === l.from)) {
         throw new Error('Only the person it is for receives it, at the far end.');
       }
@@ -450,6 +495,7 @@ function createTradeCargo(opts) {
     function gone(p) { return !!p && (who.actor(p.actor) === true || (p.profile > 0 && who.profile(p.profile) === true)); }
     return change(state, function (s) {
       var c = { loaders: 0, recipients: 0, receivers: 0 };
+      if (driven) { c.drivers = 0; }
       Object.keys(s.holds).forEach(function (id) {
         var h = s.holds[id];
         Object.keys(h.lines).forEach(function (k) {
@@ -458,6 +504,7 @@ function createTradeCargo(opts) {
           if (gone(l.for)) { l.for = null; c.recipients++; }
         });
         h.outs.forEach(function (o) { if (gone(o.who)) { o.who = null; c.receivers++; } });
+        if (driven && h.sailing && gone(h.sailing.driver)) { h.sailing.driver = null; c.drivers++; }
       });
       return c;
     });
@@ -493,11 +540,11 @@ function createTradeCargo(opts) {
   }
 
   return {
-    empty: empty, audit: audit, open: open, load: load, depart: depart, amend: amend, arrive: arrive,
+    empty: empty, audit: audit, open: open, load: load, depart: depart, amend: amend, arrive: arrive, pullIn: pullIn,
     begin: begin, finish: finish, undo: undo, release: release, aboard: aboard, save: save, parse: load_,
-    clockDocked: clockDocked, uncollected: uncollected, nextUncollected: nextUncollected,
+    uncollected: uncollected, nextUncollected: nextUncollected,
     used: function (state, id) { return inUse(holdOf(state, id)); },
-    PORTS: Object.keys(ports), MAX_LINES: maxLines
+    PORTS: Object.keys(ports), MAX_LINES: maxLines, DRIVEN: driven
   };
 }
 
@@ -633,17 +680,22 @@ function proposeRoutes(current, next, state) {
   openRegister(null) is the register of a server that never had one: no
   ports, no routes, no holds. A text that is there and does not verify is
   refused whole, never read as empty.
+
+  The carts' register is the same shape in its own file (#3158):
+  openRegister(text, { driven: true }), and the register remembers it is
+  driven through every adoptRoutes.
 */
-function registerOf(routes, state) {
-  var ships = createTradeCargo({ ports: routes.ports.map(function (p) { return p.key; }), routes: routes.routes });
+function registerOf(routes, state, driven) {
+  var ships = createTradeCargo({ ports: routes.ports.map(function (p) { return p.key; }), routes: routes.routes, driven: driven === true });
   ships.audit(state);
   return { routes: routes, ships: ships, state: state };
 }
 
-function openRegister(textIn) {
+function openRegister(textIn, opts) {
+  var driven = !!(opts && opts.driven === true);
   if (textIn === null || textIn === undefined) {
     var none = checkRoutes(NO_ROUTES);
-    return registerOf(none, createTradeCargo({ ports: [] }).empty());
+    return registerOf(none, createTradeCargo({ ports: [] }).empty(), driven);
   }
   if (typeof textIn !== 'string' || Buffer.byteLength(textIn, 'utf8') > MAX_STATE_BYTES * 2) {
     throw new Error('The ship register cannot be verified.');
@@ -653,7 +705,7 @@ function openRegister(textIn) {
   if (!isObj(raw) || raw.v !== 1 || Object.keys(raw).length !== 3 || !has(raw, 'routes') || !has(raw, 'cargo')) {
     throw new Error('The ship register cannot be verified.');
   }
-  return registerOf(checkRoutes(raw.routes), raw.cargo);
+  return registerOf(checkRoutes(raw.routes), raw.cargo, driven);
 }
 
 function saveRegister(reg) {
@@ -667,7 +719,7 @@ function saveRegister(reg) {
 function adoptRoutes(reg, next) {
   var p = proposeRoutes(reg.routes, next, reg.state);
   if (p.strands.length) { throw new Error('The edit strands a hold: ' + p.strands.join(' ')); }
-  return registerOf(p.next, copy(reg.state));
+  return registerOf(p.next, copy(reg.state), reg.ships.DRIVEN);
 }
 
 /* The counts a load banner says. */

@@ -438,8 +438,14 @@ try {
   wy.fire();
   yes('X16 a drop box that will not take it leaves every piece aboard, nothing pending', bad.calls.length === 2 &&
       wy.disk().cargo.holds['ship-1'].lines['1'].aboard === 5 && T.countsOf(T.openRegister(JSON.stringify(wy.disk()))).pending === 0);
-  const ly = wy.timers.filter(function (t) { return t.live; });
-  yes('X17 and tries again in an hour, never at once', ly.length === 1 && ly[0].ms === 60 * 60 * 1000);
+  wy.clock.now = 1000 + 7 * DAY + 2 * 60 * 60 * 1000;
+  for (let i = 0; i < 5; i++) { wy.fire(); }
+  yes('X17 and is not tried again on a clock: hours on, the box was asked nothing more', bad.calls.length === 2 &&
+      wy.disk().cargo.holds['ship-1'].lines['1'].aboard === 5);
+  wy.say(ACT.staff, '/ship add windhelm');
+  for (let i = 0; i < 5 && bad.calls.length === 2; i++) { wy.fire(); }
+  yes('X17b the next change to the register that goes through looks at it again', bad.calls.length === 4 &&
+      wy.disk().cargo.holds['ship-1'].lines['1'].aboard === 5);
   const wz = start(server('no-boxes', xtext), { clock: { now: 1000 } });
   wz.clock.now = 1000 + 7 * DAY;
   wz.fire();
@@ -449,8 +455,11 @@ try {
   const old = JSON.parse(xtext);
   old.cargo.holds['ship-2'].sailing = null; old.cargo.holds['ship-2'].port = 'windhelm';
   delete old.cargo.holds['ship-2'].landed;
-  const wo = start(server('before-landed', JSON.stringify(old)), { clock: { now: 4000 } });
-  yes('X19 a register from before landings were kept: its docked ships start their days at this start', wo.disk().cargo.holds['ship-2'].landed === 4000);
+  const oldText = JSON.stringify(old);
+  const wo = start(server('before-landed', oldText), { clock: { now: 4000 } });
+  yes('X19 a register whose ship does not say when it landed is refused whole, not carried over (alpha), and left as it was',
+      wo.logged.some(function (l) { return /could not be read \(Hold ship-2's landing cannot be verified/.test(l); }) &&
+      JSON.stringify(wo.disk()) === JSON.stringify(old));
   const allx = wx.logged.concat(wy.logged, wz.logged, wo.logged).join('\n');
   yes('X20 the log never says a form id or a profile id', [ACT.a, ACT.b, ACT.staff].every(function (n) { return allx.indexOf(n.toString(16)) < 0 && allx.indexOf(String(n)) < 0; }) &&
       ['5001', '5002', '5005'].every(function (p) { return allx.indexOf(p) < 0; }));

@@ -2,7 +2,7 @@
   "version": 1,
   "quest": "geode",
   "label": "Blackreach geodes",
-  "loadOrderSha256": "9c4e3d7191783dc8a79f2c1affde95427c4bf24c68b4a1ff93d03451fbd4baf5",
+  "loadOrderSha256": "17597555b8c439898714ebf725435a36a7102aa84d9ccbfba7a1796b6f6148b5",
   "sources": [
     {
       "reference": "10fc57:Skyrim.esm",

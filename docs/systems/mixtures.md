@@ -62,8 +62,13 @@ second bottle on the same stack once the first is in the pack.
 This list is in the server (`MIXTURES` in `game/gamemode.js`), keyed
 by the game's alchemy effects, with the rank of each. The server
 refuses a brew carrying an effect that is off it, or one above the
-rank, as soon as the engine says which effects the brew carries. The
-engine does not say yet: the craft message from the client names the
-bottle and not its effects, so the menu still brews whatever the
-ingredients share. [#1389](https://github.com/EvilPatrick06/Thornswood/issues/1389)
-says what the engine has to pass.
+rank. The engine works out which effects a brew carries from the
+ingredients it takes, the ones two or more of them share, and hands
+them to the server with the craft
+([#1389](https://github.com/EvilPatrick06/Thornswood/issues/1389)).
+
+Every ingredient in a brew must be one your character has eaten, or
+the brew is refused and the ingredients stay in the pack. A brew that
+goes through is remembered on the character, with every effect it
+showed, at any lab ([#3134](https://github.com/EvilPatrick06/Thornswood/issues/3134),
+[Alchemist](professions/alchemist.md)).

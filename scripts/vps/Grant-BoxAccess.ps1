@@ -22,8 +22,13 @@
                        an agent that only posts staff notices: a key that can
                        do nothing on the box but put one in #staff-updates
       .\scripts\vps\Grant-BoxAccess.ps1 -Name claude -MakeKey -NoticesOnly -ToEnvironment notices
-                       the same, for .github\workflows\staff-notice.yml: the
-                       key goes into that GitHub environment, not a file
+                       the same, for the ops repository's staff-notice.yml:
+                       the key goes into that GitHub environment, not a file
+      .\scripts\vps\Grant-BoxAccess.ps1 -Name desk -Deploy -MakeKey -ToEnvironment desk
+                       the release desk's deploy key (#2841): a key that logs
+                       in as thornswood-deploy and runs only the deploy gate's
+                       verbs, into the GitHub environment the ops repository's
+                       box-run.yml reads
       .\scripts\vps\Grant-BoxAccess.ps1 -Name djinn -Remove
                        take that one name's key and token off the box
       .\scripts\vps\Grant-BoxAccess.ps1 -List
@@ -46,10 +51,27 @@
   THORNSWOOD_NOTICE_KEY_B64=... and THORNSWOOD_NOTICE_TOKEN=..., for that
   agent's environment; scripts\ops\Say-Staff.ps1 uses them.
 
+  A DEPLOY KEY (-Deploy, with -MakeKey; #2841). It goes on the box not as
+  Administrator but in the authorized_keys of thornswood-deploy, an account
+  with no administrator rights that scripts\deploy\Install-Gate.ps1 makes,
+  as
+      from="127.0.0.1",restrict,command="powershell.exe ... -File C:\Thornswood-Gate\Gate.ps1"
+  so whatever the client asks for, sshd runs the gate's dispatcher, which
+  hands the line to the gate's broker; the broker runs only the verbs in
+  scripts\vps\gate\verbs.json, each one a script of main with the switches
+  allowed there. The grant stops first when Gate.ps1 or the account is not
+  on the box. Its proof asks the gate for ping, which also reads main through
+  the gate's GitHub deploy key, and then asks for a command, which the gate
+  must refuse. With -ToEnvironment it goes into the secret DESK_KEY_B64 of
+  that GitHub environment on -GitHubRepo, where the ops repository's
+  box-run.yml reads it (#4013);
+  without, into <OutDir>\deploy-access.txt as THORNSWOOD_DESK_KEY_B64=...
+
   -ToEnvironment <name> (with -MakeKey -NoticesOnly; #3045) puts the key
-  instead into the secret NOTICE_KEY_B64 of that environment on GitHub,
-  where .github\workflows\staff-notice.yml reads it: the way a cloud thread
-  posts. Before anything on the box changes, it makes the environment usable
+  instead into the secret NOTICE_KEY_B64 of that environment on GitHub, on
+  -GitHubRepo, the private ops repository EvilPatrick06/Thornswood-Ops where
+  the VPS runners are registered (#4013), whose staff-notice.yml reads it:
+  the way a cloud thread posts. Before anything on the box changes, it makes the environment usable
   by main alone (a branch policy for main and nothing else), and stops,
   changing nothing, when the environment already lets another branch in or
   gh cannot reach it. After the proof the key goes to gh secret set on its
@@ -102,9 +124,12 @@ param(
     [switch]$MakeKey,
     # With -MakeKey: a key that can only post a staff notice (see above).
     [switch]$NoticesOnly,
-    # With -MakeKey -NoticesOnly: the GitHub environment the key goes into.
+    # With -MakeKey: a key that runs only the deploy gate's verbs (see above).
+    [switch]$Deploy,
+    # With -MakeKey -NoticesOnly or -MakeKey -Deploy: the GitHub environment the key goes into.
     [string]$ToEnvironment = '',
-    [string]$GitHubRepo = 'EvilPatrick06/Thornswood',
+    # Where staff-notice.yml and the VPS runners are (#4013).
+    [string]$GitHubRepo = 'EvilPatrick06/Thornswood-Ops',
     [switch]$Remove,
     [switch]$List,
     # -ThisMachine: this machine's key, the one Setup-SshKey.ps1 makes.
@@ -141,15 +166,20 @@ $PutBack = 'Thornswood box access put back'
 $BridgeDir = Join-Path $Here 'bridge'
 # What a notices key may run, and all it may run (scripts\vps\vps-say-staff.ps1).
 $SayStaff = 'C:\Thornswood-Watch\say-staff.ps1'
+# What a deploy key may run, and all it may run (scripts\vps\gate\Gate.ps1),
+# and the account it logs in as (scripts\deploy\Install-Gate.ps1).
+$GateScript = 'C:\Thornswood-Gate\Gate.ps1'
+$GateUser = 'thornswood-deploy'
 
 # ------------------------------------------------------ the box's line ----
 # The line the box holds for a name: taken only from 127.0.0.1, so only
 # through the bridge, and for a notices key only to run say-staff.ps1 as that
 # name. The name is already one lower case word, so nothing in it can close
 # the quotes.
-function Get-BoxKeyLine([string]$Bare, [string]$Who, [bool]$Notices) {
+function Get-BoxKeyLine([string]$Bare, [string]$Who, [bool]$Notices, [bool]$Gate = $false) {
     $opts = 'from="127.0.0.1"'
-    if ($Notices) { $opts += ',restrict,command="powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ' + $SayStaff + ' -From ' + $Who + '"' }
+    if ($Gate) { $opts += ',restrict,command="powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ' + $GateScript + '"' }
+    elseif ($Notices) { $opts += ',restrict,command="powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ' + $SayStaff + ' -From ' + $Who + '"' }
     return ($opts + ' ' + $Bare + ' thornswood-' + $Who)
 }
 
@@ -157,13 +187,14 @@ function Get-BoxKeyLine([string]$Bare, [string]$Who, [bool]$Notices) {
 # they allow. '' for the key when the line holds none.
 function Read-BoxKeyLine([string]$Line) {
     $m = [regex]::Match($Line.Trim(), '^(?:(?<opts>(?:[A-Za-z-]+(?:="(?:[^"\\]|\\.)*")?)(?:,(?:[A-Za-z-]+(?:="(?:[^"\\]|\\.)*")?))*)\s+)?(?<key>(?:ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp256) [A-Za-z0-9+/=]+)(?:\s|$)')
-    if (-not $m.Success) { return [pscustomobject]@{ Options = ''; Key = ''; Bridge = $false; Notices = $false } }
+    if (-not $m.Success) { return [pscustomobject]@{ Options = ''; Key = ''; Bridge = $false; Notices = $false; Gate = $false } }
     $o = $m.Groups['opts'].Value
     return [pscustomobject]@{
         Options = $o
         Key     = $m.Groups['key'].Value
         Bridge  = ($o -match '(^|,)from="127\.0\.0\.1"(,|$)')
         Notices = ($o -match '(^|,)command="[^"]*\\say-staff\.ps1 -From [a-z0-9-]+"(,|$)' -and $o -match '(^|,)restrict(,|$)')
+        Gate    = ($o -match '(^|,)command="[^"]*-File C:\\Thornswood-Gate\\Gate\.ps1"(,|$)' -and $o -match '(^|,)restrict(,|$)')
     }
 }
 
@@ -205,12 +236,21 @@ function Find-PublicKeyLine([string]$Text) {
 # $Digest and $KeyLine both '' take the name away.
 # $Need, when given, is a file the key's forced command runs: without it on
 # the box the key would open nothing, so nothing is changed.
-function Get-BoxChangeScript([string]$Who, [string]$Digest, [string]$KeyLine, [string]$Blob, [string]$Need = '') {
+# $Gate: the key goes into the deploy gate account's authorized_keys, not
+# Administrator's (#2841).
+function Get-BoxChangeScript([string]$Who, [string]$Digest, [string]$KeyLine, [string]$Blob, [string]$Need = '', [bool]$Gate = $false) {
     $lock = 'function Lock-ThornswoodFolder {' + ${function:Lock-ThornswoodFolder}.ToString() + '}'
     return @"
 `$ErrorActionPreference = 'Stop'
 `$ProgressPreference = 'SilentlyContinue'
 `$keys = 'C:\ProgramData\ssh\administrators_authorized_keys'
+if ('$Gate' -eq 'True') {
+  `$gu = Get-LocalUser -Name '$GateUser' -EA SilentlyContinue
+  `$pl = if (`$gu) { 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\' + `$gu.SID.Value } else { '' }
+  if (-not `$pl -or -not (Test-Path -LiteralPath `$pl)) { 'STOP there is no account $GateUser with a profile on the box, and a deploy key logs in as it. Run scripts\deploy\Install-Gate.ps1 first. Nothing was changed.'; exit 1 }
+  `$keys = Join-Path (Get-ItemProperty -LiteralPath `$pl).ProfileImagePath '.ssh\authorized_keys'
+  if (-not (Test-Path -LiteralPath `$keys)) { 'STOP ' + `$keys + ' is not there. Run scripts\deploy\Install-Gate.ps1 first; it makes it with the rules sshd needs. Nothing was changed.'; exit 1 }
+}
 `$tokens = '$BridgeRoot\tokens'
 `$save = 'C:\ProgramData\ssh\box-access-before'
 `$task = '$PutBack'
@@ -233,14 +273,14 @@ if (Test-Path -LiteralPath `$keys) { Copy-Item -LiteralPath `$keys -Destination 
 if (Test-Path -LiteralPath `$tokens) { Get-ChildItem -LiteralPath `$tokens -File | Copy-Item -Destination (Join-Path `$save 'tokens') }
 # The put back runs once as SYSTEM and removes itself, its whole command
 # inline (no script file a later change could swap), with every path under
-# ProgramData\ssh or the bridge's folder, which only SYSTEM and
-# Administrators may change (#2612). One statement to a line, no double
+# ProgramData\ssh, the bridge's folder or the deploy gate account's .ssh,
+# which only SYSTEM and Administrators may change (#2612, Install-Gate.ps1). One statement to a line, no double
 # quote, so the lines join into one -Command.
 `$back = @'
-`$keys = 'C:\ProgramData\ssh\administrators_authorized_keys'
+`$keys = '__KEYS__'
 `$tokens = '$BridgeRoot\tokens'
 `$save = 'C:\ProgramData\ssh\box-access-before'
-if (Test-Path -LiteralPath (Join-Path `$save 'keys')) { Copy-Item -LiteralPath (Join-Path `$save 'keys') -Destination `$keys -Force } else { Remove-Item -LiteralPath `$keys -Force -EA SilentlyContinue }
+if (Test-Path -LiteralPath (Join-Path `$save 'keys')) { [IO.File]::WriteAllBytes(`$keys, [IO.File]::ReadAllBytes((Join-Path `$save 'keys'))) } else { Remove-Item -LiteralPath `$keys -Force -EA SilentlyContinue }
 if (Test-Path -LiteralPath `$keys) { icacls `$keys /inheritance:r /grant 'Administrators:F' /grant 'SYSTEM:F' | Out-Null }
 if (-not (Test-Path -LiteralPath `$tokens)) { New-Item -ItemType Directory -Path `$tokens -Force | Out-Null }
 Get-ChildItem -LiteralPath `$tokens -File | Remove-Item -Force
@@ -248,6 +288,9 @@ Get-ChildItem -LiteralPath (Join-Path `$save 'tokens') -File | Copy-Item -Destin
 Remove-Item -LiteralPath `$save -Recurse -Force
 Unregister-ScheduledTask -TaskName '$PutBack' -Confirm:`$false
 '@
+# The file the put back restores is the one this run changes; it is written
+# in place, so a deploy account's read rule on its file stays.
+`$back = `$back.Replace('__KEYS__', `$keys)
 `$cmd = (@(`$back -split '\r?\n' | Where-Object { `$_.Trim() }) -join '; ')
 `$a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -Command "' + `$cmd + '"')
 `$t = New-ScheduledTaskTrigger -Once -At ((Get-Date).AddMinutes(10))
@@ -296,6 +339,11 @@ function Get-BoxListScript {
 `$ErrorActionPreference = 'SilentlyContinue'
 `$keys = 'C:\ProgramData\ssh\administrators_authorized_keys'
 if (Test-Path -LiteralPath `$keys) { Get-Content -LiteralPath `$keys | Where-Object { `$_.Trim() } | ForEach-Object { 'KEY ' + `$_.Trim() } }
+`$gu = Get-LocalUser -Name '$GateUser'
+if (`$gu) {
+  `$gk = Join-Path (Get-ItemProperty -LiteralPath ('HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\' + `$gu.SID.Value)).ProfileImagePath '.ssh\authorized_keys'
+  if (Test-Path -LiteralPath `$gk) { Get-Content -LiteralPath `$gk | Where-Object { `$_.Trim() } | ForEach-Object { 'DKEY ' + `$_.Trim() } }
+}
 Get-ChildItem -LiteralPath '$BridgeRoot\tokens' -File | ForEach-Object { 'TOKEN ' + `$_.Name + ' ' + `$_.LastWriteTime.ToString('yyyy-MM-dd HH:mm') }
 if (Get-ScheduledTask -TaskName '$PutBack') { 'ARMED' }
 'LISTED'
@@ -303,7 +351,7 @@ if (Get-ScheduledTask -TaskName '$PutBack') { 'ARMED' }
 }
 
 function Clean($lines) {
-    @($lines | ForEach-Object { "$_".Trim() } | Where-Object { $_ -and $_ -notmatch 'post-quantum|store now, decrypt later|openssh\.com/pq\.html' })
+    @($lines | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
 }
 
 # A new connection from this machine, the way every script here makes one.
@@ -363,8 +411,12 @@ if ($ways -ne 1) { Die 'Pass one of: -PublicKey (or -FromClipboard), -ThisMachin
 # A notices key is made here, so its private half is never asked of anybody
 # and its file names what it is for.
 if ($NoticesOnly -and -not $MakeKey) { Die '-NoticesOnly goes with -MakeKey. Nothing was changed.' }
-if ($ToEnvironment -and -not $NoticesOnly) { Die '-ToEnvironment goes with -MakeKey -NoticesOnly. Nothing was changed.' }
-if ($ToEnvironment -and $ToEnvironment -notmatch '^[a-z0-9][a-z0-9-]{0,31}$') { Die '-ToEnvironment is one lower case word, the way the workflow names it: notices. Nothing was changed.' }
+if ($Deploy -and -not $MakeKey) { Die '-Deploy goes with -MakeKey. Nothing was changed.' }
+if ($Deploy -and $NoticesOnly) { Die 'A key is a notices key or a deploy key, not both. Nothing was changed.' }
+if ($ToEnvironment -and -not ($NoticesOnly -or $Deploy)) { Die '-ToEnvironment goes with -MakeKey -NoticesOnly or -MakeKey -Deploy. Nothing was changed.' }
+if ($ToEnvironment -and $ToEnvironment -notmatch '^[a-z0-9][a-z0-9-]{0,31}$') { Die '-ToEnvironment is one lower case word, the way the workflow names it: notices, or desk. Nothing was changed.' }
+# The secret each kind of key goes into, the name its workflow reads.
+$SecretName = if ($Deploy) { 'DESK_KEY_B64' } else { 'NOTICE_KEY_B64' }
 if ($ToEnvironment -and -not (Get-Command gh -ErrorAction SilentlyContinue)) { Die '-ToEnvironment puts the key on GitHub with gh, and gh is not on PATH. Nothing was changed.' }
 
 Write-Host ''
@@ -384,6 +436,14 @@ if ($List) {
         $how = if ($parts.Bridge) { 'only through the bridge' } else { 'from any address that reaches port 22' }
         if ($parts.Notices) { $how += ', and only to post a staff notice' }
         Say ('  key    {0,-22} {1}  {2}' -f $who, $fp, $how) $(if ($how -like 'only*') { 'Green' } else { 'Yellow' })
+    }
+    foreach ($l in @($said | Where-Object { $_ -like 'DKEY *' })) {
+        $k = $l.Substring(5)
+        $who = if ($k -match ' thornswood-([a-z0-9][a-z0-9-]*)$') { $Matches[1] } else { '(no thornswood- name)' }
+        $parts = Read-BoxKeyLine $k
+        $fp = if ($parts.Key) { Get-ThornswoodSshFingerprint ('x ' + $parts.Key) } else { '(no key on the line)' }
+        $ok = $parts.Bridge -and $parts.Gate
+        Say ('  key    {0,-22} {1}  {2}' -f $who, $fp, $(if ($ok) { "as $GateUser, only from the box, and only the deploy gate's verbs" } else { "as $GateUser, WITHOUT the gate's forced command or from=" })) $(if ($ok) { 'Green' } else { 'Yellow' })
     }
     foreach ($l in @($said | Where-Object { $_ -like 'TOKEN *' })) {
         $bits = $l.Substring(6) -split ' ', 2
@@ -448,8 +508,8 @@ try {
         if (-not $bare) {
             Die 'No public key line in what was given. It starts with ssh-ed25519 or ssh-rsa, then a long run of letters and digits; Setup-SshKey.ps1 prints it on the PC it was made on. Nothing was changed.'
         }
-        $keyLine = Get-BoxKeyLine $bare $Name ([bool]$NoticesOnly)
-        Say ('  ' + (Get-ThornswoodSshFingerprint ('x ' + $bare)) + ', taken only through the bridge' + $(if ($NoticesOnly) { ', and only to post a staff notice as ' + $Name } else { '' })) 'Green'
+        $keyLine = Get-BoxKeyLine $bare $Name ([bool]$NoticesOnly) ([bool]$Deploy)
+        Say ('  ' + (Get-ThornswoodSshFingerprint ('x ' + $bare)) + ', taken only through the bridge' + $(if ($NoticesOnly) { ', and only to post a staff notice as ' + $Name } elseif ($Deploy) { ', as ' + $GateUser + ', and only to ask the deploy gate for its verbs' } else { '' })) 'Green'
     }
     $blob = if ($bare) { ($bare -split ' ')[1] } else { '' }
     $token = ''
@@ -461,7 +521,8 @@ try {
 
     # ---------------------------------------------------------- the box ----
     Head 'On the box'
-    $said = Clean (Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script (Get-BoxChangeScript $Name $digest $keyLine $blob $(if ($NoticesOnly) { $SayStaff } else { '' })))
+    $need = if ($NoticesOnly) { $SayStaff } elseif ($Deploy) { $GateScript } else { '' }
+    $said = Clean (Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script (Get-BoxChangeScript $Name $digest $keyLine $blob $need ([bool]$Deploy)))
     foreach ($l in $said) { Say "  $l" $(if ($l -like 'STOP*') { 'Red' } elseif ($l -like 'CHANGED*') { 'Green' } else { 'Gray' }) }
     if ($said -notcontains 'DONE') {
         if (@($said | Where-Object { $_ -like 'ARMED*' }).Count) { Die "the box did not finish. It puts the key file and tokens back by itself within ten minutes (the task '$PutBack')." }
@@ -515,32 +576,48 @@ try {
         $env:THORNSWOOD_BOX_URL = $BoxUrl
         $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
         # A notices key runs say-staff.ps1 whatever is asked; with nothing on
-        # its input (-n) that says READY and writes nothing.
-        $proved = if ($NoticesOnly) { '^READY$' } else { 'THORNSWOOD_OK' }
-        $proof = @(Invoke-ThornswoodNative {
-            & ssh -n -F none -i $newKey -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 `
-                -o ("ProxyCommand=`"" + $node.Source + "`" `"" + (Join-Path $BridgeDir 'connect.js') + "`"") $target 'echo THORNSWOOD_OK'
-        } 2>&1 | ForEach-Object { "$_".Trim() })
+        # its input (-n) that says READY and writes nothing. A deploy key
+        # logs in as the gate's account and runs Gate.ps1 whatever is asked,
+        # so the command is refused and ping answers GATE READY.
+        $proved = if ($NoticesOnly) { '^READY$' } elseif ($Deploy) { '^\| GATE READY' } else { 'THORNSWOOD_OK' }
+        $proofTarget = if ($Deploy) { "$GateUser@$VpsHost" } else { $target }
+        $asks = if ($Deploy) { @('echo THORNSWOOD_OK', 'ping') } else { @('echo THORNSWOOD_OK') }
+        $proof = @()
+        foreach ($ask in $asks) {
+            $proof += @(Invoke-ThornswoodNative {
+                & ssh -n -F none -i $newKey -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 `
+                    -o ("ProxyCommand=`"" + $node.Source + "`" `"" + (Join-Path $BridgeDir 'connect.js') + "`"") $proofTarget $ask
+            } 2>&1 | ForEach-Object { "$_".Trim() })
+        }
         $ErrorActionPreference = $old
         Remove-Item Env:THORNSWOOD_BOX_TOKEN, Env:THORNSWOOD_BOX_URL -ErrorAction SilentlyContinue
-        if ($NoticesOnly -and @($proof | Where-Object { $_ -match 'THORNSWOOD_OK' }).Count) {
+        if (($NoticesOnly -or $Deploy) -and @($proof | Where-Object { $_ -match 'THORNSWOOD_OK' }).Count) {
             Die "the box ran the command it was asked for, so the key's forced command is not holding and the key can do anything. No file was written. Take it off now: .\scripts\vps\Grant-BoxAccess.ps1 -Name $Name -Remove"
         }
         if (-not @($proof | Where-Object { $_ -match $proved }).Count) {
             $proof | Select-Object -Last 5 | ForEach-Object { Say "  $_" 'DarkGray' }
             Die "it did not get in, so no file was written. Its key and token are on the box; run this again once the lines above are dealt with, or -Name $Name -Remove to take them off."
         }
+        $ran = if ($Deploy) { 'the gate refused a command and answered ping' } else { 'it ran say-staff.ps1 and nothing else' }
         if ($ToEnvironment) {
-            Say '  ssh through the bridge with the new key got in, and it ran say-staff.ps1 and nothing else' 'Green'
+            Say "  ssh through the bridge with the new key got in, and $ran" 'Green'
             Head "The key into the GitHub environment $ToEnvironment"
             # On gh's standard input: no file holds it and no command line shows it.
             $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-            $set = @([Convert]::ToBase64String([IO.File]::ReadAllBytes($newKey)) | & gh secret set NOTICE_KEY_B64 --env $ToEnvironment --repo $GitHubRepo 2>&1 | ForEach-Object { "$_" })
+            $set = @([Convert]::ToBase64String([IO.File]::ReadAllBytes($newKey)) | & gh secret set $SecretName --env $ToEnvironment --repo $GitHubRepo 2>&1 | ForEach-Object { "$_" })
             $setCode = $LASTEXITCODE
             $ErrorActionPreference = $old
             if ($setCode -ne 0) { Die ("GitHub refused the secret: " + ($set -join ' ') + " The key is on the box and holds nowhere else; run this again, which replaces it, or -Name $Name -Remove.") }
-            Say "  NOTICE_KEY_B64 in $ToEnvironment, which only main may use. Nothing here holds it." 'Green'
-            Say "  A session with no ssh now posts with scripts/ops/Say-Staff.ps1 -Text `"...`", as $Name, through .github/workflows/staff-notice.yml." 'White'
+            Say "  $SecretName in $ToEnvironment, which only main may use. Nothing here holds it." 'Green'
+            if ($Deploy) { Say "  Any session now runs a gate verb with scripts/vps/Box-Run.ps1 <verb> [switches], through box-run.yml on $GitHubRepo." 'White' }
+            else { Say "  A session with no ssh now posts with scripts/ops/Say-Staff.ps1 -Text `"...`", as $Name, through staff-notice.yml on $GitHubRepo." 'White' }
+        } elseif ($Deploy) {
+            Say "  ssh through the bridge with the new key got in, and $ran" 'Green'
+            $out = Join-Path $OutDir 'deploy-access.txt'
+            Write-ThornswoodPrivateFile -Path $out -Text ("THORNSWOOD_DESK_KEY_B64=" + [Convert]::ToBase64String([IO.File]::ReadAllBytes($newKey)) + "`n")
+            Head "The file for $Name"
+            Say "  $out" 'Green'
+            Say '  It is for a runner on the box, where Box-Run.ps1 -OnTheBox reads it; the key is taken only from 127.0.0.1. Delete the file once it is placed.' 'White'
         } elseif ($NoticesOnly) {
             Say '  ssh through the bridge with the new key got in, and it ran say-staff.ps1 and nothing else' 'Green'
             $out = Join-Path $OutDir 'notice-access.txt'

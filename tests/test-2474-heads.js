@@ -165,7 +165,7 @@ function constLine(src, name) {
   }
 
   const a = front.indexOf('  function localRef(serverId) {');
-  const b = front.indexOf('  sp.on(\'browserMessage\', guard(\'overhead\'');
+  const b = front.indexOf('  function overheadMessage(what) {');
   yes('the overhead block converts the id before it looks', a > 0 && b > a &&
       /refr = localRef\(key\);/.test(front.slice(a, b)));
   if (a > 0 && b > a) {
@@ -247,8 +247,8 @@ function constLine(src, name) {
       /twPulse 1\.15s ease-in-out infinite/.test(voice) && /50%\{opacity:\.58\}/.test(voice));
   yes('its colour is written when it changes, so a new distance shows without a new mark',
       /if \(String\(colour\) !== rec\.colour\) \{ sp\.setTextColor\(rec\.id, colour\);/.test(c));
-  yes('it is a round dot from a font the fork ships',
-      /MARK_TEXT = '\\u2022'/.test(c) && /MARK_FONT = 'DIN-Pro-bold'/.test(c));
+  yes('it is a round dot from Thornswood\'s own OFL sprite font (#1317)',
+      /MARK_TEXT = '\\u2022'/.test(c) && /MARK_FONT = 'Barlow-SemiBold'/.test(c));
 }
 
 console.log('');

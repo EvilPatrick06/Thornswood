@@ -38,8 +38,10 @@
   THE LAUNCHER ITSELF (#3312). A release from the feed that carries a new
   launcher cannot build or sign it where it runs. Invoke-ReleaseLauncherOnGitHub
   asks this repository's release-tag.yml to tag main's commit v<number> and
-  start release.yml on it, which builds and signs it on GitHub's runner, or
-  on the box's runner 3 when GitHub has no minutes, and waits for that run.
+  start main's release.yml for it, which builds and signs it on GitHub's
+  runner (the box's fallback ended with the flip to public, #4013), and waits
+  for that run. Only a run of main's own workflow signs (#3930), so the run
+  waited for is one on main whose title names the tag.
   Get-SignedFileRefusal then holds what it built to the launcher's own check
   here on Windows, or on the box anywhere else, the way the catalog is held.
 
@@ -271,7 +273,21 @@ function Get-SignedFileRefusal([string]$Path, [string]$ExpectedSigner, [string]$
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return "there is no file at $Path to check" }
     $onWindows = ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT)
     if ($onWindows -and -not $Box) { return (Get-PublishSignRefusal -Path $Path -ExpectedSigner $ExpectedSigner) }
-    $script = New-SignedFileCheckScript $Path $ExpectedSigner $RepoDir
+    return (Invoke-SignedCheckOnBox (New-SignedFileCheckScript $Path $ExpectedSigner $RepoDir) (Split-Path -Leaf $Path) $Box)
+}
+
+# The same check for a file already on the box at $BoxPath, one too big to
+# send inside a script: the installer, which Publish-Installer sends to the
+# box first and holds there before it replaces the one people download
+# (#3412). '' when it passes, else why.
+function Get-SignedBoxFileRefusal([string]$BoxPath, [string]$ExpectedSigner, [string]$RepoDir, [scriptblock]$Box) {
+    $leaf = @($BoxPath -split '[\\/]')[-1]
+    return (Invoke-SignedCheckOnBox (New-SignedFileCheckScript '' $ExpectedSigner $RepoDir $BoxPath) $leaf $Box)
+}
+
+# Runs a script New-SignedFileCheckScript made on the box (-Box stands in for
+# it) and reads its one line back: '' when the box accepted $leaf, else why.
+function Invoke-SignedCheckOnBox([string]$script, [string]$leaf, [scriptblock]$Box) {
     $lines = @()
     try {
         if ($Box) { $lines = @(& $Box $script) }
@@ -281,32 +297,38 @@ function Get-SignedFileRefusal([string]$Path, [string]$ExpectedSigner, [string]$
             $target = (Get-ThornswoodVpsUser) + '@' + (Get-ThornswoodVpsAddress)
             $lines = @(Invoke-ThornswoodRemote -Target $target -SshArgs @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes') -Script $script)
         }
-    } catch { return ('the box could not check ' + (Split-Path -Leaf $Path) + ': ' + $_.Exception.Message) }
+    } catch { return ('the box could not check ' + $leaf + ': ' + $_.Exception.Message) }
     $said = @($lines | ForEach-Object { [string]$_ } | Where-Object { $_ -match '^SIGNED ' })
     if ($said.Count -ne 1) {
-        return ('the box did not say whether ' + (Split-Path -Leaf $Path) + ' passes (it answered: ' + ((@($lines | ForEach-Object { [string]$_ }) | Select-Object -Last 3) -join ' | ') + ')')
+        return ('the box did not say whether ' + $leaf + ' passes (it answered: ' + ((@($lines | ForEach-Object { [string]$_ }) | Select-Object -Last 3) -join ' | ') + ')')
     }
-    if ($said[0] -eq 'SIGNED ACCEPTED') { Write-Host ('  the box, which holds no signing setup, accepts ' + (Split-Path -Leaf $Path) + ' with the launcher''s own check') -ForegroundColor DarkGray; return '' }
+    if ($said[0] -eq 'SIGNED ACCEPTED') { Write-Host ('  the box, which holds no signing setup, accepts ' + $leaf + ' with the launcher''s own check') -ForegroundColor DarkGray; return '' }
     return ($said[0] -replace '^SIGNED REFUSED ', '')
 }
 
 # The script the box runs for one file: the file and Signature.cs as base64
 # (Send-Script.ps1 sends a long script by scp), the check from
 # Assert-PublishSigned.ps1 as it is here, and one line back, SIGNED ACCEPTED
-# or SIGNED REFUSED <why>. Its folder goes whatever happens.
-function New-SignedFileCheckScript([string]$Path, [string]$ExpectedSigner, [string]$RepoDir) {
+# or SIGNED REFUSED <why>. Its folder goes whatever happens. With $BoxPath the
+# file is the one already there, and only Signature.cs is sent.
+function New-SignedFileCheckScript([string]$Path, [string]$ExpectedSigner, [string]$RepoDir, [string]$BoxPath = '') {
     $b64 = { param($p) [Convert]::ToBase64String([IO.File]::ReadAllBytes($p)) }
     $assert = [IO.File]::ReadAllText((Join-Path $RepoDir 'scripts\release\Assert-PublishSigned.ps1'))
     $q = { param($s) "'" + ([string]$s).Replace("'", "''") + "'" }
-    $leaf = [IO.Path]::GetFileName($Path)
-    if ($leaf -notmatch '^[A-Za-z0-9._-]+$') { $leaf = 'file.bin' }
+    if ($BoxPath) {
+        $file = @(('    $f = ' + (& $q $BoxPath)))
+    } else {
+        $leaf = [IO.Path]::GetFileName($Path)
+        if ($leaf -notmatch '^[A-Za-z0-9._-]+$') { $leaf = 'file.bin' }
+        $file = @(('    $f = Join-Path $d ' + (& $q $leaf)),
+                  ('    [IO.File]::WriteAllBytes($f, [Convert]::FromBase64String(' + (& $q (& $b64 $Path)) + '))'))
+    }
     return @(
         '$ErrorActionPreference = ''Stop'''
         '$d = Join-Path $env:TEMP (''thornswood-signed-'' + [Guid]::NewGuid().ToString(''N''))'
         'New-Item -ItemType Directory -Force -Path $d | Out-Null'
         'try {'
-        ('    $f = Join-Path $d ' + (& $q $leaf))
-        ('    [IO.File]::WriteAllBytes($f, [Convert]::FromBase64String(' + (& $q (& $b64 $Path)) + '))')
+        $file
         ('    [IO.File]::WriteAllBytes((Join-Path $d ''Signature.cs''), [Convert]::FromBase64String(' + (& $q (& $b64 (Join-Path $RepoDir 'launcher\app\Signature.cs'))) + '))')
         $assert
         '    $AssertPublishSignedCs = Join-Path $d ''Signature.cs'''
@@ -318,9 +340,10 @@ function New-SignedFileCheckScript([string]$Path, [string]$ExpectedSigner, [stri
 }
 
 # Asks $Repo's release-tag.yml to tag $Commit (on main) as $Tag and start
-# release.yml on it, then waits for that release.yml run: GitHub's runner
-# builds and signs the launcher, or the box's runner 3 when GitHub has no
-# minutes, and a build runner checks the signed draft. '' once that run is
+# main's release.yml for it, then waits for that release.yml run, the one on
+# main titled "Release launcher <tag>" (release.yml's run-name, #3930): GitHub's runner
+# builds and signs the launcher, and a second GitHub runner checks the signed
+# draft (#4013). '' once that run is
 # green, else why. The draft it made is then read the way a main Ship reads
 # one (Ship.ps1, Get-ReleaseLauncher). -WaitSeconds bounds the whole wait.
 function Invoke-ReleaseLauncherOnGitHub {
@@ -351,17 +374,17 @@ function Invoke-ReleaseLauncherOnGitHub {
                     return ("release-tag.yml ended " + [string]$tagRun.conclusion + " for $Tag, so nothing was built: " + [string]$tagRun.url)
                 }
             }
-            $run = Find-ReleaseRun $Gh $Repo 'release.yml' $asked { param($r) [string]$r.headBranch -ceq $Tag }
+            $run = Find-ReleaseRun $Gh $Repo 'release.yml' $asked { param($r) [string]$r.headBranch -ceq 'main' -and [string]$r.displayTitle -ceq ('Release launcher ' + $Tag) }
         } catch { return ('the release runs could not be read: ' + $_.Exception.Message) }
         if ($null -ne $run -and [string]$run.status -eq 'completed') { break }
         if ((Get-Date) -gt $until) {
-            if ($null -eq $run) { return "no release.yml run started on $Tag in $WaitSeconds seconds" }
-            return ("the release.yml run on $Tag is still " + [string]$run.status + " after $WaitSeconds seconds: " + [string]$run.url)
+            if ($null -eq $run) { return "no release.yml run on main started for $Tag in $WaitSeconds seconds" }
+            return ("main's release.yml run for $Tag is still " + [string]$run.status + " after $WaitSeconds seconds: " + [string]$run.url)
         }
         Start-Sleep -Seconds $Poll
     }
     if ([string]$run.conclusion -ne 'success') {
-        return ("the release.yml run on $Tag ended " + [string]$run.conclusion + ', so there is no checked, signed launcher: ' + [string]$run.url)
+        return ("main's release.yml run for $Tag ended " + [string]$run.conclusion + ', so there is no checked, signed launcher: ' + [string]$run.url)
     }
     Write-Host ("  built, signed and checked on GitHub: " + [string]$run.url) -ForegroundColor DarkGray
     return ''

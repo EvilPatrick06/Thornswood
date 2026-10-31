@@ -45,8 +45,9 @@ namespace Thornswood
     /// site has #755 (galleryStaff on that door). Older sites refuse without
     /// a cookie; the queue still shows Accept / Delete / name / note either way.
     ///
-    /// Reading fails quietly. A site that is down, a picture that will not
-    /// load, an empty list: each leaves Play's card hidden with nothing said.
+    /// Reading fails quietly. A site that is down or a picture that will not
+    /// load leaves Play's card as it was, and an empty list hides it, with
+    /// nothing said.
     /// What speaks is what somebody pressed a button for, because they are
     /// owed an answer either way.
     /// </summary>
@@ -120,9 +121,10 @@ namespace Thornswood
 
         /// <summary>
         /// Blocking. Call it off the UI thread. The pictures the site is
-        /// showing, in the order it put them, or an empty list when the feed
-        /// cannot be read. No image is fetched here; that waits until the card
-        /// turns to one.
+        /// showing, in the order it put them; an empty list when it shows
+        /// none, and null when the feed cannot be read, so a read that failed
+        /// is not taken for a gallery with nothing on it. No image is fetched
+        /// here; that waits until the card turns to one.
         /// </summary>
         public static List<Shot> Load()
         {
@@ -130,7 +132,7 @@ namespace Thornswood
             try
             {
                 string text = GetText(Feed, 5000);
-                if (text.Length == 0) return shots;
+                if (text.Length == 0) return null;
 
                 // Only the gallery array out of the document, so a "url" or a
                 // "name" somewhere else in it is not read as a picture.
@@ -153,10 +155,32 @@ namespace Thornswood
             catch
             {
                 // The gallery is a nicety on the Play page, never a reason to
-                // stop anybody. A feed that will not read leaves the list empty
-                // and the card hidden, and nothing is logged over a picture.
+                // stop anybody. A feed that will not read leaves the card as it
+                // was, and nothing is logged over a picture.
+                return null;
             }
             return shots;
+        }
+
+        /// <summary>
+        /// Gives each picture in a list just read the image already loaded for
+        /// the same address in the list before it, so reading the list again
+        /// does not send the Play card back to downloading every picture.
+        /// </summary>
+        public static void KeepLoaded(List<Shot> fresh, List<Shot> had)
+        {
+            if (fresh == null || had == null) return;
+            foreach (Shot s in fresh)
+            {
+                if (s == null || s.Image != null) continue;
+                foreach (Shot h in had)
+                {
+                    if (h == null || h.Image == null) continue;
+                    if (!string.Equals(h.ImageUrl, s.ImageUrl, StringComparison.Ordinal)) continue;
+                    s.Image = h.Image;
+                    break;
+                }
+            }
         }
 
         /// <summary>
@@ -315,7 +339,9 @@ namespace Thornswood
         /// Blocking. Call it off the UI thread. Sends one screenshot into the
         /// site's gallery queue over /api/gallery/submit. The body IS the file;
         /// the ticket, offered name, byline and note ride in the query, matching
-        /// the site's receiveUpload path.
+        /// the site's receiveUpload path. What the file says about where and
+        /// when it was made (Exif, XMP, GPS and the like) is taken out first,
+        /// by MediaStrip, so it never leaves this machine (#3648).
         ///
         /// "" when the site took it, and a sentence to show the person when it
         /// did not. Allowed kinds match the site's GALLERY_ALLOW: png, jpg,
@@ -360,6 +386,18 @@ namespace Thornswood
                 Swallow.Note("Gallery.Submit read", ex);
                 return "Could not read that file.";
             }
+
+            // Where and when it was made stays on this machine (#3648): a
+            // phone or camera picture says so in its Exif, GPS included, and
+            // the site serves the file it is sent to anyone.
+            Exception unwalked;
+            byte[] clean = MediaStrip.Clean(data, ext, out unwalked);
+            if (clean == null)
+            {
+                if (unwalked != null) Swallow.Note("Gallery.Submit clean", unwalked);
+                return "That file could not be read to take out where and when it was made, so it was not sent.";
+            }
+            data = clean;
 
             string who = by == null ? "" : by.Trim();
             if (who.Length > 40) who = who.Substring(0, 40);

@@ -119,7 +119,7 @@ Ulfric died in his bed in 4E 229.
 The Moot sat for eleven days and did not choose his kin. It chose **Eirik
 Ravensgard** of the Rift, who had been a housecarl at nineteen and a Jarl's
 steward at thirty and who had made no enemies worth the name. He has held the
-crown for twenty-two years. He is neither loved nor hated.
+crown for twenty-three years. He is neither loved nor hated.
 
 The crown sits above the holds and below nothing. There is no Emperor over it.
 Each hold keeps its own Jarl, its own court, its own law within the High King's
@@ -265,13 +265,13 @@ Fourth Era.*
 - **You can play an Imperial.** Citizens, merchants, embassy staff, the
   Ambassador's people. You are legal, you are watched, and you are one bad
   night away from being told to leave.
-- **You can play a Legion veteran.** Somebody who served forty years ago and
-  settled here is a good character to play. You cannot play a serving Legion
-  soldier: Article the Third keeps every one of them out of Skyrim under
-  arms. The six who bear arms at the embassy are its own guard, not Legion,
-  armed inside those walls and nowhere else. Walk out the gate carrying and
-  you have broken the Accord, and the Ambassador will hand you over rather
-  than answer for you.
+- **You can play a Legion veteran.** Somebody who served in the war about
+  fifty years ago and settled here when the Legion left is a good character to
+  play. You cannot play a serving Legion soldier: Article the Third keeps
+  every one of them out of Skyrim under arms. The six who bear arms at the
+  embassy are its own guard, not Legion, armed inside those walls and nowhere
+  else. Walk out the gate carrying and you have broken the Accord, and the
+  Ambassador will hand you over rather than answer for you.
 - **You can work for the Free Skyrim Trading Company.** It hauls, buys and
   sells between the holds, out of the old East Empire warehouses.
   Its lead seat is given rather than chosen, like a Jarl's.

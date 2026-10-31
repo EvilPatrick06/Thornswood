@@ -54,18 +54,29 @@
               are still the ones in cloudflare-ranges.txt, once a day. The
               Caddyfile trusts that list and the box's firewall takes 443
               from it, so a range Cloudflare adds is visitors refused.
+    game      the game's own name (vps.json's address since #3690)
+              resolves, and not into Cloudflare's ranges. Every
+              launcher writes it into the game's settings and asks the
+              server's resources by it, so a name that does not resolve is
+              nobody able to play. It is DNS only on purpose: the game port
+              is UDP, which Cloudflare's free plan does not carry. The run
+              log says only ok or WRONG, never the address it resolves to.
     domain    the registration has more than 30 days left, once a day.
               Registered 15 September 2026 through Cloudflare, runs out 15
               September 2027 (RDAP, rdap.org).
-    runner    GitHub lists every build runner as online: thornswood-vps and
+    runner    GitHub lists every box runner as online: thornswood-vps and
               the numbered ones beside it, thornswood-vps-2 and up
-              (Install-Runner.ps1 -Number, 4 October). Asked over REST with
-              WATCH_RUNNER_TOKEN, a fine-grained token that can only read the
-              repository's runners (Administration: read on that one
-              repository). With none online, no pull request gets Launcher
-              builds and nothing may merge; with some, the checks wait
-              longer. Three runs in a row, because a runner restarts itself
-              when it updates.
+              (Install-Runner.ps1 -Number, 4 October). Since the flip
+              (#4013, 30 Oct 2026) they are registered to the private
+              EvilPatrick06/Thornswood-Ops, where the box's own jobs run,
+              and the public repository has none on purpose (#3792), so
+              that is the repository asked. Asked over REST with
+              WATCH_RUNNER_TOKEN, a fine-grained token that can only read
+              that repository's runners (Administration: read on it alone).
+              With none online, the box's jobs (deploys through the gate,
+              staff notices from cloud threads, the admin App's asks) wait;
+              with some, they wait longer. Three runs in a row, because a
+              runner restarts itself when it updates.
     nexus     the Nexus collection still exists, once an hour. Nexus refuses
               a plain page request (403), but its public GraphQL answers a
               stranger: collection "Thornswood", revision 1, that day.
@@ -79,8 +90,8 @@
   signs, by Ship and Setup-ShipMachine.ps1 with the pinned identity, so no
   new identity gets any access to the signing account.
 
-  Also measured and not asked on every run: the VPS is BisectHosting
-  (NET-192-135-112-0-1, RDAP), which has no status page to ask, and the site
+  Also measured and not asked on every run: the VPS is BisectHosting,
+  which has no status page to ask, and the site
   check above is what notices the box going. Discord's API answered 200 in
   122 ms; it is the path the messages go out on, so there is nothing to tell
   anybody through when it is down. A message that cannot be posted waits and
@@ -163,13 +174,14 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # and reads watch-outside.json, which -Export writes from these: only the
 # keys in $PublicSettings, each something anybody can already see or a name
 # the runner check needs.
-$PublicSettings = @('Site', 'SiteHost', 'Feeds', 'VpsAddress', 'FrontRanges', 'Repo', 'RunnerName', 'NexusGame', 'NexusSlug', 'StaffChannel', 'CertDays', 'DomainDays')
+$PublicSettings = @('Site', 'SiteHost', 'Feeds', 'GameHost', 'FrontRanges', 'Repo', 'RunnerName', 'NexusGame', 'NexusSlug', 'StaffChannel', 'CertDays', 'DomainDays')
 
 function Read-Settings([string]$repo, [string]$saved) {
   $s = @{
     Site = 'https://thornswood.net/'; SiteHost = 'thornswood.net'
-    Feeds = @(); VpsAddress = ''; FrontRanges = @(); StaffChannel = ''
-    Repo = 'EvilPatrick06/Thornswood'; RunnerName = 'thornswood-vps'
+    Feeds = @(); GameHost = ''; FrontRanges = @(); StaffChannel = ''
+    # The repository the box's runners are registered to (#4013).
+    Repo = 'EvilPatrick06/Thornswood-Ops'; RunnerName = 'thornswood-vps'
     NexusGame = ''; NexusSlug = ''
     CertDays = 14; DomainDays = 30; Minutes = $(if ($Minutes) { $Minutes } else { 5 })
   }
@@ -184,9 +196,11 @@ function Read-Settings([string]$repo, [string]$saved) {
     $cfg = Get-Content -LiteralPath (Join-Path $repo 'launcher/app/Config.cs') -Raw
     $m = [regex]::Match($cfg, 'nexusmods\.com/games/([A-Za-z0-9]+)/collections/([A-Za-z0-9]+)')
     $s.NexusGame = $m.Groups[1].Value; $s.NexusSlug = $m.Groups[2].Value
-    # Through Vps.ps1, so this machine's own VPS file and THORNSWOOD_VPS count (#459).
+    # Through Vps.ps1, so this machine's own VPS file and THORNSWOOD_VPS count
+    # (#459). Since #3690 that is the game's own name, never the box's
+    # address, so the address is in no file here or in the export.
     . (Join-Path $repo 'scripts/vps/Vps.ps1')
-    $s.VpsAddress = Get-ThornswoodVpsAddress
+    $s.GameHost = Get-ThornswoodVpsAddress
     # Cloudflare's ranges, the ones the box takes 443 from (#2995).
     $cf = Join-Path $repo 'scripts/deploy/cloudflare-ranges.txt'
     if (Test-Path -LiteralPath $cf) { $s.FrontRanges = @(Get-Content -LiteralPath $cf | ForEach-Object { ("$_" -replace '#.*$', '').Trim() } | Where-Object { $_ }) }
@@ -433,7 +447,8 @@ function Test-InRanges([string]$address, $ranges) {
 
 # Every address the name has must be Cloudflare's: one that is not, the
 # VPS's own above all, is a record with the proxy off, and the box refuses
-# 443 to everybody who follows it (#2995).
+# 443 to everybody who follows it (#2995). The VPS's own is what the game's
+# name resolves to, asked here rather than written in a file (#3690).
 function Check-Dns($S) {
   $d = Get-Dns $S.SiteHost
   if ($d.Error -or @($d.Addresses).Count -eq 0) { return (Wrong ($S.SiteHost + ' does not resolve')) }
@@ -441,10 +456,24 @@ function Check-Dns($S) {
   $out = @($d.Addresses | Where-Object { -not (Test-InRanges $_ $S.FrontRanges) })
   if ($out.Count) {
     $why = $S.SiteHost + ' resolves to ' + (@($d.Addresses) -join ', ') + ', and ' + ($out -join ', ') + ' is not Cloudflare''s'
-    if ($out -contains $S.VpsAddress) { $why += ': that is the VPS itself, with the proxy off, and the VPS takes 443 only from Cloudflare' }
+    $box = @()
+    if ($S.GameHost) { $box = @((Get-Dns $S.GameHost).Addresses) }
+    if (@($out | Where-Object { $box -contains $_ }).Count) { $why += ': that is the VPS itself, with the proxy off, and the VPS takes 443 only from Cloudflare' }
     return (Wrong $why)
   }
   return (Ok ('resolves to ' + (@($d.Addresses) -join ', ') + ', Cloudflare''s'))
+}
+
+# The game's own name: every launcher reaches the box by it, so not
+# resolving is Wrong, and so is resolving into Cloudflare, whose free proxy
+# does not carry the game's UDP port. No line names the address it resolved
+# to, so the run log, which is public, never prints it.
+function Check-Game($S) {
+  if (-not $S.GameHost) { return (Unknown 'there is no game name here (scripts/vps/vps.json) to ask about') }
+  $d = Get-Dns $S.GameHost
+  if ($d.Error -or @($d.Addresses).Count -eq 0) { return (Wrong ($S.GameHost + ' does not resolve, so no launcher can reach the game')) }
+  if (@($d.Addresses | Where-Object { Test-InRanges $_ $S.FrontRanges }).Count) { return (Wrong ($S.GameHost + ' resolves into Cloudflare''s ranges, so its proxy is on, and the game''s UDP port does not go through it')) }
+  return (Ok ('resolves, DNS only'))
 }
 
 # Cloudflare is asked, not the site: Cloudflare's API not answering says
@@ -533,13 +562,15 @@ function Get-Checks($S) {
        Fix = 'Cloudflare renews it by itself: look in the Cloudflare dashboard, SSL/TLS, Edge Certificates. Caddy''s own certificate on the VPS is the box watchdog''s cert check.' },
     @{ Name = 'dns'; Say = $S.SiteHost; What = ('where ' + $S.SiteHost + ' points'); Fails = 'does not point at Cloudflare'; Recovers = 'points at Cloudflare again'; Misses = 2; Back = 2; Every = 0
        Fix = 'The name servers are Cloudflare''s: in the Cloudflare dashboard, DNS, Records, the records for @ and www must be Proxied (the orange cloud). The VPS takes 443 only from Cloudflare (#2995), so a record pointing straight at it reaches nobody.' },
+    @{ Name = 'game'; Say = ('The game''s name, ' + $S.GameHost + ','); What = ('where ' + $S.GameHost + ' points'); Fails = 'does not point at the box'; Recovers = 'points at the box again'; Misses = 2; Back = 2; Every = 0
+       Fix = 'Every launcher and the game reach the box by this name. In the Cloudflare dashboard, DNS, Records, it is an A record to the box, DNS only (the grey cloud): the game port is UDP, which the free plan cannot proxy.' },
     @{ Name = 'ranges'; Say = 'Cloudflare''s list of its addresses'; What = 'Cloudflare''s list of its addresses'; Fails = 'has changed'; Recovers = 'matches ours again'; Misses = 1; Back = 1; Every = 1440
        Fix = 'The VPS takes 443 only from the ranges in scripts\deploy\cloudflare-ranges.txt, and Caddy believes only those for the visitor''s address. Put Cloudflare''s list into that file and the Caddyfile''s trusted_proxies line (tests\test-2995-cloudflare-front.ps1 holds the two equal), merge it, then send the Caddyfile with Setup-Domain.ps1 and run Set-WebFirewall.ps1.' },
     @{ Name = 'domain'; Say = ('The registration of ' + $S.SiteHost); What = ('the registration of ' + $S.SiteHost); Fails = 'runs out soon'; Recovers = 'was renewed'; Misses = 1; Back = 1; Every = 1440
        Fix = 'It is registered through Cloudflare: renew it there, under Domain Registration.' },
     @{ Name = 'runner'; Say = ('The build runners, ' + $S.RunnerName + ' and the numbered ones,'); What = 'the build runners'; Fails = 'are not all online on GitHub'; Recovers = 'are all online again'; Misses = 3; Back = 2; Every = 0; Private = $true
-       Fix = 'With none of them online no pull request gets its Launcher builds check, so nothing can be merged; with some, the checks wait longer. .\scripts\deploy\Install-Runner.ps1 -Status says what the VPS sees of the first, and -Number <n> -Status of the others.'
-       Blind = 'It asks with RUNNER_TOKEN, a secret of the outside watcher''s repository: a fine-grained token that reads only the runners. A new one goes there.' },
+       Fix = 'They are registered to EvilPatrick06/Thornswood-Ops (#4013). With none of them online the box''s jobs wait: deploys through the gate, staff notices from cloud threads and the admin App''s asks; with some, they wait longer. .\scripts\deploy\Install-Runner.ps1 -Status says what the VPS sees of the first, and -Number <n> -Status of the others.'
+       Blind = 'It asks with RUNNER_TOKEN, a secret of the outside watcher''s repository: a fine-grained token that reads only the runners of EvilPatrick06/Thornswood-Ops. A new one goes there.' },
     @{ Name = 'nexus'; Say = 'The Nexus collection'; What = 'the Nexus collection'; Fails = 'cannot be reached'; Recovers = 'is reachable again'; Misses = 2; Back = 2; Every = 60
        Fix = 'A new install gets its mods through this collection.' }
   )
@@ -551,6 +582,7 @@ function Invoke-Check($S, $c) {
     'site'    { return (Check-Site $S) }
     'cert'    { return (Check-Cert $S) }
     'dns'     { return (Check-Dns $S) }
+    'game'    { return (Check-Game $S) }
     'ranges'  { return (Check-Ranges $S) }
     'domain'  { return (Check-Domain $S) }
     'runner'  { return (Check-Runner $S) }

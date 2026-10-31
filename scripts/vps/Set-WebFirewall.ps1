@@ -106,14 +106,11 @@ function Done([int]$code) { Write-Host ''; if (-not $NoPause) { [void](Read-Host
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; Done 1 }
 
 function Clean($lines) {
-    @($lines | ForEach-Object { [string]$_ } | Where-Object { $_ -and $_ -notmatch 'post-quantum|store now, decrypt later|openssh\.com/pq\.html' })
+    @($lines | ForEach-Object { [string]$_ } | Where-Object { $_ })
 }
 
 function Invoke-Box([string]$mode) {
     if (-not (Test-Path -LiteralPath $BoxScript)) { Die "There is no $BoxScript. Nothing was sent." }
-    # -WhatIf is the box's -DryRun by now. Here it would only stop the local
-    # copy of the script being removed after it is sent.
-    $WhatIfPreference = $false
     $script = Get-ThornswoodFileScript -Path $BoxScript -Arguments $mode
     $old = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'

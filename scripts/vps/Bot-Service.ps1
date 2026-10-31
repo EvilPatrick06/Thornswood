@@ -174,8 +174,11 @@ function Get-ThornswoodBotRecordNames {
 }
 
 # A log of the bot's, by its name: bot.log, its rolls bot.log.1 and on, and a
-# bot.log.<anything> somebody renamed by hand to keep it. A log is never
-# removed; a full run moves one beside the code into data with the records.
+# bot.log.<anything> somebody renamed by hand to keep it. No install removes
+# a log: a full run moves one beside the code into data with the records,
+# and there the service deletes every bot.log copy, whatever its name, once
+# its last write is 59 days old, so no line outlives the privacy page's 90
+# days (BotService.cs, RollingLog.Age, #2166 and #3583).
 function Test-ThornswoodBotLogName([string]$Name) { return ($Name -eq 'bot.log' -or $Name -like 'bot.log.*') }
 
 # WHAT THE BOT'S FOLDER HOLDS BESIDES ITS CODE (issue #1184).
@@ -281,7 +284,11 @@ function Repair-ThornswoodBotData([string]$Root, [string]$Name = 'ThornswoodBot'
 # The bot's records and logs, moved out of its code folder into data (issue
 # #1104), only ever with the service stopped. One already in data is newer,
 # because bot.py writes there once the folder exists, so the copy beside the
-# code is then only removed; a log is never removed, it is left and said.
+# code is then only removed. A log is not removed here: when data already
+# has one by its name, it goes into data under that name and
+# .beside-code (and a number when that is taken too), keeping its last write,
+# so the service ages it with the rest (#3583). Left beside the code, where
+# the service cannot delete, it was kept for ever.
 # __pycache__ goes: the service's account wrote it and owns it, and Python
 # would load a planted file from it ahead of the source. With the code read
 # only to the account, Python does not make it again.
@@ -297,7 +304,12 @@ function Move-ThornswoodBotRecords([string]$Root) {
     try {
       if (-not (Test-Path -LiteralPath $to)) { Move-Item -LiteralPath $from -Destination $to -Force -ErrorAction Stop; 'moved ' + $n + ' into ' + $data }
       elseif ($n -notmatch '^bot\.log') { Remove-Item -LiteralPath $from -Force -ErrorAction Stop; 'removed the old ' + $n + ' beside the code; data holds the newer one' }
-      else { 'left ' + $from + ': data already has its own ' + $n }
+      else {
+        $as = $n + '.beside-code'
+        for ($i = 2; Test-Path -LiteralPath (Join-Path $data $as); $i++) { $as = $n + '.beside-code-' + $i }
+        Move-Item -LiteralPath $from -Destination (Join-Path $data $as) -ErrorAction Stop
+        'moved ' + $n + ' into ' + $data + ' as ' + $as + ': data already has its own ' + $n
+      }
     } catch { 'COULD NOT MOVE ' + $from + ': ' + $_.Exception.Message }
   }
   $cache = Join-Path $Root '__pycache__'
@@ -331,6 +343,9 @@ function Move-ThornswoodBotRecords([string]$Root) {
 #     moderation.log, which the site writes there for the bot and nothing
 #     else. The rule the bot had on the site's whole data folder before, where
 #     sessions.json and the other records are, is taken off.
+#   the site's data\from-bot, Modify (issue #3140): lists.json, the site's
+#     Known Issues page and roadmap, which the bot builds from the board and
+#     the site shows. The one folder of the site's the bot writes.
 #   each game server's for-bot folder, read on it and everything in it
 #     (issue #2321): the gamemode's staff log, moderation.log, which the
 #     bot says in the staff channel. A folder, made here when the server has
@@ -469,6 +484,9 @@ function Grant-ThornswoodBotAccess {
     $forBot = Join-Path $DocsData 'for-bot'
     if (Test-Path -LiteralPath $forBot) { Give $forBot 'Read' 'tree' 'the bot''s account read' }
     else { 'not there yet, nothing granted: ' + $forBot + '. Run Deploy-Docs.ps1, whose site makes it, then Install-Bot.ps1 again' }
+    $fromBot = Join-Path $DocsData 'from-bot'
+    if (Test-Path -LiteralPath $fromBot) { Give $fromBot 'Modify' 'tree' 'the bot''s account Modify, on the known issues and roadmap it writes for the site,' }
+    else { 'not there yet, nothing granted: ' + $fromBot + '. Run Deploy-Docs.ps1, whose site makes it, then Install-Bot.ps1 again' }
   }
   foreach ($s in $ServerRoots) {
     if (-not (Test-Path -LiteralPath $s)) { 'no game server at ' + $s + ', so nothing granted there'; continue }

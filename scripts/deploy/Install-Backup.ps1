@@ -21,7 +21,7 @@
   then it does not matter who finds a backup.
 
   This installs the on-box half. Getting the backups off the box is
-  Fetch-Backups.ps1, which runs here, and restoring one is docs\RESTORING.md.
+  Fetch-Backups.ps1, which runs here, and restoring one is RESTORING.md in the ops repo.
 #>
 [CmdletBinding()]
 param(
@@ -258,6 +258,9 @@ else {
         }
         'read ' + `$src + ' (' + `$dirs.Count + ' folder(s) given the rule' + `$(if (`$locked.Count) { ', and ' + (@(`$locked | ForEach-Object { `$_.Name }) -join ', ') }) + ')'
       }
+      # What it makes is its own, not every service's (#4077): a backup
+      # LOCAL SERVICE owned was one any service could give itself a rule on.
+      Set-ThornswoodTaskOwner -TaskName '$TaskName' -Sid `$sid -Action `$a -Roots '$Root'
       'on LOCAL SERVICE, Limited, as ' + `$sid
     } catch {
       Register-ScheduledTask -TaskName '$TaskName' -Action `$a -Trigger `$t -Principal (New-ThornswoodServicePrincipal -AsSystem) -Settings `$s -Force | Out-Null
@@ -285,7 +288,7 @@ Say '  1. Put the passphrase where you keep the server password. It is at' 'Dark
 Say "     $KeyOut on this machine. Losing it makes every backup noise." 'DarkGray'
 Say '  2. Run .\scripts\vps\Fetch-Backups.ps1 -Schedule once, so this machine pulls' 'DarkGray'
 Say '     them off the box every day. A backup only on the server is not a backup.' 'DarkGray'
-Say '  3. Restore one, once, following docs\RESTORING.md, and write the date' 'DarkGray'
+Say '  3. Restore one, once, following RESTORING.md in the ops repo, and write the date' 'DarkGray'
 Say '     in it. Until that has been done none of this is known to work.' 'DarkGray'
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

@@ -10,7 +10,7 @@ namespace Thornswood
 {
     static partial class Updater
     {
-        public const string Version = "1.2.6";
+        public const string Version = "1.2.13";
 
         /// <summary>
         /// The collection revision the last feed named, or 0 when it named
@@ -94,6 +94,9 @@ namespace Thornswood
             // empty array for 204), so a caller that has to tell them apart
             // reads this (#2636). 0 until an answer arrives.
             public int Status;
+            // The connection group the request goes in, or null for the
+            // shared one. Only the feed watch sets it (WatchGroup).
+            public string Group;
             protected override WebResponse GetWebResponse(WebRequest request)
             {
                 var r = base.GetWebResponse(request);
@@ -110,6 +113,7 @@ namespace Thornswood
                 {
                     if (Since != DateTime.MinValue) h.IfModifiedSince = Since;
                     if (Gzip) h.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
+                    if (Group != null) h.ConnectionGroupName = Group;
                 }
                 return r;
             }
@@ -305,6 +309,24 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// The connection group the feed watch holds its socket in, apart from
+        /// every other request to thornswood.net.
+        ///
+        /// The .NET Framework lets a program keep two connections to a host
+        /// at a time (ServicePointManager.DefaultConnectionLimit), and a
+        /// request waits for a free one inside its own timeout. Each
+        /// connection group counts its two apart. In the shared group the
+        /// watch held one of the two all the time from #2440 on, so the
+        /// Play page's gallery, its pictures, the voice token and the news
+        /// took turns on the one left: a picture of several megabytes held
+        /// the rest back, and a request whose timeout ran out while it
+        /// waited failed, which left the gallery blank. In a group of its
+        /// own the watch leaves both to them, as before it existed.
+        /// tests\test-2440-watch-connection.ps1 holds this.
+        /// </summary>
+        public const string WatchGroup = "feed-watch";
+
+        /// <summary>
         /// The long-poll request itself, apart from CheckUrl so a test can
         /// point it at a server of its own (tests\test-2636-feed-watch-quiet.ps1),
         /// the way Conditional is apart from FromSite.
@@ -325,6 +347,7 @@ namespace Thornswood
             using (var q = (Quick)Client(cfg, false, tip))
             {
                 q.Ms = ms;
+                q.Group = WatchGroup;
                 q.Gzip = true;
                 if (tag.Length > 0) q.Headers["If-None-Match"] = tag;
                 try { q.DownloadData(tip); }
@@ -587,24 +610,6 @@ namespace Thornswood
             return !string.IsNullOrEmpty(id) && Applied().Contains(id);
         }
 
-
-        /// <summary>
-        /// Is this path really inside that folder?
-        ///
-        /// A plain StartsWith is not enough, and it matters most in the one
-        /// place that deletes things. "C:\Thornswood2\anything" starts with
-        /// "C:\Thornswood", so a pack whose file list contained ..\Thornswood2
-        /// would pass a prefix test and be treated as ours. Comparing against
-        /// the folder plus its separator is the whole fix.
-        /// </summary>
-        static bool Inside(string full, string folder)
-        {
-            if (string.IsNullOrEmpty(full) || string.IsNullOrEmpty(folder)) return false;
-            string fence = folder.TrimEnd(Path.DirectorySeparatorChar,
-                                          Path.AltDirectorySeparatorChar)
-                         + Path.DirectorySeparatorChar;
-            return full.StartsWith(fence, StringComparison.OrdinalIgnoreCase);
-        }
 
         static string PackListFile(string id)
         {
@@ -880,7 +885,7 @@ namespace Thornswood
                                 // it, outside the game.
                                 try { target = Path.GetFullPath(Path.Combine(Paths.Game, rel)); }
                                 catch { continue; }
-                                if (!Inside(target, Paths.Game)) continue;
+                                if (!PathFence.Inside(target, Paths.Game)) continue;
                                 try { if (File.Exists(target)) { File.Delete(target); log("removed " + line); } } catch (Exception ex) { Swallow.Note("Updater.Install, delete", ex); }
                                 removed.Add(rel);
                             }
@@ -932,7 +937,7 @@ namespace Thornswood
                         // game is; a profile entry has to land under Root.
                         string full = Path.GetFullPath(dest);
                         string fence = inGame ? Paths.Game : Paths.Root;
-                        if (!Inside(full, fence)) continue;
+                        if (!PathFence.Inside(full, fence)) continue;
                         Directory.CreateDirectory(Path.GetDirectoryName(full));
 
                         // Whether this file was already here decides whether
@@ -1154,7 +1159,7 @@ namespace Thornswood
                 string full;
                 try { full = Path.GetFullPath(Path.Combine(fence, rel)); }
                 catch { continue; }
-                if (!Inside(full, fence)) continue;
+                if (!PathFence.Inside(full, fence)) continue;
 
                 try
                 {
@@ -1170,7 +1175,7 @@ namespace Thornswood
                     // lands in the same place as a game\ one. Only a file that
                     // is really out of the way is recorded: one that would not
                     // delete is still in the game, so its kept copy stays.
-                    if (Inside(full, Paths.Game))
+                    if (PathFence.Inside(full, Paths.Game))
                         removed.Add(full.Substring(Paths.Game.TrimEnd('\\', '/').Length).TrimStart('\\', '/'));
                 }
                 catch { stuck++; }
@@ -1187,7 +1192,7 @@ namespace Thornswood
                 {
                     string at = d;
                     while (at.Length > fence.Length &&
-                           Inside(at, fence) &&
+                           PathFence.Inside(at, fence) &&
                            Directory.Exists(at) &&
                            Directory.GetFileSystemEntries(at).Length == 0)
                     {

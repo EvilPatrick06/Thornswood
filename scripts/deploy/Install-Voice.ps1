@@ -91,6 +91,9 @@ if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 # The account the task runs as and what it may reach (#2578), sent inside
 # the script that installs it.
 . (Join-Path $Here 'ServiceAccount.ps1')
+# Where the box keeps its firewall rules, and the refresh that makes the
+# firewall take a change to them (#3896).
+. (Join-Path $Here '..\vps\BoxFirewall.ps1')
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -188,7 +191,8 @@ try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t
 }
 
 <#
-  HOW MANY PEOPLE IT TAKES AT ONCE (#481). records\most-online.json is the one
+  HOW MANY PEOPLE HOLD A VOICE PLACE AT ONCE (#481; only somebody in the world
+  holds one, #3570). records\most-online.json is the one
   place the numbers live, the world's seats and voice's, read through
   MaxOnline.ps1 the way the deploys read the seats, before anything is sent:
   a voice number under the seats stops here with the box untouched. It goes
@@ -197,7 +201,7 @@ try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t
   and this says so.
 
   Dev voice, C:\Thornswood-Voice-Dev (the folder every dev install names,
-  docs\SERVER.md), takes the dev server's numbers, the record's dev object;
+  SERVER.md in the ops repo), takes the dev server's numbers, the record's dev object;
   any other folder is the live service and takes main's (Patrick, 12 Oct:
   dev voice at most 5).
 #>
@@ -342,11 +346,16 @@ if (-not `$AsSystem) {
 # loopback only and needs nothing opened either way.
 # Checked under the same name it is created under. This used to look for
 # 'Thornswood Voice' and create '$TaskName', so installing dev found the live
-# rule already there and never opened 7789 at all.
+# rule already there and never opened 7789 at all. The rule lives in the
+# box's own policy store, the only one the firewall takes rules from, and
+# Group Policy is refreshed after a change (scripts\vps\BoxFirewall.ps1, #3896).
+$(Get-ThornswoodFirewallScript)
+`$fwHas = [bool](Get-NetFirewallRule -PolicyStore localhost -DisplayName '$TaskName' -EA SilentlyContinue)
 if ('$Bind' -eq '127.0.0.1') {
-    Remove-NetFirewallRule -DisplayName '$TaskName' -EA SilentlyContinue
-} elseif (-not (Get-NetFirewallRule -DisplayName '$TaskName' -EA SilentlyContinue)) {
-    New-NetFirewallRule -DisplayName '$TaskName' -Direction Inbound -Protocol TCP -LocalPort $Port -Action Allow | Out-Null
+    if (`$fwHas) { Remove-NetFirewallRule -PolicyStore localhost -DisplayName '$TaskName'; Sync-ThornswoodFirewall }
+} elseif (-not `$fwHas) {
+    New-NetFirewallRule -PolicyStore localhost -DisplayName '$TaskName' -Direction Inbound -Protocol TCP -LocalPort $Port -Action Allow | Out-Null
+    Sync-ThornswoodFirewall
 }
 
 # THORNSWOOD_SITE is what lets /choose check that a character creation choice
@@ -570,8 +579,11 @@ function StartIt {
                 `$sid = Get-ThornswoodTaskSid '$TaskName'
                 if (-not `$sid) { `$why = 'the task SID NT TASK\$TaskName could not be looked up' }
                 else {
-                    try { Grant-ThornswoodServiceFolder -Root '$Root' -Sid `$sid -Writable 'chat' -Files 'voice.log', 'voice.log.*', 'token-key.txt' }
-                    catch { `$why = 'its folder could not be granted to it: ' + `$_.Exception.Message }
+                    try {
+                        Grant-ThornswoodServiceFolder -Root '$Root' -Sid `$sid -Writable 'chat' -Files 'voice.log', 'voice.log.*', 'token-key.txt'
+                        # What it makes is its own, not every service's (#4077).
+                        Set-ThornswoodTaskOwner -TaskName '$TaskName' -Sid `$sid -Action `$action -Roots '$Root'
+                    } catch { `$why = 'its folder could not be granted to it: ' + `$_.Exception.Message }
                 }
                 if (`$why) {
                     `$why + ', so the task goes back on SYSTEM'
@@ -723,8 +735,9 @@ if (Get-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue) {
     try { Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false -EA Stop; 'took off the task $TaskName' }
     catch { 'could not take off the task ${TaskName}: ' + `$_.Exception.Message; 'NOT REMOVED'; exit 1 }
 }
-if (Get-NetFirewallRule -DisplayName '$TaskName' -EA SilentlyContinue) {
-    try { Remove-NetFirewallRule -DisplayName '$TaskName' -EA Stop; 'took away the firewall rule $TaskName' }
+$(Get-ThornswoodFirewallScript)
+if (Get-NetFirewallRule -PolicyStore localhost -DisplayName '$TaskName' -EA SilentlyContinue) {
+    try { Remove-NetFirewallRule -PolicyStore localhost -DisplayName '$TaskName' -EA Stop; Sync-ThornswoodFirewall; 'took away the firewall rule $TaskName' }
     catch { 'could not take away the firewall rule ${TaskName}: ' + `$_.Exception.Message; 'NOT REMOVED'; exit 1 }
 }
 if (Test-Path -LiteralPath '$Root') {
@@ -827,13 +840,20 @@ if ($Bind -eq '127.0.0.1') {
     # The service is only useful if something is carrying it, so say whether
     # anything actually is rather than leaving that to be assumed. This goes
     # over HTTPS, so it is asked from anywhere, a cloud thread included.
+    # Through the site /health says only ok (#3806): the build, bind and auth
+    # go to a caller on the box, and the build was read there above.
     if (-not $reachable) {
         $via = ''
         if ($Site) { $via = $Site.TrimEnd('/') + $(if ($Port -eq 7778) { '/voice' } else { '/voice-dev' }) }
         if ($via) {
             try {
                 $h = Invoke-RestMethod ($via + '/health') -TimeoutSec 10
-                Say "Reached it through $via, build $($h.build), bind $($h.bind), auth $($h.auth)." 'Green'
+                if ($h -and $h.PSObject.Properties['ok'] -and $h.ok -eq $true) {
+                    Say "Reached it through $via, which says ok." 'Green'
+                } else {
+                    Say "Something answered at $via/health, but not voice's ok, so the site is not carrying voice there." 'Red'
+                    Say '  Check the Caddyfile has the handle_path block for this port.' 'DarkGray'
+                }
             } catch {
                 Say "But $via/health did not answer either, so nothing is carrying it." 'Red'
                 Say '  Check the Caddyfile has the handle_path block for this port.' 'DarkGray'
@@ -849,7 +869,7 @@ if ($Bind -eq '127.0.0.1') {
 } else {
     Say "Installed, but ${VpsHost}:$Port was $voiceTry from out here, though voice answers on the box and the game server answers from here." 'Red'
     Say "  The firewall rule '$TaskName' up there, or something between, is not letting it in." 'Red'
-    Say "  .\scripts\vps\Remote.ps1 `"Get-NetFirewallRule -DisplayName '$TaskName' | Get-NetFirewallPortFilter`"" 'DarkGray'
+    Say "  .\scripts\vps\Remote.ps1 `"Get-NetFirewallRule -PolicyStore ActiveStore -DisplayName '$TaskName' | Get-NetFirewallPortFilter`"" 'DarkGray'
 }
 # The service's files are in place: the box records that it runs this
 # artifact, and /health says so from then on (Artifact.ps1).

@@ -3,14 +3,20 @@ own_plugins.py
 
 Where a builder reads a plugin of the load order from (#2923).
 
-Thornswood's own plugins (Thornswood-Content.esp, Thornswood-Last.esp,
-Thornswood-WoodworkerTrail.esp, and any other file in game/content) are made
-and shipped from this repository's game/content. A game folder holds whichever
-release last reached it, so a table read from there describes a plugin nobody
-ships. Every plugin whose name is a file in game/content is read from there,
-and every other plugin from the game's Data folder. The same rule is
-OwnPlugins.js and OwnPlugins.ps1; tests/test-2923-own-plugins.js holds the
-three to it.
+Thornswood's own plugins (Thornswood-Content.esp and any other file in
+game/content) are made and shipped from this repository's game/content.
+A game folder holds whichever release last reached it, so a table read from
+there describes a plugin nobody ships. Every plugin whose name is a file in
+game/content is read from there, and every other plugin from the game's Data
+folder. The same rule is OwnPlugins.js and OwnPlugins.ps1;
+tests/test-2923-own-plugins.js holds the three to it.
+
+Thornswood-Last.esp is ours too, built here by Build-LastPlugin.py, but since
+#2791 no repository holds it: it copies other authors' records, so it is made
+in the Data folder from its recipe, game/data/last-plugin.recipe
+(Make-LastPlugin.py), and read from there (MADE_IN_DATA). is_own still names
+it, so what pins a load order by the collection's bytes leaves its bytes out
+the way it leaves the content plugin's out (MerchantLoadOrderPin.js, #613).
 
 Which plugins are in the load order is read here too (#2976). The game loads
 Skyrim's five masters, then every line of plugins.txt that starts with '*'. A
@@ -26,18 +32,27 @@ on 1 Oct. Every builder takes its load order from load_order.
     path = own_plugins.plugin_path(data, 'Thornswood-Content.esp')
 """
 
+import hashlib
 import io
 import os
 
 OWN_DIR = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'game', 'content'))
 
 
-def is_own(name):
+# Ours, and made in the Data folder from a recipe rather than held here (#2791).
+MADE_IN_DATA = ['Thornswood-Last.esp']
+
+
+def in_repo(name):
     return os.path.isfile(os.path.join(OWN_DIR, name))
 
 
+def is_own(name):
+    return in_repo(name) or name.lower() in [m.lower() for m in MADE_IN_DATA]
+
+
 def plugin_path(data, name):
-    return os.path.join(OWN_DIR, name) if is_own(name) else os.path.join(str(data), name)
+    return os.path.join(OWN_DIR, name) if in_repo(name) else os.path.join(str(data), name)
 
 
 # The five masters load before the game reads plugins.txt, and are never
@@ -79,3 +94,12 @@ def load_order(plugins_txt):
 
 def switched_off(plugins_txt):
     return read_plugins_txt(plugins_txt)[1]
+
+
+def load_order_name(order):
+    """What a table says it was read from: how many plugins and the first
+    twelve hex of the sha256 of their names in order, one per line. Never the
+    plugin list's path, which names one machine (#3105: every box run wrote
+    its own temp folder into ten tables)."""
+    digest = hashlib.sha256('\n'.join(order).encode('utf-8')).hexdigest()[:12]
+    return '%d plugins in load order (names sha256 %s)' % (len(order), digest)

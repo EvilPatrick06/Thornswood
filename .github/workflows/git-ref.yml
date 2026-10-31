@@ -1,5 +1,8 @@
-# Makes a release tag, or deletes a branch, for a session whose git cannot
-# write refs: a cloud Claude thread (#3107, #3314).
+# Makes a release tag, or deletes a branch or a tag, for a session whose git
+# cannot write refs: a cloud Claude thread (#3107, #3314). It also deletes a
+# release draft and publishes a signed launcher draft, which the same proxy
+# refuses (#4177, measured 31 Oct 2026: 403 "Creating, editing, or deleting
+# releases is not permitted for this session type").
 #
 # WHY. A cloud session reaches GitHub through the cloud environment's proxy,
 # which refuses every ref write before GitHub sees it (measured 22 Oct 2026:
@@ -12,6 +15,10 @@
 #
 #   pwsh scripts/ops/Set-Ref.ps1 -Tag release/dev/<id>-dev -Commit <sha> -MessageFile <file>
 #   pwsh scripts/ops/Set-Ref.ps1 -DeleteBranch claude/<what> -Commit <sha>
+#   pwsh scripts/ops/Set-Ref.ps1 -DeleteTag <tag> -Commit <sha>
+#   pwsh scripts/ops/Set-Ref.ps1 -DeleteDraft <release id>
+#   pwsh scripts/ops/Set-Ref.ps1 -PublishLauncher v<version>
+#   pwsh scripts/ops/Set-Ref.ps1 -RetagLauncher v<version>
 #
 # which starts this on main with what to do, waits for the run, and prints
 # the answer this run left as an annotation titled Set-Ref. Ship.ps1 does
@@ -19,18 +26,22 @@
 # Set-Ref.ps1's header says what it makes, what it deletes, and what it
 # refuses: only release/dev and release/main tags, on a commit main has; a
 # branch only at the commit given, never the default branch, never one an
-# open pull request comes from or is built onto.
+# open pull request comes from or is built onto; a tag only at the commit
+# given and with no release on it; only a draft; a launcher draft only when
+# Test-ReleaseFiles.ps1 -RequireSigned passes its files on this runner, as
+# release.yml's verify job checks them.
 #
 # WHAT IT RUNS. Main's Set-Ref.ps1 under pwsh with no profile. The inputs
 # reach it through the environment, never pasted into the script. The run's
-# own token can write refs and read pull requests, nothing else, and there
-# is no secret. Anybody who can start this can already push and delete refs
+# own token can write refs and releases, read pull requests and start a
+# workflow (for release-files.yml after a release tag, #3686), nothing else,
+# and there is no secret. Anybody who can start this can already push and delete refs
 # with git; this only lets a session whose proxy refuses that do the same.
 #
 # Every action here is named by a full length commit SHA with its tag in the
 # comment, for the reason build.yml gives.
 name: Tag or branch
-run-name: ${{ inputs.tag && format('Tag {0}', inputs.tag) || format('Delete branch {0}', inputs.delete_branch) }} by ${{ github.actor }}
+run-name: ${{ inputs.tag && format('Tag {0}', inputs.tag) || inputs.delete_branch && format('Delete branch {0}', inputs.delete_branch) || inputs.delete_tag && format('Delete tag {0}', inputs.delete_tag) || inputs.delete_draft && format('Delete draft {0}', inputs.delete_draft) || inputs.publish_launcher && format('Publish launcher {0}', inputs.publish_launcher) || format('Put launcher draft {0} back on its tag', inputs.retag_launcher) }} by ${{ github.actor }}
 on:
   workflow_dispatch:
     inputs:
@@ -40,21 +51,42 @@ on:
       delete_branch:
         description: 'Or the branch to delete'
         required: false
+      delete_tag:
+        description: 'Or the tag to delete'
+        required: false
+      delete_draft:
+        description: 'Or the id of the release draft to delete'
+        required: false
+      publish_launcher:
+        description: 'Or the v<version> tag whose launcher draft to publish'
+        required: false
+      retag_launcher:
+        description: 'Or the v<version> tag whose launcher draft GitHub took off it, to put back'
+        required: false
       commit:
-        description: 'The commit the tag goes on, or the commit the branch has to be at'
-        required: true
+        description: 'The commit the tag goes on, or the commit the branch or tag has to be at (not for a draft or a launcher)'
+        required: false
       message:
         description: 'The tag message'
         required: false
 permissions:
   contents: write
   pull-requests: read
+  # To start release-files.yml after a release tag it made (#3686).
+  actions: write
 jobs:
   ref:
     name: Make the tag or delete the branch
-    runs-on: [self-hosted, Windows, thornswood-vps]
-    # Six calls at most. Past this it is stuck, not slow.
-    timeout-minutes: 5
+    # Main only (#3550): runner 3 signs release launchers and takes any job
+    # that asks for thornswood-vps alone, so a job on that label never runs a
+    # branch's code. A dispatch on a branch skips it. scripts\vps\
+    # Check-RunnerIsolation.ps1 holds every job to that, on the gate through
+    # tests\test-runner-isolation.ps1.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
+    # Six calls at most, or a launcher's three files and their check. Past
+    # this it is stuck, not slow.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -80,6 +112,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REF_TAG: ${{ inputs.tag }}
           REF_DELETE_BRANCH: ${{ inputs.delete_branch }}
+          REF_DELETE_TAG: ${{ inputs.delete_tag }}
+          REF_DELETE_DRAFT: ${{ inputs.delete_draft }}
+          REF_PUBLISH_LAUNCHER: ${{ inputs.publish_launcher }}
+          REF_RETAG_LAUNCHER: ${{ inputs.retag_launcher }}
           REF_COMMIT: ${{ inputs.commit }}
           REF_MESSAGE: ${{ inputs.message }}
           REF_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
@@ -87,3 +123,22 @@ jobs:
           $ErrorActionPreference = 'Stop'
           & (Join-Path $env:GITHUB_WORKSPACE 'scripts/ops/Set-Ref.ps1') -OnGitHub
           exit $LASTEXITCODE
+
+      # A tag this run's token made starts no workflow by itself, so the
+      # release's files go on its Release by name (#3686, release-files.yml,
+      # which runs only while the repository is public). Only after the tag
+      # step succeeded, and only for a release tag.
+      - name: Start release-files.yml for the release tag
+        if: ${{ inputs.tag != '' }}
+        shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF_TAG: ${{ inputs.tag }}
+          REF_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:REF_TAG -notmatch '^release/(main|dev)/[0-9]{8}-[0-9]{4,6}(-dev)?$') { Write-Host "not a release tag: $env:REF_TAG"; exit 1 }
+          $h = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
+          $b = @{ ref = $env:REF_DEFAULT_BRANCH; inputs = @{ tag = $env:REF_TAG } } | ConvertTo-Json
+          Invoke-RestMethod -Method Post -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/workflows/release-files.yml/dispatches" -Headers $h -ContentType 'application/json' -Body $b | Out-Null
+          Write-Host "started release-files.yml for $env:REF_TAG"
