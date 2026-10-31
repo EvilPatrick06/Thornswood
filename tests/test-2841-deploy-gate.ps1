@@ -145,12 +145,14 @@ Yes '  and Run-OnBox.ps1 copies what came back into -Out as well as the checkout
 # The Ship verbs (Patrick's A, 30 Oct 2026: the box admin App mints the
 # token a Ship from the feed signs with, and the whole Ship runs on the box).
 Yes 'Ship-Dev is a dev Ship from the feed, its note as a title and detail lines' ((Words 'Ship-Dev -Title "Market stalls take your prices" -Detail "Claim a stall"') -eq '-Channel|dev|-Title|Market stalls take your prices|-Detail|Claim a stall' -and
+    (Words 'Ship-Dev -Title x -Detail y -ModsOnly') -eq '-Channel|dev|-Title|x|-Detail|y|-ModsOnly' -and
     (Words 'Ship-Dev -Channel main -Title x -Detail y') -eq 'REFUSED' -and (Words 'Ship-Dev -Title x -Detail y -Root C:/x') -eq 'REFUSED' -and (Words 'Ship-Dev -Title x -Detail y -Package') -eq 'REFUSED')
 Yes 'Ship-Main is held to a build and to -Channel main' ($verbs.verbs.'Ship-Main'.build -eq $true -and (Words 'Ship-Main -Title x -Detail y') -eq 'REFUSED' -and
     (Words "Ship-Main -Build $sha -Title x -Detail y -ModsOnly") -eq '-Channel|main|-Title|x|-Detail|y|-ModsOnly' -and (Words "Ship-Main -Build $sha -Title x -Detail y -MoveServer") -eq 'REFUSED')
 $shipBox = Text 'scripts/release/Ship-OnBox.ps1'
-Yes '  Ship-OnBox.ps1 runs Ship.ps1 from the feed, a dev one mods only, with the token in GH_TOKEN alone and gone after' (
-    $shipBox.Contains("`$ship = @{ Notes = `$notes; FromFeed = `$true; NoPause = `$true }") -and $shipBox.Contains("if (`$Channel -eq 'dev') { `$ship['Channel'] = 'dev'; `$ship['ModsOnly'] = `$true }") -and
+Yes '  Ship-OnBox.ps1 runs Ship.ps1 from the feed, keeping the launcher only when asked, with the token in GH_TOKEN alone and gone after' (
+    $shipBox.Contains("`$ship = @{ Notes = `$notes; FromFeed = `$true; NoPause = `$true }") -and $shipBox.Contains("if (`$Channel -eq 'dev') { `$ship['Channel'] = 'dev' }") -and
+    $shipBox.Contains("if (`$ModsOnly) { `$ship['ModsOnly'] = `$true }") -and -not $shipBox.Contains("elseif (`$ModsOnly)") -and
     $shipBox.Contains('$env:GH_TOKEN = $token') -and $shipBox.Contains('finally { Remove-Item -LiteralPath Env:\GH_TOKEN'))
 Yes '  a main Ship goes from the branch main at the fetched origin/main' ($shipBox.Contains("checkout --quiet -B main refs/remotes/origin/main"))
 $gt = Text 'scripts/vps/admin/ship-access.js'
