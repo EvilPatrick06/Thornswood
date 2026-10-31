@@ -91,6 +91,10 @@ try {
   before.counts.kept += 3;
   fs.writeFileSync(path.join(tmp, "docs", "systems", "cut-items.json"), JSON.stringify(before, null, 2) + "\n");
   fs.writeFileSync(path.join(tmp, "docs", "systems", "cut-items.md"), "old\n");
+  // and the rows it left in the open book, the three poles among them (#4087).
+  const keptBefore = JSON.parse(read("docs/systems/cut-kept.json"));
+  keptBefore.ids = keptBefore.ids.concat(MOD).sort();
+  fs.writeFileSync(path.join(tmp, "docs", "systems", "cut-kept.json"), JSON.stringify(keptBefore, null, 2) + "\n");
   const run = function () {
     return cp.spawnSync(process.execPath, [path.join(tmp, "scripts", "dev", "Write-CutItems.js")], { encoding: "utf8", timeout: 120000 });
   };
