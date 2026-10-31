@@ -26,8 +26,8 @@
       <!-- engine-pin:<name> -->   and   <!-- /engine-pin:<name> -->
   (each marker on its own line, spaces in front allowed). Everything between
   the two is written from the records and never by hand; everything outside
-  is the page's own text. The site leaves the markers out of what it serves
-  (site\server.js strips HTML comments).
+  is the page's own text. The site leaves the marker lines out of what it
+  serves (forMode in site\server.js).
 
   Reads only what it is given: GitHub through the $Get script block the caller
   passes (a path in, the answer as objects out), files through the checkout.
