@@ -39,10 +39,12 @@ with the lore).
    this repository. Each stays under its own licence, and `THIRD-PARTY.md`
    says which, and where its source is.
 3. **Other people's records inside Thornswood's plugins and data.**
-   `game/content/Thornswood-Last.esp` copies cells, worldspaces, quests,
-   locations and recipes from the collection's plugins, and
-   `game/content/Thornswood-WoodworkerTrail.esp` overrides 53 recipes of five
-   of them. The data files built from the load order (under `game/data`)
+   `Thornswood-Last.esp` copies cells, worldspaces, quests, locations and
+   recipes from the collection's plugins, so no repository or release holds
+   it: each machine makes it from its recipe, `game/data/last-plugin.recipe`,
+   and its own copies of those plugins (#2791). The old
+   `Thornswood-WoodworkerTrail.esp`, which overrode 53 recipes of five of
+   them, is no longer in this repository. The data files built from the load order (under `game/data`)
    hold what was read out of those plugins. Those records and that data stay
    their authors' (#2791). Every plugin also overrides records of Bethesda's
    masters, which stay Bethesda's.

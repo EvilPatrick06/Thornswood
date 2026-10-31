@@ -181,8 +181,22 @@ if (block) {
   const inRules = list ? (list[1].replace(/#.*$/gm, "").match(/'[^']+'/g) || [])
     .map(function (s) { return s.slice(1, -1); })
     .filter(function (p) { return /^Data\\[^\\]+\.(esp|esm|esl)$/i.test(p); })
-    .map(function (p) { return p.slice(5).toLowerCase(); }).sort() : [];
-  yes("Ship-Rules.ps1 names our plugins in $ShipOursFiles (" + inRules.join(", ") + ")", inRules.length > 0);
+    .map(function (p) { return p.slice(5).toLowerCase(); }) : [];
+  // And the one a release carries as its recipe, which each machine makes the
+  // plugin from (#2791): still ours, and the manifest still names it served,
+  // so the launcher never takes it for another author's mod.
+  const made = /\$ShipMadeFromRecipe = @\(([\s\S]*?)\n\)/.exec(rules);
+  const madeNames = made ? (made[1].replace(/#.*$/gm, "").match(/'[^']+'/g) || [])
+    .map(function (s) { return s.slice(1, -1); })
+    .filter(function (p) { return /^Data\\[^\\]+\.(esp|esm|esl)$/i.test(p); })
+    .map(function (p) { return p.slice(5).toLowerCase(); }) : [];
+  const recipes = madeNames.filter(function (n) {
+    return list && list[1].toLowerCase().indexOf("'data\\" + n.replace(/\.es[pml]$/i, "") + ".recipe'") >= 0;
+  });
+  inRules.push.apply(inRules, recipes);
+  inRules.sort();
+  yes("Ship-Rules.ps1 names our plugins in $ShipOursFiles, or their recipes (" + inRules.join(", ") + ")", inRules.length > 0);
+  yes("  each plugin it makes from a recipe ships as that recipe (" + madeNames.join(", ") + ")", recipes.length === madeNames.length);
   yes("the gamemode serves exactly the plugins Ship-Rules.ps1 calls ours (" + inGamemode.join(", ") + ")",
       inGamemode.length > 0 && JSON.stringify(inGamemode) === JSON.stringify(inRules));
 }

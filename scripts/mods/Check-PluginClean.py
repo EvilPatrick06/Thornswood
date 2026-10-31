@@ -566,7 +566,7 @@ def load_masters(p, data_dir, read):
             continue
         path = own_plugins.plugin_path(data_dir, m)
         if not os.path.isfile(path):
-            missing.append('%s is not in %s' % (m, data_dir if not own_plugins.is_own(m) else own_plugins.OWN_DIR))
+            missing.append('%s is not in %s' % (m, own_plugins.OWN_DIR if own_plugins.in_repo(m) else data_dir))
             continue
         try:
             read[m.lower()] = Plugin(path, m)

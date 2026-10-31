@@ -1674,7 +1674,7 @@ The machine that runs `Ship.ps1` still has to sign the build. [Setting up a mach
 
 ### The content plugin goes to the server first
 
-The server gets the content plugin first, then the Ship. When `game\content\Thornswood-Content.esp` or `game\content\Thornswood-Last.esp` changed since the last dev release, put it on the dev server before you Ship. The Ship right after it carries the same change to the launcher and says it, so the deploy posts nothing (`-ShipFollows`) and the note goes to the Ship alone:
+The server gets the content plugin first, then the Ship. When `game\content\Thornswood-Content.esp` or `game\data\last-plugin.recipe` (the recipe Thornswood-Last.esp is made from, #2791) changed since the last dev release, put it on the dev server before you Ship. The Ship right after it carries the same change to the launcher and says it, so the deploy posts nothing (`-ShipFollows`) and the note goes to the Ship alone:
 
 ```powershell
 .\scripts\deploy\Deploy-DevGamemode.ps1 -LoadOrder -ShipFollows
@@ -1684,7 +1684,7 @@ The server gets the content plugin first, then the Ship. When `game\content\Thor
 
 Each post says only what is new on its channel (#3320, Patrick, 22 Oct). Ship and `Deploy-DevGamemode.ps1` refuse a note whose title or `- ` line the channel's News or its Discord channel has already had, and say where it was said. On 22 Oct a deploy and the Ship after it posted the same note twice, which is what `-ShipFollows` is for.
 
-`-LoadOrder` keeps the dev server's own load order and sends every plugin it names that the server does not hold at the same bytes: our two plugins from your checkout, the others from the collection. `Thornswood-Last.esp` is always the last plugin in that order: when the dev server's order does not end with it, `-LoadOrder` puts it there and sends the order (#2486). It needs no server build, so it runs from the fresh checkout the deploy asks for. `-Dist <a built dist\server folder>` also writes that build's load order over the dev one.
+`-LoadOrder` keeps the dev server's own load order and sends every plugin it names that the server does not hold at the same bytes: the content plugin from your checkout, the others from the collection. `Thornswood-Last.esp` is never sent: it copies other authors' records, so the deploy makes it on the box from your checkout's recipe, into the stage beside what it sent, and the stage check holds it to the sha256 `game\data\last-plugin.json` names (#2791, `scripts\deploy\LastPluginOnBox.ps1`). It is always the last plugin in that order: when the dev server's order does not end with it, `-LoadOrder` puts it there and sends the order (#2486). It needs no server build, so it runs from the fresh checkout the deploy asks for. `-Dist <a built dist\server folder>` also writes that build's load order over the dev one.
 
 Ship asks the dev server which of our plugins it holds, by size and sha256. When this release would send clients another one, Ship stops before it publishes, posts or tells the server anything, and names the command above. On 11 Oct a dev Ship sent a new content plugin while the dev server still had the old one, and for eight minutes every dev client that updated held a plugin the server did not (#2308).
 
@@ -1782,13 +1782,13 @@ git pull
 
 ### The content plugin goes to the live server first
 
-When `game\content\Thornswood-Content.esp` or `game\content\Thornswood-Last.esp` changed since the last main release, the live server gets it before the Ship, from `main` after `git pull`:
+When `game\content\Thornswood-Content.esp` or `game\data\last-plugin.recipe` changed since the last main release, the live server gets it before the Ship, from `main` after `git pull`:
 
 ```powershell
 .\scripts\deploy\Deploy-Server.ps1 -GamemodeOnly
 ```
 
-It sends the committed gamemode and our two plugins whenever the live server's copy is not the same size and sha256. The first time the live load order has to gain `Thornswood-Last.esp` as its last plugin, `-GamemodeOnly` refuses, because it changes no setting; that release goes the full way, `Deploy-Gamemode.ps1` then `Deploy-Server.ps1`. A main Ship asks the live server the same question and stops, with nothing published, posted or told to a server, while the answer is another plugin.
+It sends the committed gamemode and the content plugin, and makes Thornswood-Last.esp on the box from the recipe, whenever the live server's copy is not the same size and sha256. The first time the live load order has to gain `Thornswood-Last.esp` as its last plugin, `-GamemodeOnly` refuses, because it changes no setting; that release goes the full way, `Deploy-Gamemode.ps1` then `Deploy-Server.ps1`. A main Ship asks the live server the same question and stops, with nothing published, posted or told to a server, while the answer is another plugin.
 
 ### Ship main
 

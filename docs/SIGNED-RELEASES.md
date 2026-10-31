@@ -418,8 +418,9 @@ took off what the job had left behind: runner 3's `thornswood-sign` label
 `records/sign-runners.json`, the signing runner's job-started hook, the
 signing hosts in runner 3's outbound rules, and Bootstrap-VPS.ps1's .NET
 runtime for Microsoft's signing client, which nothing else on the box runs.
-The check runners' `thornswood-check` stays: since #4914 the nightly's bot
-harnesses ask for it while the repository is private.
+Once the repository was public it took the check runners'
+`thornswood-check` and `records/check-runners.json` off too: their last user,
+the nightly's bot harnesses (#4914), runs on GitHub's runner.
 
 ## 8. Decisions (Patrick)
 

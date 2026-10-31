@@ -12838,8 +12838,8 @@
   },
   {
    "name": "Thornswood-Content.esp",
-   "sha256": "20c5479f925d2aab75171a9190a68b2535e085c6414907af959447c79cb8b535",
-   "size": 276675
+   "sha256": "2d47578f3f303e4995e866aed4de677fbd348bc603f1195f3f0a6b0283ca4fad",
+   "size": 281356
   },
   {
    "name": "FNIS.esp",
@@ -13166,7 +13166,7 @@
   }
  },
  "issue": 2551,
- "readFrom": "game/data/doors.json for the buildings and their doors; game/data/last-plugin.json loadOrder, then Thornswood-Last.esp, last plugin wins; Thornswood-Content.esp, Thornswood-Last.esp from game/content",
+ "readFrom": "game/data/doors.json for the buildings and their doors; game/data/last-plugin.json loadOrder, then Thornswood-Last.esp, last plugin wins; Thornswood-Content.esp from game/content, Thornswood-Last.esp made in the Data folder from its recipe",
  "refused": {
   "10a8b:Dawnguard.esm": {
    "name": "Forgotten Vale Cave",
