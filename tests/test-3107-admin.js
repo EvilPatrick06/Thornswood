@@ -67,7 +67,10 @@
 //      second run changes nothing; a ruleset the record does not name stops
 //      it and is never deleted; a repository the App is not installed on
 //      stops for it with the link to the installation's settings while the
-//      other is still matched;
+//      other is still matched; an entry's collaborators list takes off
+//      whoever it does not name (never the owner), withdraws an unnamed
+//      invitation, invites who is missing, reads back, and changes nothing
+//      a second time, and an entry with no list never touches its people;
 //      and the real records/github-repo-settings.json, when there is one,
 //      passes;
 //   5. the App's setup: no armed setup, a wrong or expired state, and an App
@@ -291,6 +294,18 @@ yes('secret scanning that is not true or false stops, named', /secret_scanning i
 yes('push protection without secret scanning stops', /secret_scanning_push_protection is on only with secret_scanning on too/.test(sstops({ repositories: [with_(settings().repositories[1], 'secret_scanning_push_protection', true)] })) &&
   sstops({ repositories: [Object.assign({}, settings().repositories[1], { secret_scanning: true, secret_scanning_push_protection: true })] }) === '');
 yes('a bad ruleset stops, naming its repository', /EvilPatrick06\/skymp: main targets push/.test(sstops({ repositories: [with_(settings().repositories[1], 'rulesets', [with_(forkMain, 'target', 'push')])] })));
+yes('a list of collaborators passes, an empty one too (nobody but the owner)', sstops({ repositories: [with_(settings().repositories[1], 'collaborators', ['Ture-Neko', 'WiccanDjinn'])] }) === '' &&
+  sstops({ repositories: [with_(settings().repositories[1], 'collaborators', [])] }) === '');
+yes('collaborators that are not a list stop, named', /collaborators is a list of GitHub logins/.test(sstops({ repositories: [with_(settings().repositories[1], 'collaborators', { WiccanDjinn: 'write' })] })));
+yes('a login GitHub could not have stops', /is not a GitHub login/.test(sstops({ repositories: [with_(settings().repositories[1], 'collaborators', ['two words'])] })) &&
+  /is not a GitHub login/.test(sstops({ repositories: [with_(settings().repositories[1], 'collaborators', ['-x'])] })));
+yes('the owner listed as a collaborator stops', /the owner, EvilPatrick06, is not a collaborator/.test(sstops({ repositories: [with_(settings().repositories[1], 'collaborators', ['evilpatrick06'])] })));
+yes('a collaborator named twice, in any case, stops', /names the collaborator wiccandjinn twice/.test(sstops({ repositories: [with_(settings().repositories[1], 'collaborators', ['WiccanDjinn', 'wiccandjinn'])] })));
+const pc = admin.planCollaborators(['WiccanDjinn', 'NewPerson', 'Asked'],
+  [{ login: 'EvilPatrick06' }, { login: 'wiccandjinn' }, { login: 'Jhinswife' }],
+  [{ id: 5, invitee: { login: 'Asked' } }, { id: 6, invitee: { login: 'Stale' } }]);
+yes('the people plan takes off whoever the list does not name and never the owner, withdraws an unnamed invitation, invites who is missing, and compares logins in any case',
+  JSON.stringify(pc.drop) === '["Jhinswife"]' && JSON.stringify(pc.withdraw) === '[{"id":6,"login":"Stale"}]' && JSON.stringify(pc.invite) === '["NewPerson"]' && JSON.stringify(pc.right) === '["WiccanDjinn"]');
 yes('the real records/github-repo-settings.json, when there is one, passes', (() => {
   const f = path.join(REPO, 'records', 'github-repo-settings.json');
   if (!fs.existsSync(f)) return true;
@@ -354,6 +369,9 @@ const gh = {
   immutable: { Thornswood: false, skymp: false },
   forkRepo: { full_name: 'EvilPatrick06/skymp', security_and_analysis: { secret_scanning: { status: 'enabled' }, secret_scanning_push_protection: { status: 'enabled' } } },
   nextRuleset: 100,
+  people: { Thornswood: ['Jhinswife', 'WiccanDjinn'], skymp: ['Ture-Neko', 'WiccanDjinn'] },
+  invites: { Thornswood: [], skymp: [{ id: 40, invitee: { login: 'Stale' }, permissions: 'write' }] },
+  nextInvite: 50,
 };
 gh.records['github-settings.json'] = { environments: { board: {}, notices: {}, 'bad name/../x': {} } };
 const appKey = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -414,7 +432,24 @@ function standIn(req, res) {
     }
     let m = /^\/repos\/EvilPatrick06\/Thornswood\/contents\/records\/(.+)$/.exec(P);
     if (m && gh.records[m[1]] && u.searchParams.get('ref') === 'main') return send(200, { content: Buffer.from(JSON.stringify(gh.records[m[1]])).toString('base64') });
-    if (/^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/(rulesets|private-vulnerability-reporting|immutable-releases)/.test(P) && !asAdmin()) return send(401, { message: 'Bad credentials' });
+    if (/^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/(rulesets|private-vulnerability-reporting|immutable-releases|collaborators|invitations)/.test(P) && !asAdmin()) return send(401, { message: 'Bad credentials' });
+    m = /^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/collaborators$/.exec(P);
+    if (m && req.method === 'GET') {
+      if (u.searchParams.get('affiliation') !== 'direct') return send(400, { message: 'ask for the direct ones' });
+      return send(200, [{ login: 'EvilPatrick06', role_name: 'admin' }].concat(gh.people[m[1]].map(l => ({ login: l, role_name: 'write' }))));
+    }
+    m = /^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/collaborators\/([^/]+)$/.exec(P);
+    if (m && req.method === 'DELETE') { const i = gh.people[m[1]].indexOf(m[2]); if (i < 0) return send(404, { message: 'Not Found' }); gh.people[m[1]].splice(i, 1); return send(204); }
+    if (m && req.method === 'PUT') {
+      if (gh.people[m[1]].includes(m[2])) return send(204);
+      const inv = { id: gh.nextInvite++, invitee: { login: m[2] }, permissions: 'write' };
+      gh.invites[m[1]].push(inv);
+      return send(201, inv);
+    }
+    m = /^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/invitations$/.exec(P);
+    if (m && req.method === 'GET') return send(200, gh.invites[m[1]]);
+    m = /^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/invitations\/(\d+)$/.exec(P);
+    if (m && req.method === 'DELETE') { const i = gh.invites[m[1]].findIndex(x => x.id === Number(m[2])); if (i < 0) return send(404, { message: 'Not Found' }); gh.invites[m[1]].splice(i, 1); return send(204); }
     m = /^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/rulesets$/.exec(P);
     if (m && req.method === 'GET') {
       if (u.searchParams.get('includes_parents') !== 'false') return send(400, { message: 'ask for this repository\'s own' });
@@ -786,6 +821,36 @@ function start(stateDir, ghPort) {
     gh.calls = [];
     r = await askRs();
     yes('  and a record that says off switches them off with DELETE', r.status === 200 && r.json.changed === 1 && gh.immutable.Thornswood === false && immu().length === 1 && immu()[0].method === 'DELETE');
+    gh.settingsRecord = settings();
+
+    // Collaborators (Four stepped down, 31 Oct 2026).
+    const peopleWrites = () => gh.calls.filter(c => /\/(collaborators|invitations)/.test(c.path) && c.method !== 'GET');
+    gh.calls = [];
+    r = await askRs();
+    yes('a record that lists nobody for either repository never reads or touches their people', r.status === 200 && !gh.calls.some(c => /\/(collaborators|invitations)/.test(c.path)));
+    gh.settingsRecord.repositories[0].collaborators = ['WiccanDjinn'];
+    gh.settingsRecord.repositories[1].collaborators = ['Ture-Neko', 'WiccanDjinn', 'NewPerson'];
+    gh.calls = [];
+    r = await askRs(true);
+    yes('a check says who would be taken off, withdrawn and invited, and changes nothing', r.status === 200 && r.json.differs === 3 && r.json.changed === 0 && peopleWrites().length === 0 &&
+      has(/^EvilPatrick06\/Thornswood: Jhinswife would be taken off, as the record does not name them$/) && has(/^EvilPatrick06\/skymp: the invitation to Stale would be withdrawn/) &&
+      has(/^EvilPatrick06\/skymp: NewPerson would be invited$/) && has(/^EvilPatrick06\/Thornswood: WiccanDjinn is a collaborator, as the record says$/));
+    gh.calls = [];
+    r = await askRs();
+    yes('a run takes Jhinswife off Thornswood, withdraws the stale invitation and invites the new person, each with its own repository\'s token, and reads back (3 changed)',
+      r.status === 200 && r.json.ok && r.json.changed === 3 &&
+      JSON.stringify(gh.people.Thornswood) === '["WiccanDjinn"]' && gh.invites.skymp.length === 1 && gh.invites.skymp[0].invitee.login === 'NewPerson' &&
+      peopleWrites().some(c => c.method === 'DELETE' && c.path === '/repos/' + T + '/collaborators/Jhinswife' && c.auth === 'Bearer ' + gh.aboutToken) &&
+      peopleWrites().some(c => c.method === 'DELETE' && c.path === '/repos/' + S + '/invitations/40' && c.auth === 'Bearer ' + gh.forkToken) &&
+      gh.calls.filter(c => c.method === 'GET' && c.path.startsWith('/repos/' + T + '/collaborators?')).length === 2);
+    yes('  and never the owner or a named collaborator', !peopleWrites().some(c => /EvilPatrick06$|WiccanDjinn$|Ture-Neko$/.test(c.path)));
+    gh.calls = [];
+    r = await askRs();
+    yes('a second run changes nothing, with the invitation still open', r.status === 200 && r.json.changed === 0 && peopleWrites().length === 0);
+    gh.people.Thornswood.push('ByHand');
+    gh.calls = [];
+    r = await askRs();
+    yes('someone added on GitHub by hand and not in the record is taken off again', r.status === 200 && r.json.changed === 1 && JSON.stringify(gh.people.Thornswood) === '["WiccanDjinn"]' && has(/^EvilPatrick06\/Thornswood: ByHand taken off$/));
     gh.settingsRecord = settings();
 
     const tokenSeen = sign(good());

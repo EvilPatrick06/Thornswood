@@ -1,5 +1,5 @@
 {
-  "about": "The rulesets, private vulnerability reporting, immutable releases and secret scanning of Thornswood and of the engine fork, EvilPatrick06/skymp (#3683, #3691). A change is a pull request to this file; once it merges, the Desk runs pwsh scripts/deploy/Set-BuildRunners.ps1 -RepoSettings (-Check first), which starts github-admin.yml in the private ops repository, and the box's admin service (scripts/vps/admin/admin.js, repo-settings) makes GitHub match it: each ruleset named here is made or put back by name, one GitHub has that this does not name stops the run and is never deleted, and reporting, immutable releases, secret scanning and push protection are switched as each entry says. A why is this file's own note and is never sent to GitHub.",
+  "about": "The rulesets, private vulnerability reporting, immutable releases and secret scanning of Thornswood and of the engine fork, EvilPatrick06/skymp (#3683, #3691). A change is a pull request to this file; once it merges, the Desk runs pwsh scripts/deploy/Set-BuildRunners.ps1 -RepoSettings (-Check first), which starts github-admin.yml in the private ops repository, and the box's admin service (scripts/vps/admin/admin.js, repo-settings) makes GitHub match it: each ruleset named here is made or put back by name, one GitHub has that this does not name stops the run and is never deleted, reporting, immutable releases, secret scanning and push protection are switched as each entry says, and where an entry lists collaborators, GitHub's are made to match it: one the list does not name is taken off, and one it names is invited. A why is this file's own note and is never sent to GitHub.",
   "repositories": [
     {
       "repository": "EvilPatrick06/Thornswood",
@@ -8,6 +8,8 @@
       "immutable_releases": true,
       "secret_scanning": true,
       "secret_scanning_push_protection": true,
+      "collaborators": ["WiccanDjinn"],
+      "collaborators_why": "Everybody besides Patrick, the owner, who may push here. Four (Jhinswife) stepped down on 31 Oct 2026 and Patrick asked for her access to go, so she is not named and the next run takes her off. A person who joins or leaves the team is a pull request to this list.",
       "rulesets": [
         {
           "name": "release tags",
@@ -40,6 +42,8 @@
       "private_vulnerability_reporting": true,
       "secret_scanning": true,
       "secret_scanning_push_protection": true,
+      "collaborators": ["Ture-Neko", "WiccanDjinn"],
+      "collaborators_why": "The fork's collaborators as GitHub had them on 31 Oct 2026, written down so nobody new gets push here without a pull request to this list.",
       "rulesets": [
         {
           "name": "thornswood/engine-changes: pull request, green build, no force push or deletion",
