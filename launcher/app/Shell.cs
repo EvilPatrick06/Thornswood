@@ -108,7 +108,7 @@ namespace Thornswood
                          txtReadyTitle, txtReadyNote;
         static Ellipse dotServer, dotVerify, dotReady;
         static StackPanel statusList, themeRow, themeEditor, pathRows, displayModeRow,
-                          firstRunCard;
+                          firstRunCard, quickKeysCard, quickKeys;
         // Play hero stats strip: three equal columns (Played / Sessions / Last played).
         static UniformGrid statRow;
         // GalleryCard is a Grid that fills the Play centre; only Visibility is touched.
@@ -770,6 +770,8 @@ namespace Thornswood
             btnScan = F<Button>("BtnScan"); btnFix = F<Button>("BtnFix");
 
             firstRunCard = F<StackPanel>("FirstRunCard");
+            quickKeysCard = F<StackPanel>("QuickKeysCard");
+            quickKeys = F<StackPanel>("QuickKeys");
             galleryCard = F<FrameworkElement>("GalleryCard");
             galleryImage = F<Image>("GalleryImage");
             galleryBy = F<TextBlock>("GalleryBy");
@@ -1449,6 +1451,11 @@ namespace Thornswood
                 win.Dispatcher.BeginInvoke(new Action(delegate
                 {
                     galleryWho = who;
+                    // A list that could not be read leaves the pictures as
+                    // they are rather than hiding Play's card; one that was
+                    // read keeps every picture already loaded.
+                    if (shots == null) shots = galleryShots;
+                    else Gallery.KeepLoaded(shots, galleryShots);
                     // Keep Play's rotation in step with what the Gallery page
                     // just learnt, without forcing a turn mid-page.
                     if (shots != null && shots.Count > 0)
@@ -3549,14 +3556,78 @@ namespace Thornswood
             BuildSideCard();
         }
 
-        // The first-time note is read once and then becomes wallpaper, so it
-        // goes once this machine has played. The In game card of keys that
-        // took its place went with the keys into the game: Settings there
-        // shows and changes every one (#3126, #3146).
+        // The first-time note is read once and then becomes wallpaper, so once
+        // this machine has played the side column hands itself over to the In
+        // game card of keys, which is still worth a glance. #3146 took the card
+        // off with the launcher's help pages, which Patrick had not asked for,
+        // and it came back on 30 Oct.
         static void BuildSideCard()
         {
             bool played = Stats.Sessions > 0 || File.Exists(Paths.PlayedFile);
             firstRunCard.Visibility = played ? Visibility.Collapsed : Visibility.Visible;
+            quickKeysCard.Visibility = played ? Visibility.Visible : Visibility.Collapsed;
+            if (!played) return;
+
+            quickKeys.Children.Clear();
+
+            // Read out of Thornswood.ini rather than typed here, so a row
+            // appears only if its binding is really there, and it shows the
+            // key it is really bound to. The five that matter first for
+            // somebody joining the server: the emote wheel, and the four keys
+            // that only make sense here, trade, party, friend and journal.
+            // Settings in the game shows the rest and changes every one
+            // (#3126); the launcher only reads them.
+            List<Keys.Binding> keys;
+            try { keys = Keys.All(); }
+            catch (Exception ex) { Swallow.Note("Shell.BuildSideCard, reading the keys", ex); keys = new List<Keys.Binding>(); }
+
+            AddKeyFor(keys, "emotewheel", "The emote wheel of gestures and animations, seen by everyone near you.");
+            AddKeyFor(keys, "tradewith",  "Offer a trade to whoever you are looking at.");
+            AddKeyFor(keys, "party",      "Your friends, who is online, and your party.");
+            AddKeyFor(keys, "friendkey",  "Add or remove the friend you are looking at.");
+            AddKeyFor(keys, "journal",    "Your journals, their pages, and sharing them.");
+        }
+
+        static void AddKeyFor(List<Keys.Binding> all, string id, string what)
+        {
+            foreach (Keys.Binding b in all)
+            {
+                if (!string.Equals(b.Id, id, StringComparison.Ordinal)) continue;
+                if (string.IsNullOrEmpty(b.Value)) return;
+                AddKey(b.Value, what);
+                return;
+            }
+        }
+
+        static void AddKey(string key, string what)
+        {
+            var g = new Grid();
+            g.Margin = new Thickness(0, 0, 0, 9);
+            // Auto rather than a fixed 58, with a minimum so the short ones
+            // still line up. A fixed width was fine until a key was called
+            // "Middle mouse", which then ran straight into its own description.
+            var c0 = new ColumnDefinition(); c0.Width = GridLength.Auto;
+            var c1 = new ColumnDefinition(); c1.Width = new GridLength(1, GridUnitType.Star);
+            g.ColumnDefinitions.Add(c0);
+            g.ColumnDefinitions.Add(c1);
+
+            var k = new TextBlock();
+            k.Text = key; k.FontSize = 11.5; k.FontWeight = FontWeights.SemiBold;
+            k.FontFamily = new FontFamily("Cascadia Mono, Consolas");
+            k.Foreground = Res("Accent");
+            k.MinWidth = 52;
+            k.Margin = new Thickness(0, 0, 14, 0);
+            k.VerticalAlignment = VerticalAlignment.Top;
+            Grid.SetColumn(k, 0);
+            g.Children.Add(k);
+
+            var v = new TextBlock();
+            v.Text = what; v.FontSize = 12; v.Foreground = Res("Muted");
+            v.TextWrapping = TextWrapping.Wrap; v.LineHeight = 17;
+            Grid.SetColumn(v, 1);
+            g.Children.Add(v);
+
+            quickKeys.Children.Add(g);
         }
 
         static void AddStat(string label, string value)
