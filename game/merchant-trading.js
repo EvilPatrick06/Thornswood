@@ -224,8 +224,12 @@ function createMerchantTrading(deps) {
     return (quests ? quests.describe(actorId,merchantId) : []).concat(commissions.view(actorId,merchantId));
   }
 
+  // A supply wait is keyed by the character's runtime form id (#2870), the
+  // one shape every register keeps, never by its formDesc. A human whose
+  // formDesc is not a runtime form has no key and cannot supply.
   function supplyKey(human, itemName) {
-    return JSON.stringify([human.desc, human.profileId, itemName.toLowerCase()]);
+    var id = COMMISSION_STATE.formIdOf(human && human.desc);
+    return id ? JSON.stringify([id, human.profileId, itemName.toLowerCase()]) : '';
   }
   function lastSupply(state, key, itemName) {
     var stamps = state.supply || {};
@@ -326,7 +330,7 @@ function createMerchantTrading(deps) {
     }
     var supply = [];
     var human = settlement.available() ? transfer.identity(actorId) : null;
-    var owns = human && human.desc && human.profileId === profileId;
+    var owns = human && COMMISSION_STATE.formIdOf(human.desc) && human.profileId === profileId;
     var at = now();
     for (var k = 0; k < offers.length; k++) {
       if (offers[k].buy == null || !permits(state.reference,'supply',supplyIds[k])) continue;
@@ -594,7 +598,7 @@ function createMerchantTrading(deps) {
     if (verb === 'supply') {
       if (!settlement.available()) return response('Buying and selling wait on the native transfer. Nothing was taken.',state);
       var human = transfer.identity(actorId);
-      if (!human || !human.desc || human.profileId !== profileId) return fail('That request is not yours.');
+      if (!human || !COMMISSION_STATE.formIdOf(human.desc) || human.profileId !== profileId) return fail('That request is not yours.');
       completedSupplyKey = supplyKey(human, itemName);
       var last = lastSupply(state, completedSupplyKey, itemName);
       if (last && now() - last < SUPPLY_WAIT) return fail('That supply is not due.');

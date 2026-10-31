@@ -56,7 +56,7 @@ try {
   const oldPurse=ctx.createNpcMerchantPurses(api,data,oldStorage);
   assert.throws(()=>oldPurse.compareAndCommit(1,2,{...done,purse:0}),/acknowledgement/);
   props.clear();
-  const initializing=ctx.createNpcMerchantPurses(api,data,{durable:true,load:()=>({version:1,entries:{'1:Skyrim.esm':null}}),save:()=>{throw new Error('initial ack lost');}});
+  const initializing=ctx.createNpcMerchantPurses(api,data,{durable:true,load:()=>({version:2,entries:{'1:Skyrim.esm':null}}),save:()=>{throw new Error('initial ack lost');}});
   assert.throws(()=>initializing.prepare(1),/initial ack lost/);
   assert.throws(()=>initializing.prepare(1),/unavailable/,'ambiguous initialization also revokes retained service');
   console.log('PASS merchant durable revisions, stale offer/settlement refusal, restart, pending isolation and persistence failure');

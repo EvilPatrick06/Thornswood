@@ -11,7 +11,7 @@ const fixtureSource=fs.readFileSync(settlementTest,'utf8');
 const fixtureContext={Map,Set,JSON,require:createRequire(settlementTest)};
 vm.createContext(fixtureContext);vm.runInContext(fixtureSource.slice(0,fixtureSource.indexOf('// Four large')),fixtureContext);
 const human=fixtureContext.fixture();
-let ledger={version:1,entries:{'1:Skyrim.esm':{version:1,reference:'1:Skyrim.esm',base:'a:Skyrim.esm',revision:0,purse:250,stock:[],supply:{}},'2:Skyrim.esm':null}};
+let ledger={version:2,entries:{'1:Skyrim.esm':{version:1,reference:'1:Skyrim.esm',base:'a:Skyrim.esm',revision:0,purse:250,stock:[],supply:{}},'2:Skyrim.esm':null}};
 const projections=new Map(),present=new Set([1,2]);let retiredReads=0;
 const api={makeProperty(){},getIdFromDesc:ref=>({'1:Skyrim.esm':1,'2:Skyrim.esm':2}[ref]),
   getNpcAIState(id){if(!present.has(id)){retiredReads++;throw Error('retired actor absent');}return {isHuman:false,profileId:0};},

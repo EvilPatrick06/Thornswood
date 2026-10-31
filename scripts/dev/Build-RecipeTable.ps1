@@ -609,11 +609,38 @@ $CONDITION_FUNCTIONS_THE_SERVER_HAS = @{
 # classes.md line 4: "Nothing you do raises a vanilla skill and no perk menu
 # opens when you sleep", and the page says vanilla progression being off is the
 # part already shipped. So no character on this server will ever hold a vanilla
-# perk. A recipe behind one is a recipe nobody can reach, whatever this table
-# says about who owns it, and the count of them per half is printed and written
-# into the json so that a half made entirely of them is visible rather than
-# reported as work.
+# perk. A recipe behind one was a recipe nobody could reach, whatever this
+# table said about who owns it.
+#
+# THE PERKS COME OFF (#4826; Patrick, 22 Oct 2026, B: the whole vanilla perk
+# system goes). scripts\mods\Build-LastPlugin.py takes every perk test out of
+# every winning recipe in Thornswood-Last.esp, so the crafting menu no longer
+# hides a row the server allows. This table reads the end state in one pass:
+# a perk test on a recipe the last plugin copies is not one of the row's
+# needs. A recipe of a plugin the last plugin never copies from
+# (notCopiedFrom in game\data\last-plugin-policy.json) keeps its perk tests,
+# and those rows are still counted as behind a perk, unless that plugin's row
+# says perkRecipesCopied: Immersive Armors' does (Patrick, 31 Oct 2026, A on
+# q-4826-ia-perk-recipes), so its perk tests come off like everybody's.
+# Thornswood-Last.esp's own copy of a recipe is never read for its
+# conditions: the ones below it are, the way its bench is (#3120), so the
+# table is the same whether the box's last plugin is from before this or
+# after. A perk test counts as passed, so one joined to other conditions by
+# OR makes its whole OR group pass, and none of that group is a need either,
+# the same OR groups Build-LastPlugin.py takes off (perk_drops there).
+#
+# Gourmet makes many dishes twice over, the plain recipe asking
+# MAG_FoodUpgradePerk03 == 0 and one that makes two portions asking it == 1.
+# Both are rows here already, each ranked by this table (the two-portion
+# dumplings are advanced Confectioner work), so with the perks off both list
+# and the rank decides who makes which, as for every other row.
 $CONDITION_VANILLA_PERK = 448
+$PERKS_OFF_IN_LAST_PLUGIN = $true
+$LAST_POLICY_FILE = Join-Path $PSScriptRoot '..\..\game\data\last-plugin-policy.json'
+$PERKS_KEPT_IN = @{}
+foreach ($row in @(([IO.File]::ReadAllText($LAST_POLICY_FILE) | ConvertFrom-Json).notCopiedFrom)) {
+    if ($row -and $row.plugin -and $row.perkRecipesCopied -ne $true) { $PERKS_KEPT_IN[([string]$row.plugin).ToLowerInvariant()] = $true }
+}
 
 # HOW A CONDITION IS READ OUT LOUD. The operator is the top three bits of the
 # CTDA's first byte, and these six are the enum in
@@ -1251,7 +1278,7 @@ $RUNGS_MUST_BE_STANDABLE = $true
 # a check quietly passing. Any half not named here that fails the check fails
 # the build, because a rung nobody can gather for is a rank that opens nothing.
 $HALVES_WITH_AN_UNSTANDABLE_RUNG = [ordered]@{
-    'Cook/Confectioner' = 'every one of its 28 rows wants a Sack of Flour and a pat of Butter, counted over the whole half on 21 September, and flour is made from Wheat, which harvests.json ranks advanced for a gatherer and for a farmer alike. So the cheapest thing a Confectioner can bake is advanced work to gather for and the novice rung cannot be stood on whatever rule ranks the half: by input cost all 28 land 20 advanced and 8 expert and none novice (28 September), and filling the empty novice rung (HOLE_FILL_MOVES_ONE_RUNG) only relabels eight of the advanced ones. This appeared the day the hop was followed and it was always true; before it, flour had no producer at all and every row read as costing nothing. It closes when somebody decides where a Confectioner''s flour comes from, which is the same decision HALVES_NOBODY_CAN_START is already waiting on for this half: all 28 rows are behind two vanilla perks nobody here will ever hold, so nothing is being opened to anybody at any rank yet.'
+    'Cook/Confectioner' = 'every one of its 28 rows wants a Sack of Flour and a pat of Butter, counted over the whole half on 21 September, and flour is made from Wheat, which harvests.json ranks advanced for a gatherer and for a farmer alike. So the cheapest thing a Confectioner can bake is advanced work to gather for and the novice rung cannot be stood on whatever rule ranks the half: by input cost all 28 land 20 advanced and 8 expert and none novice (28 September), and filling the empty novice rung (HOLE_FILL_MOVES_ONE_RUNG) only relabels eight of the advanced ones. This appeared the day the hop was followed and it was always true; before it, flour had no producer at all and every row read as costing nothing. It closes when somebody decides where a Confectioner''s flour comes from. The two vanilla perks every row carried come off in Thornswood-Last.esp since #4826, so the rows are open to whoever the server allows.'
     'Enchanter/Bladebinder' = 'all of its 161 rows but the Aetherial Staff want a Heart Stone, which is master mining (the miner page, issues #1380 and #1586, RANK_BY_ORE in Build-OreTable.ps1), so by input cost all 160 land on master. Patrick, 4 October (#1622): each college book staff at its spell''s rank, named in RECIPE_RANK. So the thirteen the Bladebinder page keeps sit novice 3, advanced 6 and expert 4, and the other 148, all cut, stay on master. The novice, advanced and expert rungs hold only staves whose stone nobody below master can dig, so a Bladebinder below master buys heart stones from a master miner. That is the decision, not a hole: the recipe says what the spell gate already says, because a staff is not made until its spell is on you and a Bladebinder unlocks a spell on K only at a rank at least the spell''s.'
 }
 
@@ -1330,7 +1357,6 @@ $BOOK_TEACHES_SPELL = 0x04
 $CONDITION_HAS_SPELL = 264
 
 $HALVES_NOBODY_CAN_START = [ordered]@{
-    'Cook/Confectioner'     = 'every one of its 28 recipes carries two vanilla perk conditions, function index 448: MAG_FoodUpgradePerk03 out of Gourmet.esp on all 28, and a second perk named for the recipe itself, MAG_RecipePerkSnowberryDumpling and its like, on all 28 as well. classes.md says no perk menu opens and vanilla progression is off, so nobody here will ever hold either. The server would wave the condition through, because the fork has no function for that index, but Skyrim''s own crafting menu evaluates it first and never lists the recipe, so onCraft is not even reached. The dessert keyword split is right and the half is real; what is missing is somebody deciding what a new Confectioner starts able to bake. Four of the 28 want an item on top of the perks.'
 }
 
 # WHEN A HALF IS THIN ENOUGH TO NAME OUT LOUD. A half with a handful of rows a
@@ -3069,6 +3095,16 @@ foreach ($pl in $order) {
                                 Count = $c.Count
                             })
                         }
+                        # Thornswood-Last.esp's copy has its perk tests
+                        # taken out (#4826), so the conditions stay the ones
+                        # the plugin before it carried, read with that
+                        # plugin's masters.
+                        $condList = $conds.ToArray(); $condMasters = $masters; $condIn = $pl
+                        if ($pl -eq $LAST_PLUGIN -and $recipes.Contains($desc)) {
+                            $condList = $recipes[$desc].Conditions
+                            $condMasters = $recipes[$desc].CondMasters
+                            $condIn = $recipes[$desc].CondIn
+                        }
                         $recipes[$desc] = [pscustomobject]@{
                             Desc = $desc; Edid = $edid; SeenIn = $pl
                             Plugin = $desc.Split(':')[1]
@@ -3076,7 +3112,8 @@ foreach ($pl in $order) {
                             OutDesc = $outDesc; BenchDesc = $benchDesc
                             Count = $nam1; Inputs = $inputs; Coct = $coct
                             InputList = $inList.ToArray()
-                            Conditions = $conds.ToArray(); Masters = $masters
+                            Conditions = $condList; Masters = $masters
+                            CondMasters = $condMasters; CondIn = $condIn
                         }
                         $here++
                         if (-not $perPluginRecipes.ContainsKey($pl)) { $perPluginRecipes[$pl] = 0 }
@@ -3358,6 +3395,51 @@ function ConditionRead($cond, $masters, [string]$plugin) {
     }
 }
 
+# Whether Thornswood-Last.esp takes this recipe's perk tests out (#4826): yes,
+# unless the record or the plugin that carries it below the last plugin is
+# one the last plugin never copies from and does not copy the perk recipes of.
+function PerksComeOff($r) {
+    if (-not $PERKS_OFF_IN_LAST_PLUGIN) { return $false }
+    if ($PERKS_KEPT_IN.ContainsKey(([string]$r.Plugin).ToLowerInvariant())) { return $false }
+    if ($PERKS_KEPT_IN.ContainsKey(([string]$r.CondIn).ToLowerInvariant())) { return $false }
+    return $true
+}
+
+# How many perk tests a recipe carries, and Joined when one is joined to
+# another condition by OR (its own OR flag, or the one of the condition
+# before it).
+function PerkTestsOf($r) {
+    $n = 0; $joined = $false; $prevOr = $false
+    foreach ($c in $r.Conditions) {
+        if ($c.Func -eq $CONDITION_VANILLA_PERK) {
+            $n++
+            if ($c.Or -or $prevOr) { $joined = $true }
+        }
+        $prevOr = [bool]$c.Or
+    }
+    return [pscustomobject]@{ Count = $n; Joined = $joined }
+}
+
+# The positions in a recipe's conditions that come off with its perks
+# (#4826): every OR group holding a perk test, whole, as perk_drops in
+# Build-LastPlugin.py takes them. A group is a run of conditions each joined
+# to the next by OR, ended by one that is not; groups are joined by AND.
+function PerkDropsOf($r) {
+    $drop = @{}
+    $group = New-Object 'System.Collections.Generic.List[int]'
+    $hasPerk = $false
+    $conds = @($r.Conditions)
+    for ($i = 0; $i -lt $conds.Count; $i++) {
+        $group.Add($i)
+        if ($conds[$i].Func -eq $CONDITION_VANILLA_PERK) { $hasPerk = $true }
+        if (-not $conds[$i].Or -or $i -eq $conds.Count - 1) {
+            if ($hasPerk) { foreach ($j in $group) { $drop[$j] = $true } }
+            $group.Clear(); $hasPerk = $false
+        }
+    }
+    return $drop
+}
+
 # Can a new character get past every condition on a row. No condition at all
 # is the plain yes. Under TOMES_TEACH_STAFF_SPELLS a HasSpell whose spell a
 # tome teaches is also a yes, because the tome is how the spell is learned.
@@ -3395,6 +3477,21 @@ $unresolvedOut = New-Object 'System.Collections.Generic.List[string]'
 $namelessOut = @{}
 $outTypeCount = @{}
 $script:lightRows = 0
+
+# The perks come off (#4826): the count of what comes off, and of the
+# recipes whose perk test takes an OR group off with it.
+$perkRows = 0; $perkConds = 0; $perkKeptRows = 0; $perkJoinedRows = 0; $perkGroupConds = 0
+foreach ($desc in $recipes.Keys) {
+    $r = $recipes[$desc]
+    $pt = PerkTestsOf $r
+    if ($pt.Count -eq 0) { continue }
+    if (-not (PerksComeOff $r)) { $perkKeptRows++; continue }
+    $perkRows++; $perkConds += $pt.Count
+    if ($pt.Joined) { $perkJoinedRows++; $perkGroupConds += (PerkDropsOf $r).Count - $pt.Count }
+}
+if ($PERKS_OFF_IN_LAST_PLUGIN) {
+    Ok ("{0} perk test(s) on {1} recipe(s) come off in Thornswood-Last.esp, {2} of them joined by OR, which take {3} other condition(s) of their OR groups off with them; {4} recipe(s) of a plugin it never copies from keep theirs" -f $perkConds, $perkRows, $perkJoinedRows, $perkGroupConds, $perkKeptRows)
+}
 
 foreach ($desc in $recipes.Keys) {
     $r = $recipes[$desc]
@@ -3682,8 +3779,13 @@ foreach ($desc in $recipes.Keys) {
     # recipes nobody on this server can reach" printed the same number until
     # these were read.
     $needs = New-Object 'System.Collections.Generic.List[object]'
+    $perksOff = PerksComeOff $r
+    $perkDrops = if ($perksOff) { PerkDropsOf $r } else { @{} }
+    $ci = 0
     foreach ($c in $r.Conditions) {
-        $needs.Add((ConditionRead $c $r.Masters $r.SeenIn))
+        $at = $ci; $ci++
+        if ($perkDrops.ContainsKey($at)) { continue }
+        $needs.Add((ConditionRead $c $r.CondMasters $r.CondIn))
     }
     $behindPerk = $false
     $serverChecks = 0

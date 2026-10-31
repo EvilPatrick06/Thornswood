@@ -132,7 +132,7 @@ for(const merchant of [false,true]) {
     set(id,key){if(revoked)stale.push(key);},callPapyrusFunction(){if(revoked)stale.push('title');},
     setNpcServerControlled(){if(revoked)stale.push('ownership');},stopNpcMovement(){if(revoked)stale.push('movement');}};
   const purses=merchant?ctx.createNpcMerchantPurses(api,catalogue,{namespace:{},durable:true,
-    load:()=>({version:1,entries:{'1:Skyrim.esm':null}}),save(){saves++;return true;}}):null;
+    load:()=>({version:2,entries:{'1:Skyrim.esm':null}}),save(){saves++;return true;}}):null;
   const policy=ctx.createNpcPopulation(api,catalogue,data.plugins,purses);
   runtime=ctx.startSharedNpcServerRuntime(api,timers,()=>0,()=>{},policy,{suspended:true});runtime.enroll(1);
   const [handle,callback]=Array.from(pending).find(([,fn])=>fn.npcRuntimeTask==='prepareTick');

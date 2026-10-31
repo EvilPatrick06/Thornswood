@@ -37807,6 +37807,13 @@ log('gamemode loaded:',
 
       { "profiles": [ 5001 ], "actors": [ 4278192641 ] }
 
+  An actor is the character's runtime form id, 0xff000000 | the local hex its
+  change form's formDesc holds (formDesc "a01" is 0xff000a01), the one number
+  every register keeps (#2870, formIdOf below, game\form-id.js). A list with
+  an actor outside that range is the old shape, from a build before #2870,
+  and is not read: nothing is let go and the list is left as it is, for a
+  person (docs\GAMEMODE.md says what to do; nothing converts it).
+
   The part "saves" goes first, before the engine has started:
   server-log.js, which the task starts the server under, deletes their change
   forms (the engine loads them at its start, so it cannot be done from here)
@@ -37889,9 +37896,21 @@ log('gamemode loaded:',
     return path.join((cfg && cfg.privDir) ? String(cfg.privDir) : 'private', 'deleted-characters.json');
   }
 
-  // The list, read once a load, field by field. Anything that is not a whole
-  // number above 0 (a form id at most 0xffffffff), or a done mark that is not
-  // a time, makes the whole list unreadable rather than half read.
+  // One shape for a character's form id (#2870); game\form-id.js is the
+  // original and tests\test-2870-form-id-shape.js keeps this copy the same.
+  function formIdOf(desc) {
+    if (typeof desc !== 'string' || !/^[0-9a-f]{1,6}$/i.test(desc)) return 0;
+    var local = parseInt(desc, 16);
+    return local > 0 ? 0xff000000 + local : 0;
+  }
+  function isFormId(n) {
+    return Number.isSafeInteger(n) && n > 0xff000000 && n <= 0xffffffff;
+  }
+
+  // The list, read once a load, field by field. A profile that is not a whole
+  // number above 0, an actor that is not a runtime form id (isFormId), or a
+  // done mark that is not a time, makes the whole list unreadable rather than
+  // half read.
   function read() {
     if (st !== undefined) { return st; }
     st = null;
@@ -37909,11 +37928,16 @@ log('gamemode loaded:',
       return Array.isArray(a) && a.every(function (n) { return Number.isSafeInteger(n) && n > 0 && n <= top; });
     };
     var ok = !!list && typeof list === 'object' && !Array.isArray(list) &&
-      idsOk(list.profiles, Number.MAX_SAFE_INTEGER) && idsOk(list.actors === undefined ? [] : list.actors, 0xffffffff) &&
+      idsOk(list.profiles, Number.MAX_SAFE_INTEGER) &&
+      (list.actors === undefined || (Array.isArray(list.actors) && list.actors.every(isFormId))) &&
       (list.done === undefined || (!!list.done && typeof list.done === 'object' && !Array.isArray(list.done) &&
         Object.keys(list.done).every(function (k) { return Number.isSafeInteger(list.done[k]) && list.done[k] > 0; })));
     if (!ok) {
-      rlog(file + ' is not a list of deleted characters, so nothing was let go and it is left as it is');
+      var old = !!list && typeof list === 'object' && Array.isArray(list.actors) &&
+        list.actors.some(function (n) { return Number.isSafeInteger(n) && n > 0 && n <= 0xffffff; });
+      rlog(file + (old ? ' holds form ids in the old shape, from a build before #2870, and is not read'
+        : ' is not a list of deleted characters') + ', so nothing was let go and it is left as it is' +
+        (old ? '; docs\\GAMEMODE.md says what to do' : ''));
       return st;
     }
     var P = {}, A = {};
@@ -37926,7 +37950,7 @@ log('gamemode loaded:',
       done: list.done ? Object.assign({}, list.done) : {},
       who: {
         profile: function (n) { n = Number(n) || 0; return n > 0 && has(P, n); },
-        actor: function (n) { n = Number(n) || 0; return n > 0 && has(A, n); }
+        actor: function (n) { n = Number(n) || 0; return isFormId(n) && has(A, n); }
       }
     };
     rlog('a list of ' + st.profiles.length + ' profile(s) and ' + st.actors.length +
@@ -62115,6 +62139,10 @@ const WORDS = ['/ooc', '/o',
                // Asking staff for help and reporting somebody; see the asking
                // staff block at the end of this file.
                '/helpme', '/help-me', '/report',
+               // Report a problem on the help panel (#3155): the button's
+               // line, never typed and not in PLAYER_WORDS. It goes on the
+               // board through the site and the bot; see the asking staff block.
+               '/problem',
                // Out of a wedged spot; see the stuck block after it.
                '/stuck',
                // The four needs bars said as one line of text, for somebody
@@ -64536,6 +64564,20 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       }
       askStaff.ask(word === '/report' ? 'report' : 'help', parts, profileId, actorId,
                    toProfile, isDev);
+      return;
+    }
+
+    // Report a problem on the help panel (#3155), the same block's third
+    // kind: to the site, and from there onto the board.
+    if (word === '/problem') {
+      if (!needCharacter()) { return; }
+      var askBoard = g.__thornswoodAskStaff;
+      if (!askBoard) {
+        toProfile(profileId, 'Problems cannot be sent from the game right now. Post it in ' +
+                  '#test-findings in the Discord and it will reach the developers.');
+        return;
+      }
+      askBoard.ask('problem', parts, profileId, actorId, toProfile, isDev);
       return;
     }
 
@@ -77969,6 +78011,14 @@ module.exports = {
 
   /stuck, the escape hatch the issue also names, is the stuck block right
   after this one, built to Patrick's rules of 28 September.
+
+  REPORT A PROBLEM (#3155), the third kind. Patrick, 21 Oct: testers get a
+  button that files a board issue with their log and where they are. The
+  button is on the help panel and its line is /problem, which nobody types.
+  It goes to the site the same way, kind 'problem', and is said to no staff
+  in the world: it is for the developers, and the bot files it on the board
+  from the inbox. The site ties it to the session the launcher has open for
+  that account, so the issue points at that session's logs.
 */
 (function () {
   'use strict';
@@ -77997,7 +78047,10 @@ module.exports = {
     wait: 8000,
     // The longest a reason is kept, and a name.
     said: 300,
-    name: 60
+    name: 60,
+    // The longest a problem report is kept: a bug wants more words than a
+    // call for help (#3155). The site keeps the same.
+    problem: 1000
   };
 
   // On globalThis, so a hot reload does not hand everybody a fresh allowance.
@@ -78023,6 +78076,11 @@ module.exports = {
   function refusal(kind, profileId, aboutKey, now) {
     prune(now);
     var mine = seen.by[profileId] || [];
+    if (mine.length >= LIMIT.hour && kind === 'problem') {
+      return 'That is ' + LIMIT.hour + ' reports and calls to staff from you in the last hour, ' +
+             'which is as many as the game takes. Try again in ' +
+             minutes(mine[0].at + 60 * 60 * 1000 - now) + ', or post it in #test-findings in the Discord.';
+    }
     if (mine.length >= LIMIT.hour) {
       return 'That is ' + LIMIT.hour + ' calls to staff from you in the last hour, which is ' +
              'as many as the game takes. Try again in ' +
@@ -78035,6 +78093,12 @@ module.exports = {
         return 'Staff already have your call for help from ' + minutes(now - r.at) +
                ' ago. Somebody will come to you; try again in ' +
                minutes(r.at + LIMIT.helpEvery - now) + ' if nobody has.';
+      }
+      // The same problem sent twice: aboutKey is its words for this kind.
+      if (kind === 'problem' && r.kind === 'problem' && aboutKey && r.about === aboutKey &&
+          now - r.at < LIMIT.sameEvery) {
+        return 'You sent that problem ' + minutes(now - r.at) + ' ago, and it is on its way ' +
+               'to the board. Anything new about it can go in #test-findings in the Discord.';
       }
       if (kind === 'report' && r.kind === 'report' && aboutKey && r.about === aboutKey &&
           now - r.at < LIMIT.sameEvery) {
@@ -78193,13 +78257,20 @@ module.exports = {
         toProfile(profileId, 'That is you. /helpme reaches staff if something is wrong.');
         return;
       }
+    } else if (kind === 'problem') {
+      said = words.join(' ');
+      if (!said) {
+        toProfile(profileId, 'Say what went wrong in the box on the help panel, then press Send.');
+        return;
+      }
     } else {
       said = words.join(' ');
     }
-    said = said.slice(0, LIMIT.said);
+    said = said.slice(0, kind === 'problem' ? LIMIT.problem : LIMIT.said);
 
     var aboutKey = about ? (about.person ? 'p' + about.person.profileId
-                                         : 'n' + about.name.toLowerCase()) : '';
+                                         : 'n' + about.name.toLowerCase())
+                         : (kind === 'problem' ? 's' + said.toLowerCase() : '');
     var no = refusal(kind, profileId, aboutKey, now);
     if (no) { toProfile(profileId, no); return; }
     taken(kind, profileId, aboutKey, now);
@@ -78211,22 +78282,25 @@ module.exports = {
     } catch (e) { }
 
     // Staff in the world, told now. Never the person reported, and never the
-    // one asking, who is told separately below.
+    // one asking, who is told separately below. Never for a problem, which
+    // is for the developers and the board, not for whoever is on shift.
     var told = 0;
-    var line = kind === 'help'
-      ? '[staff] ' + mine + ' asks for help at ' + (cell || 'somewhere unknown') +
-        (said ? ': ' + said : '.')
-      : '[staff] ' + mine + ' reported ' + about.name + ': ' + said +
-        ' (at ' + (cell || 'somewhere unknown') + ')';
-    for (var i = 0; i < people.length; i++) {
-      var p = people[i];
-      if (p.profileId === profileId) { continue; }
-      if (about && about.person && p.profileId === about.person.profileId) { continue; }
-      var staff = false;
-      try { staff = !!isStaff(p.profileId); } catch (e) { staff = false; }
-      if (!staff) { continue; }
-      toProfile(p.profileId, line);
-      told++;
+    if (kind !== 'problem') {
+      var line = kind === 'help'
+        ? '[staff] ' + mine + ' asks for help at ' + (cell || 'somewhere unknown') +
+          (said ? ': ' + said : '.')
+        : '[staff] ' + mine + ' reported ' + about.name + ': ' + said +
+          ' (at ' + (cell || 'somewhere unknown') + ')';
+      for (var i = 0; i < people.length; i++) {
+        var p = people[i];
+        if (p.profileId === profileId) { continue; }
+        if (about && about.person && p.profileId === about.person.profileId) { continue; }
+        var staff = false;
+        try { staff = !!isStaff(p.profileId); } catch (e) { staff = false; }
+        if (!staff) { continue; }
+        toProfile(p.profileId, line);
+        told++;
+      }
     }
 
     var row = {
@@ -78241,12 +78315,20 @@ module.exports = {
       at: now,
       staffTold: told
     };
-    slog(kind === 'help' ? '/helpme' : '/report', 'from profile', profileId,
+    slog(kind === 'help' ? '/helpme' : '/' + kind, 'from profile', profileId,
          about ? 'about ' + (row.aboutProfileId || JSON.stringify(row.about)) : '',
          'at', cell, 'staff in the world told:', told);
 
     toSite(row, function (ok, why) {
       if (!ok) { slog('the site did not take it:', why); }
+      if (kind === 'problem') {
+        toProfile(profileId, ok
+          ? 'Your problem report reached the site and goes on the board for the developers, ' +
+            'with where you are and the logs of this game once you close it. Thank you.'
+          : 'Your problem report could not reach the site, so nothing was filed. Post it in ' +
+            '#test-findings in the Discord and it will reach the developers.');
+        return;
+      }
       var inWorld = told
         ? (told === 1 ? 'A member of staff in the world has it now'
                       : told + ' members of staff in the world have it now')
@@ -80416,7 +80498,15 @@ function createNpcMerchantPurses(api,data,storage) {
         row.baseId>0 && row.baseId<=0xffffffff && row.baseId!==15 &&
       Number.isInteger(row.count) && row.count>0 && row.count<=2147483647);
   }
-  if(!ledger || ledger.version!==1 || !ledger.entries || typeof ledger.entries!=='object' || Array.isArray(ledger.entries))
+  // Version 2 from #2870: supply waits and commission owners name a runtime
+  // character by its runtime form id. A version 1 ledger keyed them by
+  // formDesc and local form id. It is refused and never read: in the alpha
+  // nothing is carried over, so the deploy replaces it with the fresh
+  // version 2 ledger scripts\ops\New-AlphaMerchantLedger.js prints
+  // (docs\GAMEMODE.md), and merchant stock and purses start again.
+  if(ledger && ledger.version===1)
+    throw new Error('Saved merchant ledger is version 1, from before #2870, and is not read; with this server stopped, replace it with what node scripts\\ops\\New-AlphaMerchantLedger.js --confirm-discard-alpha prints (the alpha reset: merchant stock and purses start fresh)');
+  if(!ledger || ledger.version!==2 || !ledger.entries || typeof ledger.entries!=='object' || Array.isArray(ledger.entries))
     throw new Error('Saved merchant ledger cannot be verified');
   const references=new Map(Array.from(catalogue.values()).map(identity=>[identity.reference,identity]));
   if(Object.keys(ledger.entries).length!==references.size) throw new Error('Saved merchant ledger manifest cannot be verified');
@@ -80555,14 +80645,14 @@ function createNpcMerchantPurses(api,data,storage) {
   // block's: who.profile(profile id) and who.actor(form id) say whether a
   // character is on private\deleted-characters.json. In every entry, retired
   // traders' too:
-  //   supply       a supply wait keyed by [desc, profile, what] of theirs
-  //                is dropped
+  //   supply       a supply wait keyed by [form id, profile, what] of theirs
+  //                is dropped (the runtime form id, #2870)
   //   commissions  a promise the trader holds for them (commissions.held)
   //                is dropped, so its gold is the trader's to spend again
   //                and it no longer counts toward MAX_HELD; a finished one
   //                cooling down (commissions.cool) goes too. Both are keyed
   //                by the owner merchant-commission-state.js writes,
-  //                [local form id, plugin, profile]
+  //                [runtime form id, '', profile] for a character (#2870)
   //   a trade      still waiting on them is cleared:
   //     debit      the trader's state is still pending.previous (records()
   //                in the trading checks it), so clearing pending leaves it
@@ -80589,19 +80679,27 @@ function createNpcMerchantPurses(api,data,storage) {
   // than waiting for prepare(). Only a copy that names them is written, so
   // a run whose ledger was let go at an earlier start but whose copy write
   // did not take still finds and writes that copy.
-  function characterOf(desc) {
-    // A runtime human's desc is its form id in hex alone (FormDesc); a
-    // placed form's has a plugin and is never a character.
-    return typeof desc==='string' && /^[0-9a-f]{1,8}$/i.test(desc) ? parseInt(desc,16) : 0;
+  // One shape for a character's form id (#2870); game\form-id.js is the
+  // original and tests\test-2870-form-id-shape.js keeps this copy the same.
+  // A runtime human's formDesc is its local hex alone; a placed form's has a
+  // plugin and is never a character (formIdOf gives 0).
+  function formIdOf(desc) {
+    if (typeof desc !== 'string' || !/^[0-9a-f]{1,6}$/i.test(desc)) return 0;
+    var local = parseInt(desc, 16);
+    return local > 0 ? 0xff000000 + local : 0;
+  }
+  function isFormId(n) {
+    return Number.isSafeInteger(n) && n > 0xff000000 && n <= 0xffffffff;
   }
   function release(who) {
     return mutate(()=>{
       const counts={merchants:0,supply:0,commissions:0,trades:0,copies:0};
-      const theirs=(desc,profile)=>!!(who.profile(profile) || who.actor(characterOf(desc)));
-      // A commission key is JSON [owner, job], the owner JSON [local form id, plugin, profile].
+      // Every form id here is the runtime form id, as on the list (#2870).
+      const theirs=(id,profile)=>!!(who.profile(profile) || (isFormId(id) && who.actor(id)));
+      // A commission key is JSON [owner, job], the owner JSON [form id, plugin, profile].
       const promisedTo=key=>{
         const row=JSON.parse(JSON.parse(key)[0]);
-        return !!(who.profile(row[2]) || (!row[1] && who.actor(row[0])));
+        return !!(who.profile(row[2]) || (!row[1] && theirs(row[0],0)));
       };
       // Whether a trader's saved copy still names them: a supply wait, a
       // commission promise or one cooling down, or a trade waiting on them.
@@ -80619,7 +80717,7 @@ function createNpcMerchantPurses(api,data,storage) {
           try {return promisedTo(k);} catch(error) {return false;}
         }))) return true;
         const pending=copy.pending;
-        return !!(pending && pending.human && theirs(pending.human.desc,pending.human.profileId));
+        return !!(pending && pending.human && theirs(formIdOf(pending.human.desc),pending.human.profileId));
       };
       const next=JSON.parse(JSON.stringify(ledger)),changed=[];
       let busy=0;
@@ -80640,7 +80738,7 @@ function createNpcMerchantPurses(api,data,storage) {
           }
         }
         const pending=state.pending;
-        const trade=!!(pending && pending.human && theirs(pending.human.desc,pending.human.profileId));
+        const trade=!!(pending && pending.human && theirs(formIdOf(pending.human.desc),pending.human.profileId));
         if(!trade && !rows) continue;
         if(pending && !trade) {busy++;continue;}
         if(trade) {state.pending=null;counts.trades++;}
@@ -82330,16 +82428,32 @@ const object=value=>value&&typeof value==='object'&&!Array.isArray(value);
 const fields=(value,keys)=>object(value)&&Object.keys(value).length===keys.length&&keys.every(key=>owns(value,key));
 const copy=value=>JSON.parse(JSON.stringify(value));
 const job=id=>typeof id==='string'&&/^q-[a-z0-9-]{1,46}$/.test(id);
+// One shape for a character's form id (#2870); game\form-id.js is the
+// original and tests\test-2870-form-id-shape.js keeps this copy the same.
+function formIdOf(desc) {
+  if (typeof desc !== 'string' || !/^[0-9a-f]{1,6}$/i.test(desc)) return 0;
+  var local = parseInt(desc, 16);
+  return local > 0 ? 0xff000000 + local : 0;
+}
+function isFormId(n) {
+  return Number.isSafeInteger(n) && n > 0xff000000 && n <= 0xffffffff;
+}
+// A runtime character (formDesc the local hex alone) owns by its runtime form
+// id, [0xff000000 | local, '', profile]; a placed form (hex:plugin) keeps
+// [local, plugin, profile]. The merchant ledger stores these strings, so its
+// version is 2 from #2870. A version 1 ledger, whose owners were
+// [local, '', profile], is not read: the alpha reset replaces it.
 function owner(human) {
  if(!human||!integer(human.profileId,1,MAX_GOLD)||typeof human.desc!=='string')return '';
  const match=/^([0-9a-f]{1,6})(?::([^:/\\\x00-\x1f\x7f]+\.(?:esm|esp|esl)))?$/i.exec(human.desc);
- return match&&parseInt(match[1],16)>0?JSON.stringify([parseInt(match[1],16),(match[2]||'').toLowerCase(),human.profileId]):'';
+ if(!match||!(parseInt(match[1],16)>0))return '';
+ return JSON.stringify(match[2]?[parseInt(match[1],16),match[2].toLowerCase(),human.profileId]:[formIdOf(match[1]),'',human.profileId]);
 }
 function ownerString(value) {
  if(typeof value!=='string')return false;
  try {
   const row=JSON.parse(value);
-  return Array.isArray(row)&&row.length===3&&integer(row[0],1,0xffffff)&&typeof row[1]==='string'&&
+  return Array.isArray(row)&&row.length===3&&typeof row[1]==='string'&&(row[1]?integer(row[0],1,0xffffff):isFormId(row[0]))&&
    (!row[1]||/^[^:/\\\x00-\x1f\x7f]+\.(?:esm|esp|esl)$/.test(row[1]))&&row[1]===row[1].toLowerCase()&&
    integer(row[2],1,MAX_GOLD)&&JSON.stringify(row)===value;
  }catch(error){return false;}
@@ -82437,7 +82551,7 @@ function close(raw,human,id,token,at,pay) {
  if(pay)next.cool[name]=owns(row,'goods')?[at,row.hours]:at;
  return {ok:true,next,gold:pay?row.gold:0,terms:row};
 }
-module.exports={WAIT,MAX_HELD,MAX_COOL,empty,read,owner,key,reserved,spendable,openCount,reserve,cooldownAt,cooldownWait,
+module.exports={WAIT,MAX_HELD,MAX_COOL,formIdOf,isFormId,ownerString,empty,read,owner,key,reserved,spendable,openCount,reserve,cooldownAt,cooldownWait,
  cancel:(raw,human,id,token,at)=>close(raw,human,id,token,at,false),
  finish:(raw,human,id,token,at)=>close(raw,human,id,token,at,true)};
 return module.exports;})();
@@ -82603,9 +82717,12 @@ function createSettlement(deps) {
   function humanKey(human) {
     if(!human || typeof human.desc!=='string' || !Number.isSafeInteger(human.profileId) || human.profileId<=0 || human.profileId>MAX_COUNT) return '';
     // FormDesc emits local hex alone for runtime humans and hex:plugin for
-    // placed forms. Compare numeric ids so leading zeros cannot split a lock.
+    // placed forms. Compare numeric ids so leading zeros cannot split a lock;
+    // a runtime human by its runtime form id, the one shape (#2870).
     var parts=/^([0-9a-f]{1,6})(?::([^:\/\\\x00-\x1f\x7f]+\.(?:esm|esp|esl)))?$/i.exec(human.desc);
-    return parts ? JSON.stringify([parseInt(parts[1],16),(parts[2] || '').toLowerCase(),human.profileId]) : '';
+    if(!parts) return '';
+    if(!parts[2]) return COMMISSION_STATE.formIdOf(parts[1]) ? JSON.stringify([COMMISSION_STATE.formIdOf(parts[1]),'',human.profileId]) : '';
+    return JSON.stringify([parseInt(parts[1],16),parts[2].toLowerCase(),human.profileId]);
   }
   function nativeRows(snapshot) {
     var value=inventory(snapshot);
@@ -82615,6 +82732,11 @@ function createSettlement(deps) {
   function compact(pending) {
     return pending.phase==='credit' && pending.expected===undefined && pending.debit===undefined &&
       pending.previous && pending.previous.purse===undefined && pending.previous.stock===undefined;
+  }
+  // A supply wait names its character by runtime form id (#2870).
+  function supplier(owner,human) {
+    var id=COMMISSION_STATE.formIdOf(human && human.desc);
+    return id>0 && owner[0]===id;
   }
   function supplyTransition(pending,previous,next,fresh,moved) {
     if(pending.kind!=='supply') {
@@ -82627,13 +82749,13 @@ function createSettlement(deps) {
     if(!equal(canonical(before),canonical(after))) throw new Error('Merchant supply cannot be verified.');
     try {owner=JSON.parse(key);} catch(error) {owner=null;}
     if(fresh || pending.terms!==undefined) {
-      if(!Array.isArray(owner) || owner.length!==3 || owner[0]!==pending.human.desc || owner[1]!==pending.human.profileId ||
+      if(!Array.isArray(owner) || owner.length!==3 || !supplier(owner,pending.human) || owner[1]!==pending.human.profileId ||
           typeof owner[2]!=='string' || !owner[2] || owner[2]!==owner[2].toLowerCase()) throw new Error('Merchant supply owner cannot be verified.');
       if(moved) {
         var labels=Array.from(new Set(moved.map(function(row) {return row.label;})));
         if(labels.length!==1 || owner[2]!==labels[0].toLowerCase()) throw new Error('Merchant supply owner cannot be verified.');
       }
-    } else if(Array.isArray(owner) && (owner.length!==3 || owner[0]!==pending.human.desc || owner[1]!==pending.human.profileId ||
+    } else if(Array.isArray(owner) && (owner.length!==3 || !supplier(owner,pending.human) || owner[1]!==pending.human.profileId ||
         typeof owner[2]!=='string' || !owner[2]))
       throw new Error('Merchant supply owner cannot be verified.');
   }
@@ -82912,7 +83034,7 @@ function createSettlement(deps) {
       if (offer.kind === 'supply') {
         var key = changedSupplyKey(state, offer.next), owner;
         try { owner = JSON.parse(key); } catch (error) { owner = null; }
-        if (!Array.isArray(owner) || owner.length !== 3 || owner[0] !== human.desc ||
+        if (!Array.isArray(owner) || owner.length !== 3 || !supplier(owner, human) ||
             owner[1] !== human.profileId || typeof owner[2] !== 'string' || !owner[2])
           throw new Error('Supply cooldown cannot be verified.');
       }
@@ -84700,8 +84822,12 @@ function createMerchantTrading(deps) {
     return (quests ? quests.describe(actorId,merchantId) : []).concat(commissions.view(actorId,merchantId));
   }
 
+  // A supply wait is keyed by the character's runtime form id (#2870), the
+  // one shape every register keeps, never by its formDesc. A human whose
+  // formDesc is not a runtime form has no key and cannot supply.
   function supplyKey(human, itemName) {
-    return JSON.stringify([human.desc, human.profileId, itemName.toLowerCase()]);
+    var id = COMMISSION_STATE.formIdOf(human && human.desc);
+    return id ? JSON.stringify([id, human.profileId, itemName.toLowerCase()]) : '';
   }
   function lastSupply(state, key, itemName) {
     var stamps = state.supply || {};
@@ -84802,7 +84928,7 @@ function createMerchantTrading(deps) {
     }
     var supply = [];
     var human = settlement.available() ? transfer.identity(actorId) : null;
-    var owns = human && human.desc && human.profileId === profileId;
+    var owns = human && COMMISSION_STATE.formIdOf(human.desc) && human.profileId === profileId;
     var at = now();
     for (var k = 0; k < offers.length; k++) {
       if (offers[k].buy == null || !permits(state.reference,'supply',supplyIds[k])) continue;
@@ -85070,7 +85196,7 @@ function createMerchantTrading(deps) {
     if (verb === 'supply') {
       if (!settlement.available()) return response('Buying and selling wait on the native transfer. Nothing was taken.',state);
       var human = transfer.identity(actorId);
-      if (!human || !human.desc || human.profileId !== profileId) return fail('That request is not yours.');
+      if (!human || !COMMISSION_STATE.formIdOf(human.desc) || human.profileId !== profileId) return fail('That request is not yours.');
       completedSupplyKey = supplyKey(human, itemName);
       var last = lastSupply(state, completedSupplyKey, itemName);
       if (last && now() - last < SUPPLY_WAIT) return fail('That supply is not due.');

@@ -30,7 +30,8 @@ function createAlphaMerchantLedger(roster,population) {
   const entries={};
   for(const [reference,base] of history) entries[reference]=selected.has(reference)?
     {version:1,reference,base,revision:0,purse:250,stock:[],supply:{}}:null;
-  const doc={version:1,entries};
+  // Version 2: the merchant ledger's shape since #2870 (game\gamemode.js, NPC MERCHANT PURSES).
+  const doc={version:2,entries};
   doc.sha256=crypto.createHash('sha256').update(JSON.stringify([doc.version,doc.entries])).digest('hex');
   return doc;
 }
