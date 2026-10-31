@@ -172,11 +172,13 @@ function gates(state) {
     __thornswoodCharacter: { stateOf: function () { return state; }, nameOf: nameOf }
   };
   const fn = new Function('globalThis', 'log', 'raceGate', 'NO_PROFESSION_AT_A_BENCH',
-                          'BENCH_BY_BASE', 'BENCH_ACCESS',
+                          'BENCH_BY_BASE', 'BENCH_ACCESS', 'benchToolKey', 'toolGate', 'professionOfHalf',
                           helpers.join('\n') + '\n' + craftSrc + '\n' + benchSrc +
                           '\nreturn { craftAnswer: craftAnswer, benchGate: benchGate };');
   const byBase = { lab: 'alchemy', enchanter: 'enchanting' };
-  return fn(g, function () {}, function () { return null; }, NO_PROFESSION, byBase, BENCH_ACCESS);
+  // Everybody here holds their trade's tool (#3162); tests/test-3162-bench-tools.js asks the refusal.
+  return fn(g, function () {}, function () { return null; }, NO_PROFESSION, byBase, BENCH_ACCESS,
+            function () { return ''; }, function () { return null; }, function () { return ''; });
 }
 function made(state, r) { return gates(state).craftAnswer(1, r).refusal === null; }
 function smith(half, rank) {

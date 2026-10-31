@@ -217,12 +217,14 @@ const furnitureDoc = JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 
 const furnitureOuts = furnitureDoc.pieces.filter((p) => furnitureDoc.limits.types[p.type])
   .map((p) => p.item + ':Thornswood-Content.esp');
 // And the Woodwright's forge rows #3120 moved to its home bench (movedFrom
-// keeps the forge their mod put them at).
+// keeps the forge their mod put them at), and the cook's wooden ladle
+// (#3162), a woodwright's, written by Add-ContentRecords.py at the same bench.
 const benchMoved = atBench.filter((r) => r.movedFrom).length;
-const movedAt = atBench.length - furnitureOuts.length - benchMoved;
-yes('R1 game/data/recipes.json has the 26 rows #2529 moved at the woodworking bench, the 9 #3120 moved off the forge, and one for each piece of furniture (' +
-    atBench.length + ', ' + benchMoved + ' moved off the forge, ' + furnitureOuts.length + ' of them furniture)',
-    movedAt === 26 && benchMoved === 9 &&
+const ladles = atBench.filter((r) => r.editorId === 'ThornswoodRecipeToolLadle');
+const movedAt = atBench.length - furnitureOuts.length - benchMoved - ladles.length;
+yes('R1 game/data/recipes.json has the 26 rows #2529 moved at the woodworking bench, the 9 #3120 moved off the forge, one for each piece of furniture and the ladle (' +
+    atBench.length + ', ' + benchMoved + ' moved off the forge, ' + furnitureOuts.length + ' of them furniture, ' + ladles.length + ' ladle)',
+    movedAt === 26 && benchMoved === 9 && ladles.length === 1 &&
     atBench.filter((r) => r.movedFrom).every((r) => r.movedFromName === 'CraftingSmithingForge') &&
     furnitureOuts.every((o) => atBench.some((r) => r.out === o)) &&
     atBench.every((r) => r.benchName === 'ThornswoodCraftingWoodworking'));

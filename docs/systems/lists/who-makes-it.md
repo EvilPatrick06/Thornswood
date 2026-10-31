@@ -6,7 +6,7 @@ Everything in the world has a recipe except named uniques and quest items (Patri
 
 What the world hands out and who makes it both come from [Where every item comes from](item-sources.md) (`game/data/item-sources.json`). A maker is a recipe in the open book (not cut and not tempering), a class that gathers the item, or the scarce work or rare seam a class works. A bottle the alchemy lab brews is a new form, not a record, so the lab is the maker of no record. The build fails when the world hands out something with no maker that `scripts/dev/Check-Makers.waiting.json` does not name with the issue that will give it one.
 
-283 items handed out. 164 have a maker. 119 have none yet.
+288 items handed out. 169 have a maker. 119 have none yet.
 
 ## Nobody makes these yet
 
@@ -146,13 +146,13 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Cook/Hearthcook | 64 |  |
 | Cook/Confectioner | 12 |  |
 | Smith/Platewright | 252 |  |
-| Smith/Edgewright | 82 |  |
+| Smith/Edgewright | 86 |  |
 | Enchanter/Bladebinder | 13 | also enchants in the arcane enchanter's menu |
 | Enchanter/Wardweaver | 0 | enchants armour and clothing in the arcane enchanter's menu, which has no recipe rows |
 | Tailor/Liverywright | 85 |  |
 | Tailor/Haberdasher | 171 |  |
 | Woodworker/Charburner | 5 |  |
-| Woodworker/Woodwright | 45 |  |
+| Woodworker/Woodwright | 46 |  |
 | Farmer | 14 |  |
 | Fisher | 12 |  |
 | Gatherer | 48 |  |
@@ -163,10 +163,15 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 
 | Item | Where the world has it | Who makes or gathers it | Id |
 | --- | --- | --- | --- |
+| Alembic | A class pick's tool | Smith/Edgewright, novice | `1b001:Thornswood-Content.esp` |
 | Crude Fishing Pole | A class pick's tool | Woodworker/Woodwright, novice | `15498:Thornswood-Content.esp` |
+| Hammer | A class pick's tool | Smith/Edgewright, novice | `5cae1:Skyrim.esm` |
 | Pickaxe | A class pick's tool | Smith/Edgewright, novice | `e3c16:Skyrim.esm` |
+| Rune Knife | A class pick's tool | Smith/Edgewright, novice | `1b002:Thornswood-Content.esp` |
+| Shears | A class pick's tool | Smith/Edgewright, novice | `1b000:Thornswood-Content.esp` |
 | Shovel | A class pick's tool | Smith/Edgewright, novice | `f5d05:Skyrim.esm` |
 | Woodcutter's Axe | A class pick's tool | Smith/Edgewright, novice | `2f2f4:Skyrim.esm` |
+| Wooden Ladle | A class pick's tool | Woodworker/Woodwright, novice | `319e5:Skyrim.esm` |
 | Belted Tunic | A new character's clothes | Tailor/Haberdasher, novice | `1be1a:Skyrim.esm` |
 | Boots | A new character's clothes | Tailor/Haberdasher, novice | `1be1b:Skyrim.esm` |
 | Riekling Belted Tunic | A new character's clothes | Tailor/Haberdasher, novice, Riekling only | `bfd98:Playable Rieklings.esp` |
