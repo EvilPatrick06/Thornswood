@@ -20,6 +20,7 @@
       "fixed": [],
       "params": {
         "LoadOrder": "switch",
+        "FromRecord": "switch",
         "LoadOrderRefuse": "^(on|off)$",
         "RequirePass": "^(on|off)$",
         "Npcs": "^(on|off)$",
