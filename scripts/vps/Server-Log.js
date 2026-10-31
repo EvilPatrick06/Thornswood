@@ -355,7 +355,7 @@ function rollNow(log, now, o) {
   leaves the request where it is, for the next start, and is said. Each line
   here says counts and never a name, a Discord id, a profile id or a form id.
 */
-const RELEASE_PARTS = ['saves', 'farms', 'property', 'embassy', 'dungeon', 'cargo', 'books', 'merchants'];
+const RELEASE_PARTS = ['saves', 'farms', 'property', 'embassy', 'dungeon', 'cargo', 'stalls', 'carts', 'books', 'merchants'];
 
 function startDeletions(dir, now) {
   const out = [];
@@ -529,6 +529,82 @@ function startDeletions(dir, now) {
   return out;
 }
 
+/*
+  COPIES SET ASIDE BESIDE A GAME SERVER GO AFTER ASIDE_DAYS (#3620).
+
+  A wipe (Wipe-Saves.ps1), a restore (Restore-Server.ps1), a character reset
+  (Reset-Character.ps1) and an appearance reset (Reset-Appearance.ps1) each
+  move or copy the characters they replace aside inside the server's own
+  folder, so the step can be undone, and nothing ever deleted them. Those
+  copies hold every character, the book chat and the registers, while the
+  privacy page said a character is kept until a wipe. So this deletes each
+  one ASIDE_DAYS after it was set aside, at the start and once an hour, by
+  the time in its name (the step writes it, local time, yyyyMMdd-HHmmss),
+  never by a file's own times, which a move keeps from the original:
+
+      <root>\world-before-<stamp>                     a wipe's world
+      <root>\world-before-restore-<stamp>             a restore's world and private
+      <root>\<privDir>\<name>-before-<stamp>.json     a wipe's registers and cards
+      <root>\<privDir>\<name>-before-<stamp>          a wipe's other marks
+      <root>\<world>\changeForms\_discarded-<stamp>   a character reset's forms
+      <root>\<world>\changeForms\<id>.json.bak-<stamp>  an appearance reset's copy
+
+  Only a game server's folder (a server-settings.json in it), only those
+  names, and only directly where each step puts them. A link is left as it is
+  and said, because deleting through one can reach whatever it points at. A
+  copy that will not go is named with the error, and the next hourly pass is
+  the next try. Each line names the copy and when it was set aside, never
+  what is in it.
+*/
+const ASIDE_DAYS = 30;
+function asideAt(stamp) {
+  const m = /^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})$/.exec(stamp);
+  if (!m) return null;
+  const t = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime();
+  return Number.isFinite(t) ? t : null;
+}
+function ageAside(dir, now, days) {
+  const out = [];
+  let settings;
+  try { settings = JSON.parse(fs.readFileSync(path.join(dir, 'server-settings.json'), 'utf8').replace(/^﻿/, '')); }
+  catch (e) { return out; }
+  if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return out;
+  const world = settings.databaseName ? String(settings.databaseName) : 'world';
+  const places = [
+    [dir, /^world-before-(?:restore-)?(\d{8}-\d{6})$/, true],
+    [path.join(dir, settings.privDir ? String(settings.privDir) : 'private'), /^.+-before-(\d{8}-\d{6})(?:\.json)?$/, false],
+    [path.join(dir, world, 'changeForms'), /^_discarded-(\d{8}-\d{6})$/, true],
+    [path.join(dir, world, 'changeForms'), /^.+\.json\.bak-(\d{8}-\d{6})$/, false]
+  ];
+  const cut = now - (days || ASIDE_DAYS) * DAY_MS;
+  for (const [where, rule, folder] of places) {
+    let names = [];
+    try { names = fs.readdirSync(where); }
+    catch (e) { if (e.code !== 'ENOENT') out.push('set-aside copies: could not list ' + path.relative(dir, where) + ': ' + (e.code || e.message)); continue; }
+    for (const n of names) {
+      const m = rule.exec(n);
+      if (!m) continue;
+      const at = asideAt(m[1]);
+      if (at === null || at >= cut) continue;
+      const p = path.join(where, n);
+      const rel = path.relative(dir, p);
+      let st;
+      try { st = fs.lstatSync(p); } catch (e) { out.push('set-aside copies: could not look at ' + rel + ': ' + (e.code || e.message)); continue; }
+      if (st.isSymbolicLink()) { out.push('set-aside copies: left ' + rel + ': it is a link'); continue; }
+      if (st.isDirectory() !== folder) continue;
+      try {
+        fs.rmSync(p, { recursive: folder, force: false });
+        out.push('set-aside copies: deleted ' + rel + ', set aside ' + stampOf(new Date(at)).slice(0, 10) +
+          ', more than ' + (days || ASIDE_DAYS) + ' days ago');
+      } catch (e) {
+        out.push('set-aside copies: COULD NOT DELETE ' + rel + ', set aside ' + stampOf(new Date(at)).slice(0, 10) +
+          ': ' + (e.code || e.message) + '. It is tried again in an hour.');
+      }
+    }
+  }
+  return out;
+}
+
 function run(o) {
   const log = o.log;
   const state = { fd: null, bytes: 0, day: 0, atLineStart: true, rollAfter: 0, lost: 0, lostSince: 0, lostWhy: '' };
@@ -645,6 +721,7 @@ function run(o) {
   for (const l of pending) say(l);
   // Before the program, so nothing of theirs is open when it goes (#2758).
   for (const l of startDeletions(process.cwd(), now)) say(l);
+  for (const l of ageAside(process.cwd(), now)) say(l);
 
   if (!o.program.length) {
     say('nothing to run: server-log.js was started with no program after its own switches');
@@ -662,6 +739,7 @@ function run(o) {
     const t = Date.now();
     if (due(t) && state.atLineStart) roll(t);
     else for (const l of sweep(log, t, o.days).concat(ageAlsos(o, t))) say(l);
+    for (const l of ageAside(process.cwd(), t)) say(l);
   }, SWEEP_MS);
   child.on('error', (e) => {
     say('could not start ' + o.program.join(' ') + ': ' + (e.code || e.message));
@@ -684,5 +762,5 @@ if (require.main === module) {
   }
   run(o);
 } else {
-  module.exports = { KEEP_DAYS, ALSO_DAYS, MAX_BYTES, rolledFiles, trimFile, sweep, rollFile, rollAtStart, rollNow, lineTime, parseArgs, ageAlso, startDeletions, RELEASE_PARTS };
+  module.exports = { KEEP_DAYS, ALSO_DAYS, MAX_BYTES, rolledFiles, trimFile, sweep, rollFile, rollAtStart, rollNow, lineTime, parseArgs, ageAlso, startDeletions, RELEASE_PARTS, ASIDE_DAYS, ageAside };
 }

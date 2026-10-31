@@ -88,7 +88,7 @@ if (runFn && removeFn) {
 }
 
 // isTemporarySpawn reads the actor's own marker (#2623 review): kept, this
-// run, an earlier run and the old plain true.
+// run, an earlier run, and not the plain true from before #2623 (#3265).
 {
   const fn = lift('isTemporarySpawn');
   yes('isTemporarySpawn is in the gamemode', !!fn);
@@ -99,7 +99,7 @@ if (runFn && removeFn) {
     marks[1] = { run: 'now' }; marks[2] = { run: 'before' }; marks[3] = true; marks[4] = { keep: true }; marks[5] = undefined;
     yes('a spawn from this run is temporary', ctx.isTemporarySpawn(1) === true);
     yes('one from an earlier run is temporary', ctx.isTemporarySpawn(2) === true);
-    yes('the old plain true is temporary', ctx.isTemporarySpawn(3) === true);
+    yes('the plain true from before #2623 is not read as a marker (#3265)', ctx.isTemporarySpawn(3) === false);
     yes('a kept one is not', ctx.isTemporarySpawn(4) === false);
     yes('an ordinary creature is not', ctx.isTemporarySpawn(5) === false);
   }

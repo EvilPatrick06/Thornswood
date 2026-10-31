@@ -32,9 +32,10 @@ foreach ($kind in $fileKinds) {
     Yes "the committed $kind record reads at a known version with its fields" ((Refusal { Read-ThornswoodRecord -Path $p -Kind $kind }) -eq '')
 }
 $out = & $winPs -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo 'scripts\release\Check-Records.ps1') 2>&1
-# One OK line per record, and two for records held to each other: the Skyrim
-# pin with its files, and the client's licences with its build (#3099).
-Yes 'Check-Records passes this checkout (exit 0), one OK line per record' ($LASTEXITCODE -eq 0 -and @($out | Where-Object { "$_" -match '^\s+OK ' }).Count -eq ($fileKinds.Count + 2))
+# One OK line per record, and three for records held to each other: the
+# Skyrim pin with its files, the client's licences with its build (#3099),
+# and the front's packages with their texts (#3751).
+Yes 'Check-Records passes this checkout (exit 0), one OK line per record' ($LASTEXITCODE -eq 0 -and @($out | Where-Object { "$_" -match '^\s+OK ' }).Count -eq ($fileKinds.Count + 3))
 Yes 'Check-Records holds the client licences to the client build and their texts' (@($out | Where-Object { "$_" -match '^\s+OK\s+client licences\s+\d+ texts, of [0-9a-f]{8}' }).Count -eq 1)
 Yes 'docs\JSON-STATE-INVENTORY.md lists each of these records' ((Test-Path -LiteralPath (Join-Path $repo 'docs\JSON-STATE-INVENTORY.md')) -and -not @($script:ThornswoodRecordKinds.Values | Where-Object { $_.File } | Where-Object { -not ([IO.File]::ReadAllText((Join-Path $repo 'docs\JSON-STATE-INVENTORY.md')).Contains($_.File.Replace('\', '/'))) }).Count)
 

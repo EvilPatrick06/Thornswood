@@ -41,6 +41,9 @@ namespace Thornswood
         public string Name = "";
         public string Password = "";
         public string Why = "";        // link, guild, banned, role, offline
+        // With offline: what the request ran into and how long it waited
+        // (Discord.LastFailure), for the log line that reports it.
+        public string NetFailure = "";
         public string Message = "";
         public string Invite = "";
         public bool Admin;
@@ -58,10 +61,12 @@ namespace Thornswood
         public const string Site = "https://thornswood.net";
 
         public static string Folder = @"C:\Thornswood\Profile";
-        static string TicketFile { get { return Path.Combine(Folder, "discord.txt"); } }
-        static string NameFile   { get { return Path.Combine(Folder, "discord-name.txt"); } }
-        static string AvatarFile { get { return Path.Combine(Folder, "discord-avatar.txt"); } }
-        static string DevFile    { get { return Path.Combine(Folder, "dev-allowed.txt"); } }
+        const string TicketName = "discord.txt", NameName = "discord-name.txt",
+                     AvatarName = "discord-avatar.txt", DevName = "dev-allowed.txt";
+        static string TicketFile { get { return Path.Combine(Folder, TicketName); } }
+        static string NameFile   { get { return Path.Combine(Folder, NameName); } }
+        static string AvatarFile { get { return Path.Combine(Folder, AvatarName); } }
+        static string DevFile    { get { return Path.Combine(Folder, DevName); } }
 
         /// <summary>Which build is asking: "" for the main build, "dev" for the dev build. Set by the shell.</summary>
         public static string Channel = "";
@@ -232,23 +237,38 @@ namespace Thornswood
             catch { return ""; }
         }
 
+        /// <summary>
+        /// Every file this account leaves in folder: the sign-in ticket, the
+        /// name and picture kept beside it, the site's last staff answer and
+        /// the door's last yes or no. Forget deletes them, and so does an
+        /// uninstall that keeps the saves and settings (LocalKeep.NotSaves,
+        /// #3679), so the two cannot name different files.
+        /// </summary>
+        public static string[] AccountFiles(string folder)
+        {
+            return new string[]
+            {
+                Path.Combine(folder, TicketName),
+                Path.Combine(folder, NameName),
+                Path.Combine(folder, AvatarName),
+                // The site's last staff answer for this account. Left on disk,
+                // DevAllowed stays true for the next account until that
+                // account's first check-in, and the staff queue can show in
+                // between (#1208).
+                Path.Combine(folder, DevName),
+                // door.txt is the last yes or no the site gave for this ticket
+                // (Door.AnswerFile, kept beside the ticket).
+                Path.Combine(folder, "door.txt"),
+            };
+        }
+
         public static void Forget()
         {
-            try { if (File.Exists(TicketFile)) File.Delete(TicketFile); } catch (Exception ex) { Swallow.Note("Discord.Forget, TicketFile", ex); }
-            try { if (File.Exists(NameFile)) File.Delete(NameFile); } catch (Exception ex) { Swallow.Note("Discord.Forget, NameFile", ex); }
-            try { if (File.Exists(AvatarFile)) File.Delete(AvatarFile); } catch (Exception ex) { Swallow.Note("Discord.Forget", ex); }
-            // The site's last staff answer for this account. Left on disk,
-            // DevAllowed stays true for the next account until that account's
-            // first check-in, and the staff queue can show in between (#1208).
-            try { if (File.Exists(DevFile)) File.Delete(DevFile); } catch (Exception ex) { Swallow.Note("Discord.Forget, DevFile", ex); }
-            // door.txt is the last yes or no the site gave for this ticket
-            // (Door.AnswerFile, kept beside the ticket). It goes with the account.
-            try
+            foreach (string f in AccountFiles(Folder))
             {
-                string door = Path.Combine(Folder, "door.txt");
-                if (File.Exists(door)) File.Delete(door);
+                try { if (File.Exists(f)) File.Delete(f); }
+                catch (Exception ex) { Swallow.Note("Discord.Forget, " + Path.GetFileName(f), ex); }
             }
-            catch (Exception ex) { Swallow.Note("Discord.Forget, door.txt", ex); }
             ticket = ""; name = ""; avatar = "";
         }
 
@@ -494,6 +514,7 @@ namespace Thornswood
                 // implying the person is banned.
                 st.Why = "offline";
                 st.Message = "Could not reach thornswood.net to check you in.";
+                st.NetFailure = LastFailure ?? "";
                 return st;
             }
 
@@ -700,9 +721,13 @@ namespace Thornswood
         /// somebody is suspended, and evidence the accused can overwrite is
         /// not evidence.
         ///
-        /// Nothing here is read from the person: these are the launcher's own
-        /// log and the game's own logs. Called from a pool thread, after
-        /// SessionEnd so the row it attaches to exists.
+        /// These are the launcher's own log and the game's own logs, and they
+        /// are read from the person's PC, so what they can hold is named file
+        /// by file on the privacy page (site\data\site\privacy.md, "The logs
+        /// sent when a session ends"), and tests\test-session-logs.js fails
+        /// when this list names a file that page does not (#3627). Every file
+        /// and every line of the scan goes through Scrub first. Called from a
+        /// pool thread, after SessionEnd so the row it attaches to exists.
         /// </summary>
         public static void SessionLogs()
         {
@@ -729,7 +754,6 @@ namespace Thornswood
                     new string[] { "thornswood-voice.log",       Path.Combine(plat, "thornswood-voice.log") },
                     new string[] { "thornswood-emotes.log",      Path.Combine(plat, "thornswood-emotes.log") },
                     new string[] { "thornswood-input.log",       Path.Combine(plat, "thornswood-input.log") },
-                    new string[] { "thornswood-dress.log",       Path.Combine(plat, "thornswood-dress.log") },
                     new string[] { "thornswood-loadorder.txt",   Path.Combine(plat, "thornswood-loadorder.txt") },
                     new string[] { "thornswood-plugins-light.txt", Path.Combine(plat, "thornswood-plugins-light.txt") },
                     // Skyrim Platform's own log: the browser, the native calls
@@ -817,7 +841,7 @@ namespace Thornswood
                 {
                     if (i == null) continue;
                     if (n > 0) sb.Append(",");
-                    sb.Append("{\"text\":\"").Append(Escape(i.Text)).Append("\"");
+                    sb.Append("{\"text\":\"").Append(Escape(Scrub(i.Text))).Append("\"");
                     sb.Append(",\"blocking\":").Append(i.Blocking ? "true" : "false");
                     sb.Append(",\"absent\":").Append(i.Absent ? "true" : "false");
                     if (!string.IsNullOrEmpty(i.Plugin))
@@ -854,8 +878,8 @@ namespace Thornswood
                 {
                     if (c == null || c.Ok) continue;   // only what was wrong
                     if (n > 0) sb.Append(",");
-                    sb.Append("{\"name\":\"").Append(Escape(c.Name)).Append("\"");
-                    sb.Append(",\"detail\":\"").Append(Escape(c.Detail)).Append("\"}");
+                    sb.Append("{\"name\":\"").Append(Escape(Scrub(c.Name))).Append("\"");
+                    sb.Append(",\"detail\":\"").Append(Escape(Scrub(c.Detail))).Append("\"}");
                     n++;
                     if (n >= 40) break;
                 }
@@ -1033,8 +1057,26 @@ namespace Thornswood
         /// "v2.profile.minted.nonce.signature" from voice-server.js
         /// signToken (#1322), the older "v1.profile.until.signature", and
         /// "tk1.body.signature" from the site.
+        ///
+        /// And who the PC belongs to (#3627). The launcher's log names files
+        /// under the Windows user folder (a .NET error names the full path of
+        /// the file it failed on, and Vortex keeps everything under AppData),
+        /// the voice page logs its own file:// address, and the folder's name
+        /// is usually the Windows account's, often a real name. None of that
+        /// helps anybody read a fault, and the privacy page promises it is
+        /// taken out, so the user folder, any other folder under a Users
+        /// folder, the account name as a folder and the PC's name are all
+        /// replaced here, the one place every log and scan line leaves by.
+        /// The values are read here and not kept, so a test can hand
+        /// ScrubFor its own.
         /// </summary>
         static string Scrub(string text)
+        {
+            return ScrubFor(text, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                            Environment.UserName, Environment.MachineName);
+        }
+
+        static string ScrubFor(string text, string profile, string user, string machine)
         {
             if (string.IsNullOrEmpty(text)) return "";
             string s = Regex.Replace(text, @"\bv1\.[0-9]+\.[0-9]+\.[A-Za-z0-9_-]{16,}", "v1.[join token removed]");
@@ -1042,6 +1084,31 @@ namespace Thornswood
             s = Regex.Replace(s, @"\btk1\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}", "tk1.[ticket removed]");
             // The join pass (#937), "jp1.body.signature" from the site's makePass.
             s = Regex.Replace(s, @"\bjp1\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}", "jp1.[join pass removed]");
+
+            // This PC's user folder, however a log wrote it: with backslashes,
+            // doubled in JSON, with forward slashes and %20 for a space in a
+            // file:// address. Not when the next letter carries the name on,
+            // so a folder named Al is not taken out of one named Alba.
+            string[] parts = (profile ?? "").Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 2)
+            {
+                var sep = new string[parts.Length];
+                for (int i = 0; i < parts.Length; i++) sep[i] = Regex.Escape(parts[i]).Replace("\\ ", "(?: |%20)");
+                s = Regex.Replace(s, string.Join(@"[\\/]{1,2}", sep) + @"(?![\w-])", "%USERPROFILE%", RegexOptions.IgnoreCase);
+            }
+            // Any other folder under a Users folder: another account on this
+            // PC, or this one by its short 8.3 name, spaces and all, up to the
+            // separator before the next folder. Public and Default belong to
+            // nobody.
+            s = Regex.Replace(s, @"(\b[A-Za-z]:[\\/]{1,2}Users[\\/]{1,2})(?!(?:Public|Default)[\\/])[^\\/:*?""<>|\r\n\t ]+(?: [^\\/:*?""<>|\r\n\t ]+)*(?=[\\/])",
+                              "$1[user]", RegexOptions.IgnoreCase);
+            // The account's name as a folder anywhere else, D:\Games\<name>\.
+            if (!string.IsNullOrEmpty(user))
+                s = Regex.Replace(s, @"(?<=[\\/])" + Regex.Escape(user) + @"(?=[\\/]|$|[\s""'])", "[user]",
+                                  RegexOptions.IgnoreCase | RegexOptions.Multiline);
+            // The PC's own name, wherever it stands as a word.
+            if (!string.IsNullOrEmpty(machine))
+                s = Regex.Replace(s, @"(?<![\w-])" + Regex.Escape(machine) + @"(?![\w-])", "[pc]", RegexOptions.IgnoreCase);
             return s;
         }
 
@@ -1098,6 +1165,17 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// Why the last Send on this thread got no answer at all, and how long
+        /// it waited, or empty when it got one. Send returns 0 for every such
+        /// failure, so until 22 October a timeout, a refused connection and a
+        /// name that would not resolve all reached the log as the same "not
+        /// answering", and a check in that failed while the game was starting
+        /// (launcher.log, 22 Oct, 13:16:06 and 13:17:44) could not say which.
+        /// Per thread, because check ins run on pool threads side by side.
+        /// </summary>
+        [ThreadStatic] public static string LastFailure;
+
+        /// <summary>
         /// One call to the site and whatever it answered: the status code, and
         /// the body in reply, refusals included. 0 is the site not reached at
         /// all, which is not a refusal and is never read as one.
@@ -1111,6 +1189,8 @@ namespace Thornswood
         public static int Send(string method, string url, string json, out string reply)
         {
             reply = "";
+            LastFailure = "";
+            var took = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; // added, never replaced (#1360)
@@ -1146,11 +1226,15 @@ namespace Thornswood
                     catch (Exception ex) { Swallow.Note("Discord.Send, reading refusal body", ex); }
                     return (int)res.StatusCode;
                 }
+                // WebExceptionStatus names the kind: Timeout, ConnectFailure,
+                // NameResolutionFailure, SecureChannelFailure and the like.
+                LastFailure = we.Status + " after " + took.ElapsedMilliseconds + " ms";
                 return 0;
             }
             catch (Exception ex)
             {
                 Swallow.Note("Discord.Send", ex);
+                LastFailure = ex.GetType().Name + " after " + took.ElapsedMilliseconds + " ms";
                 return 0;
             }
         }

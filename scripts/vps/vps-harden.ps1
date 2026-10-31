@@ -20,20 +20,36 @@
                      runners with nobody signed in never uses, each stopped
                      and set to Disabled, with the reason beside it (#3186).
                      One that is not installed is said and left.
+    Edge             the in-box Microsoft Edge, which nothing on the box runs
+                     and whose setup adds an inbound firewall rule with every
+                     version (#3896), uninstalled with its own setup, and the
+                     EdgeUpdate policy in $EdgePolicies below set so its
+                     updater never installs it again. The WebView2 Runtime and
+                     the updater stay: the Visual Studio C++ workload the
+                     runners build with requires WebView2, and the updater
+                     keeps it patched. Should Edge's setup refuse the
+                     uninstall (Microsoft lets it on some Windows versions),
+                     Edge stays, unused, with the updater told never to install
+                     it again, and the run says KEPT with the exit code and
+                     where its log is and goes on: the box's own firewall
+                     policy ignores the rules its setup adds (Patrick, 27 Oct,
+                     q-3896-edge-uninstall-refused, A).
     telemetry        the scheduled tasks in $TelemetryTasks below
                      (DiskSnapshot.exe, CompatTelRunner.exe and the Customer
                      Experience Improvement Program) set to Disabled, and
                      AllowTelemetry set to 0, with the reason beside each
                      (#3213). One that is not on the box is said and left.
     Windows Update   the policy values in $UpdatePolicies below: updates
-                     install every day at 4 AM box time, Windows never
-                     restarts for one between 6 AM and midnight, and its
+                     install every day at 4 AM box time, Windows restarts
+                     15 minutes after an install that needs it, and its
                      automatic maintenance starts at 4 AM with no random
                      delay (#3213). Windows Update itself stays on: its
                      services are read and left as they are, and a WARN
                      says so if one is Disabled. A WARN too if the box's
                      clock is not Mountain time, since every hour here is
-                     the box's own.
+                     the box's own, and if Windows already has a restart
+                     set outside 4 AM to 6 AM, which these values do not
+                     move.
     sshd_config     PasswordAuthentication no and KbdInteractiveAuthentication
                      no, as the first setting of each (sshd takes the first
                      one it reads) and above the Match block, where a global
@@ -49,6 +65,10 @@
                      still works: if the change ever locked the key out, the
                      box undoes it on its own.
 
+  Firewall rules are read as the firewall takes them and turned off in the
+  store they came from: the box's own policy, then Group Policy refreshed
+  (scripts\vps\BoxFirewall.ps1, #3896), or the local store.
+
   Every line of output starts with one word: CHANGED, WOULD (with -DryRun),
   ALREADY, KEPT, WARN or STOP. STOP means nothing after it was done, and the
   exit code is 1.
@@ -60,7 +80,10 @@
   The sshd_config to change. The Windows OpenSSH server's own by default.
 
 .PARAMETER Sshd
-  The sshd.exe that checks the new file (sshd -t) before it is used.
+  The sshd.exe that checks the new file (sshd -t) before it is used. The one
+  the sshd service runs when empty, read from the service, so the check is
+  made by the sshd that will read the file: since #1043 that is OpenSSH for
+  Windows in C:\Program Files\OpenSSH, not the inbox one in System32.
 
 .PARAMETER Layer
   A file that replaces the functions below that touch Windows (the registry,
@@ -72,7 +95,7 @@
 param(
     [switch]$DryRun,
     [string]$SshdConfig = (Join-Path $env:ProgramData 'ssh\sshd_config'),
-    [string]$Sshd = (Join-Path $env:WINDIR 'System32\OpenSSH\sshd.exe'),
+    [string]$Sshd = '',
     [string]$Layer = ''
 )
 
@@ -90,8 +113,8 @@ $RestartTask = 'Thornswood sshd restart'
 # together used about 0.03 of a core, so each of these is a little memory
 # and processor time, and the print spooler is attack surface with a history
 # (PrintNightmare). Microsoft Edge's update tasks stay: the same updater
-# keeps the WebView2 runtime patched, and an Edge left unpatched on the box
-# is worse than a few seconds an hour.
+# keeps the WebView2 runtime patched, and WebView2 stays because the Visual
+# Studio C++ workload requires it (#3896). Edge itself goes, below.
 $IdleServices = @(
     @{ Name = 'Spooler'; Why = 'print spooler: nothing prints from the box, and it is the PrintNightmare service' },
     @{ Name = 'DiagTrack'; Why = 'Connected User Experiences and Telemetry: sends usage data to Microsoft' },
@@ -135,17 +158,29 @@ $TelemetryTasks = @(
 #
 # Each key is one Server 2022's own Group Policy templates write: the update
 # ones WindowsUpdate.admx, the maintenance ones msched.admx and
-# AllowTelemetry DataCollection.admx. What Server 2022 has no key for is an
-# install on a schedule with the restart left to us. Option 4 restarts by
-# itself, outside active hours, when an update needs it; option 7 never
-# installs by itself, and Windows had set Reboot_AC under it all the same;
-# and NoAutoRebootWithLoggedOnUsers holds a restart off only while somebody
-# is signed in, which on this box nobody is, so it is not set. So the
-# restart is held to the night instead: active hours are the 18 hours
-# Windows allows at most (ActiveHoursMaxRange is 8 to 18), 6 AM to midnight,
-# so a restart for the 4 AM install comes before 6 AM or not until midnight.
-# One still waiting at 6 AM can also be done by Set-TimeWait.ps1 -Restart,
-# which restarts the box only when nobody is on either server. The hour Windows looks for
+# AllowTelemetry DataCollection.admx. Option 4 installs at the scheduled
+# time; option 7 never installs by itself, and Windows had set Reboot_AC
+# under it all the same; and NoAutoRebootWithLoggedOnUsers holds a restart
+# off only while somebody is signed in, which on this box nobody is, so it is
+# not set. The restart is pinned to the install: AlwaysAutoRebootAtScheduledTime
+# 1 starts a timer the moment Windows Update installs an update that needs a
+# restart, and restarts when AlwaysAutoRebootAtScheduledTimeMinutes runs out
+# (15 to 180; 15, the shortest, so an install that takes an hour still ends
+# in a restart before 6 AM). Microsoft's "Manage device restarts after
+# updates" names exactly these four values as the way to schedule a specific
+# install and restart time, and says the timer applies to Windows 10 and
+# not 11; Server 2022 is the Windows 10 line. Until 23 Oct 2026 the restart
+# was left to active hours alone, and that was measured to miss the window:
+# the 4 AM install on 23 Oct needed a restart at 4:06 AM, Windows did not
+# take it before 6 AM, and set Reboot_AC to 2:33 AM on 24 Oct instead, the
+# night hour it chose after active hours ended, 18 minutes after the backup
+# starts and outside 4 AM to 6 AM. Active hours stay set, 6 AM to midnight,
+# the 18 hours Windows allows at most (ActiveHoursMaxRange is 8 to 18):
+# Microsoft's page says they have no effect while the timer is on, and they
+# are what holds a restart Windows sets by itself (an update installed some
+# other way) out of the day instead of its default of 8 AM to 5 PM. A
+# restart Windows set before these values were is not moved by them; the
+# run says when one stands outside the window. The hour Windows looks for
 # updates and downloads them has no key outside WSUS (DetectionFrequency
 # needs an update server of our own), so only the install is moved. Low
 # priority: Windows already runs its update installer (TiWorker.exe) and the
@@ -159,7 +194,8 @@ $UpdatePolicies = @(
     @{ Key = "$PolicyRoot\WindowsUpdate\AU"; Name = 'ScheduledInstallDay'; Type = 'DWord'; Value = 0; Why = 'every day, so an update waits a day at most' },
     @{ Key = "$PolicyRoot\WindowsUpdate\AU"; Name = 'ScheduledInstallTime'; Type = 'DWord'; Value = 4; Why = 'at 4 AM box time, after the backup and the nightly checks' },
     @{ Key = "$PolicyRoot\WindowsUpdate\AU"; Name = 'ScheduledInstallEveryWeek'; Type = 'DWord'; Value = 1; Why = 'every week of the month, as Group Policy writes it beside the day' },
-    @{ Key = "$PolicyRoot\WindowsUpdate\AU"; Name = 'AlwaysAutoRebootAtScheduledTime'; Type = 'DWord'; Value = 0; Why = 'no restart forced at the install time on a 15 minute warning' },
+    @{ Key = "$PolicyRoot\WindowsUpdate\AU"; Name = 'AlwaysAutoRebootAtScheduledTime'; Type = 'DWord'; Value = 1; Why = 'the restart an install needs comes on a timer started by the install, so in the 4 AM to 6 AM window' },
+    @{ Key = "$PolicyRoot\WindowsUpdate\AU"; Name = 'AlwaysAutoRebootAtScheduledTimeMinutes'; Type = 'DWord'; Value = 15; Why = 'the timer: 15 minutes, the shortest Windows takes, so the restart comes about 4:20 AM' },
     @{ Key = "$PolicyRoot\WindowsUpdate"; Name = 'SetActiveHours'; Type = 'DWord'; Value = 1; Why = 'Windows never restarts for an update inside the active hours below' },
     @{ Key = "$PolicyRoot\WindowsUpdate"; Name = 'ActiveHoursStart'; Type = 'DWord'; Value = 6; Why = 'active from 6 AM, so a restart for the 4 AM install can come only before 6 or after midnight' },
     @{ Key = "$PolicyRoot\WindowsUpdate"; Name = 'ActiveHoursEnd'; Type = 'DWord'; Value = 0; Why = 'to midnight: 18 hours, the most Windows allows' },
@@ -173,7 +209,26 @@ $UpdateServices = @(
     @{ Name = 'UsoSvc'; Why = 'Update Orchestrator, which starts the scheduled install' }
 )
 $BoxTimeZone = 'Mountain Standard Time'
+# Windows' own restart for an update, which it sets when an install needs one.
+$RestartTask = @{ Path = '\Microsoft\Windows\UpdateOrchestrator\'; Name = 'Reboot_AC' }
 $RollbackTask = 'Thornswood harden rollback'
+
+# Microsoft Edge (#3896). Measured on 26 Oct 2026: the in-box Edge (EdgeUpdate
+# brand INBX), which nothing on the box runs (one profile, Administrator's,
+# last written 12 Sep 2026; no process loads it), and whose setup adds an
+# inbound "Microsoft Edge (mDNS-In)" rule on UDP 5353 with every new version
+# (one added 24 Oct 2026). Chromium's installer adds that rule with no policy
+# or check in its way, so the browser goes. Patrick, 27 Oct 2026 (B). Its
+# updater stays for the WebView2 Runtime, so the updater's own policy keeps it
+# from putting Edge back: Install{<Edge's app id>} 0 is "do not allow
+# installation" in Microsoft's EdgeUpdate policy, for that app only.
+# Update{...} is not set: should the uninstall ever be refused, an Edge left on
+# the box must still be patched.
+$EdgeAppId = '{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}'
+$EdgeUninstallKey = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Edge'
+$EdgePolicies = @(
+    @{ Key = 'HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate'; Name = ('Install' + $EdgeAppId); Type = 'DWord'; Value = 0; Why = 'the Edge updater never installs Edge on the box again; it still updates the WebView2 Runtime' }
+)
 
 # ---------------------------------------------------------------- the layer ---
 # Everything that touches Windows goes through these, so the harness can put
@@ -186,17 +241,41 @@ function Get-RdpDeny {
 }
 function Set-RdpDeny { Set-ItemProperty -LiteralPath $TsKey -Name fDenyTSConnections -Value 1 -Type DWord }
 
-# Enabled inbound rules, each as Name, DisplayName, Action, Group, Ports.
+# Enabled inbound rules the firewall takes, each as Name, DisplayName,
+# Action, Group, Ports and Store (GroupPolicy for the box's own policy, Local
+# for the local store; #3896).
 function Get-InboundRules {
-    foreach ($r in @(Get-NetFirewallRule -Direction Inbound -Enabled True -ErrorAction SilentlyContinue)) {
+    foreach ($r in @(Get-NetFirewallRule -PolicyStore ActiveStore -Direction Inbound -Enabled True -ErrorAction SilentlyContinue)) {
         $pf = $r | Get-NetFirewallPortFilter -ErrorAction SilentlyContinue
         [pscustomobject]@{
             Name = [string]$r.Name; DisplayName = [string]$r.DisplayName; Action = [string]$r.Action
             Group = [string]$r.Group; Ports = @(@($pf.LocalPort) | ForEach-Object { [string]$_ })
+            Store = [string]$r.PolicyStoreSourceType
         }
     }
 }
-function Disable-InboundRule([string]$Name) { Disable-NetFirewallRule -Name $Name }
+function Disable-InboundRule([string]$Name, [string]$Store = 'GroupPolicy') {
+    if ($Store -eq 'Local') { Disable-NetFirewallRule -PolicyStore PersistentStore -Name $Name; return }
+    Disable-NetFirewallRule -PolicyStore localhost -Name $Name
+    Sync-ThornswoodFirewall
+}
+
+# The in-box Edge as its uninstall entry says it, Version and Setup (its
+# setup.exe) and Arguments (what its uninstall entry runs it with), or $null
+# when it is not installed.
+function Get-EdgeInstall {
+    $v = Get-ItemProperty -LiteralPath $EdgeUninstallKey -ErrorAction SilentlyContinue
+    if ($null -eq $v -or -not $v.UninstallString) { return $null }
+    $s = [string]$v.UninstallString
+    $exe = $s; $rest = ''
+    if ($s.StartsWith('"')) { $end = $s.IndexOf('"', 1); $exe = $s.Substring(1, $end - 1); $rest = $s.Substring($end + 1).Trim() }
+    return [pscustomobject]@{ Version = [string]$v.DisplayVersion; Setup = $exe; Arguments = $rest }
+}
+# Runs Edge's own uninstall, with --force-uninstall so it does not stop to
+# ask, and returns its exit code.
+function Remove-EdgeInstall($Edge) {
+    return [int](Start-Process -FilePath $Edge.Setup -ArgumentList ($Edge.Arguments + ' --force-uninstall') -Wait -PassThru).ExitCode
+}
 
 function Get-TermService {
     $s = Get-Service -Name TermService -ErrorAction SilentlyContinue
@@ -236,10 +315,30 @@ function Set-PolicyValue([string]$Key, [string]$Name, $Value, [string]$Type) {
 
 function Get-BoxTimeZone { return [string](Get-TimeZone).Id }
 
+# When a scheduled task runs next, or $null when it is not set to.
+function Get-TaskNextRun([string]$Path, [string]$Name) {
+    $t = Get-ScheduledTask -TaskPath $Path -TaskName $Name -ErrorAction SilentlyContinue
+    if (-not $t) { return $null }
+    $next = ($t | Get-ScheduledTaskInfo).NextRunTime
+    if (-not $next -or $next.Year -lt 2000) { return $null }
+    return [datetime]$next
+}
+
+# The program the sshd service runs, without quotes or arguments.
+function Get-SshdExe {
+    $p = [string](Get-CimInstance -ClassName Win32_Service -Filter "Name='sshd'" -ErrorAction Stop).PathName
+    if (-not $p) { throw 'there is no sshd service' }
+    if ($p.StartsWith('"')) { return $p.Substring(1, $p.IndexOf('"', 1) - 1) }
+    if ($p -match '^(.*?\.exe)\b') { return $Matches[1] }
+    return $p
+}
+
 function Test-SshdFile([string]$Path) {
+    $exe = $Sshd
+    if (-not $exe) { $exe = Get-SshdExe }
     $old = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    $out = @(& $Sshd -t -f $Path 2>&1 | ForEach-Object { [string]$_ })
+    $out = @(& $exe -t -f $Path 2>&1 | ForEach-Object { [string]$_ })
     $rc = $LASTEXITCODE
     $ErrorActionPreference = $old
     return [pscustomobject]@{ Ok = ($rc -eq 0); Said = ($out -join ' ') }
@@ -283,6 +382,19 @@ function New-PrivateFile([string]$Path) {
     $who = @($got.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | ForEach-Object { $_.IdentityReference.Value } | Sort-Object -Unique)
     if (-not $got.AreAccessRulesProtected -or ($who -join ',') -ne 'S-1-5-18,S-1-5-32-544') { throw ($Path + ' did not take SYSTEM and Administrators alone: ' + ($who -join ', ')) }
 }
+
+# ---- BoxFirewall.ps1 (copy) ----
+function Sync-ThornswoodFirewall {
+    # scripts\vps\BoxFirewall.ps1 (#3896): the firewall takes the box's policy
+    # store when Group Policy is refreshed, so every change to the store ends here.
+    $was = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $said = @(& gpupdate.exe /target:computer /force 2>&1 | ForEach-Object { [string]$_ } | Where-Object { $_.Trim() })
+    $rc = $LASTEXITCODE
+    $ErrorActionPreference = $was
+    if ($rc -ne 0) { throw ('gpupdate did not refresh the box''s policy, so the firewall has not taken the change (exit ' + $rc + '): ' + ($said -join ' ')) }
+}
+# ---- end BoxFirewall.ps1 ----
 
 if ($Layer) { . $Layer }
 
@@ -361,7 +473,7 @@ function Invoke-Harden {
     $rdpRules = @($rules | Where-Object { $_.Action -eq 'Allow' -and ($_.Group -eq $RdpGroup -or $_.Ports -contains '3389') })
     foreach ($r in $rdpRules) {
         if ($r.Ports -contains '22') { Say 'KEPT' ("firewall rule '" + $r.DisplayName + "' covers port 22 as well as Remote Desktop, so it was left on. Look at it by hand."); continue }
-        if (-not $DryRun) { Disable-InboundRule $r.Name }
+        if (-not $DryRun) { Disable-InboundRule $r.Name $r.Store }
         Change ("firewall rule '" + $r.DisplayName + "' turned off (allowed " + (($r.Ports | Where-Object { $_ }) -join ',') + ')')
     }
     if (-not $rdpRules.Count) { Say 'ALREADY' 'no enabled firewall rule lets Remote Desktop in' }
@@ -403,6 +515,25 @@ function Invoke-Harden {
         Change ($full + ' set to Disabled (was ' + $state + '): ' + $t.Why)
     }
 
+    # -------------------------------------------------------------- Edge ---
+    foreach ($v in $EdgePolicies) {
+        $have = Get-PolicyValue $v.Key $v.Name
+        if ($null -ne $have -and [string]$have -eq [string]$v.Value) { Say 'ALREADY' ($v.Name + ' is ' + $v.Value); continue }
+        if (-not $DryRun) { Set-PolicyValue $v.Key $v.Name $v.Value $v.Type }
+        Change ($v.Name + ' set to ' + $v.Value + ' (was ' + $(if ($null -eq $have) { 'not set' } else { [string]$have }) + '): ' + $v.Why)
+    }
+    $edge = Get-EdgeInstall
+    if (-not $edge) { Say 'ALREADY' 'Microsoft Edge is not installed (#3896)' }
+    elseif ($DryRun) { Change ('Microsoft Edge ' + $edge.Version + ' uninstalled with its own setup (' + $edge.Setup + '): nothing on the box runs it, and its setup adds an inbound firewall rule with every version (#3896)') }
+    else {
+        $code = Remove-EdgeInstall $edge
+        $left = Get-EdgeInstall
+        # Patrick, 27 Oct, q-3896-edge-uninstall-refused, A: a refused uninstall
+        # keeps Edge, blocked from coming back, and the run goes on.
+        if ($left) { Say 'KEPT' ('Microsoft Edge ' + $left.Version + ' is still installed: its setup refused the uninstall (exit ' + $code + '; its log is msedge_installer.log in C:\Windows\SystemTemp or C:\Windows\Temp). It stays unused, the updater is told never to install it again, and the box''s own firewall policy ignores the rules its setup adds (#3896).') }
+        else { Change ('Microsoft Edge ' + $edge.Version + ' uninstalled with its own setup (exit ' + $code + '): nothing on the box runs it, and its setup added an inbound firewall rule with every version (#3896)') }
+    }
+
     # ---------------------------------------------------- Windows Update ---
     $tz = Get-BoxTimeZone
     if ($tz -eq $BoxTimeZone) { Say 'ALREADY' ("the box's clock is " + $tz + ', so the hours below are Mountain time') }
@@ -414,6 +545,14 @@ function Invoke-Harden {
         if (-not $DryRun) { Set-PolicyValue $v.Key $v.Name $v.Value $v.Type }
         Change ($v.Name + ' set to ' + $v.Value + ' (was ' + $(if ($null -eq $have) { 'not set' } else { [string]$have }) + '): ' + $v.Why)
     }
+
+    # A restart Windows set before the values above were, read only: they
+    # pin the restart of the next install, not one already set.
+    $next = Get-TaskNextRun $RestartTask.Path $RestartTask.Name
+    $when = $(if ($next) { $next.ToString('yyyy-MM-dd h:mm tt', [Globalization.CultureInfo]::InvariantCulture) } else { '' })
+    if (-not $next) { Say 'ALREADY' 'Windows has no restart for an update set' }
+    elseif ($next.Hour -ge 4 -and $next.Hour -lt 6) { Say 'ALREADY' ('Windows has its restart for an update set for ' + $when + ', inside 4 AM to 6 AM') }
+    else { Say 'WARN' ('Windows has a restart for an update set for ' + $when + ', outside 4 AM to 6 AM. It was set by an install before the values above, which pin the restart of the next install, so it stands. Nothing here moves it.') }
 
     # The same read as the services above, and nothing more: Windows Update stays on.
     foreach ($svc in $UpdateServices) {

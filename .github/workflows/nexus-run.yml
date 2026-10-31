@@ -1,0 +1,99 @@
+# Runs one of the Nexus scripts with Patrick's Nexus API key (#2841), for a
+# session that does not hold the key: every cloud thread, the Cloud Desk
+# included.
+#
+# WHY. Patrick, 25 Oct 2026, on #2841: the Nexus API key moves out of the
+# default cloud environment, the same way the box key does (his answer A on
+# the page, 27 Oct: a secret of the "desk" environment, run by a workflow).
+# Only main may use that environment, so no branch's workflow can read it.
+#
+# HOW. A session runs
+#
+#   pwsh scripts/release/Nexus-Run.ps1 -Line 'Set-NexusKey'
+#
+# which starts this on main with the line and the public half of a key it
+# made for this run. Here Nexus-Run.ps1 -OnTheRunner holds the line to
+# scripts/release/nexus-verbs.json and runs that script of main with the key
+# in its environment, and nothing else (Nexus-Run.ps1 says the rest).
+#
+# WHAT THE LOG SHOWS. The verb, main's commit and the exit code, and nothing
+# the script printed: that, and every file it wrote, is sealed to the
+# session's key and uploaded as the artifact nexus-run-sealed, kept for a
+# day. Once the repository is public anyone can read a run's log and download
+# its artifacts.
+#
+# THE KEY. NEXUS_API_KEY, put there on One by
+# .\scripts\release\Set-NexusKey.ps1 -ToEnvironment desk, from the key file
+# Set-NexusKey keeps there. It is in the environment of one step, the one
+# that runs the script, and of no other.
+#
+# WHERE IT RUNS. On GitHub's Windows runner (Patrick, 30 Oct 2026, with the
+# flip, #4013): nothing it does needs the box. Every script it runs talks to
+# api.nexusmods.com and Nexus's upload addresses alone, and 7-Zip is on
+# GitHub's image. No runner of the box is registered to a public
+# repository, and box-run.yml, which does need the box, moved to the private
+# ops repository. The run's log and artifacts are public, which is why the
+# output is sealed (above), and the key stays in the main-only "desk"
+# environment, which a fork's pull request never reaches.
+#
+# Every action here is named by a full length commit SHA with its tag in the
+# comment, for the reason build.yml gives.
+name: Nexus run
+run-name: Nexus run by ${{ github.actor }}
+on:
+  workflow_dispatch:
+    inputs:
+      line:
+        description: 'The script and its parameters, as scripts/release/nexus-verbs.json allows'
+        required: true
+      recipient:
+        description: 'The public half of the key the output is sealed to (Nexus-Run.ps1 makes it)'
+        required: false
+permissions:
+  contents: read
+# One at a time: Nexus keeps one draft revision, and two runs writing to the
+# same mod or collection would race.
+concurrency:
+  group: nexus-run
+  cancel-in-progress: false
+jobs:
+  run:
+    name: Run a Nexus script
+    # Main only (#3550), as the environment is.
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    environment: desk
+    # The longest verb's timeoutMinutes in nexus-verbs.json (Install-NexusRevision
+    # downloads every mod of the collection), and the steps around it.
+    timeout-minutes: 170
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Run the script
+        shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"
+        env:
+          THORNSWOOD_NEXUS_API_KEY: ${{ secrets.NEXUS_API_KEY }}
+          NEXUS_LINE: ${{ inputs.line }}
+          NEXUS_RECIPIENT: ${{ inputs.recipient }}
+          NEXUS_RUN_SEALED: ${{ runner.temp }}/nexus-run-sealed/nexus-run.sealed
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & (Join-Path $env:GITHUB_WORKSPACE 'scripts/release/Nexus-Run.ps1') -OnTheRunner
+          exit $LASTEXITCODE
+
+      - name: Upload the sealed output
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: nexus-run-sealed
+          path: ${{ runner.temp }}/nexus-run-sealed/nexus-run.sealed
+          if-no-files-found: ignore
+          retention-days: 1
+
+      - name: Leave nothing behind
+        if: always()
+        shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"
+        run: |
+          Remove-Item -LiteralPath (Join-Path $env:RUNNER_TEMP 'nexus-run-sealed') -Recurse -Force -ErrorAction SilentlyContinue

@@ -1,0 +1,249 @@
+{
+  "sections": {
+    "$TW_WEAPONS": {
+      "priority": 10,
+      "keywords": [
+        "WeapTypeBattleaxe",
+        "WeapTypeBow",
+        "WeapTypeDagger",
+        "WeapTypeGreatsword",
+        "WeapTypeMace",
+        "WeapTypeStaff",
+        "WeapTypeSword",
+        "WeapTypeWarAxe",
+        "WeapTypeWarhammer"
+      ],
+      "icon": {
+        "source": "skyui/icons_item_psychosteve.swf",
+        "label": "weapon_sword"
+      }
+    },
+    "$TW_ARMOUR": {
+      "priority": 10,
+      "keywords": [ "ArmorHeavy", "ArmorLight", "ArmorShield" ],
+      "icon": {
+        "source": "skyui/icons_item_psychosteve.swf",
+        "label": "armor_body"
+      }
+    },
+    "$TW_ARROWS": {
+      "priority": 10,
+      "keywords": [ "VendorItemArrow" ],
+      "icon": {
+        "source": "skyui/icons_item_psychosteve.swf",
+        "label": "weapon_arrow"
+      }
+    }
+  },
+  "categories": {
+    "$TW_Weapons_Wood": {
+      "section": "$TW_WEAPONS",
+      "keywords": [ "WeapMaterialWood" ]
+    },
+    "$TW_Weapons_Iron": {
+      "section": "$TW_WEAPONS",
+      "keywords": [ "WeapMaterialIron" ]
+    },
+    "$TW_Weapons_Steel": {
+      "section": "$TW_WEAPONS",
+      "keywords": [ "WeapMaterialSteel" ]
+    },
+    "$TW_Weapons_Imperial": {
+      "section": "$TW_WEAPONS",
+      "keywords": [ "WeapMaterialImperial" ]
+    },
+    "$TW_Weapons_Silver": {
+      "section": "$TW_WEAPONS",
+      "keywords": [ "WeapMaterialSilver" ]
+    },
+    "$TW_Weapons_AncientNord": {
+      "section": "$TW_WEAPONS",
+      "keywords": [ "WeapMaterialDraugr", "WeapMaterialDraugrHoned" ]
+    },
+    "$TW_Weapons_Nordic": {
+      "section": "$TW_WEAPONS",
+      "keywords": [ "DLC2WeaponMaterialNordic" ]
+    },
+    "$TW_Weapons_Dwarven": {
+      "section": "$TW_WEAPONS",
+      "keywords": [ "WeapMaterialDwarven" ]
+    },
+    "$TW_Weapons_Elven": {
+      "section": "$TW_WEAPONS",
+      "keywords": [ "WeapMaterialElven" ]
+    },
+    "$TW_Weapons_Orcish": {
+      "section": "$TW_WEAPONS",
+      "keywords": [ "WeapMaterialOrcish" ]
+    },
+    "$TW_Weapons_Falmer": {
+      "section": "$TW_WEAPONS",
+      "keywords": [ "WeapMaterialFalmer", "WeapMaterialFalmerHoned" ]
+    },
+    "$TW_Weapons_Glass": {
+      "section": "$TW_WEAPONS",
+      "keywords": [ "WeapMaterialGlass" ]
+    },
+    "$TW_Weapons_Ebony": {
+      "section": "$TW_WEAPONS",
+      "keywords": [ "WeapMaterialEbony" ]
+    },
+    "$TW_Weapons_Stalhrim": {
+      "section": "$TW_WEAPONS",
+      "keywords": [ "DLC2WeaponMaterialStalhrim" ]
+    },
+    "$TW_Weapons_Dragon": {
+      "section": "$TW_WEAPONS",
+      "keywords": [ "DLC1WeapMaterialDragonbone" ]
+    },
+    "$TW_Weapons_Daedric": {
+      "section": "$TW_WEAPONS",
+      "keywords": [ "WeapMaterialDaedric" ]
+    },
+    "$TW_Weapons_Aetherium": {
+      "section": "$TW_WEAPONS",
+      "keywords": [ "DLC1LD_CraftingMaterialAetherium" ]
+    },
+    "$TW_Armour_Hide": {
+      "section": "$TW_ARMOUR",
+      "keywords": [
+        "ArmorMaterialHide",
+        "ArmorMaterialScaled",
+        "ArmorMaterialStudded",
+        "ArmorMaterialForsworn",
+        "MCE_ArmorMaterialExecutioner",
+        "MCE_ArmorMaterialGiant",
+        "IAKMaterialAdvancedScale"
+      ]
+    },
+    "$TW_Armour_Leather": {
+      "section": "$TW_ARMOUR",
+      "keywords": [ "ArmorMaterialLeather", "IAKMaterialLeather" ]
+    },
+    "$TW_Armour_Iron": {
+      "section": "$TW_ARMOUR",
+      "keywords": [ "ArmorMaterialIron", "ArmorMaterialIronBanded", "IAKMaterialIron" ]
+    },
+    "$TW_Armour_Steel": {
+      "section": "$TW_ARMOUR",
+      "keywords": [
+        "ArmorMaterialSteel",
+        "ArmorMaterialSteelPlate",
+        "MCE_ArmorMaterialTsun",
+        "IAKMaterialSteel",
+        "IAKMaterialSteelChain",
+        "IAKMaterialAdvancedPlate"
+      ]
+    },
+    "$TW_Armour_Imperial": {
+      "section": "$TW_ARMOUR",
+      "keywords": [
+        "ArmorMaterialImperialHeavy",
+        "ArmorMaterialImperialLight",
+        "ArmorMaterialImperialStudded"
+      ]
+    },
+    "$TW_Armour_Guard": {
+      "section": "$TW_ARMOUR",
+      "keywords": [ "ArmorMaterialStormcloak", "WAF_ArmorMaterialGuard" ]
+    },
+    "$TW_Armour_Stormcloak": {
+      "section": "$TW_ARMOUR",
+      "keywords": [ "ArmorMaterialBearStormcloak" ]
+    },
+    "$TW_Armour_Thalmor": {
+      "section": "$TW_ARMOUR",
+      "keywords": [ "WAF_ArmorMaterialThalmor" ]
+    },
+    "$TW_Armour_Blades": {
+      "section": "$TW_ARMOUR",
+      "keywords": [ "ArmorMaterialBlades" ]
+    },
+    "$TW_Armour_Companions": {
+      "section": "$TW_ARMOUR",
+      "keywords": [ "MCE_ArmorMaterialWolf" ]
+    },
+    "$TW_Armour_DarkBrotherhood": {
+      "section": "$TW_ARMOUR",
+      "keywords": [ "ArmorDarkBrotherhood" ]
+    },
+    "$TW_Armour_ThievesGuild": {
+      "section": "$TW_ARMOUR",
+      "keywords": [
+        "ArmorMaterialThievesGuild",
+        "ArmorMaterialThievesGuildLeader",
+        "MCE_ArmorMaterialThievesGuildAlt",
+        "MCE_ArmorMaterialThievesGuildKarliah"
+      ]
+    },
+    "$TW_Armour_Dawnguard": {
+      "section": "$TW_ARMOUR",
+      "keywords": [ "DLC1ArmorMaterialDawnguard" ]
+    },
+    "$TW_Armour_Vampire": {
+      "section": "$TW_ARMOUR",
+      "keywords": [ "DLC1ArmorMaterialVampire" ]
+    },
+    "$TW_Armour_Bonemold": {
+      "section": "$TW_ARMOUR",
+      "keywords": [ "DLC2ArmorMaterialBonemoldHeavy", "DLC2ArmorMaterialBonemoldLight" ]
+    },
+    "$TW_Armour_Chitin": {
+      "section": "$TW_ARMOUR",
+      "keywords": [ "DLC2ArmorMaterialChitinHeavy", "DLC2ArmorMaterialChitinLight", "WAF_MaterialChitin" ]
+    },
+    "$TW_Armour_Nordic": {
+      "section": "$TW_ARMOUR",
+      "keywords": [ "DLC2ArmorMaterialNordicHeavy", "DLC2ArmorMaterialNordicLight" ]
+    },
+    "$TW_Armour_Dwarven": {
+      "section": "$TW_ARMOUR",
+      "keywords": [ "ArmorMaterialDwarven", "IAKMaterialDwarven" ]
+    },
+    "$TW_Armour_Elven": {
+      "section": "$TW_ARMOUR",
+      "keywords": [ "ArmorMaterialElven", "ArmorMaterialElvenGilded", "IAKMaterialElven" ]
+    },
+    "$TW_Armour_Orcish": {
+      "section": "$TW_ARMOUR",
+      "keywords": [ "ArmorMaterialOrcish", "IAKMaterialOrcish" ]
+    },
+    "$TW_Armour_Falmer": {
+      "section": "$TW_ARMOUR",
+      "keywords": [
+        "ArmorMaterialFalmer",
+        "DLC1ArmorMaterielFalmerHeavy",
+        "DLC1ArmorMaterielFalmerHeavyOriginal"
+      ]
+    },
+    "$TW_Armour_Glass": {
+      "section": "$TW_ARMOUR",
+      "keywords": [ "ArmorMaterialGlass", "IAKMaterialGlass" ]
+    },
+    "$TW_Armour_Ebony": {
+      "section": "$TW_ARMOUR",
+      "keywords": [ "ArmorMaterialEbony", "IAKMaterialEbony" ]
+    },
+    "$TW_Armour_Stalhrim": {
+      "section": "$TW_ARMOUR",
+      "keywords": [ "DLC2ArmorMaterialStalhrimHeavy", "DLC2ArmorMaterialStalhrimLight" ]
+    },
+    "$TW_Armour_Dragon": {
+      "section": "$TW_ARMOUR",
+      "keywords": [
+        "ArmorMaterialDragonplate",
+        "ArmorMaterialDragonscale",
+        "IAKMaterialDragonPlate",
+        "IAKMaterialDragonScale"
+      ]
+    },
+    "$TW_Armour_Daedric": {
+      "section": "$TW_ARMOUR",
+      "keywords": [ "ArmorMaterialDaedric", "IAKMaterialDaedric" ]
+    },
+    "$TW_Armour_Aetherium": {
+      "section": "$TW_ARMOUR",
+      "keywords": [ "DLC1LD_CraftingMaterialAetherium" ]
+    }
+  }
+}

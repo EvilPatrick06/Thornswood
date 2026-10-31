@@ -119,7 +119,7 @@ CLEANING
   When this finds something, the cure is in the writer that made the record,
   not in an editor: the plugins are rebuilt by their scripts and an edit by
   hand is lost at the next build. Content: Add-ContentRecords.py. Last:
-  Build-LastPlugin.py. Woodworker trail: Build-WoodworkerTrailOverrides.py.
+  Build-LastPlugin.py.
 """
 
 import argparse
@@ -566,7 +566,7 @@ def load_masters(p, data_dir, read):
             continue
         path = own_plugins.plugin_path(data_dir, m)
         if not os.path.isfile(path):
-            missing.append('%s is not in %s' % (m, data_dir if not own_plugins.is_own(m) else own_plugins.OWN_DIR))
+            missing.append('%s is not in %s' % (m, own_plugins.OWN_DIR if own_plugins.in_repo(m) else data_dir))
             continue
         try:
             read[m.lower()] = Plugin(path, m)

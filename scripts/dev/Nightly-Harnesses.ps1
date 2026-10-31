@@ -32,6 +32,18 @@
   header, with its measured time beside it ("NIGHTLY CLOCK: 600 seconds"),
   and gets that clock instead, never more than 600 (#1273).
 
+  A LONGER CLOCK OFF THE BOX (#4981). A few heavy harnesses take several
+  times as long on One's runners as on the box, and are named in
+  $OFF_BOX_CLOCK below with the clock they get there, never more than 600.
+  test-2914-nexus-scripts.ps1 starts about 390 processes: 37.5 s on the box,
+  122 to 162 s on One's idle runner, and killed at 300 s there on 30 Oct 2026
+  with a build beside it, Defender scanning each process start. A runner is
+  off the box when its name is thornswood-pr-*, the way Run-Gate.ps1 tells
+  them apart: Install-Runner.ps1 -OffBox names One's runners that way, and
+  the box's are thornswood-vps-n. On the box, on GitHub's runner and off a
+  runner every harness keeps its clock as before. The line a harness ends
+  with and the summary say when it had the longer clock, and why.
+
   What a harness leaves running when it ends is killed too, and named.
 
   INSIDE ITS TIME (#2357). The job that runs this has 45 minutes and is
@@ -63,7 +75,7 @@
 
   A SHARE, AND MORE ONLY INTO FREE CORES (#3114, 22 Oct 2026). Up to -Share
   run at once whatever the machine is doing: that is this run's part of the
-  cores beside the other builds the box runs at once. Past it, up to
+  cores beside the other builds the machine runs at once. Past it, up to
   -Throttle, another starts only into a core the machine has free: the
   processor is read every half second, and after each reading no more of
   those start than it had cores idle. So a build alone on the box uses the
@@ -162,6 +174,12 @@ if (-not $OutDir) {
 
 $PER_HARNESS = 300
 $MAX_CLOCK = 600
+# The heavy harnesses and their clock on a runner off the box (#4981), at
+# most $MAX_CLOCK. A harness here keeps its usual clock on the box.
+$OFF_BOX_CLOCK = @{
+    'test-2914-nexus-scripts.ps1' = 600
+}
+$offBox = [string]$env:RUNNER_NAME -like 'thornswood-pr-*'
 function Head-Of($path) {
     $head = [IO.File]::ReadAllText($path)
     if ($head.Length -gt 8000) { $head = $head.Substring(0, 8000) }
@@ -290,6 +308,25 @@ function Idle-Cores($a, $b) {
     [Math]::Floor($cores * (100 - [Math]::Min(100, [Math]::Max(0, $busy))) / 100 + 1e-9)
 }
 
+# One git setting for every git a harness starts, through git's own
+# GIT_CONFIG_COUNT / GIT_CONFIG_KEY_n / GIT_CONFIG_VALUE_n, after the ones
+# already there. Hands back what was there, for Undo-GitSetting.
+function Add-GitSetting([string]$Key, [string]$Value) {
+    $was = $env:GIT_CONFIG_COUNT
+    $n = 0
+    if ($was -match '^\d+$') { $n = [int]$was }
+    [Environment]::SetEnvironmentVariable(('GIT_CONFIG_KEY_' + $n), $Key)
+    [Environment]::SetEnvironmentVariable(('GIT_CONFIG_VALUE_' + $n), $Value)
+    $env:GIT_CONFIG_COUNT = [string]($n + 1)
+    return [pscustomobject]@{ Count = $was; Index = $n }
+}
+function Undo-GitSetting($was) {
+    [Environment]::SetEnvironmentVariable(('GIT_CONFIG_KEY_' + $was.Index), $null)
+    [Environment]::SetEnvironmentVariable(('GIT_CONFIG_VALUE_' + $was.Index), $null)
+    if ($null -eq $was.Count) { Remove-Item Env:\GIT_CONFIG_COUNT -ErrorAction SilentlyContinue }
+    else { $env:GIT_CONFIG_COUNT = $was.Count }
+}
+
 # Start-Process joins -ArgumentList with spaces and quotes nothing, so a path
 # is quoted here. $p.Handle is read at once because without it ExitCode comes
 # back empty once the process is gone.
@@ -300,12 +337,24 @@ function Start-One($t) {
     if ($t.File.Extension -eq '.js') { $exe = 'node'; $argList = @('"' + $t.File.FullName + '"') }
     else { $exe = 'pwsh'; $argList = @('-NoProfile', '-File', ('"' + $t.File.FullName + '"')) }
     if (-not $onWindows) { $env:THORNSWOOD_NIGHTLY_RUN = $mark }
+    # Git's auto maintenance off for the harness and all it starts (#3835).
+    # A commit, fetch, merge or pull starts `git maintenance run --auto`
+    # after it, a process of its own that a scratch clone has no use for.
+    # Counted on the box on 26 Oct 2026: a commit is 3 processes with it and
+    # 2 without, and each process start costs Defender about 4.5 ms of
+    # processor beside its own. Added after any git settings this process
+    # already carries; a harness that sets GIT_CONFIG_COUNT itself replaces
+    # them for its own git.
+    $gitWas = Add-GitSetting 'maintenance.auto' 'false'
     $sw = [Diagnostics.Stopwatch]::StartNew()
     $before = [DateTime]::UtcNow
     try {
         $p = Start-Process -FilePath $exe -ArgumentList $argList -NoNewWindow -PassThru -WorkingDirectory $Root `
                -RedirectStandardInput $nothing -RedirectStandardOutput $o -RedirectStandardError $e
-    } finally { Remove-Item Env:\THORNSWOOD_NIGHTLY_RUN -ErrorAction SilentlyContinue }
+    } finally {
+        Remove-Item Env:\THORNSWOOD_NIGHTLY_RUN -ErrorAction SilentlyContinue
+        Undo-GitSetting $gitWas
+    }
     $null = $p.Handle
     $job = [IntPtr]::Zero
     if ($onWindows) {
@@ -359,7 +408,8 @@ function Finish-One($r, [bool]$timedOut) {
     $code = if ($timedOut) { -1 } else { $p.ExitCode }
     $secs = [Math]::Round($r.Sw.Elapsed.TotalSeconds, 1)
     $said = @()
-    if ($t.Clock -ne $PER_HARNESS) { $said += 'on a ' + $t.Clock + ' s clock it names' }
+    if ($t.OffBox) { $said += 'on a ' + $t.Clock + ' s clock off the box' }
+    elseif ($t.Clock -ne $PER_HARNESS) { $said += 'on a ' + $t.Clock + ' s clock it names' }
     if ($null -ne $cpu) { $said += ('{0}s of processor in {1} process(es)' -f $cpu, $procs) }
     Write-Host ("--- {0}  ({1}s{2})" -f $t.Name, $secs, $(if ($said.Count) { ', ' + ($said -join ', ') } else { '' }))
     $skipped = $false
@@ -403,7 +453,12 @@ if ($Only.Trim()) {
 # nothing else of this run beside it.
 $order = @(foreach ($t in $mine) {
     $head = Head-Of $t.File.FullName
-    [pscustomobject]@{ Name = $t.Name; File = $t.File; Clock = (Clock-Of $head); Alone = (Alone-Of $head) }
+    $clock = Clock-Of $head; $longer = $false
+    if ($offBox -and $OFF_BOX_CLOCK.ContainsKey($t.Name)) {
+        $heavy = [Math]::Min([int]$OFF_BOX_CLOCK[$t.Name], $MAX_CLOCK)
+        if ($heavy -gt $clock) { $clock = $heavy; $longer = $true }
+    }
+    [pscustomobject]@{ Name = $t.Name; File = $t.File; Clock = $clock; OffBox = $longer; Alone = (Alone-Of $head) }
 })
 $order = @(@($order | Where-Object { -not $_.Alone }) + @($order | Where-Object { $_.Alone }))
 if ($Throttle -gt 1) {
@@ -483,6 +538,11 @@ Write-Host ('the machine''s {0} cores while they ran: {1}% busy on average, {2}%
 if ($Throttle -gt 1) {
     $avg = if ($clockAll.Elapsed.TotalSeconds -gt 0) { [Math]::Round($runningTime / $clockAll.Elapsed.TotalSeconds, 1) } else { 0 }
     Write-Host ('at once: {0} on average, {1} at most; {2} always, up to {3} into free cores' -f $avg, $mostAtOnce, $Share, $Throttle)
+}
+$longClock = @($order | Where-Object { $_.OffBox })
+if ($longClock.Count) {
+    Write-Host ('longer clock off the box: {0}; {1} is an off-box runner, where these heavy harnesses run slower than on the box (#4981)' -f
+        ((@($longClock | ForEach-Object { '{0} {1} s' -f $_.Name, $_.Clock })) -join ', '), $env:RUNNER_NAME)
 }
 if ($notRun.Count) {
     Write-Host ''

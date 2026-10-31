@@ -535,6 +535,26 @@ yes('every log the launcher sends is one the site keeps',
 yes('in the same order, so both ends leave out the same ones first',
     JSON.stringify(sends) === JSON.stringify(SLOG_NAMES));
 
+/* #3627: the privacy page named one log, "about the game", while ten files
+   went up at the end of every session. The page now names each file the
+   site keeps, under one heading, and this pins the two lists together both
+   ways: a name added to SLOG_NAMES that the page does not name fails here,
+   and so does a file the page names that nothing sends any more. */
+const PRIVACY = fs.readFileSync(path.join(REPO_DIR, 'site', 'data', 'site', 'privacy.md'), 'utf8').replace(/\r\n/g, '\n');
+const LOGS_HEAD = '**The logs sent when a session ends.**';
+const logsAt = PRIVACY.indexOf(LOGS_HEAD);
+const logsEnd = logsAt < 0 ? -1 : PRIVACY.indexOf('\n**', logsAt + LOGS_HEAD.length);
+const logsPart = logsAt < 0 ? '' : PRIVACY.slice(logsAt, logsEnd < 0 ? PRIVACY.length : logsEnd);
+const named = (logsPart.match(/\*\*[a-z0-9-]+\.(?:log|txt)\*\*/g) || []).map((m) => m.slice(2, -2));
+yes('the privacy page has a part for the logs sent when a session ends', logsPart.length > 0);
+const unnamed = SLOG_NAMES.filter((n) => named.indexOf(n) < 0);
+yes('every file the site keeps is named there (' + (unnamed.join(', ') || 'all named') + ')', logsPart.length > 0 && unnamed.length === 0);
+const unsent = named.filter((n) => SLOG_NAMES.indexOf(n) < 0);
+yes('and the page names no file that is not sent (' + (unsent.join(', ') || 'none') + ')', logsPart.length > 0 && unsent.length === 0);
+const keptFor = /\*\*The logs sent when a session ends\*\*[^\n]*\n(?:  [^\n]*\n)*/.exec(PRIVACY);
+yes('and the page gives those logs their 365 days, and says a kept session keeps them',
+    !!keptFor && /365 days/.test(keptFor[0]) && /kept/.test(keptFor[0]) && SLOG_DAYS === 365);
+
 /* The launcher leaves a log out rather than send a body the site cuts off,
    because a body past the cap is dropped whole, every log in it. */
 const product = s => s.split('*').reduce((a, b) => a * Number(b.trim()), 1);

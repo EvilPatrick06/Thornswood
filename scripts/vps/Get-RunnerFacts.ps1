@@ -82,7 +82,7 @@ function Get-RunnerFacts {
         $root = Split-Path -Parent (Split-Path -Parent $exe)
         $temp = Join-Path $root '_work\_temp'
         $left = @(Get-ChildItem -LiteralPath $temp -Recurse -File -Force -EA SilentlyContinue)
-        $fw = @(Get-NetFirewallRule -EA SilentlyContinue | Where-Object { $_.Owner -eq $sid -or ([string]($_ | Get-NetFirewallSecurityFilter).LocalUser) -match [regex]::Escape($sid) }).Count
+        $fw = @(Get-NetFirewallRule -PolicyStore ActiveStore -EA SilentlyContinue | Where-Object { $_.Owner -eq $sid -or ([string]($_ | Get-NetFirewallSecurityFilter).LocalUser) -match [regex]::Escape($sid) }).Count
         $runners += [ordered]@{
             service = $s.Name; account = $acct; sid = $sid; state = $s.State; groups = $groups
             root = $root; hasCredentials = (Test-Path -LiteralPath (Join-Path $root '.credentials'))

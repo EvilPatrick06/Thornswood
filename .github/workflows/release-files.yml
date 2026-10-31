@@ -1,0 +1,105 @@
+# Puts every file a release names on a GitHub Release of this repository, on
+# the release's own tag (#3686, Patrick's decision of 26 Oct: downloads and
+# updates move to this repository's Releases).
+#
+# WHAT IT DOES. scripts/release/Publish-ReleaseFiles.ps1, from main, for the
+# tag: reads which files the tag names (the record and what it lists, the
+# launcher, the client runtime, the notes, the signed manifest, and on main
+# the installer), fetches each from thornswood.net, checks its sha256, and
+# uploads it to a draft Release named by its sha256, then publishes the
+# Release (dev as a prerelease, main as the latest) once GitHub's own digest
+# of every file is right. The script's header says what it refuses.
+#
+# WHAT LAUNCHERS SEE. Nothing changes for them: every launcher keeps asking
+# thornswood.net/feed[-dev]/assets/<sha256>, and the site answers with a
+# redirect to the Release's copy once GitHub shows it publicly (site/server.js,
+# "release copies"), and with the bytes itself until then.
+#
+# WHEN. A release tag Ship pushes from One starts it (push). A tag a cloud
+# Ship has GitHub make (git-ref.yml) starts no workflow by itself, so
+# git-ref.yml starts this by name after it. By hand, for a release already
+# out (the live main and dev releases, once the repository is public):
+#   gh workflow run release-files.yml --ref main -f tag=release/main/<id>
+#
+# ONLY WHILE THE REPOSITORY IS PUBLIC. A private repository's Release answers
+# 404 to a launcher, and one made now would go public with the repository,
+# with whatever it holds; Patrick flips it public only after #3721's blockers
+# are cleared. So the job is skipped while it is private and costs nothing.
+#
+# WHERE IT RUNS. GitHub's hosted Ubuntu runner, free in a public repository,
+# never a VPS runner: it needs nothing from the box, and only reads the public
+# site. The run's own token (contents: write) is all it uses; no secret.
+#
+# THE DEPLOYMENT. A second job records the release as a GitHub Deployment
+# of this repository, to the Main or Dev environment, once the channel's
+# feed names it (scripts/release/Record-Deployment.ps1; Patrick, 30 Oct 2026:
+# use GitHub's Deployments once public). It runs beside the files job, not
+# after it: the release is live on its feed whether or not its Release is
+# filled yet. Its own token has deployments: write and nothing else.
+#
+# Every action is named by a full length commit SHA with its tag in the
+# comment, for the reason build.yml gives.
+name: Release files
+run-name: Release files for ${{ inputs.tag || github.ref_name }}
+on:
+  push:
+    tags:
+      - 'release/main/*'
+      - 'release/dev/*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'The release tag, release/main/<id> or release/dev/<id>'
+        required: true
+permissions:
+  contents: write
+concurrency:
+  group: release-files-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  files:
+    name: Put the release's files on its Release
+    if: ${{ github.event.repository.private == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Main's script, whatever commit the tag is on: a release's commit can be
+      # older than the script.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      # The tag reaches the script through env, never pasted into its text.
+      - name: Upload and publish
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          & ./scripts/release/Publish-ReleaseFiles.ps1 -Tag $env:RELEASE_TAG
+          exit $LASTEXITCODE
+
+  deployment:
+    name: Record the live release as a Deployment
+    if: ${{ github.event.repository.private == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Record the Deployment
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          LOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          & ./scripts/release/Record-Deployment.ps1 -Tag $env:RELEASE_TAG -LogUrl $env:LOG_URL
+          exit $LASTEXITCODE

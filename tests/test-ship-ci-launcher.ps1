@@ -27,6 +27,14 @@
   over is every byte value with CR, LF and Ctrl-Z among them, so a download
   that went through a text pipe would not come out the same.
 
+  Since 31 Oct (#2841) the files come first from the newest green run of
+  main's release.yml titled for the tag, its artifact "release-files", and
+  the draft only when no run still holds them: GitHub lists a draft only to
+  an account that can push, and the deploy gate's Ship token reads contents
+  and nothing more, so the gate's Ship-Main said there was no launcher for
+  v1.2.12 while its draft held all three files. The fake gh answers the runs,
+  artifacts and zip calls too.
+
   This lifts the functions that do it, Get-SourceRepo, Get-ReleaseLauncher,
   Get-ReleaseStub and the REST helpers they call, out of the shipped Ship.ps1
   by the parser, the way the other ship tests lift their blocks, and drives
@@ -69,7 +77,7 @@ Yes 'Ship.ps1 parses' (@($e).Count -eq 0)
 $FnAst = [System.Management.Automation.Language.FunctionDefinitionAst]
 $fns = @{}
 foreach ($f in $ast.FindAll({ param($n) $n -is $FnAst }, $true)) { $fns[$f.Name] = $f.Extent.Text }
-$lift = 'Get-SourceRepo', 'Get-ReleaseLauncher', 'Get-ReleaseStub', 'ConvertTo-GhArgument', 'Invoke-GhToStream', 'Find-ReleaseByTag', 'Save-ReleaseAssets'
+$lift = 'Get-SourceRepo', 'Get-ReleaseLauncher', 'Get-ReleaseStub', 'ConvertTo-GhArgument', 'Invoke-GhToStream', 'Find-ReleaseByTag', 'Save-ReleaseAssets', 'Save-ReleaseFiles'
 foreach ($n in $lift) { Yes "Ship.ps1 has $n" ($fns.ContainsKey($n)) }
 if (@($lift | Where-Object { -not $fns.ContainsKey($_) }).Count) { Done }
 foreach ($n in $lift) { Invoke-Expression $fns[$n] }
@@ -110,6 +118,12 @@ try {
         [void](Run-Git -C $repoB remote add origin 'git@github.com:Some-Owner/Some-Repo.git')
         Yes "Get-SourceRepo reads owner/name off an ssh origin: '$(Get-SourceRepo $repoB)'" ((Get-SourceRepo $repoB) -eq 'Some-Owner/Some-Repo')
 
+        $repoD = Join-Path $work 'repoD'
+        New-Item -ItemType Directory -Force -Path $repoD | Out-Null
+        [void](Run-Git init -q $repoD)
+        [void](Run-Git -C $repoD remote add origin 'ssh://git@ssh.github.com:443/EvilPatrick06/Thornswood.git')
+        Yes "Get-SourceRepo reads owner/name off the gate's ssh origin on port 443, not the port: '$(Get-SourceRepo $repoD)'" ((Get-SourceRepo $repoD) -eq 'EvilPatrick06/Thornswood')
+
         $repoC = Join-Path $work 'repoC'
         New-Item -ItemType Directory -Force -Path $repoC | Out-Null
         [void](Run-Git init -q $repoC)
@@ -132,7 +146,15 @@ try {
     # older draft for the same tag with wrong hashes, listed first), paged (the
     # draft is on the second page of the list), short (the file comes down
     # shorter than the release lists), dlfail (the list answers, the download
-    # does not).
+    # does not). The runs of release.yml answer with none in those modes, as
+    # for a tag built before #2841; run (a green run for the tag holds the
+    # three files as its artifact, beside an older run and one for another
+    # tag), runexpired (its artifact is past its days), runzipfail (the
+    # artifact is listed and its zip does not come down), runnostub (the
+    # artifact has the launcher and SHA256SUMS only) bend that call.
+    #   api ... repos/<repo>/actions/workflows/release.yml/runs?...   the runs
+    #   api ... repos/<repo>/actions/runs/<id>/artifacts              its files
+    #   api repos/<repo>/actions/artifacts/<id>/zip                   the zip
     $helper = Join-Path $bin 'fake-gh.ps1'
     [IO.File]::WriteAllText($helper, @'
 $mode = $env:TS_FAKE_GH_MODE; if (-not $mode) { $mode = 'good' }
@@ -170,6 +192,40 @@ $list = switch ($mode) {
     default { @((Release 401 'v1.2.3' $mine), $other) }
 }
 $target = [string]$args[$args.Count - 1]
+$runMode = $mode -like 'run*'
+if ($target -match '^repos/[^/]+/[^/]+/actions/workflows/release\.yml/runs\?branch=main&event=workflow_dispatch&status=success&per_page=50$') {
+    $runs = @()
+    if ($runMode) {
+        $runs = @(
+            [ordered]@{ id = 899; display_title = 'Release launcher v1.2.3'; head_branch = 'main'; html_url = 'https://github.com/x/runs/899' },
+            [ordered]@{ id = 901; display_title = 'Release launcher v1.2.4'; head_branch = 'main'; html_url = 'https://github.com/x/runs/901' },
+            [ordered]@{ id = 900; display_title = 'Release launcher v1.2.3'; head_branch = 'main'; html_url = 'https://github.com/x/runs/900' })
+    }
+    Out-Bytes ($utf8.GetBytes((ConvertTo-Json -InputObject ([ordered]@{ total_count = $runs.Count; workflow_runs = @($runs) }) -Depth 5 -Compress)))
+    exit 0
+}
+$m = [regex]::Match($target, '^repos/[^/]+/[^/]+/actions/runs/(\d+)/artifacts$')
+if ($m.Success) {
+    $arts = @()
+    if ($m.Groups[1].Value -eq '900') { $arts = @([ordered]@{ id = 77; name = 'release-files'; expired = ($mode -eq 'runexpired') }) }
+    if ($m.Groups[1].Value -eq '899') { $arts = @([ordered]@{ id = 66; name = 'release-files'; expired = $false }) }
+    Out-Bytes ($utf8.GetBytes((ConvertTo-Json -InputObject ([ordered]@{ total_count = $arts.Count; artifacts = @($arts) }) -Depth 5 -Compress)))
+    exit 0
+}
+$m = [regex]::Match($target, '^repos/[^/]+/[^/]+/actions/artifacts/(\d+)/zip$')
+if ($m.Success) {
+    if ($mode -eq 'runzipfail') { [Console]::Error.WriteLine('HTTP 500: Internal Server Error'); exit 1 }
+    if ($m.Groups[1].Value -ne '77') { [Console]::Error.WriteLine('HTTP 404: Not Found'); exit 1 }
+    Add-Type -AssemblyName System.IO.Compression
+    $ms = New-Object IO.MemoryStream
+    $zip = New-Object IO.Compression.ZipArchive($ms, [IO.Compression.ZipArchiveMode]::Create, $true)
+    $in = [ordered]@{ 'Thornswood.exe' = $exe; 'SHA256SUMS' = (Sums $false ($mode -ne 'runnostub')) }
+    if ($mode -ne 'runnostub') { $in['setup-stub.exe'] = $stub }
+    foreach ($k in $in.Keys) { $en = $zip.CreateEntry($k); $w = $en.Open(); $w.Write($in[$k], 0, $in[$k].Length); $w.Dispose() }
+    $zip.Dispose()
+    Out-Bytes $ms.ToArray()
+    exit 0
+}
 $m = [regex]::Match($target, '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$')
 if ($m.Success) {
     $page = [int]$m.Groups[1].Value
@@ -224,8 +280,9 @@ exit 9
     Yes ("  byte for byte, CR, LF, Ctrl-Z and zero bytes included ({0} of {1} bytes)" -f $got.Length, $exeBytes.Length) (
         $got.Length -eq $exeBytes.Length -and [Convert]::ToBase64String($got) -eq [Convert]::ToBase64String($exeBytes))
     $calls = Calls
-    Yes ("  found through the REST list of releases and downloaded by asset id, nothing else asked of gh: " + ($calls -join '; ')) (
-        $calls.Count -eq 3 -and $calls[0] -match '^gh api .*repos/EvilPatrick06/Thornswood/releases\?per_page=100&page=1$' -and
+    Yes ("  with no release.yml run holding them, found through the REST list of releases and downloaded by asset id, nothing else asked of gh: " + ($calls -join '; ')) (
+        $calls.Count -eq 4 -and $calls[0] -match '^gh api .*repos/EvilPatrick06/Thornswood/actions/workflows/release\.yml/runs\?' -and
+        $calls[1] -match '^gh api .*repos/EvilPatrick06/Thornswood/releases\?per_page=100&page=1$' -and
         @($calls | Where-Object { $_ -match '^gh api -H Accept: application/octet-stream repos/EvilPatrick06/Thornswood/releases/assets/(11|13)$' }).Count -eq 2)
     Yes '  and nothing in this folder is left beside them' (@(Get-ChildItem -LiteralPath $into -File | Where-Object { $_.Name -notin 'Thornswood.exe', 'SHA256SUMS' }).Count -eq 0)
 
@@ -284,6 +341,33 @@ exit 9
     $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
     Yes "a download gh could not make is refused with what gh said: '$why'" ($why -match 'could not download Thornswood\.exe' -and $why -match 'HTTP 502' -and $why -notmatch 'There is no verified launcher')
 
+    # 4f. A green release.yml run for the tag holds the files (#2841): they
+    # come from its artifact, the newest run's, and the draft is not asked.
+    Remove-Item -LiteralPath $ghLog -Force -ErrorAction SilentlyContinue
+    $env:TS_FAKE_GH_MODE = 'run'
+    $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
+    Yes "the files of the newest green release.yml run for the tag verify: '$why'" ($why -eq '')
+    $got = if (Test-Path -LiteralPath (Join-Path $into 'Thornswood.exe')) { [IO.File]::ReadAllBytes((Join-Path $into 'Thornswood.exe')) } else { @() }
+    Yes '  byte for byte, out of the zip' ($got.Length -eq $exeBytes.Length -and [Convert]::ToBase64String($got) -eq [Convert]::ToBase64String($exeBytes))
+    $calls = Calls
+    Yes ("  run 900's artifact 77, not the older run's, and no draft asked for: " + ($calls -join '; ')) (
+        @($calls | Where-Object { $_ -match 'actions/runs/900/artifacts$' }).Count -eq 1 -and @($calls | Where-Object { $_ -match 'actions/artifacts/77/zip$' }).Count -eq 1 -and
+        @($calls | Where-Object { $_ -match 'runs/899|artifacts/66|/releases' }).Count -eq 0)
+    Yes '  and nothing but the two files is left in the folder' (@(Get-ChildItem -LiteralPath $into -Force | Where-Object { $_.Name -notin 'Thornswood.exe', 'SHA256SUMS' }).Count -eq 0)
+
+    # 4g. Its artifact past its days: the draft, as before.
+    Remove-Item -LiteralPath $ghLog -Force -ErrorAction SilentlyContinue
+    $env:TS_FAKE_GH_MODE = 'runexpired'
+    $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
+    Yes "an expired artifact falls to the draft, which verifies: '$why'" ($why -eq '' -and @(Calls | Where-Object { $_ -match 'actions/artifacts/77/zip$' }).Count -eq 0 -and @(Calls | Where-Object { $_ -match '/releases\?per_page' }).Count -eq 1)
+
+    # 4h. The artifact is listed and does not come down: said as that, with
+    # what gh said, and not as "no launcher".
+    $env:TS_FAKE_GH_MODE = 'runzipfail'
+    $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
+    Yes "a zip gh could not download is refused with what gh said: '$why'" ($why -match 'could not download the files of release\.yml run 900' -and $why -match 'HTTP 500' -and $why -notmatch 'There is no verified launcher' -and $why -match 'Nothing was published')
+    Yes '  and nothing half written is left' (@(Get-ChildItem -LiteralPath $into -Force).Count -eq 0)
+
     # ---- Get-ReleaseStub (issue #932) ---------------------------------------------
     $stubInto = Join-Path $work 'stub'
 
@@ -315,6 +399,16 @@ exit 9
     $why = Get-ReleaseStub 'EvilPatrick06/Thornswood' '1.2.3' $stubInto
     Yes 'no release at all stops it too' ($why -match 'no setup program')
 
+    # 8a. The setup program from the run's artifact (#2841), and a run whose
+    # artifact has none falls to the draft, which has it.
+    $env:TS_FAKE_GH_MODE = 'run'
+    $why = Get-ReleaseStub 'EvilPatrick06/Thornswood' '1.2.3' $stubInto
+    Yes "the setup program from the release.yml run verifies: '$why'" ($why -eq '' -and [IO.File]::ReadAllText((Join-Path $stubInto 'setup-stub.exe')) -eq 'the setup program CI built for this tag')
+    Remove-Item -LiteralPath $ghLog -Force -ErrorAction SilentlyContinue
+    $env:TS_FAKE_GH_MODE = 'runnostub'
+    $why = Get-ReleaseStub 'EvilPatrick06/Thornswood' '1.2.3' $stubInto
+    Yes "a run whose files have no setup program falls to the draft: '$why'" ($why -eq '' -and @(Calls | Where-Object { $_ -match '/releases\?per_page' }).Count -eq 1)
+
     # 9. GitHub refusing gh is said as that here too, not as a missing stub.
     $env:TS_FAKE_GH_MODE = 'fail'
     $why = Get-ReleaseStub 'EvilPatrick06/Thornswood' '1.2.3' $stubInto
@@ -333,6 +427,15 @@ $rel = [IO.File]::ReadAllText((Join-Path $repoRoot '.github/workflows/release.ym
 Yes 'release.yml stops when the build made no setup-stub.exe' ($rel -match [regex]::Escape("if (-not (Test-Path 'out\setup-stub.exe'))"))
 Yes '  lists it in SHA256SUMS beside the launcher' ($rel -match [regex]::Escape("foreach (`$n in 'Thornswood.exe', 'setup-stub.exe')"))
 Yes '  and attaches it to the draft' ($rel -match [regex]::Escape('foreach ($asset in @($exe, $stub, $sums))'))
+# #2841: the same folder as the run's artifact, under the name Ship reads.
+Yes '  and keeps the same folder as the run''s artifact release-files, which Ship reads (#2841)' (
+    $rel -match '(?s)uses: actions/upload-artifact@[0-9a-f]{40} # v\d+\s+with:\s+name: release-files\s+path: \$\{\{ runner\.temp \}\}/release/' -and
+    $src -match [regex]::Escape("[string]`$a.name -ceq 'release-files'"))
+# 31 Oct: dev 20261031-051138-dev put main's 1.2.11 exe under 1.2.12. A Ship
+# from the feed takes main's exe only when it is main's own launcher.
+Yes 'a dev Ship from the feed takes main''s exe only for main''s own launcher, not for main''s number alone' (
+    $src -match [regex]::Escape("if (`$MainsOwnLauncher) {") + '\s+Head "Main''s launcher, from main''s feed"' -and
+    $src -notmatch [regex]::Escape("if (`$MainEquivalent) {") + '\s+Head "Main''s launcher, from main''s feed"')
 Yes 'Ship fetches it for a main -Package, before the build and the publish' ($src -match '(?s)if \(\$Package -and -not \$Dev -and -not \$DryRun\) \{.*?Get-ReleaseStub.*?# -+ build')
 Yes '  and hands it to Package-Thornswood as -Stub' ($src -match [regex]::Escape("if (`$ciStub) { `$pkgArgs['Stub'] = `$ciStub }") -and $src -match [regex]::Escape("& (Join-Path `$Here 'Package-Thornswood.ps1') @pkgArgs"))
 # Issue #1213: the site carries the one file build, so -Package asks for it,

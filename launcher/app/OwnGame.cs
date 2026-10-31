@@ -19,7 +19,7 @@ namespace Thornswood
     /// Until 17 September three roleplay servers all ran out of the one
     /// Steam copy of Skyrim. Every launcher wrote its own client into it, every
     /// Vortex profile switch took the other collection out of it, and on 16 Sep
-    /// that was a another server session drawing Thornswood's menu, a Daedric menu
+    /// that was another server's session drawing Thornswood's menu, a Daedric menu
     /// behind every server, and a Thornswood launcher that thought its mods were
     /// gone whenever Vortex had another profile on. With a folder of its own,
     /// Thornswood starts from Root\Game, the other servers start from theirs,
@@ -1001,10 +1001,15 @@ namespace Thornswood
         ///    Images\speaking.png and the ChainLink, NoticeIcon and VoiceIcon
         ///    sprite fonts) are left out, so a refresh cannot copy them back
         ///    after a pack deletes them. See Foreign, issue #2177.
+        /// 18: the two commercial sprite fonts (Fonts\DIN-Pro-bold and
+        ///    Fonts\Futura) are left out, so a refresh cannot copy them back
+        ///    after a pack deletes them, and so are the four Futura PT and
+        ///    DIN Pro faces under UI that records\ui-gone.json now lists.
+        ///    See Foreign, issue #1317.
         ///
         /// Every number from 14 on also gets a line in RuleTouches below.
         /// </summary>
-        const int Rules = 17;
+        const int Rules = 18;
 
         /// <summary>
         /// What each rule from 14 on can decide differently, as the start of
@@ -1027,6 +1032,7 @@ namespace Thornswood
             { 15, new string[] { "Data\\Platform\\UI\\" } },
             { 16, new string[] { "Data\\Platform\\UI\\" } },
             { 17, new string[] { "Data\\Platform\\Images\\", "Data\\Platform\\Fonts\\" } },
+            { 18, new string[] { "Data\\Platform\\Fonts\\", "Data\\Platform\\UI\\" } },
         };
 
         /// <summary>
@@ -2499,7 +2505,7 @@ namespace Thornswood
         /// <summary>
         /// The SkyMP client runtime Thornswood ships: the six files the fork
         /// builds that differ from upstream, put into the game folder by
-        /// tools\Sync-Client.ps1 against tools\client-build.json. They are
+        /// scripts\release\Sync-Client.ps1 against records\client-build.json. They are
         /// never taken from the Steam copy, because until 20 September the Steam
         /// copy held another server's launcher's builds of every one of them
         /// and this class copied them across on every rebuild.
@@ -2522,7 +2528,7 @@ namespace Thornswood
 
         /// <summary>
         /// Not one of ours, by what belongs rather than by whose it is. The
-        /// same shape as Test-ShipOtherServer in tools\Ship-Rules.ps1; change
+        /// same shape as Test-ShipOtherServer in scripts\release\Ship-Rules.ps1; change
         /// both together. Nothing here names another server: the list is what
         /// Thornswood's folder holds, and anything else in these places is
         /// left out whoever wrote it.
@@ -2626,6 +2632,13 @@ namespace Thornswood
             // ones back in. Ship-Rules.ps1 carries the same five
             // ($ShipPlatformUnused); change the two together.
             if (Regex.IsMatch(rel, @"^Data\\Platform\\(Images\\(lock|speaking)\.png|Fonts\\(ChainLink|NoticeIcon|VoiceIcon)\.spritefont)$", I)) return true;
+            // Two sprite fonts of commercial faces, issue #1317: DIN-Pro-bold
+            // (FSI FontShop's DIN Pro Bold) and Futura (ParaType's Futura PT),
+            // which nothing gives Thornswood the right to hand on. The voice
+            // mark draws in Barlow-SemiBold since. Packs delete them, and this
+            // keeps a refresh from copying a Steam copy's back in. Ship-Rules.ps1
+            // carries the same two ($ShipCommercialFonts); change the two together.
+            if (Regex.IsMatch(rel, @"^Data\\Platform\\Fonts\\(DIN-Pro-bold|Futura)\.spritefont$", I)) return true;
             // The bundle is on ClientFiles and answered above in WhyLeft, so
             // here it is simply not ours to take from the Steam copy either.
             if (Regex.IsMatch(rel, @"^Data\\Platform\\Plugins\\[^\\]+\.js$", I))
@@ -3387,8 +3400,7 @@ namespace Thornswood
         /// mod's folder in Vortex's mods folder, and that folder carries the
         /// mod's name. Null when there is no record or it does not list the
         /// plugin. Scan and Fix name it for another author's plugin whose
-        /// bytes are not the server's, which the server does not hand out
-        /// (#1180).
+        /// bytes are not the server's, which Fix has no copy of (#1180).
         /// </summary>
         public static string VortexModOf(Config cfg, string plugin)
         {
@@ -3556,7 +3568,7 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Files a Thornswood update, the installer or Build-Generated put into
+        /// Files a Thornswood update, the installer or GeneratedBuild put into
         /// the game, which a refresh leaves as they are. What the installer laid
         /// down that Vortex also deploys stays Vortex's, so collection updates
         /// still reach it.

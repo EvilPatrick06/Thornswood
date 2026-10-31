@@ -10,7 +10,8 @@
 # the live server's folders (records\runner-isolation.json, #2161).
 #
 # How. Dispatch it on main, or on a branch to try that branch's harnesses,
-# with the names as the nightly prints them, split by spaces or commas:
+# with the names as the nightly prints them, split by spaces or commas. It
+# runs on the build runners, which never sign (#3550):
 #
 #   gh workflow run harnesses.yml --ref main -f harnesses='test-deploy-swaps.ps1 voice/test-most.js'
 #
@@ -43,7 +44,12 @@ permissions:
 jobs:
   harnesses:
     name: Named harnesses
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    # On a build runner (records\build-runners.json), never on any VPS runner
+    # (#3550): this runs a branch's harnesses, and runner 3, which takes any
+    # job asking for thornswood-vps alone, signs the release launchers. Nine
+    # runs of claude/* branches landed there from 22 to 26 Oct. A share of
+    # harnesses, or the whole gate, is a build runner's kind of work anyway.
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps", "thornswood-build"]') || 'windows-latest' }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

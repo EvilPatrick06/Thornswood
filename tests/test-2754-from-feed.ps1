@@ -129,6 +129,8 @@ try {
     Yes 'nothing differs: the check holds' (@(Get-ShipSkyUIFeedChange $g $record @()).Count -eq 0)
     Put (Join-Path $g 'Data\Platform\Plugins\chat.js') 'changed, and not SkyUI''s'
     Yes '  a change outside Scripts, Interface and the archives does not count' (@(Get-ShipSkyUIFeedChange $g $record @()).Count -eq 0)
+    Put (Join-Path $g 'Data\Interface\Translations\Thornswood-Content_ENGLISH.txt') 'a string table the check never opens'
+    Yes '  nor a file under Interface that is not a menu, such as a string table' (@(Get-ShipSkyUIFeedChange $g $record @()).Count -eq 0)
     Put (Join-Path $g 'Data\Scripts\ski_main.pex') 'another script'
     $c = @(Get-ShipSkyUIFeedChange $g $record @())
     Yes 'a changed script is named' (($c -join '|') -eq 'Data\Scripts\ski_main.pex')
@@ -388,8 +390,11 @@ try {
                 return ('[{"databaseId":7,"displayTitle":"tag v1.2.6.7","headBranch":"main","status":"' + $script:lstate.TagStatus + '","conclusion":"' + $script:lstate.TagRun + '","url":"https://github.com/x/runs/7","createdAt":"' + $when + '"}]')
             }
             if (-not $script:lstate.Runs) { return '[]' }
-            return ('[{"databaseId":9,"displayTitle":"Release launcher","headBranch":"v1.2.6.7","status":"' + $script:lstate.Status + '","conclusion":"' + $script:lstate.Conclusion + '","url":"https://github.com/x/runs/9","createdAt":"' + $when + '"},' +
-                    '{"databaseId":8,"displayTitle":"Release launcher","headBranch":"v1.2.6.6","status":"completed","conclusion":"success","url":"x","createdAt":"' + $when + '"}]')
+            # Main's run for the tag (#3930), an older tag's on main, and a
+            # newer manual run on the tag's own ref, which signs nothing.
+            return ('[{"databaseId":9,"displayTitle":"Release launcher v1.2.6.7","headBranch":"main","status":"' + $script:lstate.Status + '","conclusion":"' + $script:lstate.Conclusion + '","url":"https://github.com/x/runs/9","createdAt":"' + $when + '"},' +
+                    '{"databaseId":8,"displayTitle":"Release launcher v1.2.6.6","headBranch":"main","status":"completed","conclusion":"success","url":"x","createdAt":"' + $when + '"},' +
+                    '{"databaseId":10,"displayTitle":"Release launcher v1.2.6.7","headBranch":"v1.2.6.7","status":"completed","conclusion":"success","url":"https://github.com/x/runs/10","createdAt":"' + $when + '"}]')
         }
         throw "gh was asked something unexpected: $($args -join ' ')"
     }
@@ -402,15 +407,16 @@ try {
     $script:lstate.Conclusion = 'failure'
     $why = AskNow
     Yes 'a red release.yml run: refused, with the run' ($why -match 'ended failure' -and $why -match 'runs/9')
+    Yes '  and a green run on the tag''s own ref, which signs nothing, is not taken instead (#3930)' ($why -notmatch 'runs/10')
     $script:lstate.Conclusion = 'success'; $script:lstate.Runs = $false; $script:lstate.TagRun = 'failure'
     $why = AskNow
     Yes 'a red release-tag.yml run (a tag on another commit): refused, with that run' ($why -match 'release-tag\.yml ended failure' -and $why -match 'runs/7')
     $script:lstate.TagRun = 'success'
     $why = AskNow
-    Yes 'no release.yml run on the tag: refused when the wait is up' ($why -match 'no release\.yml run started on v1\.2\.6\.7')
+    Yes 'no release.yml run on the tag: refused when the wait is up' ($why -match 'no release\.yml run on main started for v1\.2\.6\.7')
     $script:lstate.Runs = $true; $script:lstate.Old = $true
     $why = AskNow
-    Yes '  and a run from before the ask is not taken for it' ($why -match 'no release\.yml run started')
+    Yes '  and a run from before the ask is not taken for it' ($why -match 'no release\.yml run on main started')
     $script:lstate.Old = $false; $script:lstate.Status = 'in_progress'
     $why = AskNow
     Yes 'a run still going when the wait is up: refused' ($why -match 'still in_progress')

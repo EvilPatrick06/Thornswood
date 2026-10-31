@@ -34,7 +34,15 @@ been asked of Discord:
      channels are made, #welcome-travelers gets the bot's Attach Files
      overwrite, and nothing else is asked of Discord: no role made or moved,
      no other channel written, no server setting, no post, no webhook;
-  5. a name the plan does not have stops it before Discord is asked.
+  5. a name the plan does not have stops it before Discord is asked;
+  6. DISCORD_ONLY='lore,factions' with -Posts (#3656: the run of 27 Oct
+     said "made 0, already there 127" and wrote nothing, because ONLY
+     stopped before the post step): exactly those two posts are written,
+     each with its Changelog thread, and nothing else is asked of Discord;
+     a named channel's post links the live channels it mentions; without
+     -Posts both are left alone; with -Check it says would write for those
+     two and asks for nothing; a named draft is never written; and a whole
+     -Posts run still writes every post that is not a draft.
 
 Never connects to anything. The news webhook file goes to a temporary folder.
 """
@@ -45,6 +53,7 @@ import importlib.util
 import io
 import itertools
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -483,6 +492,79 @@ try:
     yes('ONLY with -Check asks Discord for nothing, and names the category, its channels and the overwrite',
         g.calls == [] and 'category Gamemasters' in out and
         '#welcome-travelers gets the overwrites of its mode' in out)
+
+    # ---- 6. ONLY with -Posts (#3656) ------------------------------------
+    # post() and keep_changelog() are the build's own, and their work on a
+    # channel is bot/test-3336-changelogs.py's. Here they are recorders, so
+    # this sees which channels a run writes and with what.
+    wrote, threads = [], []
+    real_post, real_changelog = B.post, B.keep_changelog
+
+    async def record_post(ch, text, found):
+        wrote.append((getattr(ch, 'name', None), text, dict(found)))
+
+    async def record_changelog(ch, key):
+        threads.append(getattr(ch, 'name', None))
+        return None
+    B.post, B.keep_changelog = record_post, record_changelog
+    try:
+        def written(g, **kw):
+            del wrote[:]
+            del threads[:]
+            return run(g, **kw)
+
+        g = live_server()
+        roles_before = [(r.name, r.position) for r in g.roles]
+        out = written(g, only='lore,factions', posts=True)
+        yes('ONLY lore,factions with -Posts writes exactly #lore and #factions',
+            [w[0] for w in wrote] == ['lore', 'factions'])
+        yes('  each from its own words in content.py, with its change line',
+            [w[1] for w in wrote] == [B.doc_with_footer('LORE'), B.doc_with_footer('FACTIONS')])
+        yes('  each after its Changelog thread', threads == ['lore', 'factions'])
+        yes('  makes, moves and rewrites nothing else: no role, channel, setting, webhook or delete',
+            g.calls == [] and [(r.name, r.position) for r in g.roles] == roles_before
+            and not os.path.exists(B.WEBHOOK_OUT))
+        yes('  and says what it was limited to and that it made nothing',
+            'lore, factions. Nothing else was touched' in out and 'made 0' in out)
+
+        g = live_server()
+        out = written(g, only='rules', posts=True)
+        links = wrote[0][2] if wrote else {}
+        named = dict((s['key'], s['name']) for _c, ss in B.PLAN for s in ss if s.get('key'))
+        said = sorted(set(re.findall(r'<#([A-Z]+)>', B.C.DOCS['RULES'])))
+        yes('a named channel\'s post links the live channels it mentions, not only the named one (%s)'
+            % ', '.join(said),
+            [w[0] for w in wrote] == ['rules'] and len(said) > 0 and
+            all(getattr(links.get(k), 'name', None) == named[k] for k in said)
+            and g.calls == [])
+
+        g = live_server()
+        out = written(g, only='lore,factions')
+        yes('ONLY lore,factions without -Posts writes no post and says both are left alone',
+            wrote == [] and threads == [] and '2 read only post(s). -Posts rewrites them.' in out
+            and g.calls == [])
+
+        g = live_server()
+        out = written(g, check=True, only='lore,factions', posts=True)
+        yes('ONLY lore,factions with -Posts and -Check asks Discord for nothing',
+            g.calls == [] and wrote == [] and threads == [])
+        yes('  and says it would write those two and no other',
+            out.count('would write') == 2 and '#lore and its changelog' in out
+            and '#factions and its changelog' in out)
+
+        g = live_server()
+        out = written(g, only='playtester-rules', posts=True)
+        yes('a named channel whose words are a draft is never written',
+            wrote == [] and 'its words are a draft waiting on approval' in out)
+
+        g = live_server()
+        out = written(g, posts=True)
+        live = [s['name'] for _c, ss in B.PLAN for s in ss
+                if s.get('post') and s['key'] not in B.C.DRAFTS]
+        yes('a whole -Posts run still writes every post that is not a draft (%d)' % len(live),
+            sorted(w[0] for w in wrote) == sorted(live) and len(live) > 2)
+    finally:
+        B.post, B.keep_changelog = real_post, real_changelog
 
     # ---- 5. a name the plan does not have -------------------------------
     try:

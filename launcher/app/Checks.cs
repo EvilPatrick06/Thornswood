@@ -227,6 +227,34 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// The address every collection button opens (#4115): the page of the
+        /// revision the server was built against, .../collections/7essxf/revisions/2.
+        ///
+        /// The buttons used to open the collection's own page, which names no
+        /// revision, so Nexus showed its newest and Vortex installed that. On
+        /// 30 October Nexus was on revision 5 and both feeds on 2, so following
+        /// the "your mods need updating" card, or installing fresh, took a copy
+        /// straight past the server and Play shut again on the ahead card.
+        /// Nexus keeps every published revision on a page of its own, and
+        /// Vortex installs the one on the page it is opened from.
+        ///
+        /// No revision known (0, the feed not read yet) or an address that is
+        /// not a collection's: the address as it is, the only page there is.
+        /// </summary>
+        public static string CollectionRevisionUrl(Config cfg, int revision)
+        {
+            string url = cfg == null ? "" : (cfg.CollectionUrl ?? "");
+            try
+            {
+                string slug = CollectionSlug(cfg);
+                if (revision <= 0 || slug.Length == 0) return url;
+                int at = url.LastIndexOf("/collections/", StringComparison.OrdinalIgnoreCase);
+                return url.Substring(0, at + "/collections/".Length) + slug + "/revisions/" + revision;
+            }
+            catch { return url; }
+        }
+
+        /// <summary>
         /// At or below this many enabled plugins the collection counts as not
         /// installed. Two things on screen ask it: the Mods row on the checks
         /// list and the "not installed yet" card above Play, which is
@@ -350,7 +378,7 @@ namespace Thornswood
         /// two are the record. Keeping NirnLab out of Thornswood's own folder
         /// is OwnGame.Foreign's job: it leaves out Data\NirnLabUIPlatform and
         /// NirnLabUIPlugin.dll when the folder is built, the same rule as
-        /// Test-ShipOtherServer in tools\Ship-Rules.ps1.
+        /// Test-ShipOtherServer in scripts\release\Ship-Rules.ps1.
         // Empty since 20 September. It held the file names of another
         // server's client probe, and Thornswood no longer looks for other
         // servers' files at all: its own folder is built from what belongs,
@@ -410,146 +438,41 @@ namespace Thornswood
             return found.ToArray();
         }
 
-        /// <summary>
-        /// Plugins that have to carry the ESL flag for the load order to line up
-        /// with the server's.
-        ///
-        /// SkyMP resolves a form as fileIdx * 0x01000000 + shortFormId, with
-        /// fileIdx the plugin's position in the server's list, and the client
-        /// counts its own with Game.GetModCount, which skips every light plugin.
-        /// The server leaves light plugins out for the same reason, and it also
-        /// has to leave out anything that masters to one, because libespm will
-        /// not load a plugin whose master is absent.
-        ///
-        /// MCMHelper.esp masters to SkyUI_SE.esp, which is light, so the server
-        /// drops it. MCM Helper ships two copies of that plugin in its archive,
-        /// identical to the byte apart from this one flag, and the collection
-        /// installs the one without it. The game hands that one an index, the
-        /// server has no such entry, and from that position on every plugin on
-        /// the client is one place away from the server's copy. On 2026-09-16
-        /// that was the whole of "connects, then sits on the main menu".
-        ///
-        /// The file is 100 bytes and holds no records, so flagging it costs
-        /// nothing and the mod keeps working. This is what the author's own ESL
-        /// variant is.
-        ///
-        /// HOTHTROOPER44_ARMOR_ECKSSTRA.ESP IS THE SAME CASE, found on
-        /// 2026-09-24 from Djinn's dev build: "Your load order is not the
-        /// server's from position 52: you have Hothtrooper44_Armor_Ecksstra.esp
-        /// there, the server has SkyHUD.esp", with Fix, a Vortex purge and a
-        /// redeploy all failing to clear it. Measured: the Nexus archive of
-        /// Immersive Armors, Script Free and Skypatched 1.3.0, ships this file
-        /// light (171 bytes, flags 0x200), and so does the machine the server's
-        /// order is built from, so the server leaves it out and counts SkyHUD at
-        /// 52. A copy without the flag gets an index of its own and pushes every
-        /// plugin after it one place along. Fix only reorders the list, so it
-        /// could never clear it; flagging it is what this list is for.
-        ///
-        /// This is now the HAND FALLBACK, not the whole answer. Verify.MustBeLight
-        /// derives the real set from the server: any plugin the collection
-        /// reference (Paths.Golden) enables that the server leaves out of its
-        /// manifest is one the server counts as light, so this machine must too.
-        /// That catches the next plugin that ships light on the server but not on
-        /// a tester's disk without a name being added here. This list is folded
-        /// into that set, so the two cases below are still caught when the server
-        /// cannot be asked and there is no manifest to derive from.
-        /// </summary>
-        public static readonly string[] MustBeLight = {
-            "MCMHelper.esp",
-            "Hothtrooper44_Armor_Ecksstra.esp",
-        };
-
+        // The ESL flag in a plugin's header. The launcher only reads it: which
+        // plugins are light is the collection's to install (#2979), and a copy
+        // whose flag is not the server's is Vortex's to put right (#3022).
         const uint LightFlag = 0x200;
 
-        /// <summary>True when the TES4 header carries the ESL flag. A file that
-        /// cannot be read answers true, so nothing is reported for it.</summary>
-        static bool IsLight(string path)
+        /// <summary>The ESL flag in the TES4 header, or null when the file is
+        /// not there, is not a plugin or cannot be read.</summary>
+        static bool? HeaderLight(string path)
         {
             try
             {
                 using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 {
                     var b = new byte[12];
-                    if (fs.Read(b, 0, 12) < 12) return true;
-                    if (b[0] != (byte)'T' || b[1] != (byte)'E' || b[2] != (byte)'S' || b[3] != (byte)'4') return true;
+                    if (fs.Read(b, 0, 12) < 12) return null;
+                    if (b[0] != (byte)'T' || b[1] != (byte)'E' || b[2] != (byte)'S' || b[3] != (byte)'4') return null;
                     uint flags = BitConverter.ToUInt32(b, 8);
                     return (flags & LightFlag) != 0;
                 }
             }
-            catch { return true; }
+            catch { return null; }
         }
 
-        /// <summary>The plugins in the hand list that are present and not yet light.</summary>
-        public static List<string> NotLight() { return NotLight(MustBeLight); }
-
-        /// <summary>
-        /// The plugins in <paramref name="mustBeLight"/> that are in Data and do
-        /// not yet carry the ESL flag. The set is the server's to decide:
-        /// Verify.MustBeLight works it out from the plugins the collection
-        /// reference enables that the server leaves out of its manifest, folding
-        /// the hand list above in for when the server cannot be asked. A file
-        /// that cannot be read, or is not there, is left alone.
-        /// </summary>
-        public static List<string> NotLight(IEnumerable<string> mustBeLight)
+        /// <summary>True when the TES4 header carries the ESL flag. A file that
+        /// cannot be read answers true, so nothing is reported for it.</summary>
+        static bool IsLight(string path)
         {
-            var l = new List<string>();
-            if (mustBeLight == null) return l;
-            string data = Path.Combine(Paths.Game, "Data");
-            foreach (string n in mustBeLight)
-            {
-                if (string.IsNullOrEmpty(n)) continue;
-                if (l.Contains(n)) continue;
-                string p = Path.Combine(data, n);
-                try { if (File.Exists(p) && !IsLight(p)) l.Add(n); } catch (Exception ex) { Swallow.Note("Checks.NotLight", ex); }
-            }
-            return l;
+            return HeaderLight(path) ?? true;
         }
 
-        /// <summary>
-        /// Sets the ESL flag on each plugin in the hand list that lacks it. The
-        /// server-derived overload below is what Fix calls; this stays for a
-        /// caller with no Config to hand and for the fallback list.
-        /// </summary>
-        public static int FlagLight(Action<string> say) { return FlagLight(MustBeLight, say); }
-
-        /// <summary>
-        /// Sets the ESL flag on each plugin in <paramref name="mustBeLight"/>
-        /// that lacks it. One byte, in place, so a Vortex hard link stays a hard
-        /// link and the staging copy is corrected with it. Returns how many were
-        /// changed.
-        /// </summary>
-        public static int FlagLight(IEnumerable<string> mustBeLight, Action<string> say)
+        /// <summary>The ESL flag of a plugin in Data, or null when it cannot be
+        /// read, so a file open elsewhere is never reported either way.</summary>
+        public static bool? FlaggedLight(string name)
         {
-            int n = 0;
-            string data = Path.Combine(Paths.Game, "Data");
-            foreach (string name in NotLight(mustBeLight))
-            {
-                string p = Path.Combine(data, name);
-                try
-                {
-                    // In Thornswood's own folder the plugin is a link to Vortex's
-                    // copy, which every other server's folder may link too.
-                    // Flagging it there would flag it for all of them.
-                    OwnGame.Separate(p);
-                    try { File.SetAttributes(p, FileAttributes.Normal); } catch (Exception ex) { Swallow.Note("Checks.FlagLight, attributes", ex); }
-                    using (var fs = new FileStream(p, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite))
-                    {
-                        var b = new byte[4];
-                        fs.Seek(8, SeekOrigin.Begin);
-                        if (fs.Read(b, 0, 4) < 4) continue;
-                        uint flags = BitConverter.ToUInt32(b, 0) | LightFlag;
-                        fs.Seek(8, SeekOrigin.Begin);
-                        fs.Write(BitConverter.GetBytes(flags), 0, 4);
-                    }
-                    n++;
-                    if (say != null) say(name + " is now flagged light, so your load order counts the same way the server's does.");
-                }
-                catch (Exception ex)
-                {
-                    if (say != null) say("Could not flag " + name + " light: " + ex.Message + "  Close Skyrim and Vortex and try again.");
-                }
-            }
-            return n;
+            return HeaderLight(Path.Combine(Paths.Game, "Data", name));
         }
 
         /// <summary>
@@ -652,7 +575,7 @@ namespace Thornswood
         /// five masters, whatever plugins.txt says. So they are in no plugin
         /// list and every other row of the scan passes them.
         ///
-        /// Measured on 19 Sep. another server's launcher put the free ones back
+        /// Measured on 19 Sep. Another server's launcher put the free ones back
         /// into Data, Thornswood's folder took them in, and the game loaded two
         /// full masters the server does not have. Every plugin after
         /// Dragonborn.esm was two places off, the game showed LOAD ORDER ERROR,

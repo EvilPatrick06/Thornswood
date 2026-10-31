@@ -2,7 +2,7 @@
 
 New original mine and kill contracts appear at one retained specialist each.
 The same trade in another hold does not repeat the offer. The appointed
-references below belong to the existing60-specialist roster; none moves or
+references below belong to the existing 60-specialist roster; none moves or
 adds an NPC. This changes neither rewards, resource draws, rank/tool rules,
 personal rests nor target lives and returns.
 
@@ -34,5 +34,5 @@ exact roster/role bindings.
 
 The six other scarce resources and seven retrievals remain unbound in this
 section. Their interaction, source and dedicated-item work must be completed
-separately before activation. The241 parcel commissions and four expanded
+separately before activation. The 241 parcel commissions and four expanded
 combat offers retain their immutable appointed references and terms.

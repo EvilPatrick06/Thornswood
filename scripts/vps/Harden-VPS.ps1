@@ -29,10 +29,12 @@
        Disabled. Then telemetry off: DiskSnapshot.exe's, CompatTelRunner.exe's
        and the Customer Experience Improvement Program's tasks set to
        Disabled, and AllowTelemetry 0. Then Windows Update, which stays on,
-       installs every day at 4 AM box time, never restarts the box for an
-       update between 6 AM and midnight, and its automatic maintenance
-       starts at 4 AM, after the 2:15 AM backup and the nightly checks
-       (Patrick, 22 Oct 2026, #3213). Then PasswordAuthentication
+       installs every day at 4 AM box time, restarts the box 15 minutes
+       after an install that needs it, so in the 4 AM to 6 AM window, and
+       its automatic maintenance starts at 4 AM, after the 2:15 AM backup
+       and the nightly checks (Patrick, 22 Oct 2026, #3213). A restart
+       Windows set before that is said, WARN when it is outside the window,
+       and left. Then PasswordAuthentication
        no and KbdInteractiveAuthentication no in sshd_config, checked with
        sshd -t first, the old file kept beside it, and sshd restarted. Every
        line it prints says CHANGED, WOULD, ALREADY, KEPT, WARN or STOP.
@@ -73,14 +75,22 @@
     each value), for example:
       Set-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' AUOptions 7
 
-    Remote Desktop back:
+    Remote Desktop back (the firewall takes rules only from the box's own
+    policy store since #3896, scripts\vps\BoxFirewall.ps1):
       Set-ItemProperty 'HKLM:\System\CurrentControlSet\Control\Terminal Server' fDenyTSConnections 0
-      Enable-NetFirewallRule -Group '@FirewallAPI.dll,-28752'
+      Copy-NetFirewallRule -Group '@FirewallAPI.dll,-28752' -NewPolicyStore localhost
+      Enable-NetFirewallRule -PolicyStore localhost -Group '@FirewallAPI.dll,-28752'
+      gpupdate /target:computer /force
       Set-Service TermService -StartupType Manual
       Start-Service TermService
     The two "Thornswood: block RDP from outside" rules put on the box by hand
     before this script existed still block port 3389; turn those off too
-    (Disable-NetFirewallRule -DisplayName 'Thornswood: block RDP from outside*').
+    (Disable-NetFirewallRule -PolicyStore localhost -DisplayName 'Thornswood: block RDP from outside*',
+    then gpupdate /target:computer /force).
+
+    Microsoft Edge back (#3896; the WebView2 Runtime never went):
+      Remove-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate' 'Install{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}'
+    then install Edge from https://www.microsoft.com/edge/business/download.
 
   HOW TO CONFIRM IT WORKED, by hand, from your machine:
       .\scripts\vps\Setup-SshKey.ps1 -Test
@@ -150,9 +160,10 @@ function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Ho
 function Done([int]$code) { Write-Host ''; if (-not $NoPause) { [void](Read-Host 'Enter to close') }; exit $code }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; Done 1 }
 
-# ssh's own chatter, not the box's answer.
+# The box's answer as lines, the empty ones left out. A warning ssh prints
+# stays in, so one that starts is seen (#1043).
 function Clean($lines) {
-    @($lines | ForEach-Object { [string]$_ } | Where-Object { $_ -and $_ -notmatch 'post-quantum|store now, decrypt later|openssh\.com/pq\.html' })
+    @($lines | ForEach-Object { [string]$_ } | Where-Object { $_ })
 }
 
 # Publickey as the only method, so a password can never be what lets it in.

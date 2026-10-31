@@ -46,7 +46,7 @@
 #>
 param(
     [string]$Repo,
-    [string]$Game = 'C:\Thornswood\Game'
+    [string]$Game = (Join-Path ([string](& (Join-Path $PSScriptRoot '..\scripts\release\Where.ps1') Install)) 'Game')
 )
 # Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
 $env:THORNSWOOD_HARNESS = '1'
@@ -110,7 +110,7 @@ try {
     $null = New-Item -ItemType Directory -Force -Path $fixTools, $fixRecords, $fixDev, $fixGame
     Copy-Item -LiteralPath (Join-Path $Repo 'scripts\release\Ship-Rules.ps1') -Destination $fixTools
 # Ship-Rules holds ui-gone.json to RecordShape.ps1 (#2180), which loads Read-JsonFile.ps1.
-foreach ($n in 'RecordShape.ps1', 'Read-JsonFile.ps1', 'RepoPlugins.ps1') { Copy-Item -LiteralPath (Join-Path $Repo ('scripts\release\' + $n)) -Destination $fixTools }
+foreach ($n in 'RecordShape.ps1', 'Read-JsonFile.ps1', 'RepoPlugins.ps1', 'CollectionRevision.ps1') { Copy-Item -LiteralPath (Join-Path $Repo ('scripts\release\' + $n)) -Destination $fixTools }
     Copy-Item -LiteralPath (Join-Path $Repo 'records\ui-gone.json') -Destination $fixRecords
     $files = [ordered]@{}
     foreach ($n in $names) {

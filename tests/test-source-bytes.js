@@ -29,6 +29,11 @@
 // Check-Records.ps1 and tests/test-third-party.js, so an accident there fails
 // those instead.
 //
+// And a translation file for the game (#3133), Data\Interface\Translations\
+// <plugin>_<LANGUAGE>.txt, which Skyrim reads only as UTF-16 with a byte
+// order mark, so every other byte of it is a NUL on purpose. One of those is
+// read as the UTF-16 text it is, and the same rule holds for its characters.
+//
 // Read only.
 const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
@@ -56,10 +61,23 @@ const KEPT_AS_THEY_CAME = 'records/client-licences/';
 const text = files.filter(function (f) { return TEXT.test(f) && f.indexOf(KEPT_AS_THEY_CAME) !== 0; });
 yes('there are tracked text files to read, ' + text.length + ' of them', text.length > 50);
 
+const GAME_TRANSLATION = /(^|\/)Interface\/Translations\/[^/]+_[A-Za-z]+\.txt$/;
+
 const bad = [];
 text.forEach(function (rel) {
   let d = null;
   try { d = fs.readFileSync(path.join(ROOT, rel)); } catch (e) { return; }
+  if (GAME_TRANSLATION.test(rel) && d.length >= 2 && d[0] === 0xff && d[1] === 0xfe) {
+    if (d.length % 2) { bad.push(rel + '  is UTF-16 with an odd number of bytes, so its last character is cut'); return; }
+    const t = d.slice(2).toString('utf16le');
+    let ln = 1;
+    for (let i = 0; i < t.length; i++) {
+      const c = t.charCodeAt(i);
+      if (c === 10) { ln++; continue; }
+      if (c < 32 && c !== 9 && c !== 13) bad.push(rel + ':' + ln + '  character 0x' + c.toString(16).padStart(2, '0') + '  ...' + JSON.stringify(t.slice(Math.max(0, i - 30), i + 12)) + '...');
+    }
+    return;
+  }
   let line = 1;
   for (let i = 0; i < d.length; i++) {
     const b = d[i];

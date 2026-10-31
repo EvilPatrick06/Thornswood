@@ -11,7 +11,10 @@ read it (issue #440, phase 8):
   fork commit, every file by hash (#2754). `scripts\release\Build-Front.ps1
   -Record` writes it when the pin moves; Build-Front puts the build in
   `local\thornswood-front.zip` only when it is this one, and Go.ps1 refuses a
-  zip that is not.
+  zip that is not. Its `packages` are the npm packages webpack put in
+  build.js, each with its licence text in `front-licences\<name>.txt`
+  (#3751); the installer and every update that carries build.js carry those
+  texts.
 - `server-build.json`: every server file the fork builds the same way (the
   binary, the JavaScript half the server runs, its map and the rest
   `scripts\deploy\ServerBuild.ps1` names), and the one fork commit.
@@ -33,12 +36,25 @@ read it (issue #440, phase 8):
   because a pin move is one release. `tests\test-skyrim-pin.ps1` fails while
   they disagree.
 - `ui-gone.json`: the 37 Daedric Online menu files (name and sha256) and the
-  42 unused skymp5-front svgs plus bg.png that must never ship and that every
-  pack deletes (issue #1318). `Ship-Rules.ps1` loads it; Build-Launcher puts
+  41 unused skymp5-front svgs, bg.png, and the four Futura PT and DIN Pro
+  faces main's older front build named (#1317), that must never ship and that
+  every pack deletes (issue #1318). `Ship-Rules.ps1` loads it; Build-Launcher puts
   it inside the launcher; OwnGame.Foreign reads that copy so a refresh cannot
   copy those files back. No script writes this one: it is changed by hand, in
   a pull request. `tests\test-ship-rules.ps1` fails while Ship-Rules and
   OwnGame disagree with it.
+- `shipped-not-ours.json`: 165 of the 166 loose files of other authors
+  (67.6 MB) that our packs shipped as ours until the scrub of 29 September,
+  each with the bytes and sha256 it had, measured on 12 October 2026 on the
+  shipping machine's main install (#1178). The 166th, the other server's
+  haybale, would name that server, which no tracked file may (#400), so the
+  launcher's `Leaks.cs` takes it out of Thornswood's own folder by its shape
+  and bytes instead. `Ship-Rules.ps1` reads it and stops on any
+  path it does not call another author's; Publish-Update puts every one in
+  each release record as gone at its sha256, and the launcher deletes one only
+  while it still has those bytes and Vortex does not deploy the path. No
+  script writes this one: it is changed by hand, in a pull request.
+  `tests\test-shipped-not-ours.ps1` holds it.
 - `skyrim-files.json`: every file of the pinned build, 46 on 1.6.1170, with
   its bytes, SHA-1 and depot, read out of Steam's own manifests of the three
   depots `skyrim-pin.json` names by `scripts\release\New-SkyrimFilesRecord.ps1`
@@ -47,6 +63,15 @@ read it (issue #440, phase 8):
   on this list, so a mod put into the Steam copy by hand never gets in. Run
   the script again in the same pull request as a pin move;
   `tests\test-skyrim-pin.ps1` fails while the two disagree.
+- `recipe-owners.json`: the recipes whose owner or rank is a decision rather
+  than a reading, each with the measured reason it cannot be derived:
+  `"owner"` is RECIPE_OWNER and `"rank"` is RECIPE_RANK in
+  `scripts\dev\Build-RecipeTable.ps1`, which reads them from here. No script
+  writes this one: it is changed by hand, in the pull request that adds the
+  recipe it names. It is data so that a recipe change is this file and
+  `game\content\Thornswood-Content.esp` and nothing else, the two files the
+  box's Rebuild-ContentTables takes from a pull request to rebuild its tables
+  with main's own builders (Patrick, 30 Oct 2026, B on the report page, #3470).
 - `game-strings.json`: the loose string tables of the localized masters the
   content tools read whose names are in no Skyrim archive, by size and
   sha256 (#2899): RaceCompatibility.esm's three, measured 20 Oct 2026.
@@ -63,21 +88,25 @@ read it (issue #440, phase 8):
   gamemode table hands one out (issue #479). `node
   scripts\mods\Check-CreationForms.js --write records\update-creation-club.json`
   writes it; run it again when the Skyrim pin moves.
-- `generated.json`: what `scripts\mods\Build-Generated.ps1` builds in
-  Thornswood's own game folder on the shipping machine before a Ship (issue
-  #1247): the behavior patch codes Pandora Behaviour Engine+ generates the behavior files with, and
+- `generated.json`: what the launcher builds in Thornswood's own game folder
+  on each computer before Play (issues #1247 and #3715,
+  `launcher\app\GeneratedBuild.cs`, which `scripts\mods\Build-Generated.ps1`
+  also runs); it is compiled into the launcher, and no release carries what it
+  builds: the behavior patch codes Pandora Behaviour Engine+ generates the behavior files with, and
   the BodySlide slider sets built into the bodies, each at its own slider
   defaults. No script writes this one: it is changed by hand, in a pull
-  request. Build-Generated refuses a set or a slider move that shapes the
+  request. The build refuses a set or a slider move that shapes the
   breasts, the seat, the genitals or the nipples (#1004) or takes the
-  underwear off (#405), and Ship stops after a change until the files are
-  built again.
+  underwear off (#405); after a change every launcher on the next release
+  builds the files again before Play, and Ship stops first when the
+  collection installed on the shipping machine cannot build them.
 - `most-online.json`: the most people in the world at once (`people`) and
   the seats over it that only the Discord staff roles may take
   (`staffSeats`), with Patrick's decisions in its `note` (issue #481), and
-  the most people the voice service takes at once (`voice`), never fewer than
-  the two together, since everybody seated and everybody waiting in line at
-  the menu holds a socket to it. Those are main's. Its `dev` object holds the
+  the most people who hold a voice place at once (`voice`), never fewer than
+  the two together, so everybody seated has one. Only somebody in the world
+  holds one: somebody waiting in line at the menu holds a socket for text
+  chat and the line, and no voice place (#3570). Those are main's. Its `dev` object holds the
   same three for the dev server and dev voice (Patrick, 12 Oct: 5, 0 and 5),
   and a record without one gives dev main's numbers.
   `scripts\deploy\MaxOnline.ps1` reads it for Deploy-Gamemode,
@@ -134,8 +163,24 @@ names. No script reads them. `THIRD-PARTY.md` and
   built for the starting clothes in character creation (fork commit
   ac46d078, 3 October).
 - `runner-isolation.json`: what a runner account on the VPS must not reach (production paths, groups), the crash dump folder it may only write, the age limit for files left in its temp folder, and differences agreed as intentional. `scripts\vps\Check-RunnerIsolation.ps1` compares the runners against it (issue #2161).
-- `remote-commands.json`: every call under `scripts\` that reaches the VPS (ssh, scp, Invoke-ThornswoodRemote and its wrappers, Remote.ps1), what it sends, and the class it needs: a gate verb, admin, or transport. Read from the code; `docs\DEPLOY-IDENTITIES.md` section 2a is its summary. `tests\test-remote-command-map.ps1` fails when a remote call has no row or a row has no call (issue #2182). A row names its call by script, function, command and an anchor, a line of text from the call (or just above it), never by its place in the file, so a call put in elsewhere moves no row (#2498).
+- `remote-commands.json`: every call under `scripts\` that reaches the VPS (ssh, scp, Invoke-ThornswoodRemote and its wrappers, Remote.ps1), what it sends, and the class it needs: a gate verb, admin, or transport. Read from the code; the ops repo's `DEPLOY-IDENTITIES.md` section 2a is its summary. `tests\test-remote-command-map.ps1` fails when a remote call has no row or a row has no call (issue #2182). A row names its call by script, function, command and an anchor, a line of text from the call (or just above it), never by its place in the file, so a call put in elsewhere moves no row (#2498).
 - `prod-parity.json`: what the VPS should look like (which ports listen where and as which program, each task's account and triggers, the services' accounts, which live files must match which repository file, the TLS margin, environment variables that must not be set) and the differences agreed as intentional, each with its reason. `scripts\vps\Check-ProdParity.ps1` compares the box against it; no secret belongs in it (issue #2165).
+- `collection-permissions.json`: what each mod in the Nexus collection says
+  on its own page's Permissions and credits about being put in a collection,
+  one entry per Nexus mod of the revision `collection-plugins.json` is, with
+  the files and plugins it brings, when the page was read, by whom, and the
+  page's own words (issue #3649). `collections` is `allowed`, `not stated` or
+  `not allowed`; Thornswood's own two mods are `ours` and need no reading.
+  Only a line against being in a collection is `not allowed`; one against
+  uploading or redistributing the files is `not stated` (Patrick, 27 Oct,
+  q-3649-no-upload-lines).
+  `node scripts\release\collection-permissions.js update <collection.json>
+  --revision <n>` takes the list of mods from a new revision and keeps every
+  reading, so a new mod comes in unread. `New-NexusRevision.ps1` makes and
+  publishes no revision with a mod that has no reading or whose page says no,
+  and `tests\test-collection-permissions.js` fails on a page not read or a
+  plugin from a mod the record does not list. The pages answer a cloud
+  session with a 403, so they are read in a browser on One.
 - `asset-provenance.json`: the asset provenance register (issue #2177). Every picture, video, sound, font, mesh, texture, interface file and plugin Thornswood hands to people or shows them: where it came from, who made it, its licence or permission, the credit it asks for, who approved it and when, where it is published and its sha256, or which of those is not recorded and who can answer. Files that ship from the game folder but are not in the repository are in it by name, and gallery uploads and the collection's mods are dispositioned. Operator only: nothing that builds a pack, the installer, the launcher or the site reads it. A permission itself is never written in it; an entry says where it is kept. No script writes it: it is changed by hand in the pull request that adds or changes an asset, and `tests	est-asset-provenance.js` fails on a tracked asset with no entry or a changed hash.
 - `merchant-runtime-provenance.md`: the server module built for merchant
   settlement, and why the six client files kept their 0dd0590b bytes (fork

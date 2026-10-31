@@ -68,5 +68,5 @@ People cannot join. Exact guild relocation remains separate. These are source co
 
 Total: 60
 
-Each authored identity returns after360 minutes and keeps its existing512-unit home radius.
+Each authored identity returns after 360 minutes and keeps its existing 512-unit home radius.
 Exact coordinates and the shared population rules are in [NPC spawns](../NPC-SPAWNS.csv).

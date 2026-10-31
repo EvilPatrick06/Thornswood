@@ -82,6 +82,24 @@ function Plugin([string]$dir, [string]$name, [uint32]$flags) {
     [IO.File]::WriteAllBytes((Join-Path $dir $name), $b)
 }
 
+# The same with the masters the header names, each a MAST field: the four
+# letters, a UInt16 length, the name and a zero.
+function PluginWithMasters([string]$dir, [string]$name, [uint32]$flags, [string[]]$masters) {
+    $fields = New-Object Collections.Generic.List[byte]
+    foreach ($m in $masters) {
+        $n = [Text.Encoding]::ASCII.GetBytes($m + [char]0)
+        $fields.AddRange([Text.Encoding]::ASCII.GetBytes('MAST'))
+        $fields.AddRange([BitConverter]::GetBytes([uint16]$n.Length))
+        $fields.AddRange($n)
+    }
+    $b = New-Object byte[] (24 + $fields.Count)
+    [Text.Encoding]::ASCII.GetBytes('TES4').CopyTo($b, 0)
+    [BitConverter]::GetBytes([uint32]$fields.Count).CopyTo($b, 4)
+    [BitConverter]::GetBytes($flags).CopyTo($b, 8)
+    $fields.ToArray().CopyTo($b, 24)
+    [IO.File]::WriteAllBytes((Join-Path $dir $name), $b)
+}
+
 # A plugin list the way Vortex writes one: a comment first, CRLF, no BOM.
 function PluginList([string]$path, [string[]]$lines) {
     $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path)
@@ -334,6 +352,38 @@ try {
     Collection (Join-Path $logMachine.Mod 'collection.json') $chain
     Write-VortexState
 
+    # Revision 5's cheddars_mashups.esl, an .esl and so a master, ruled to
+    # load after three plugins that are not (27 Oct): LOOT's "cyclic
+    # interaction" three times on every install. Its own Data folder, so the
+    # counts above stay as they are.
+    $data5 = Join-Path $root 'Data5'
+    $null = New-Item -ItemType Directory -Force -Path $data5
+    Plugin $data5 'Water for ENB.esm' 0x1
+    Plugin $data5 'RaceCompatibility.esm' 0x1
+    Plugin $data5 'Immersive Weapons.esp' 0
+    Plugin $data5 'Hothtrooper44_ArmorCompilation.esp' 0
+    Plugin $data5 'ZIA_Complete Pack.esp' 0
+    PluginWithMasters $data5 'cheddars_mashups.esl' 0x200 @('Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'Dragonborn.esm')
+    PluginWithMasters $data5 'Patch.esp' 0 @('Skyrim.esm', 'ZIA_Complete Pack.esp')
+    $chain5 = @(
+        @{ name = 'racecompatibility.esm'; after = @('water for enb.esm') },
+        @{ name = 'immersive weapons.esp'; after = @('racecompatibility.esm') },
+        @{ name = 'hothtrooper44_armorcompilation.esp'; after = @('immersive weapons.esp') },
+        @{ name = 'zia_complete pack.esp'; after = @('hothtrooper44_armorcompilation.esp') }
+    )
+    $cheddar5 = Join-Path $root 'col-cheddar5\collection.json'
+    Collection $cheddar5 ($chain5 + @(@{ name = 'cheddars_mashups.esl'; after = @('immersive weapons.esp', 'hothtrooper44_armorcompilation.esp', 'zia_complete pack.esp') }))
+    $cheddar6 = Join-Path $root 'col-cheddar6\collection.json'
+    Collection $cheddar6 ($chain5 + @(@{ name = 'cheddars_mashups.esl'; after = @('racecompatibility.esm') }))
+    $masterLoop = Join-Path $root 'col-master-loop\collection.json'
+    Collection $masterLoop ($chain5 + @(@{ name = 'patch.esp'; after = @('zia_complete pack.esp') }, @{ name = 'zia_complete pack.esp'; after = @('patch.esp') }))
+    $rev5List = Join-Path $root 'lists\rev5.txt'
+    PluginList $rev5List @('*Water for ENB.esm', '*RaceCompatibility.esm', '*Immersive Weapons.esp', '*Hothtrooper44_ArmorCompilation.esp', '*ZIA_Complete Pack.esp', '*cheddars_mashups.esl')
+    $rev6List = Join-Path $root 'lists\rev6.txt'
+    PluginList $rev6List @('*Water for ENB.esm', '*RaceCompatibility.esm', '*cheddars_mashups.esl', '*Immersive Weapons.esp', '*Hothtrooper44_ArmorCompilation.esp', '*ZIA_Complete Pack.esp')
+    $patchList = Join-Path $root 'lists\patch.txt'
+    PluginList $patchList @('*Water for ENB.esm', '*RaceCompatibility.esm', '*Immersive Weapons.esp', '*Hothtrooper44_ArmorCompilation.esp', '*ZIA_Complete Pack.esp', '*Patch.esp')
+
     # Everything the runs may read, so the last check can prove none was written.
     # Every path, and every file's size and write time. Not a folder's write
     # time: measured on the first run of this harness, NTFS moved the times of
@@ -408,6 +458,21 @@ try {
     Yes 'a list that is not there stops it (exit 1)' ($r.Code -eq 1 -and (Has $r.Out 'no plugin list at'))
     $r = Run @('-Collection', $col5, '-List', $good, '-Data', (Join-Path $root 'no-such-data'))
     Yes 'a Data folder that is not there stops it (exit 1)' ($r.Code -eq 1 -and (Has $r.Out 'no Data folder at'))
+
+    # ---- a rule that goes round in a circle with the game's own order -------
+    $r = Run @('-Collection', $cheddar5, '-List', $rev5List, '-Data', $data5)
+    Yes 'revision 5''s cheddars_mashups.esl rule fails (exit 1), though the list keeps it' ($r.Code -eq 1)
+    Yes 'and names each loop the way Vortex shows it, with why' `
+        ((Has $r.Out 'cheddars_mashups.esl --> Immersive Weapons.esp --> cheddars_mashups.esl: cheddars_mashups.esl loads as a master and Immersive Weapons.esp does not; the rule cheddars_mashups.esl loads after Immersive Weapons.esp.') -and
+         (Has $r.Out 'cheddars_mashups.esl --> Hothtrooper44_ArmorCompilation.esp --> cheddars_mashups.esl') -and
+         (Has $r.Out 'cheddars_mashups.esl --> ZIA_Complete Pack.esp --> cheddars_mashups.esl'))
+    Yes 'and nothing else is reported for it' (-not (Has $r.Out 'must load after') -and -not (Has $r.Out 'no rule names it'))
+    $r = Run @('-Collection', $cheddar6, '-List', $rev6List, '-Data', $data5)
+    Yes 'the fix, cheddars_mashups.esl after RaceCompatibility.esm, holds (exit 0)' ($r.Code -eq 0)
+    Yes 'and says no rule goes round' (Has $r.Out 'yes   no rule goes round in a circle with the order the game sets')
+    $r = Run @('-Collection', $masterLoop, '-List', $patchList, '-Data', $data5)
+    Yes 'a plugin ruled to load before a plugin that names it as a master fails (exit 1)' ($r.Code -eq 1)
+    Yes 'and says the header sets the other way' (Has $r.Out 'Patch.esp names ZIA_Complete Pack.esp as a master')
 
     # ---- finding the collection the way Vortex lays it out ----------------------
     try {

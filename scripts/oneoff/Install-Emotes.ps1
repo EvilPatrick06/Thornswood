@@ -67,9 +67,8 @@ foreach ($f in $strays) {
     }
 }
 
-# The keys live in an ini so the launcher's Controls page can read and rebind
-# them next to every other key in the build. Never overwrite one that is already
-# there: that is somebody's rebind.
+# The keys live in an ini so Settings in the game can read and rebind them
+# (#3126). Never overwrite one that is already there: that is somebody's rebind.
 $iniDest = Join-Path $Game 'Data\SKSE\Plugins\Thornswood.ini'
 if (Test-Path -LiteralPath $iniDest) {
     Write-Host '  keys             already set, left alone' -ForegroundColor DarkGray
@@ -96,5 +95,5 @@ if (Test-Path -LiteralPath $ini) {
 }
 
 Write-Host ''
-# The keys are on the launcher's Controls page, read out of the same ini this
-# just wrote. Printing them here as well is a second copy that goes stale.
+# The keys are on Settings in the game, read out of the same ini this just
+# wrote. Printing them here as well is a second copy that goes stale.

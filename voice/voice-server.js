@@ -47,7 +47,8 @@ const HERE = __dirname;
 
 /*
  * Stamped into /health so that "is the VPS running the copy I just sent it"
- * is one request rather than an afternoon.
+ * is one request rather than an afternoon. Asked on the box itself: from
+ * anywhere else /health says only ok (#3806).
  *
  * Node does not reload a file it has already required, so copying this up
  * changes nothing until the scheduled task is restarted, and every symptom of
@@ -57,16 +58,17 @@ const HERE = __dirname;
  * Bump it whenever anything in this file changes behaviour.
  */
 // Bumped whenever what this serves changes, because /health reports it and
-// that string is the only way to tell from outside which copy is running. It
+// that string is the only way to tell which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1-most-1-roster-once-1-long-command-1-captions-2-line-log-1-own-reports-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1-most-1-roster-once-1-long-command-1-captions-2-line-log-1-own-reports-1-seated-voice-1-health-here-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
 // artifact's record beside this file as thornswood-deploy.json once the files
-// are in place, and /health hands back its commit, zip and hash. null when no
-// deploy has written one, which is every copy sent before the artifacts.
+// are in place, and /health hands back its commit, zip and hash, to a caller
+// on the box only (#3806). null when no deploy has written one, which is
+// every copy sent before the artifacts.
 function deployRecord(dir) {
   try {
     const r = JSON.parse(fs.readFileSync(path.join(dir, 'thornswood-deploy.json'), 'utf8').replace(/^﻿/, ''));
@@ -449,7 +451,6 @@ const PLUGIN_REPORTS = [
   /^\/face done$/,
   /^\/burn [01]$/,
   /^\/chopped$/,
-  /^\/ate [0-9a-f]+$/,
   /^\/rest (?:bed|sit|up)$/,
   /^\/tspicks \d+$/,
   /^\/tspicked [0-9a-f]+$/,
@@ -831,7 +832,7 @@ function relayCaption(me, raw, now) {
  *
  * SAID LINES ONLY. The handler asks after the slash branch, never before.
  * The plugins report gameplay down this same socket as slash lines: /chopped
- * on every fall of the axe, /place as somebody walks about, /ate, /burn, the
+ * on every fall of the axe, /place as somebody walks about, /burn, the
  * journal, the party and the trade window. A limit ahead of that branch
  * would lose somebody's firewood for talking too much.
  *
@@ -1023,6 +1024,7 @@ setInterval(() => {
 const QUEUE_CEILING = 1024 * 1024;
 let droppedPositions = 0;   // ticks not sent to a backed socket, for /health
 let skippedRosters = 0;     // rosters replaced by a newer one unsent, for /health
+let rostersAhead = 0;       // held rosters written ahead of a message sent to their socket, for /health
 let closedBacklogged = 0;   // sockets closed at the ceiling, for /health
 
 /*
@@ -1131,7 +1133,9 @@ class Sock {
     if (this.closed) return;
     // A roster held back while this socket was backed goes out first, so
     // every message still arrives after the roster that was current when it
-    // was sent, as it did before rosters were held back.
+    // was sent, as it did before rosters were held back. Counted, so a
+    // harness can tell this from a drain having sent it already.
+    if (this.latest) rostersAhead++;
     this.flushLatest();
     if (this.closed) return;
     try { this.write(frame(JSON.stringify(obj))); } catch (e) { this.close(); }
@@ -1384,6 +1388,8 @@ function signal(msg) {
 function roster() {
   const list = [];
   for (const [id, p] of peers) {
+    // Only a voice place is on the roster (#3570); see HOW MANY PEOPLE.
+    if (!hasVoice(p)) continue;
     const row = { peer: id, profileId: p.profileId, name: peerName(p), mode: p.mode || 'local' };
     if (p.voice === false) row.voice = false;
     list.push(row);
@@ -1448,7 +1454,17 @@ function sendRoster() {
   rosterDue = false;
   if (peers.size === 0) return;
   const once = frame(JSON.stringify({ t: 'peers', peers: roster(), iceServers: iceServers() }));
-  for (const [, p] of peers) p.ws.sendLatest(once);
+  let none = null;
+  for (const [, p] of peers) {
+    // A socket that lost its voice place (#3570) is sent an empty roster
+    // once, so its page lets go of every connection it built; one that
+    // never had a place is sent none.
+    const voice = hasVoice(p);
+    if (!voice && !p.inRoom) continue;
+    if (!voice && !none) none = frame(JSON.stringify({ t: 'peers', peers: [], iceServers: iceServers() }));
+    p.ws.sendLatest(voice ? once : none);
+    p.inRoom = voice;
+  }
 }
 
 /*
@@ -1495,7 +1511,10 @@ function onJoin(ws, msg, profileId) {
   if (profileId && silencedLeft(profileId, Date.now())) {
     ws.send({ t: 'hush', profileId: profileId, on: true });
   }
-  announce();
+  // A profile already in the world takes its voice place (#3570): this
+  // socket joins the room, and the roster naming it goes out this turn.
+  if (voiced.has(profileId)) announce();
+  placeVoices();
   return id;
 }
 
@@ -1815,31 +1834,43 @@ function doorWait(door, req, now) {
   return 0;
 }
 /*
-  HOW MANY PEOPLE THE SERVICE TAKES AT ONCE (#481).
+  HOW MANY PEOPLE THE SERVICE TAKES AT ONCE (#481), AND WHO HOLDS A VOICE
+  PLACE (#3570).
 
   The game server seats so many (records\most-online.json, people and the
-  staff seats over it) and nothing here counted at all, so the one service
-  every person in the world holds a socket to, and every person waiting in
-  line at the menu as well, took everybody who came. The issue's words: cap
-  one without the other and it only moves where it breaks.
+  staff seats over it), and THORNSWOOD_VOICE_MOST is the most of them who
+  hold a VOICE PLACE at once: on the roster, sent the roster, and let trade
+  signalling. Install-Voice.ps1 sets it from records\most-online.json
+  (voice), which is never fewer than the seats. Unset or 0 is no cap.
 
-  THORNSWOOD_VOICE_MOST is the most PEOPLE, not sockets: a person holds one
-  socket for the launcher's voice page and one for the game's chat, and a
-  reconnect can overlap the socket it replaces until that one is let go, so
-  each of those counts once, by the profile its join token proved. A profile
-  that already holds a socket is always let in, so nobody in the room loses
-  their second page or a reconnect to a full room. Install-Voice.ps1 sets it
-  from records\most-online.json (voice). Unset or 0 is no cap, which is how
-  this ran until now.
+  A voice place is a seat's and nobody else's. Patrick, 27 Oct, on #3570
+  (answer C): "People waiting can't speak to anyone anyways because voice is
+  Proximity only." Until then every socket that proved itself took one of the
+  places at the handshake, so somebody waiting in line at the menu, who holds
+  the game's chat socket to say "/line", took a place as well as everybody
+  seated. With 25 seated and 5 waiting the room was full at 30: a staff
+  member taking their free staff seat was closed with 1013, and nobody new
+  could open the chat socket to join the line at all.
 
-  Past it, a new profile's socket is opened, told in one chat line why, and
-  closed with 1013, "try again later", rather than refused at the handshake:
-  a browser never shows a page why a handshake failed, and the game's chat
-  draws a line from the service, so the person reads the reason where they
-  would have talked. Both pages then try again on their own backoff (two
-  seconds to a minute, and one to thirty), each try with a token of its own.
-  The token it came with is spent, as every token is on its handshake. The
-  log says it once a minute at most, and /health counts the refusals.
+  So now every socket a join token proves is let in, and carries text chat
+  and commands ("/line" among them) whatever the numbers. A profile holds a
+  voice place only while the game server's position feed has it in the world
+  (seated: the feed is the engine's online players, and the engine takes no
+  more than the seats), and only while fewer than MOST profiles hold one.
+  At the menu, waiting or still choosing, a profile is on nobody's roster and
+  sent none, so no page builds a peer connection to it; it would have heard
+  nobody anyway, with no row to measure a distance from. The moment the feed
+  has it in the world it takes a place and the next roster names it; when the
+  feed drops it (back to the menu, out for being idle, gone) the place goes,
+  its own pages are sent an empty roster so they let go of every connection,
+  and everybody else's next roster leaves it out.
+
+  A place is the profile's, not the socket's: the launcher's voice page and
+  the game's chat, and a reconnect overlapping the socket it replaces, share
+  the one place. A profile in the world past MOST (the record and the game's
+  seats disagree, or no record) keeps text chat and is told once, in one chat
+  line, that voice is full; it takes a place by itself when one frees. The
+  log says it once a minute at most, and /health counts it in refusedFull.
 */
 function wholeOrZero(v) {
   const n = Number(String(v == null ? '' : v).trim());
@@ -1847,19 +1878,57 @@ function wholeOrZero(v) {
 }
 const MOST = wholeOrZero(process.env.THORNSWOOD_VOICE_MOST);
 const heldBy = new Map();     // profileId -> sockets open for it
-let refusedFull = 0;          // sockets turned away for numbers, for /health
+const voiced = new Set();     // profiles holding a voice place
+let refusedFull = 0;          // times a profile in the world was kept off voice for numbers, for /health
 let fullSaidAt = 0;
-const FULL_LINE = 'Voice and chat are full: ' + MOST + ' people are connected, the most they take at once. ' +
-                  'This tries again by itself.';
+const FULL_LINE = 'Voice is full: ' + MOST + ' people are using it, the most it takes at once. ' +
+                  'Text chat still works, and your voice comes on by itself when a place frees.';
 
 function holdFor(profileId) { heldBy.set(profileId, (heldBy.get(profileId) || 0) + 1); }
 function letGoFor(profileId) {
   const n = (heldBy.get(profileId) || 0) - 1;
   if (n > 0) heldBy.set(profileId, n); else heldBy.delete(profileId);
 }
-/* Whether this profile's socket is past the number. */
-function overMost(profileId) {
-  return MOST > 0 && !heldBy.has(profileId) && heldBy.size >= MOST;
+function hasVoice(p) { return !!p && voiced.has(Number(p.profileId) || 0); }
+
+/*
+  Who holds a voice place now, worked out again whenever it could change: a
+  position feed, a join, a socket closing. Places already held are kept, so
+  somebody in the room never loses theirs to a newcomer; new ones go in the
+  order their sockets joined. A change sends one roster (announce).
+*/
+function placeVoices() {
+  const inWorld = new Set();
+  for (const [, p] of peers) {
+    const pid = Number(p.profileId) || 0;
+    if (pid && positions.has(pid)) inWorld.add(pid);
+  }
+  let changed = false;
+  for (const pid of Array.from(voiced)) {
+    if (!inWorld.has(pid)) { voiced.delete(pid); changed = true; }
+  }
+  for (const [, p] of peers) {
+    const pid = Number(p.profileId) || 0;
+    if (!inWorld.has(pid)) { p.toldFull = false; continue; }
+    if (voiced.has(pid)) { p.toldFull = false; continue; }
+    if (MOST > 0 && voiced.size >= MOST) {
+      if (!p.toldFull) {
+        p.toldFull = true;
+        refusedFull++;
+        p.ws.send({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood', text: FULL_LINE, at: Date.now() });
+        if (Date.now() - fullSaidAt > 60000) {
+          fullSaidAt = Date.now();
+          console.log('[voice] full: ' + voiced.size + ' people hold voice, the most this service takes ' +
+                      '(THORNSWOOD_VOICE_MOST), so profile ' + pid + ' in the world has text chat only (' +
+                      refusedFull + ' kept off voice so far)');
+        }
+      }
+      continue;
+    }
+    voiced.add(pid);
+    changed = true;
+  }
+  if (changed) announce();
 }
 
 // Places whose minute is over are forgotten.
@@ -2228,6 +2297,8 @@ const server = http.createServer((req, res) => {
           });
         }
         for (const pid of Array.from(positions.keys())) if (!seen.has(pid)) positions.delete(pid);
+        // Who is in the world is who holds a voice place (#3570).
+        placeVoices();
         // doc.requirePass, the game server's join pass switch (#410), is not
         // read here any more: it refused unproven joins while it was on, and
         // since #1303 every unproven join is refused whatever it says.
@@ -2466,6 +2537,28 @@ const server = http.createServer((req, res) => {
 
   if (route === '/health') {
     /*
+      ONLY OK TO ANYBODY BUT THIS MACHINE (#3806).
+
+      This answered every field below to whoever asked, and Caddy carries
+      https://thornswood.net/voice/health and /voice-dev/health, so anybody on
+      the internet could read the build, the deploy record's commit, zip and
+      hash, and the live counts. With the source public, a commit is a map of
+      exactly what a server runs. Patrick, 26 Oct (q-3721-voice-health, A):
+      the public answer says only ok, and the detail answers only on the box.
+
+      Every request Caddy forwards comes from 127.0.0.1 too, so where the
+      socket is from says nothing; isLoopback (#1797) also wants no
+      X-Forwarded-* header, which Caddy writes on everything it carries.
+      Anybody else, the launcher's voice check and the site check in Go.ps1
+      among them, is told the service is up and nothing more. The box's own
+      readers (Get-Logs, Install-Voice, the watchdog) ask 127.0.0.1.
+    */
+    if (!isLoopback(req)) {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+    /*
       uptime is here so a watchdog can tell a RESTART from a HANG. Everything
       else in this payload looks identical either way: a service that has just
       come back up and a service that has been wedged for an hour both answer
@@ -2487,7 +2580,7 @@ const server = http.createServer((req, res) => {
                             turn: TURN_URL ? (TURN_SECRET ? 'ephemeral' : (TURN_USER ? 'static' : 'MISCONFIGURED')) : 'none',
                             chatRange: CHAT_RANGE,
                             peers: peers.size, tracked: positions.size,
-                            most: MOST, people: heldBy.size, refusedFull: refusedFull,
+                            most: MOST, people: voiced.size, refusedFull: refusedFull,
                             queuedCommands: commands.length,
                             backed: backed, largestQueueBytes: largestQueue,
                             droppedPositions: droppedPositions,
@@ -2498,7 +2591,8 @@ const server = http.createServer((req, res) => {
                             // Last: /health's fields only ever go on the end (voice/test-turn-key.js).
                             captions: { on: CAPTIONS, sent: captionCounts.sent, dropped: captionCounts.dropped,
                                         tailMs: CAPTION_TAIL_MS, burst: CAPTION_BURST, refillMs: CAPTION_REFILL_MS,
-                                        reach: CAPTION_REACH || 'voice', textMute: CAPTION_TEXT_MUTE } }));
+                                        reach: CAPTION_REACH || 'voice', textMute: CAPTION_TEXT_MUTE },
+                            rostersAhead: rostersAhead }));
     return;
   }
 
@@ -2660,22 +2754,6 @@ server.on('upgrade', (req, socket, head) => {
     'Sec-WebSocket-Accept: ' + accept(key) + '\r\n' +
     'Sec-WebSocket-Protocol: ' + PROTOCOL + '\r\n\r\n');
 
-  // Past the most people at once (#481): told why, then closed; see MOST.
-  if (overMost(proven)) {
-    refusedFull++;
-    if (Date.now() - fullSaidAt > 60000) {
-      fullSaidAt = Date.now();
-      console.log('[voice] full: ' + heldBy.size + ' people are connected, the most this service takes ' +
-                  '(THORNSWOOD_VOICE_MOST), so profile ' + proven + ' was told and closed (' +
-                  refusedFull + ' turned away so far)');
-    }
-    socket.on('error', () => { /* the client hung up first; see refuseUpgrade */ });
-    const why = Buffer.from('full', 'utf8');
-    socket.write(frame(JSON.stringify({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood', text: FULL_LINE, at: Date.now() })));
-    socket.end(Buffer.concat([Buffer.from([0x88, 2 + why.length, 0x03, 0xf5]), why]));   // FIN+close, 1013 try again later
-    return;
-  }
-
   const ws = new Sock(socket);
   holdFor(proven);
   let myId = 0;
@@ -2706,7 +2784,9 @@ server.on('upgrade', (req, socket, head) => {
     // decides who is allowed to hear it; see signal for the shape.
     if (msg.t === 'sdp' || msg.t === 'ice') {
       const to = peers.get(Number(msg.to));
-      if (!to) return;
+      // Only between two voice places (#3570): a socket at the menu is on
+      // nobody's roster, and nobody's page builds a connection to it.
+      if (!to || !hasVoice(peers.get(myId)) || !hasVoice(to)) return;
       const out = signal(msg);
       if (!out) return;
       out.from = myId;
@@ -2726,7 +2806,7 @@ server.on('upgrade', (req, socket, head) => {
       const me = peers.get(myId);
       if (!me || msg.on !== false || me.voice === false) return;
       me.voice = false;
-      announce();
+      if (hasVoice(me)) announce();
       return;
     }
 
@@ -2743,7 +2823,9 @@ server.on('upgrade', (req, socket, head) => {
       const out = { t: 'vmode', from: myId, profileId: me.profileId, mode: mode };
       for (const [, p] of peers) {
         if (Number(p.profileId) === Number(me.profileId)) p.mode = mode;
-        p.ws.send(out);
+        // Told only to the room, and only from inside it (#3570): a page
+        // at the menu is on no roster, and the next one carries the mode.
+        if (hasVoice(me) && hasVoice(p)) p.ws.send(out);
       }
       return;
     }
@@ -2998,8 +3080,11 @@ server.on('upgrade', (req, socket, head) => {
     if (!heldBy.has(proven)) forgetCaptions(proven);
     if (!myId) return;
     const me = peers.get(myId);
+    const hadVoice = hasVoice(me);
     peers.delete(myId);
-    announce();
+    if (hadVoice) announce();
+    // The profile's last socket gives up its place, which can free one.
+    placeVoices();
     lineClosed(me);
   };
 });

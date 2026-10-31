@@ -2,6 +2,7 @@
 // Build-time evidence for public delivery goods. Delivery never claims that
 // the accepting character personally made or harvested the supplied items.
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const hash=value=>require('node:crypto').createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const ranks=['novice','advanced','expert','master'];
 const recipeFields=['owner','half','rank','out','makes','bench','inputItems','needs'];
 function publicRecipe(source,reference,row) {
@@ -18,8 +19,15 @@ function producerMinimum(source) {
  for(const row of Object.values(source.ores))if(ranks.includes(row.rank))put(row.ore,ranks.indexOf(row.rank));
  return minimum;
 }
+// A commission is admitted on a field-for-field copy of today's source rows.
+// Once published (source.published, the activation manifest's id -> sha256)
+// its definition is immutable and accepted jobs are bound to its hash, so a
+// later change to a row it copied (a recipe moved to its trade's bench, #3120)
+// cannot be copied into it. A published one is held to its pin instead, and
+// each good to a source that still makes it at no higher rank than its tier.
 function validateRankedQuests(doc,source) {
  const fail=()=>{throw Error('Ranked commission source evidence cannot be verified.');};
+ const pins=source.published||{};
  doc=JSON.parse(JSON.stringify(doc));
  if(!doc||doc.version!==1||doc.active!==false||doc.complete!==false||!Array.isArray(doc.quests))fail();
  const ids=new Set(),objectives=new Set();
@@ -33,6 +41,9 @@ function validateRankedQuests(doc,source) {
  }
  return doc.quests.map(row=>{
   const tier=ranks.indexOf(row.tier),merchant=row.merchant;
+  const pinned=Object.prototype.hasOwnProperty.call(pins,row.id);
+  if(pinned&&hash(row)!==pins[row.id])fail();
+  const copied=(proof,actual)=>pinned||same(proof,actual);
   let gate;try{gate=source.gates.validate(row.gate);}catch(error){fail();}
   if(!/^q-[a-z0-9-]{1,46}$/.test(row.id)||typeof row.name!=='string'||!row.name.trim()||typeof row.text!=='string'||!row.text.trim()||
     row.kind!=='commission'||row.deliveryVersion!==2||tier<0||gate.open===true||gate.rank!==row.tier||
@@ -50,7 +61,7 @@ function validateRankedQuests(doc,source) {
    if(good.recipe) {
     const proof=good.recipe,actual=source.recipes[proof.reference];
     if(!publicRecipe(source,proof.reference,actual)||actual.out!==good.item||
-      !same(proof,{reference:proof.reference,...Object.fromEntries(recipeFields.map(key=>[key,actual[key]]))})||
+      !copied(proof,{reference:proof.reference,...Object.fromEntries(recipeFields.map(key=>[key,actual[key]]))})||
       !actual.inputItems.every(item=>item.suppliedBy&&ranks.indexOf(item.suppliedAt)>=0&&ranks.indexOf(item.suppliedAt)<=tier))fail();
     rank=ranks.indexOf(actual.rank);const quantity=Math.ceil(good.count/actual.makes);
     if(!Number.isSafeInteger(quantity)||quantity<1)fail();
@@ -58,11 +69,11 @@ function validateRankedQuests(doc,source) {
     if(rank===2&&actual.owner==='Tailor'&&minimum.get(good.item)===2)expertBatches+=quantity;
    }else if(good.harvest) {
     const proof=good.harvest,actual=source.harvests[proof.reference];
-    if(!actual||!same(proof,{reference:proof.reference,...actual})||actual.produce!==good.item||merchant.role!=='Alchemist')fail();
+    if(!actual||!copied(proof,{reference:proof.reference,...actual})||actual.produce!==good.item||merchant.role!=='Alchemist')fail();
     rank=ranks.indexOf(actual.rank);
    }else {
     const proof=good.mining,actual=source.ores[proof.reference];
-    if(!actual||!same(proof,{reference:proof.reference,...actual})||actual.ore!==good.item||
+    if(!actual||!copied(proof,{reference:proof.reference,...actual})||actual.ore!==good.item||
       merchant.role!=='Smith'||row.gate.classKey!=='miner')fail();
     rank=ranks.indexOf(actual.rank);
    }

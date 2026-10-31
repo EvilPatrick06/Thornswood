@@ -1,8 +1,10 @@
 <#
   Set-Ref.ps1
 
-  Makes a release tag, or deletes a branch, on GitHub for a session whose git
-  cannot write refs: a cloud Claude thread (#3107, #3314).
+  Makes a release tag, or deletes a branch or a tag, on GitHub for a session
+  whose git cannot write refs: a cloud Claude thread (#3107, #3314). It also
+  deletes a release draft and publishes a signed launcher draft, which the
+  same proxy refuses (#4177).
 
       pwsh scripts/ops/Set-Ref.ps1 -Tag release/dev/20261022-154916-dev -Commit <40 hex> -MessageFile <file>
                        the annotated release tag on that commit
@@ -10,6 +12,15 @@
                        the branch, when it is still at that commit
       pwsh scripts/ops/Set-Ref.ps1 -Fork -DeleteBranch claude/what -Commit <40 hex>
                        the same in the fork, EvilPatrick06/skymp
+      pwsh scripts/ops/Set-Ref.ps1 -DeleteTag v1.1.47 -Commit <40 hex>
+                       the tag, when it still names that commit
+      pwsh scripts/ops/Set-Ref.ps1 -DeleteDraft 397526903
+                       the release with that id, when it is a draft
+      pwsh scripts/ops/Set-Ref.ps1 -PublishLauncher v1.2.11
+                       the tag's launcher draft, when its files check as signed
+      pwsh scripts/ops/Set-Ref.ps1 -RetagLauncher v1.2.13
+                       the tag's launcher draft put back on its tag, when
+                       GitHub has dropped the tag from it
       pwsh scripts/ops/Set-Ref.ps1 -Run 39712345678
                        the answer of a run that had not ended
 
@@ -20,8 +31,11 @@
   and POST git/refs, for a tag or a branch, are 403 "Write access to this
   GitHub API path is not permitted through this proxy". Starting a workflow
   is allowed. So the tag went to One, and so did every branch a cloud thread
-  left behind (#3107, #2862). The proxy's policy belongs to the cloud
-  environment, and nothing in this repository changes it.
+  left behind (#3107, #2862). Measured 31 Oct 2026: DELETE releases/<id>
+  and PATCH releases/<id> are 403 "Creating, editing, or deleting releases
+  is not permitted for this session type" (#4177). The proxy's policy
+  belongs to the cloud environment, and nothing in this repository changes
+  it.
 
   HOW. This starts .github/workflows/git-ref.yml on main with what to do,
   waits for the run to end, and prints its answer, the way Say-Staff.ps1 and
@@ -46,9 +60,48 @@
         deleted with it, and no open pull request may come from it or be
         built onto it. A branch already gone is the answer GONE. GitHub's
         "Restore branch" button on a closed pull request brings one back.
+    -DeleteTag: the tag has to name the commit given (through its tag
+        object when it is annotated), so the tag deleted is the one the
+        caller looked at and wrote down. No release, draft or published, may
+        be on it: deleting a published release's tag breaks the release,
+        and a draft's goes first with -DeleteDraft. A tag already gone is
+        GONE. Nothing brings a deleted tag back but the commit it named, so
+        the caller records that first (#4177 has the list it deleted). The
+        "release tags" ruleset holds every v* tag against deletion, and only
+        an administrator passes it, so the run's token is refused one: that
+        is a failure that names GitHub's answer, never GONE.
+    -DeleteDraft: only a draft, by its id; a published release is refused.
+        One already gone is DRAFT-GONE.
+    -PublishLauncher: only a v<version> tag with exactly one release, a
+        draft named "Launcher v<version>" built from the commit the tag
+        names, holding Thornswood.exe, setup-stub.exe and SHA256SUMS. Its
+        three files are downloaded and Test-ReleaseFiles.ps1 -RequireSigned
+        checks them the way release.yml's verify job does (the checksums,
+        the publish gate and the launcher's own Signature.cs); a draft that
+        fails stays a draft. It is published as not the latest, so the game
+        release Publish-ReleaseFiles.ps1 marks latest stays latest, and a
+        four part version, a dev launcher, as a prerelease. One already
+        published is ALREADY-PUBLISHED.
+    -RetagLauncher: only a v<version> tag on GitHub that no release is on,
+        and exactly one draft named "Launcher v<version>" whose tag GitHub
+        dropped (its tag_name reads untagged-<hex>) and which holds the
+        commit the tag names. It sets tag_name and target_commitish
+        together, which is how a draft keeps its tag, then reads the draft
+        back and checks it is on the tag and still a draft. Its files are
+        not touched. A tag that already has its release is ALREADY-ON-TAG.
+        Why a draft loses its tag: measured 31 Oct 2026, after immutable
+        releases were turned on, a PATCH of a draft that does not name
+        tag_name drops it. 3684-release-targets.ps1 set target_commitish
+        alone on 24 drafts at 12:28 UTC and every one read untagged-<hex>
+        after; release.yml set body alone on the v1.2.13 draft at 12:13
+        UTC, when a second run uploaded into it, and the same happened.
+        release.yml now names the tag in that PATCH.
 
   WHAT IT SAYS AND EXITS.
     TAGGED, ALREADY, DELETED, GONE    0
+    DRAFT-DELETED, DRAFT-GONE         0
+    PUBLISHED, ALREADY-PUBLISHED      0
+    RETAGGED, ALREADY-ON-TAG          0
     refused, or GitHub said no        1, with why; nothing changed
     the run had not ended             2, after -WaitMinutes; the run still
                                       does it, and -Run <its id> reads it
@@ -66,9 +119,18 @@ param(
     [string]$MessageFile = '',
     [Parameter(ParameterSetName = 'Delete', Mandatory = $true)]
     [string]$DeleteBranch,
+    [Parameter(ParameterSetName = 'DeleteTag', Mandatory = $true)]
+    [string]$DeleteTag,
     [Parameter(ParameterSetName = 'Tag', Mandatory = $true)]
     [Parameter(ParameterSetName = 'Delete', Mandatory = $true)]
+    [Parameter(ParameterSetName = 'DeleteTag', Mandatory = $true)]
     [string]$Commit,
+    [Parameter(ParameterSetName = 'DeleteDraft', Mandatory = $true)]
+    [long]$DeleteDraft,
+    [Parameter(ParameterSetName = 'Publish', Mandatory = $true)]
+    [string]$PublishLauncher,
+    [Parameter(ParameterSetName = 'Retag', Mandatory = $true)]
+    [string]$RetagLauncher,
     # A git-ref run that had not ended: read its answer.
     [Parameter(ParameterSetName = 'Run', Mandatory = $true)]
     [long]$Run,
@@ -114,6 +176,11 @@ function Get-RefPath([string]$n) { return (@($n.Split('/') | ForEach-Object { [U
 if ($OnGitHub) {
     $Tag = [string]$env:REF_TAG
     $DeleteBranch = [string]$env:REF_DELETE_BRANCH
+    $DeleteTag = [string]$env:REF_DELETE_TAG
+    # A [long] parameter takes no text, so the draft has a name of its own here.
+    $draftId = [string]$env:REF_DELETE_DRAFT
+    $PublishLauncher = [string]$env:REF_PUBLISH_LAUNCHER
+    $RetagLauncher = [string]$env:REF_RETAG_LAUNCHER
     $Commit = [string]$env:REF_COMMIT
     $Message = [string]$env:REF_MESSAGE
     $default = if ($env:REF_DEFAULT_BRANCH) { [string]$env:REF_DEFAULT_BRANCH } else { 'main' }
@@ -146,8 +213,24 @@ if ($OnGitHub) {
         return [string]$t.Body.object.sha
     }
 
-    if ($Commit -notmatch '^[0-9a-f]{40}$') { Die "the commit has to be a full 40 character commit id, and it is '$Commit'. Nothing was changed." }
-    if ($Tag -and $DeleteBranch) { Die 'give a tag to make or a branch to delete, not both. Nothing was changed.' }
+    $asked = @(@($Tag, $DeleteBranch, $DeleteTag, $draftId, $PublishLauncher, $RetagLauncher) | Where-Object { $_ })
+    if ($asked.Count -gt 1) { Die 'give one thing to do: a tag to make, a branch or tag to delete, a draft to delete, or a launcher to publish or put back on its tag. Nothing was changed.' }
+    if (($Tag -or $DeleteBranch -or $DeleteTag) -and $Commit -notmatch '^[0-9a-f]{40}$') { Die "the commit has to be a full 40 character commit id, and it is '$Commit'. Nothing was changed." }
+
+    # Every release, drafts too, page by page. GitHub's answer comes back as
+    # one object holding the JSON array, so each page is spread before it is
+    # counted (#3686).
+    function Get-Releases {
+        $all = @()
+        for ($page = 1; $page -le 50; $page++) {
+            $a = Api GET ('releases?per_page=100&page=' + $page)
+            if ($a.Code -ne 200) { Die ('GitHub would not list the releases (' + (Said $a) + '). Nothing was changed.') }
+            $got = @($a.Body | ForEach-Object { $_ } | Where-Object { $_ -and $_.PSObject.Properties['id'] })
+            $all += $got
+            if ($got.Count -lt 100) { return $all }
+        }
+        Die 'GitHub listed more than 5000 releases, so the list was not read to its end. Nothing was changed.'
+    }
 
     if ($Tag) {
         if ($Tag -notmatch $tagShape) { Die "$Tag is not a release tag (release/dev/<id>-dev or release/main/<id>), and this makes no other. Nothing was changed." }
@@ -211,18 +294,119 @@ if ($OnGitHub) {
         }
         $gone = Api DELETE ('git/refs/heads/' + (Get-RefPath $DeleteBranch))
         if ($gone.Code -eq 204) { Note 'notice' "DELETED $DeleteBranch $Commit"; Say "DELETED $DeleteBranch $Commit" 'Green'; exit 0 }
-        # 422 is GitHub saying the ref is not there any more: it went between
-        # the read and the delete, which is the state this run is for.
-        if ($gone.Code -eq 422) { Note 'notice' "GONE $DeleteBranch"; Say "GONE $DeleteBranch" 'Green'; exit 0 }
+        # 422 is either the ref gone between the read and the delete, or a
+        # rule refusing the delete (#4177: the release tags ruleset answered
+        # 422 and the tag was still there). Only a second read tells them apart.
+        if ($gone.Code -eq 422 -and (Api GET $refPath).Code -eq 404) { Note 'notice' "GONE $DeleteBranch"; Say "GONE $DeleteBranch" 'Green'; exit 0 }
         Die ("GitHub did not delete $DeleteBranch (" + (Said $gone) + ').')
     }
-    Die 'the run was given no tag to make and no branch to delete.'
+    if ($DeleteTag) {
+        if (-not (Test-RefName $DeleteTag)) { Die "'$DeleteTag' is not a tag name this deletes. Nothing was changed." }
+        $refPath = 'git/ref/tags/' + (Get-RefPath $DeleteTag)
+        $has = Api GET $refPath
+        if ($has.Code -eq 404) { Note 'notice' "GONE $DeleteTag"; Say "GONE $DeleteTag" 'Green'; exit 0 }
+        if ($has.Code -ne 200) { Die ("GitHub would not say where $DeleteTag is (" + (Said $has) + '). Nothing was changed.') }
+        $on = Get-TagCommit $has.Body
+        if ($on -ne $Commit) { Die "$DeleteTag names $on, not ${Commit}, so it stays. Look at it, then ask again with its commit." }
+        $on = @(Get-Releases | Where-Object { [string]$_.tag_name -eq $DeleteTag })
+        if ($on.Count) {
+            Die ("$DeleteTag stays: release(s) " + ((@($on | ForEach-Object { [string]$_.id + $(if ($_.draft) { ' (a draft)' } else { '' }) })) -join ', ') + ' are on it. A draft goes first with -DeleteDraft; a published release keeps its tag.')
+        }
+        $gone = Api DELETE ('git/refs/tags/' + (Get-RefPath $DeleteTag))
+        if ($gone.Code -eq 204) { Note 'notice' "DELETED $DeleteTag $Commit"; Say "DELETED $DeleteTag $Commit" 'Green'; exit 0 }
+        # 422, as for a branch: gone only when a second read says so. A tag the
+        # release tags ruleset holds (refs/tags/v*) is refused this way, and
+        # only an administrator may delete it.
+        if ($gone.Code -eq 422 -and (Api GET $refPath).Code -eq 404) { Note 'notice' "GONE $DeleteTag"; Say "GONE $DeleteTag" 'Green'; exit 0 }
+        Die ("GitHub did not delete $DeleteTag (" + (Said $gone) + ').')
+    }
+
+    if ($draftId) {
+        if ($draftId -notmatch '^[1-9][0-9]{0,15}$') { Die "'$draftId' is not a release id. Nothing was changed." }
+        $rel = Api GET ('releases/' + $draftId)
+        if ($rel.Code -eq 404) { Note 'notice' "DRAFT-GONE $draftId"; Say "DRAFT-GONE $draftId" 'Green'; exit 0 }
+        if ($rel.Code -ne 200) { Die ("GitHub would not read release $draftId (" + (Said $rel) + '). Nothing was changed.') }
+        $tagName = [string]$rel.Body.tag_name
+        if (-not $rel.Body.draft) { Die "release $draftId ($tagName) is published, and this deletes only drafts. Nothing was changed." }
+        $gone = Api DELETE ('releases/' + $draftId)
+        if ($gone.Code -eq 204) { Note 'notice' "DRAFT-DELETED $draftId $tagName"; Say "DRAFT-DELETED $draftId $tagName" 'Green'; exit 0 }
+        if ($gone.Code -eq 404) { Note 'notice' "DRAFT-GONE $draftId"; Say "DRAFT-GONE $draftId" 'Green'; exit 0 }
+        Die ("GitHub did not delete release $draftId (" + (Said $gone) + ').')
+    }
+
+    if ($PublishLauncher) {
+        if ($PublishLauncher -notmatch '^v\d+\.\d+\.\d+(\.\d+)?$') { Die "$PublishLauncher is not a launcher tag (v<version>), the only releases this publishes. Nothing was changed." }
+        $dev = [bool]$Matches[1]
+        $on = @(Get-Releases | Where-Object { [string]$_.tag_name -eq $PublishLauncher })
+        if ($on.Count -eq 0) { Die "no release is on $PublishLauncher. release.yml drafts one when it builds the tag. Nothing was changed." }
+        if ($on.Count -gt 1) { Die ("$PublishLauncher has " + $on.Count + ' releases (' + ((@($on | ForEach-Object { [string]$_.id })) -join ', ') + '), so which one is the launcher is not this run''s to choose. Delete the extra draft first. Nothing was changed.') }
+        $rel = $on[0]
+        $has = Api GET ('git/ref/tags/' + (Get-RefPath $PublishLauncher))
+        if ($has.Code -ne 200) { Die ("GitHub would not say where $PublishLauncher is (" + (Said $has) + '). Nothing was changed.') }
+        $commitOf = Get-TagCommit $has.Body
+        if (-not $rel.draft) { Note 'notice' "ALREADY-PUBLISHED $PublishLauncher $commitOf"; Say "ALREADY-PUBLISHED $PublishLauncher $commitOf" 'Green'; exit 0 }
+        if ([string]$rel.name -ne "Launcher $PublishLauncher") { Die ("release " + $rel.id + " is named '" + $rel.name + "', not 'Launcher $PublishLauncher', so it is not a launcher draft. Nothing was changed.") }
+        $built = [string]$rel.target_commitish
+        if ($built -match '^[0-9a-f]{40}$' -and $built -ne $commitOf) { Die "$PublishLauncher names $commitOf, but its draft was built from $built, so the tag moved after the build. It stays a draft." }
+        $want = @('SHA256SUMS', 'Thornswood.exe', 'setup-stub.exe')
+        $assets = @($rel.assets | Where-Object { $_ })
+        foreach ($n in $want) {
+            if (@($assets | Where-Object { [string]$_.name -eq $n }).Count -ne 1) { Die "the $PublishLauncher draft does not hold exactly one $n, so it stays a draft." }
+        }
+        $dir = Join-Path ([IO.Path]::GetTempPath()) ('set-ref-' + [Guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        try {
+            foreach ($n in $want) {
+                $a = @($assets | Where-Object { [string]$_.name -eq $n })[0]
+                $r = Invoke-WebRequest -Method GET -Uri ("$apiBase/releases/assets/" + $a.id) -OutFile (Join-Path $dir $n) -PassThru -SkipHttpErrorCheck -TimeoutSec 300 -Headers @{
+                    Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/octet-stream'; 'X-GitHub-Api-Version' = '2022-11-28' }
+                if ([int]$r.StatusCode -ne 200) { Die ("GitHub did not hand over the draft's $n (HTTP " + $r.StatusCode + '), so it stays a draft.') }
+            }
+            # The verify job's own check (release.yml), on this run's runner,
+            # which holds no signing setup either.
+            $global:LASTEXITCODE = 0
+            & (Join-Path $PSScriptRoot '../release/Test-ReleaseFiles.ps1') -Dir $dir -RequireSigned
+            $rc = $LASTEXITCODE
+            if ($rc -ne 0) { Die "the $PublishLauncher draft's files did not pass Test-ReleaseFiles.ps1 -RequireSigned (exit $rc; the lines above say which check), so it stays a draft." }
+        } finally {
+            Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        $done = Api PATCH ('releases/' + $rel.id) ([ordered]@{ draft = $false; prerelease = $dev; make_latest = 'false' })
+        if ($done.Code -ne 200) { Die ("GitHub did not publish release " + $rel.id + ' (' + (Said $done) + ').') }
+        Note 'notice' "PUBLISHED $PublishLauncher $commitOf"; Say "PUBLISHED $PublishLauncher $commitOf" 'Green'; exit 0
+    }
+
+    if ($RetagLauncher) {
+        if ($RetagLauncher -notmatch '^v\d+\.\d+\.\d+(\.\d+)?$') { Die "$RetagLauncher is not a launcher tag (v<version>), the only drafts this puts back on their tag. Nothing was changed." }
+        $has = Api GET ('git/ref/tags/' + (Get-RefPath $RetagLauncher))
+        if ($has.Code -eq 404) { Die "$RetagLauncher is not on GitHub, so there is no tag to put its draft back on. Nothing was changed." }
+        if ($has.Code -ne 200) { Die ("GitHub would not say where $RetagLauncher is (" + (Said $has) + '). Nothing was changed.') }
+        $commitOf = Get-TagCommit $has.Body
+        $all = @(Get-Releases)
+        $on = @($all | Where-Object { [string]$_.tag_name -eq $RetagLauncher })
+        if ($on.Count -eq 1) { Note 'notice' "ALREADY-ON-TAG $RetagLauncher $commitOf"; Say "ALREADY-ON-TAG $RetagLauncher $commitOf" 'Green'; exit 0 }
+        if ($on.Count -gt 1) { Die ("$RetagLauncher already has " + $on.Count + ' releases (' + ((@($on | ForEach-Object { [string]$_.id })) -join ', ') + '), so no draft is put back on it. Nothing was changed.') }
+        $lost = @($all | Where-Object { $_.draft -and [string]$_.name -ceq "Launcher $RetagLauncher" -and [string]$_.tag_name -like 'untagged-*' })
+        if ($lost.Count -ne 1) { Die ("there are " + $lost.Count + " drafts named 'Launcher $RetagLauncher' that GitHub took off their tag, and this puts back exactly one" + $(if ($lost.Count) { ' (' + ((@($lost | ForEach-Object { [string]$_.id })) -join ', ') + ')' } else { '' }) + '. Nothing was changed.') }
+        $rel = $lost[0]
+        $built = [string]$rel.target_commitish
+        if ($built -ne $commitOf) { Die ("draft " + $rel.id + " holds $built, but $RetagLauncher names $commitOf, so it is not that tag's build. It stays as it is.") }
+        $done = Api PATCH ('releases/' + $rel.id) ([ordered]@{ tag_name = $RetagLauncher; target_commitish = $commitOf })
+        if ($done.Code -ne 200) { Die ("GitHub did not put release " + $rel.id + " back on $RetagLauncher (" + (Said $done) + ').') }
+        $back = Api GET ('releases/' + $rel.id)
+        if ($back.Code -ne 200) { Die ("GitHub took the edit of release " + $rel.id + ' but would not read it back (' + (Said $back) + '), so whether it is on its tag is not known.') }
+        if ([string]$back.Body.tag_name -ne $RetagLauncher -or -not $back.Body.draft -or [string]$back.Body.target_commitish -ne $commitOf) {
+            Die ("release " + $rel.id + ' reads back as ' + [string]$back.Body.tag_name + ' at ' + [string]$back.Body.target_commitish + $(if ($back.Body.draft) { ', a draft' } else { ', published' }) + ", not a draft on $RetagLauncher at $commitOf.")
+        }
+        Note 'notice' "RETAGGED $RetagLauncher $commitOf"; Say "RETAGGED $RetagLauncher $commitOf" 'Green'; exit 0
+    }
+    Die 'the run was given nothing to do.'
 }
 
 # ======================================================= the session half ===
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { Die 'there is no gh here to start the git-ref workflow with. Nothing was changed.' }
 
-if ($PSCmdlet.ParameterSetName -ne 'Run') {
+if (@('Tag', 'Delete', 'DeleteTag') -contains $PSCmdlet.ParameterSetName) {
     if ($Commit -notmatch '^[0-9a-f]{40}$') { Die "-Commit has to be a full 40 character commit id, and it is '$Commit'. Nothing was changed." }
 }
 if ($PSCmdlet.ParameterSetName -eq 'Tag') {
@@ -237,6 +421,18 @@ if ($PSCmdlet.ParameterSetName -eq 'Tag') {
 }
 if ($PSCmdlet.ParameterSetName -eq 'Delete') {
     if (-not (Test-RefName $DeleteBranch)) { Die "'$DeleteBranch' is not a branch name this deletes. Nothing was changed." }
+}
+if ($PSCmdlet.ParameterSetName -eq 'DeleteTag') {
+    if (-not (Test-RefName $DeleteTag)) { Die "'$DeleteTag' is not a tag name this deletes. Nothing was changed." }
+}
+if ($PSCmdlet.ParameterSetName -eq 'DeleteDraft') {
+    if ($DeleteDraft -lt 1) { Die "$DeleteDraft is not a release id. Nothing was changed." }
+}
+if ($PSCmdlet.ParameterSetName -eq 'Publish') {
+    if ($PublishLauncher -notmatch '^v\d+\.\d+\.\d+(\.\d+)?$') { Die "$PublishLauncher is not a launcher tag (v<version>), the only releases this publishes. Nothing was changed." }
+}
+if ($PSCmdlet.ParameterSetName -eq 'Retag') {
+    if ($RetagLauncher -notmatch '^v\d+\.\d+\.\d+(\.\d+)?$') { Die "$RetagLauncher is not a launcher tag (v<version>), the only drafts this puts back on their tag. Nothing was changed." }
 }
 
 . (Join-Path $PSScriptRoot 'WorkflowRun.ps1')
@@ -271,7 +467,14 @@ function Read-Answer([long]$id, [switch]$Started) {
 if ($PSCmdlet.ParameterSetName -eq 'Run') {
     $answer = Read-Answer $Run
 } else {
-    $inputs = if ($PSCmdlet.ParameterSetName -eq 'Tag') { [ordered]@{ tag = $Tag; commit = $Commit; message = $Message } } else { [ordered]@{ delete_branch = $DeleteBranch; commit = $Commit } }
+    $inputs = switch ($PSCmdlet.ParameterSetName) {
+        'Tag' { [ordered]@{ tag = $Tag; commit = $Commit; message = $Message } }
+        'Delete' { [ordered]@{ delete_branch = $DeleteBranch; commit = $Commit } }
+        'DeleteTag' { [ordered]@{ delete_tag = $DeleteTag; commit = $Commit } }
+        'DeleteDraft' { [ordered]@{ delete_draft = [string]$DeleteDraft } }
+        'Publish' { [ordered]@{ publish_launcher = $PublishLauncher } }
+        'Retag' { [ordered]@{ retag_launcher = $RetagLauncher } }
+    }
     try { $started = Start-ThornswoodWorkflow -Repo $GitHubRepo -Workflow $workflow -Inputs $inputs }
     catch { Die ($_.Exception.Message + '. Nothing was changed.') }
     if (-not $started.Run) {
@@ -287,5 +490,11 @@ switch -Regex ("$answer") {
     '^ALREADY (\S+) (\S+)$' { Say ($Matches[1] + ' was already on GitHub, on ' + $Matches[2].Substring(0, 12) + '.') 'Green'; exit 0 }
     '^DELETED (\S+) (\S+)$' { Say ($Matches[1] + ' is deleted on GitHub (it was at ' + $Matches[2].Substring(0, 12) + ').') 'Green'; exit 0 }
     '^GONE (\S+)$' { Say ($Matches[1] + ' was already gone from GitHub.') 'Green'; exit 0 }
+    '^DRAFT-DELETED (\S+) (\S+)$' { Say ('release ' + $Matches[1] + ', the ' + $Matches[2] + ' draft, is deleted on GitHub.') 'Green'; exit 0 }
+    '^DRAFT-GONE (\S+)$' { Say ('release ' + $Matches[1] + ' was already gone from GitHub.') 'Green'; exit 0 }
+    '^PUBLISHED (\S+) (\S+)$' { Say ($Matches[1] + ' is published on GitHub, from ' + $Matches[2].Substring(0, 12) + ', its files checked as signed.') 'Green'; exit 0 }
+    '^ALREADY-PUBLISHED (\S+) (\S+)$' { Say ($Matches[1] + ' was already published on GitHub.') 'Green'; exit 0 }
+    '^RETAGGED (\S+) (\S+)$' { Say ('the ' + $Matches[1] + ' launcher draft is back on its tag, at ' + $Matches[2].Substring(0, 12) + ', still a draft.') 'Green'; exit 0 }
+    '^ALREADY-ON-TAG (\S+) (\S+)$' { Say ($Matches[1] + ' already had its release on it; nothing was changed.') 'Green'; exit 0 }
 }
 Die ("the run answered '$answer', which is none of the answers this knows. Nothing it knows of was changed.")

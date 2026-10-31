@@ -1,6 +1,6 @@
 {
   "builtBy": "scripts\\dev\\Build-HuntTable.ps1",
-  "source": "the winning NPC_ records of 101 plugins in the recorded load order",
+  "source": "the winning NPC_ records of 106 plugins in the recorded load order",
   "language": "english",
   "animalsAre": "an NPC whose race, followed through the template while the Use Traits bit is set, carries the keyword ActorTypeAnimal. No race in this build carries that and ActorTypeNPC both. Reading RNAM straight off the record instead would call 1515 records animals, 1084 of which are not.",
   "yieldIs": "what the death item list in INAM gives for certain: its items, following a sublist only while that sublist's chance of giving nothing, LVLD, is zero. A sublist with a chance in it is a chance and not a yield, which is what keeps the treasure lists a chest draws from out of the table.",

@@ -2,8 +2,9 @@
   Backup-Server.ps1
 
   Pulls everything off the server that could not be rebuilt from the repo, and
-  puts it in a dated zip on this machine: in local\backups in the repository
-  (Where.ps1 Backups), or the folder -Out names.
+  puts it on this machine as a dated zip encrypted with the backup passphrase,
+  thornswood-backup-<yyyyMMdd-HHmm>.zip.enc: in local\backups in the
+  repository (Where.ps1 Backups), or the folder -Out names.
 
       .\scripts\vps\Backup-Server.ps1
 
@@ -14,8 +15,9 @@
     the website's data folder   linked Discord accounts, the boards, the
                                 documents people have typed into, the public
                                 pages
-    the bot folder              its config and its log
-    the voice server folder     its config
+    the bot folder              whole: its config, bot.log and joins.json
+    the voice server folder     whole: its config, voice.log and the chat\
+                                day files, every line typed in the game
     the game server             server-settings.json, gamemode.js, and the
                                 data, world and private folders next to it.
                                 world is the characters: every person who plays
@@ -40,11 +42,22 @@
     from the repo. Taking it would turn a two minute backup into a long one.
 
   The zip has the bot token, the Discord client secret and the server password
-  in it, because a backup without them is not a backup. Keep it where you keep
-  the rest of that, which is not a shared drive and not the repo.
+  in it, because a backup without them is not a backup, and the site's
+  sign-ins with their addresses, voice chat and every character besides.
+
+  ENCRYPTED ON THE BOX, AND KEPT 30 DAYS (#3582). The zip is encrypted on the
+  box before it comes down, with the nightly backup's passphrase
+  (C:\Thornswood-Backup\key.txt) and in the nightly's own format
+  (Protect-BackupZip.ps1), so Restore-Backup.ps1 opens it like any nightly and
+  no plain copy ever reaches this machine. With no passphrase on the box it
+  stops and brings nothing down. Fetch-Backups.ps1 deletes one here 30 days
+  after it was taken (its -KeepDays), on its daily run, so it is kept no
+  longer than site/data/site/privacy.md says a copy on the operator's computer
+  is. Until 26 Oct 2026 this brought down a plain zip that nothing ever
+  deleted, and Fetch-Backups.ps1's prune matched only the nightly's names.
 
   Reads only, on the server side. The one thing it writes there is the copy
-  it zips and the zip, in a folder of the run's own under C:\Windows\Temp
+  it zips, the zip and the encrypted zip, in a folder of the run's own under C:\Windows\Temp
   that lives as long as one ssh session (scripts\mods\OnBox.ps1, the same
   folder Run-OnBox.ps1 uses): the session's keeper makes it, and removes it
   when this says the run is over or the session drops. A keeper killed with
@@ -110,7 +123,8 @@ if (-not (Test-Path -LiteralPath $Out)) { [void](New-Item -ItemType Directory -P
 
 $stamp = (Get-Date).ToString('yyyyMMdd-HHmm')
 $name  = "thornswood-backup-$stamp.zip"
-$localZip  = Join-Path $Out $name
+$localZip  = Join-Path $Out ($name + '.enc')
+$protect = [IO.File]::ReadAllText((Join-Path $Here 'Protect-BackupZip.ps1'))
 
 Write-Host ''
 Write-Host '  THORNSWOOD  -  back up the server' -ForegroundColor White
@@ -267,7 +281,7 @@ foreach (`$exe in @('node','python','npm','git')) {
 }
 `$notes += ''
 `$notes += 'firewall rules that let anything in:'
-foreach (`$r in (Get-NetFirewallRule -Direction Inbound -Enabled True -Action Allow -EA SilentlyContinue)) {
+foreach (`$r in (Get-NetFirewallRule -PolicyStore ActiveStore -Direction Inbound -Enabled True -Action Allow -EA SilentlyContinue)) {
   `$p = `$r | Get-NetFirewallPortFilter -EA SilentlyContinue
   if (`$p -and `$p.LocalPort -and `$p.LocalPort -ne 'Any') {
     `$notes += '  ' + `$r.DisplayName + '   ' + `$p.Protocol + ' ' + (`$p.LocalPort -join ',')
@@ -280,10 +294,17 @@ foreach (`$w in `$webNotes) { `$notes += '  ' + `$w }
 [IO.File]::WriteAllText((Join-Path `$stage 'notes.txt'), (`$notes -join [Environment]::NewLine))
 'took      notes.txt'
 
+# Encrypted here, before anything leaves the box (#3582): with no passphrase
+# there is no 'zip' line, and the side that asked brings nothing down.
+`$keyFile = 'C:\Thornswood-Backup\key.txt'
+`$pass = ''
+if (Test-Path -LiteralPath `$keyFile) { `$pass = ("`$(Get-Content -LiteralPath `$keyFile -Raw)").Trim() }
+if (-not `$pass) { 'STOP the backup passphrase is not at ' + `$keyFile + ', or is empty, so nothing was zipped. Install-Backup.ps1 puts it there.'; return }
 `$zip = Join-Path `$run '$name'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [IO.Compression.ZipFile]::CreateFromDirectory(`$stage, `$zip)
-'zip       ' + [math]::Round((Get-Item `$zip).Length / 1MB, 1) + ' MB'
+Protect-ThornswoodBackupZip -Zip `$zip -Enc (`$zip + '.enc') -Pass `$pass
+'zip       ' + [math]::Round((Get-Item (`$zip + '.enc')).Length / 1MB, 1) + ' MB, encrypted'
 "@
 
 # The run's folder on the box, held by its keeper until the run is over, or
@@ -301,9 +322,9 @@ function Shut {
 try {
   foreach ($l in $box.Said) { Say "  box  $l" 'DarkGray' }
   if (-not $box.Made) { Die ('The server could not make ' + $box.Run + ' for the run. What ssh said is above. Nothing has been brought down.') }
-  $remoteZip = $box.Far + '/' + $name
+  $remoteZip = $box.Far + '/' + $name + '.enc'
 
-  $lines = Remote ((Get-ThornswoodOnBoxHoldScript -Run $box.Run) + "`r`n" + $gather)
+  $lines = Remote ((Get-ThornswoodOnBoxHoldScript -Run $box.Run) + "`r`n" + $protect + "`r`n" + $gather)
   foreach ($l in $lines) {
     $c = 'Gray'
     if ("$l" -match '^missing') { $c = 'Yellow' }
@@ -326,9 +347,9 @@ $mb = [math]::Round((Get-Item -LiteralPath $localZip).Length / 1MB, 1)
 Say "  $localZip   $mb MB" 'Green'
 
 Head 'Keep this somewhere sensible'
-Say '  The zip has the bot token, the Discord client secret and the server' 'DarkGray'
-Say '  password in it. That is on purpose. It is also why it does not belong' 'DarkGray'
-Say '  in the repo, in a Discord message, or on a shared drive.' 'DarkGray'
+Say '  It is encrypted with the backup passphrase. Restore-Backup.ps1 opens it.' 'DarkGray'
+Say '  Fetch-Backups.ps1 deletes it here 30 days after it was taken, as the' 'DarkGray'
+Say '  privacy page says of every copy on this machine.' 'DarkGray'
 
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

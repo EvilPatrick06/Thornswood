@@ -95,6 +95,8 @@ New-Item -ItemType Directory -Path $far -Force | Out-Null
 # Send-Script.ps1 runs with its C:\Windows\Temp pointed at the far folder.
 $fakes = @'
 function global:ssh {
+    # A native ssh knows nothing of -WhatIf, so neither does its fake.
+    $WhatIfPreference = $false
     $a = @($args | ForEach-Object { [string]$_ })
     $cmd = $a[-1]
     $in = @($input)
@@ -138,6 +140,7 @@ function global:ssh {
     $global:LASTEXITCODE = 255
 }
 function global:scp {
+    $WhatIfPreference = $false
     $a = @($args | ForEach-Object { [string]$_ })
     $src = $a[-2]; $dst = $a[-1]
     [void]$global:TsSs.Calls.Add([pscustomobject]@{ Tool = 'scp'; Args = $a; Command = $dst; Src = $src; Sent = [IO.File]::ReadAllText($src) })
@@ -224,6 +227,17 @@ $utf = "Write-Output ('SAID ' + [string][char]0x00E9 + [string][char]0x2014)`r`n
 $out = @(Invoke-ThornswoodRemote -Target $target -SshArgs $sshArgs -Script $utf | ForEach-Object { "$_" })
 $said = @($out | Where-Object { $_ -like 'SAID *' }) | Select-Object -First 1
 Yes 'long: a script with letters past ASCII arrives as it was written' ("$said".Length -eq 7 -and [int]"$said"[5] -eq 0x00E9 -and [int]"$said"[6] -eq 0x2014)
+
+# -WhatIf on a caller (a box wrapper run with -WhatIf) reaches the helper as
+# $WhatIfPreference. The local temp copy is the helper's own scratch, not a
+# change the caller asked about, so it goes all the same (#3123).
+Reset
+& {
+    $WhatIfPreference = $true
+    Invoke-ThornswoodRemote -Target $target -SshArgs $sshArgs -Script (Long 'whatif' 0) | Out-Null
+}
+$copies = @(Calls 'scp')
+Yes 'long, under -WhatIf: the local temp copy of the script is removed all the same (#3123)' ($copies.Count -eq 1 -and $copies[0].Src -and -not (Test-Path -LiteralPath $copies[0].Src))
 
 # ---- 3. when something fails -----------------------------------------------------
 Reset

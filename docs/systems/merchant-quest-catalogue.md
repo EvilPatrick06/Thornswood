@@ -1,19 +1,19 @@
 # Merchant quest catalogue
 
 There are **245 authored definitions** in
-`game/data/merchant-quests.json` and `game/data/merchant-ranked-quests.json`, covering all240 merchant/rank slots
-for the60 retained merchants. Four kill scenes are explicitly admitted
+`game/data/merchant-quests.json` and `game/data/merchant-ranked-quests.json`, covering all 240 merchant/rank slots
+for the 60 retained merchants. Four kill scenes are explicitly admitted
 by the pinned activation manifest, along with 241 delivery commissions.
 The aggregate authoring file stays `active:false` and
-`complete:false`, so adding a draft does not enable it. Runtime includes the23
-legacy definitions and ten bound routes plus these245 offers. Source
+`complete:false`, so adding a draft does not enable it. Runtime includes the 23
+legacy definitions and ten bound routes plus these 245 offers. Source
 activation is not proof of a completed Dev deployment.
 
 Four scenes give Novice and Advanced Warriors and Mages different work. Ten
 Novice commissions request goods for specific trades and holds. Eight more
 commissions add six Master offers, one Expert offer and one Novice Enchanter
-offer in Whiterun. Thirteen further parcels complete all24 Whiterun slots.
-A further69 parcels complete the Rift, Reach and Haafingar. A final141 parcels complete Hjaalmarch, Falkreath, Eastmarch, the Pale, Winterhold and Solstheim. All ten holds now have all240 unique merchant/rank slots;
+offer in Whiterun. Thirteen further parcels complete all 24 Whiterun slots.
+A further 69 parcels complete the Rift, Reach and Haafingar. A final 141 parcels complete Hjaalmarch, Falkreath, Eastmarch, the Pale, Winterhold and Solstheim. All ten holds now have all 240 unique merchant/rank slots;
 the five class Novice extras share already covered slots. These are deliveries,
 which can include goods obtained from other craftspeople; they do not assert
 that the person returning them crafted them. Neither kind grants ordinary
@@ -72,7 +72,7 @@ not count. Existing camp difficulty and animal habitat remain unchanged.
 
 ## Finite-purse commissions
 
-The [regional delivery catalogue](merchant-regional-deliveries.md) lists the69 additions in the Rift, Reach and Haafingar, with their exact references, source records, counts, gates and personal rest periods. The [remaining-hold catalogue](merchant-all-hold-deliveries.md) lists the final141 additions and complete Master-half/school allocation. Whiterun's first complete set is below.
+The [regional delivery catalogue](merchant-regional-deliveries.md) lists the 69 additions in the Rift, Reach and Haafingar, with their exact references, source records, counts, gates and personal rest periods. The [remaining-hold catalogue](merchant-all-hold-deliveries.md) lists the final 141 additions and complete Master-half/school allocation. Whiterun's first complete set is below.
 
 ### Complete Whiterun rank coverage
 
@@ -99,13 +99,13 @@ are pinned in `merchant-ranked-quests.json`. No existing published terms change.
 
 These additions also bring each class and each profession to at least two
 distinct authored jobs across the catalogue. Source checks enforce both that
-coverage and all24 Whiterun merchant/rank slots. The full catalogue now covers all240 slots, every14 non-Mage mastered half, all five Master schools and each Master class. Displayed payments use the offering
+coverage and all 24 Whiterun merchant/rank slots. The full catalogue now covers all 240 slots, every 14 non-Mage mastered half, all five Master schools and each Master class. Displayed payments use the offering
 hold's submitted buy prices and existing finite purse; no default quote,
 additional money, stock refill, source placement or yield is added.
 
 Each new item set differs from every earlier commission, independent of
 quantities or titles. Recipe quantities align with finished goods; a single
-orcish arrow batch makes24 arrows. Accepted terms, complete-parcel settlement
+orcish arrow batch makes 24 arrows. Accepted terms, complete-parcel settlement
 and original cooldowns use the same reviewed bundle protocol as the eight
 ranked parcels below. The Enchanter's delivery uses only its existing public
 wearable permission and makes no particular enchantment claim.
@@ -147,13 +147,13 @@ unenchanted blanks, or create resources. Gatherer and Miner source references
 identify existing producer evidence, not a requirement to use one particular
 plant or seam.
 
-Only a new bundle reservation changes the private commission map to version2.
+Only a new bundle reservation changes the private commission map to version 2.
 Existing single-good promises and numeric six-hour cooldowns remain readable
 without changing their bytes. Bundle promises retain every quoted item and
-their6/12/24/48-hour cadence; their cooldown stores its own cadence. Pending
-transfer version4 remains compatible with earlier full and compact records.
-Rolling back to old code while any version2 map exists requires Claude's
-stopped-instance disposition of disposable alpha work. No automatic reset,
+their 6/12/24/48-hour cadence; their cooldown stores its own cadence. Pending
+transfer version 4 remains compatible with earlier full and compact records.
+Rolling back to old code while any version 2 map exists requires disposing
+of the disposable alpha work with the instance stopped. No automatic reset,
 refill or migration runs.
 
 ### First ten Novice deliveries
@@ -281,7 +281,7 @@ stable hashes and IDs; changing an objective or reward needs a new ID.
 The private merchant ledger owns each original promise and its monotonic
 action token. A character may hold three commissions across the complete
 merchant namespace, including retired identities. Each merchant admits at
-most100 promises and1024 combined promises and active cooldowns, reserving
+most 100 promises and 1024 combined promises and active cooldowns, reserving
 space for each accepted job's later cooldown. Expired cooldowns may be pruned;
 active ones and accepted promises are never evicted for capacity. This is
 separate from the three-open-scene limit and scene mint allowance.
@@ -294,11 +294,11 @@ removes one authenticated owner's token without payment, preserving other
 jobs, cooldowns and the serial. Malformed state refuses changes instead of
 recreating a purse or dropping payment evidence.
 
-Commission-bearing transfers use an explicit version4 pending format.
+Commission-bearing transfers use an explicit version 4 pending format.
 Normal trades retain the promises; a commission transfer removes exactly
 its original quantity, conserves each inventory entry's metadata in merchant
 stock, transfers its reserved gold and releases its promise. Full and compact
-recovery bind the original terms. Previous version2/3 pending formats retain
+recovery bind the original terms. Previous version 2/3 pending formats retain
 their exact snapshot and digest representation, tested against serialized
 pre-change full and compact fixtures.
 
@@ -318,8 +318,8 @@ ledger byte limits remain in force. No alpha reset is required for this slice.
 exact merchant and retained-target bindings, distinct objectives, source
 positions and returns, exact commission recipe/harvest/gate/role evidence, distinct
 goods bundles and the explicit activation boundary. It does not construct a server,
-touch a private world or establish connected acceptance. Claude owns all
-operational steps after their source prerequisites are complete.
+touch a private world or establish connected acceptance. Operational steps
+follow only after their source prerequisites are complete.
 
 ## Runtime admission and recovery
 
@@ -333,7 +333,7 @@ At acceptance, the server reserves the original reward in the same character
 property transaction as its objective and copied terms. At completion,
 verified kills, that reservation, gold and the cooldown change in one native
 inventory/property transaction. A failed write changes none of them. The
-rolling24-hour allowance is150 gold per character across all newly admitted
+rolling 24-hour allowance is 150 gold per character across all newly admitted
 scenes, counting paid gold plus every outstanding reservation. Holds do not
 expire. A delayed payout is dated when it succeeds, never when it was reserved.
 This is not an account or world cap and does not include legacy scene rewards.
@@ -346,16 +346,16 @@ history. Structurally corrupt payment evidence refuses changes and needs
 trusted staff recovery; it is never erased or rebuilt by a retry.
 
 There are at most three open expanded combat jobs. This first runtime section has
-20 owned target references in total, including the14 legacy references. The
+20 owned target references in total, including the 14 legacy references. The
 complete representative character property with three original-term jobs,
-all20 maximum-generation histories,23 legacy cooldowns, the largest valid
-remaining paid list and1024 retained unknown bytes is3523 UTF-8 bytes. Native
-property capacity remains16384 bytes. Oversized existing records refuse new
+all 20 maximum-generation histories, 23 legacy cooldowns, the largest valid
+remaining paid list and 1024 retained unknown bytes is 3523 UTF-8 bytes. Native
+property capacity remains 16384 bytes. Oversized existing records refuse new
 acceptance without deleting unknown or legacy fields. This is a source and
 synthetic transaction measurement, not a connected playtest.
 
-The [crimson work](merchant-crimson-work.md) now connects its eight existing Blackreach plants to the Winterhold Alchemist, using the original Gatherer rules, shared ten-minute returns, ask3/cap8 and12-hour personal rest. No orchard planting or cultivation mechanics are included. Source activation still requires Claude's release step.
+The [crimson work](merchant-crimson-work.md) now connects its eight existing Blackreach plants to the Winterhold Alchemist, using the original Gatherer rules, shared ten-minute returns, ask 3/cap 8 and 12-hour personal rest. No orchard planting or cultivation mechanics are included. Source activation still requires a release.
 
-The [geode work](merchant-geode-work.md) connects six existing Blackreach deposits, requiring Enchanter standing and yielding empty petty soul gems. Its ask2/cap6 and12-hour personal rest follow the original table; selected sources share a documented thirty-minute return. Source implementation is not a deployment record.
+The [geode work](merchant-geode-work.md) connects six existing Blackreach deposits, requiring Enchanter standing and yielding empty petty soul gems. Its ask 2/cap 6 and 12-hour personal rest follow the original table; selected sources share a documented thirty-minute return. Source implementation is not a deployment record.
 
-[Longfin work](merchant-longfin-work.md) now has its dedicated sea-marker interaction, Master Fisher/pole gates and exclusive Haafingar Alchemist offer. Its shared four-hour wait and bounded personal draw create no gold or purse refill. Matching Content and runtime release remain with Claude.
+[Longfin work](merchant-longfin-work.md) now has its dedicated sea-marker interaction, Master Fisher/pole gates and exclusive Haafingar Alchemist offer. Its shared four-hour wait and bounded personal draw create no gold or purse refill. It is live only once the matching Content and runtime are released.

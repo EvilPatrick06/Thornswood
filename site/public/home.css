@@ -59,7 +59,8 @@ header{position:sticky;top:0;z-index:40;
   border-bottom:1px solid var(--edge)}
 header .bar{display:flex;align-items:center;gap:26px;height:64px}
 .mark{display:flex;align-items:center;gap:11px;font:600 19px/1 var(--carve);
-  letter-spacing:.11em;text-transform:uppercase;color:var(--page);white-space:nowrap}
+  letter-spacing:.11em;text-transform:uppercase;color:var(--page);white-space:nowrap;
+  flex-shrink:0}
 .mark img{width:28px;height:28px;border-radius:6px}
 nav.top{display:flex;gap:24px;margin-left:auto;align-items:center}
 nav.top a{font:400 14px/1 var(--sans);letter-spacing:.07em;text-transform:uppercase;
@@ -77,16 +78,22 @@ nav.top a:hover{color:var(--page)}
 .breadcrumbs{padding-top:24px;font:14px/1.6 var(--sans);color:var(--quiet)}
 .breadcrumbs ol{display:flex;flex-wrap:wrap;gap:12px;list-style:none;margin:0;padding:0}
 .breadcrumbs li+li::before{content:'/';margin-right:12px}
+/* The menu folds into the burger at 1080 and under, not 900: the name (210
+   wide, never squeezed) and the eight links need about 1050 across, and below
+   that the bar shrank the name into RULES and pushed Discord and Download off
+   the right edge (#3293). home.js narrow() asks the same width. */
 @media(max-width:900px){
-  header .bar{gap:12px}
   .mark{font-size:15px;letter-spacing:.04em;gap:7px}
+}
+@media(max-width:1080px){
+  header .bar{gap:12px}
   .mobile-cta{display:flex;align-items:center;min-height:44px;margin-left:auto;
     padding:0 10px;border:1px solid var(--gold);font:600 13px/1 var(--sans);color:var(--gold)}
   .burger{margin-left:0;flex-shrink:0}
 }
 /* Keep anchor destinations visible below the sticky header. */
 [id]{scroll-margin-top:100px}
-@media(max-width:900px){
+@media(max-width:1080px){
   nav.top{position:fixed;inset:calc(64px + env(safe-area-inset-top,0px)) 0 auto 0;
     flex-direction:column;align-items:stretch;gap:0;background:var(--stone);
     border-bottom:1px solid var(--edge);margin:0;padding:6px 0 14px}
@@ -153,24 +160,29 @@ nav.top a:hover{color:var(--page)}
   painting, and readable on desktop too. Measured at 412, 768, 1024, 1366,
   1920 and 3440 wide with the words hidden: 4.5:1 or better at the worst
   pixel behind every line.
+
+  THE WORDS ARE UNDER THE PAINTING AT EVERY WIDTH (Patrick, 26 Oct: "the text
+  be covering the logo some"). On a wide screen the words still sat over the
+  painting's foot, and at 1920 by 950 the era line and the pitch covered the
+  bottom of the painted title, its thorns and the purple crest: the words
+  are about 430 pixels tall, and no hero height under the 84vh cap left that
+  much room below the title once the picture was cropped. So the band below
+  900 pixels is the layout everywhere now. The painting is a band of its
+  own, the whole picture (16:9 of the width) when that fits, kept to the top
+  (the title is in its top 42%), no taller than 52vh so the Download button
+  is still on a 1366 by 768 screen, and never under 27vw so the whole title
+  fits in it even on an ultrawide and with the slow drift. Measured at 412,
+  768, 1024, 1366, 1920, 2560 and 3440 wide: the era line starts under the
+  painting every time, and the title's foot is inside it.
 */
-.hero{position:relative;min-height:min(84vh,56.25vw);display:grid;align-items:end;
-  padding:84px 0 64px;text-align:center;overflow:hidden;isolation:isolate}
-.hero > .paint{position:absolute;inset:0;z-index:-2;overflow:hidden}
+.hero{position:relative;padding:0 0 56px;text-align:center;overflow:hidden;isolation:isolate}
+.hero > .paint{position:relative;z-index:-2;overflow:hidden;height:min(56.25vw,max(52vh,27vw))}
 .hero .art{position:absolute;inset:0;width:100%;height:100%;
-  object-fit:cover;object-position:50% 25%}
-.hero .wrap::before{content:"";position:absolute;z-index:-1;pointer-events:none;
-  top:-96px;bottom:-64px;left:-50vw;right:-50vw;
-  background:linear-gradient(180deg,rgba(11,9,7,0) 0,rgba(11,9,7,.8) 96px,rgba(11,9,7,.9) 100%)}
-@media(max-width:900px){
-  .hero{display:block;min-height:0;padding:0 0 56px}
-  .hero > .paint{position:relative;inset:auto;aspect-ratio:16/9}
-  /* the foot of the painting fades into the page the words are on */
-  .hero > .paint::after{content:"";position:absolute;left:0;right:0;bottom:0;height:28%;
-    background:linear-gradient(180deg,rgba(11,14,10,0),var(--night))}
-  .hero .wrap{padding-top:22px}
-  .hero .wrap::before{content:none}
-}
+  object-fit:cover;object-position:50% 0}
+/* the foot of the painting fades into the page the words are on */
+.hero > .paint::after{content:"";position:absolute;left:0;right:0;bottom:0;height:28%;
+  background:linear-gradient(180deg,rgba(11,14,10,0),var(--night))}
+.hero .wrap{padding-top:22px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 /* Grain over the whole thing, because a flat gradient reads as a web page and
    a grained one reads as a place. */
@@ -261,9 +273,7 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
 .feat p{margin:0;color:var(--quiet);font-size:15.5px;line-height:1.65}
 
 .being-built{margin-top:40px;padding-top:28px;border-top:1px solid var(--edge)}
-.being-built .eyebrow{margin-bottom:10px}
-.being-built h3.built-title{margin:0 0 8px;font:500 22px/1.25 var(--carve);color:var(--page)}
-.being-built .built-lead{margin:0 0 22px;max-width:62ch;color:var(--quiet);font-size:15.5px;line-height:1.65}
+.being-built .built-lead{margin:0;max-width:62ch;color:var(--quiet);font-size:15.5px;line-height:1.65}
 
 .steps{counter-reset:s;margin-top:48px;border-top:1px solid var(--edge)}
 /* 34px of top margin was right when this sat on its own above the steps.

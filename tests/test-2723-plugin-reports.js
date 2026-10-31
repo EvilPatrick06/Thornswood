@@ -72,7 +72,6 @@ const SITES = {
   "'/racemenu'": { n: 1, kind: 'report', lines: ['/racemenu'] },
   "'/racedown'": { n: 1, kind: 'report', lines: ['/racedown'] },
   "'/face done'": { n: 1, kind: 'report', lines: ['/face done'] },
-  "'/ate ' + id.toString(16)": { n: 1, kind: 'report', lines: ['/ate 3eb35', '/ate fe0012ab'] },
   // /place: kind, the weather's id or -, night, roof, height to 500, fire to 25 or -
   "line": { n: 1, kind: 'report', lines: ['/place snow 10e1f2 1 0 1500 75', '/place outdoors - 0 0 -500 -',
                                           '/place indoors 81a 0 1 0 0', '/place water 10a241 0 0 -1000 -',
@@ -85,6 +84,8 @@ const SITES = {
   "'/' + sig": { n: 2, kind: 'kept', lines: ['/lock ff001234', '/unlock ff001234', '/claim ff001234', '/key ff001234 master'] },
   "'/repair'": { n: 1, kind: 'kept', lines: ['/repair'] },
   "'/treat'": { n: 1, kind: 'kept', lines: ['/treat'] },
+  // the preserving panel, from the friend key in the inventory (#3163)
+  "'/preserve'": { n: 1, kind: 'kept', lines: ['/preserve'] },
   // furniture in a held building (#2679): the line asked for, the panel, a piece's keys
   "'/furniture look'": { n: 1, kind: 'report', lines: ['/furniture look'] },
   "'/furniture'": { n: 1, kind: 'kept', lines: ['/furniture'] },

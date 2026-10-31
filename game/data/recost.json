@@ -23,10 +23,10 @@
   "how": "peers are the rows of the same family, rank and tempering material; cost is how many materials a row asks, every input counted but gold coins. A row under low or over high times its peers' median cost has every material count multiplied by the one factor that brings it to the median, rounded, never under one. Every forge recipe that charges gold coins has them taken out (to 0). A row already listed keeps the original inputs it was first measured with."
  },
  "counts": {
-  "measured": 1112,
-  "inGroups": 882,
-  "groups": 105,
-  "recosted": 43,
+  "measured": 1200,
+  "inGroups": 978,
+  "groups": 109,
+  "recosted": 48,
   "coinsTakenOut": 11,
   "unreachable": 0,
   "notCopied": 17
@@ -218,7 +218,7 @@
    "name": "Dragonguard Katana",
    "plugin": "Immersive Weapons.esp",
    "kind": "Swords",
-   "rank": "expert",
+   "rank": "advanced",
    "costWas": 8,
    "inputs": [
     {
@@ -419,7 +419,7 @@
    "name": "Colovian Composite Bow",
    "plugin": "Immersive Weapons.esp",
    "kind": "Bows",
-   "rank": "advanced",
+   "rank": "novice",
    "costWas": 5,
    "inputs": [
     {
@@ -548,8 +548,8 @@
    ],
    "costNow": 3,
    "metal": "Leather",
-   "peers": 22,
-   "usual": 3.0,
+   "peers": 25,
+   "usual": 3,
    "why": [
     "peers"
    ]
@@ -578,8 +578,8 @@
    ],
    "costNow": 3,
    "metal": "Leather",
-   "peers": 22,
-   "usual": 3.0,
+   "peers": 25,
+   "usual": 3,
    "why": [
     "peers"
    ]
@@ -608,8 +608,8 @@
    ],
    "costNow": 3,
    "metal": "Leather",
-   "peers": 22,
-   "usual": 3.0,
+   "peers": 25,
+   "usual": 3,
    "why": [
     "peers"
    ]
@@ -651,6 +651,54 @@
    ]
   },
   {
+   "recipe": "bfe65:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingForswornCuirass",
+   "name": "Riekling Forsworn Armour",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Other armour and clothing",
+   "rank": "novice",
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 4
+    }
+   ],
+   "costNow": 4,
+   "metal": "Leather",
+   "peers": 4,
+   "usual": 4.5,
+   "why": [
+    "peers"
+   ]
+  },
+  {
+   "recipe": "bfe6a:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingForswornBoots",
+   "name": "Riekling Forsworn Boots",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Armoured boots",
+   "rank": "novice",
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 4
+    }
+   ],
+   "costNow": 4,
+   "metal": "Leather",
+   "peers": 18,
+   "usual": 4.5,
+   "why": [
+    "peers"
+   ]
+  },
+  {
    "recipe": "bfe6b:Playable Rieklings.esp",
    "editorId": "RecipeArmor1RieklingBanditKilt",
    "name": "Riekling Bandit Fur Kilt",
@@ -663,13 +711,37 @@
      "item": "800e4:Skyrim.esm",
      "name": "Leather Strips",
      "count": 2,
-     "to": 5
+     "to": 6
     }
    ],
-   "costNow": 5,
+   "costNow": 6,
    "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
+   "peers": 50,
+   "usual": 6.5,
+   "why": [
+    "peers"
+   ]
+  },
+  {
+   "recipe": "bfe6c:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingBanditFurCloak",
+   "name": "Riekling Bandit Fur Cloak",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Other armour and clothing",
+   "rank": "novice",
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 4
+    }
+   ],
+   "costNow": 4,
+   "metal": "Leather",
+   "peers": 4,
+   "usual": 4.5,
    "why": [
     "peers"
    ]
@@ -687,13 +759,13 @@
      "item": "800e4:Skyrim.esm",
      "name": "Leather Strips",
      "count": 2,
-     "to": 5
+     "to": 6
     }
    ],
-   "costNow": 5,
+   "costNow": 6,
    "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
+   "peers": 50,
+   "usual": 6.5,
    "why": [
     "peers"
    ]
@@ -711,13 +783,13 @@
      "item": "800e4:Skyrim.esm",
      "name": "Leather Strips",
      "count": 2,
-     "to": 5
+     "to": 6
     }
    ],
-   "costNow": 5,
+   "costNow": 6,
    "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
+   "peers": 50,
+   "usual": 6.5,
    "why": [
     "peers"
    ]
@@ -735,13 +807,13 @@
      "item": "800e4:Skyrim.esm",
      "name": "Leather Strips",
      "count": 2,
-     "to": 5
+     "to": 6
     }
    ],
-   "costNow": 5,
+   "costNow": 6,
    "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
+   "peers": 50,
+   "usual": 6.5,
    "why": [
     "peers"
    ]
@@ -759,13 +831,13 @@
      "item": "800e4:Skyrim.esm",
      "name": "Leather Strips",
      "count": 2,
-     "to": 5
+     "to": 6
     }
    ],
-   "costNow": 5,
+   "costNow": 6,
    "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
+   "peers": 50,
+   "usual": 6.5,
    "why": [
     "peers"
    ]
@@ -783,13 +855,13 @@
      "item": "800e4:Skyrim.esm",
      "name": "Leather Strips",
      "count": 2,
-     "to": 5
+     "to": 6
     }
    ],
-   "costNow": 5,
+   "costNow": 6,
    "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
+   "peers": 50,
+   "usual": 6.5,
    "why": [
     "peers"
    ]
@@ -807,13 +879,13 @@
      "item": "800e4:Skyrim.esm",
      "name": "Leather Strips",
      "count": 2,
-     "to": 5
+     "to": 6
     }
    ],
-   "costNow": 5,
+   "costNow": 6,
    "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
+   "peers": 50,
+   "usual": 6.5,
    "why": [
     "peers"
    ]
@@ -831,13 +903,13 @@
      "item": "800e4:Skyrim.esm",
      "name": "Leather Strips",
      "count": 2,
-     "to": 5
+     "to": 6
     }
    ],
-   "costNow": 5,
+   "costNow": 6,
    "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
+   "peers": 50,
+   "usual": 6.5,
    "why": [
     "peers"
    ]
@@ -855,13 +927,13 @@
      "item": "800e4:Skyrim.esm",
      "name": "Leather Strips",
      "count": 2,
-     "to": 5
+     "to": 6
     }
    ],
-   "costNow": 5,
+   "costNow": 6,
    "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
+   "peers": 50,
+   "usual": 6.5,
    "why": [
     "peers"
    ]
@@ -879,13 +951,13 @@
      "item": "800e4:Skyrim.esm",
      "name": "Leather Strips",
      "count": 2,
-     "to": 5
+     "to": 6
     }
    ],
-   "costNow": 5,
+   "costNow": 6,
    "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
+   "peers": 50,
+   "usual": 6.5,
    "why": [
     "peers"
    ]
@@ -903,19 +975,19 @@
      "item": "5ad93:Skyrim.esm",
      "name": "Corundum Ingot",
      "count": 2,
-     "to": 5
+     "to": 4
     },
     {
      "item": "800e4:Skyrim.esm",
      "name": "Leather Strips",
      "count": 2,
-     "to": 5
+     "to": 4
     }
    ],
-   "costNow": 10,
+   "costNow": 8,
    "metal": "Corundum Ingot",
-   "peers": 14,
-   "usual": 10.5,
+   "peers": 18,
+   "usual": 9.0,
    "why": [
     "peers"
    ]
@@ -933,19 +1005,19 @@
      "item": "5ad93:Skyrim.esm",
      "name": "Corundum Ingot",
      "count": 2,
-     "to": 5
+     "to": 4
     },
     {
      "item": "800e4:Skyrim.esm",
      "name": "Leather Strips",
      "count": 2,
-     "to": 5
+     "to": 4
     }
    ],
-   "costNow": 10,
+   "costNow": 8,
    "metal": "Corundum Ingot",
-   "peers": 14,
-   "usual": 10.5,
+   "peers": 18,
+   "usual": 9.0,
    "why": [
     "peers"
    ]
@@ -963,13 +1035,13 @@
      "item": "800e4:Skyrim.esm",
      "name": "Leather Strips",
      "count": 2,
-     "to": 5
+     "to": 6
     }
    ],
-   "costNow": 5,
+   "costNow": 6,
    "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
+   "peers": 50,
+   "usual": 6.5,
    "why": [
     "peers"
    ]
@@ -987,13 +1059,13 @@
      "item": "800e4:Skyrim.esm",
      "name": "Leather Strips",
      "count": 2,
-     "to": 5
+     "to": 6
     }
    ],
-   "costNow": 5,
+   "costNow": 6,
    "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
+   "peers": 50,
+   "usual": 6.5,
    "why": [
     "peers"
    ]
@@ -1011,13 +1083,13 @@
      "item": "800e4:Skyrim.esm",
      "name": "Leather Strips",
      "count": 2,
-     "to": 5
+     "to": 6
     }
    ],
-   "costNow": 5,
+   "costNow": 6,
    "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
+   "peers": 50,
+   "usual": 6.5,
    "why": [
     "peers"
    ]
@@ -1040,7 +1112,7 @@
    ],
    "costNow": 8,
    "metal": "Iron Ingot",
-   "peers": 10,
+   "peers": 20,
    "usual": 8.0,
    "why": [
     "peers"
@@ -1089,13 +1161,13 @@
      "item": "800e4:Skyrim.esm",
      "name": "Leather Strips",
      "count": 2,
-     "to": 5
+     "to": 6
     }
    ],
-   "costNow": 5,
+   "costNow": 6,
    "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
+   "peers": 50,
+   "usual": 6.5,
    "why": [
     "peers"
    ]
@@ -1149,6 +1221,30 @@
    ]
   },
   {
+   "recipe": "bfec4:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDBArmorShortSleeve",
+   "name": "Riekling Shrouded Armor Sleeveless",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "novice",
+   "costWas": 3,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 3,
+     "to": 6
+    }
+   ],
+   "costNow": 6,
+   "metal": "Leather",
+   "peers": 50,
+   "usual": 6.5,
+   "why": [
+    "peers"
+   ]
+  },
+  {
    "recipe": "bfed0:Playable Rieklings.esp",
    "editorId": "RecipeArmorDLC1ArmorHunterCuirass",
    "name": "Riekling Dawnguard Armor",
@@ -1196,8 +1292,8 @@
    ],
    "costNow": 8,
    "metal": "Refined Moonstone",
-   "peers": 5,
-   "usual": 9,
+   "peers": 6,
+   "usual": 9.0,
    "why": [
     "peers"
    ]
@@ -1226,8 +1322,8 @@
    ],
    "costNow": 8,
    "metal": "Refined Moonstone",
-   "peers": 5,
-   "usual": 9,
+   "peers": 6,
+   "usual": 9.0,
    "why": [
     "peers"
    ]
@@ -1245,13 +1341,13 @@
      "item": "800e4:Skyrim.esm",
      "name": "Leather Strips",
      "count": 2,
-     "to": 5
+     "to": 6
     }
    ],
-   "costNow": 5,
+   "costNow": 6,
    "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
+   "peers": 50,
+   "usual": 6.5,
    "why": [
     "peers"
    ]
@@ -1269,13 +1365,37 @@
      "item": "800e4:Skyrim.esm",
      "name": "Leather Strips",
      "count": 2,
-     "to": 5
+     "to": 6
     }
    ],
-   "costNow": 5,
+   "costNow": 6,
    "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
+   "peers": 50,
+   "usual": 6.5,
+   "why": [
+    "peers"
+   ]
+  },
+  {
+   "recipe": "bff38:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorBanditBoots",
+   "name": "Riekling Bandit Fur Shoes",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Armoured boots",
+   "rank": "novice",
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 4
+    }
+   ],
+   "costNow": 4,
+   "metal": "Leather",
+   "peers": 18,
+   "usual": 4.5,
    "why": [
     "peers"
    ]

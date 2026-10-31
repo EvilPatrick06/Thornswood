@@ -15,7 +15,8 @@
       skyrim-pin          records\skyrim-pin.json        the Skyrim build a release is pinned to
       skyrim-files        records\skyrim-files.json      every file of that build (the launcher embeds it)
       ui-gone             records\ui-gone.json           the files every pack deletes (Ship and the launcher)
-      generated           records\generated.json         what Build-Generated builds before a Ship
+      generated           records\generated.json         what the launcher builds on each computer (#3715)
+      shipped-not-ours    records\shipped-not-ours.json  other authors' files our old packs shipped, deleted by sha256 (#1178)
 
       $doc = Read-ThornswoodRecord -Path <file> -Kind server-build
       $problems = Get-ThornswoodRecordProblems -Doc $doc -Kind server-build
@@ -53,6 +54,8 @@ $script:ThornswoodRecordKinds = [ordered]@{
     'skyrim-files'       = @{ File = 'records\skyrim-files.json';       Versions = @(1); MustSay = $false }
     'ui-gone'            = @{ File = 'records\ui-gone.json';            Versions = @(1); MustSay = $false }
     'generated'          = @{ File = 'records\generated.json';          Versions = @(1); MustSay = $false }
+    # #1178: what every release record deletes where the bytes still match.
+    'shipped-not-ours'   = @{ File = 'records\shipped-not-ours.json';   Versions = @(1); MustSay = $true }
     # Slice 5 (#2180): the feed store's files. No committed file: each channel's
     # store holds its own (Check-Records -Feed <folder> reads them).
     'feed-version'       = @{ File = $null; Feed = 'version.json';      Versions = @(1); MustSay = $false }
@@ -164,10 +167,36 @@ function Get-ThornswoodRecordProblems {
                     }
                 }
             }
+            # The fork's own noticed folders and the npm packages in
+            # skymp5-client.js (#3751). A client measured before that has none.
+            $libs = Get-ThornswoodRecordProp $Doc 'libraries'
+            if ($null -ne $libs) {
+                if ($libs -isnot [psobject] -or $libs -is [array] -or $libs -is [string]) { $out += 'libraries is there and not a map of library to its text' }
+                else {
+                    foreach ($p in $libs.PSObject.Properties) {
+                        if ($p.Name -notmatch '^[a-z0-9][a-z0-9._-]*$') { $out += "libraries.$($p.Name) is not a name a text can safely have" }
+                        if (@('fork', 'npm') -notcontains [string](Get-ThornswoodRecordProp $p.Value 'kind')) { $out += "libraries.$($p.Name) is not of kind fork or npm" }
+                        if (-not (Test-ThornswoodHex (Get-ThornswoodRecordProp $p.Value 'sha256') 64 64)) { $out += "libraries.$($p.Name) has no sha256" }
+                        if (-not (Test-ThornswoodWhole (Get-ThornswoodRecordProp $p.Value 'bytes') 1)) { $out += "libraries.$($p.Name) has no whole bytes" }
+                        if (-not @(Get-ThornswoodRecordProp $p.Value 'in').Count) { $out += "libraries.$($p.Name) is in no file" }
+                    }
+                }
+            }
         }
         'front-build' {
             if (-not (Test-ThornswoodHex (Get-ThornswoodRecordProp $Doc 'forkCommit') 40 40)) { $out += 'forkCommit is missing or not a full commit SHA' }
             $out += @(Get-ThornswoodFilesMapProblems (Get-ThornswoodRecordProp $Doc 'files') 'files')
+            # The npm packages in build.js, each with its text (#3751).
+            $pk = Get-ThornswoodRecordProp $Doc 'packages'
+            if ($null -eq $pk -or $pk -isnot [psobject] -or $pk -is [array] -or $pk -is [string]) { $out += 'packages is missing or not a map of package to its text' }
+            else {
+                foreach ($p in $pk.PSObject.Properties) {
+                    if ($p.Name -notmatch '^npm-[a-z0-9][a-z0-9._-]*$') { $out += "packages.$($p.Name) is not an npm-<name>-<version> text name" }
+                    if (-not (Test-ThornswoodHex (Get-ThornswoodRecordProp $p.Value 'sha256') 64 64)) { $out += "packages.$($p.Name) has no sha256" }
+                    if (-not (Test-ThornswoodWhole (Get-ThornswoodRecordProp $p.Value 'bytes') 1)) { $out += "packages.$($p.Name) has no whole bytes" }
+                    if (-not ((Get-ThornswoodRecordProp $p.Value 'version') -is [string])) { $out += "packages.$($p.Name) has no version" }
+                }
+            }
         }
         'most-online' {
             # Main's numbers are the record's own, and dev's, when it has its
@@ -184,8 +213,8 @@ function Get-ThornswoodRecordProblems {
                 elseif ([int64](Get-ThornswoodRecordProp $o 'people') -gt 1000) { $out += "${pre}people is over 1000, the engine's limit" }
                 $s = Get-ThornswoodRecordProp $o 'staffSeats'
                 if ($null -ne $s -and -not (Test-ThornswoodWhole $s 0)) { $out += "${pre}staffSeats is there and not a whole number" }
-                # The most the voice service takes at once (#481); MaxOnline.ps1
-                # holds it to no fewer than the seats.
+                # The most people who hold a voice place at once (#481, #3570);
+                # MaxOnline.ps1 holds it to no fewer than the seats.
                 $v = Get-ThornswoodRecordProp $o 'voice'
                 if ($null -ne $v -and -not (Test-ThornswoodWhole $v 1)) { $out += "${pre}voice is there and not a whole number above zero" }
             }
@@ -228,9 +257,23 @@ function Get-ThornswoodRecordProblems {
             if ($null -eq $un -or $un -isnot [array] -or @($un).Count -eq 0) { $out += 'unused is missing, empty, or not a list of file names' }
             elseif (@($un | Where-Object { -not ($_ -is [string]) -or -not $_.Trim() }).Count) { $out += 'unused has an entry that is not a file name' }
         }
+        'shipped-not-ours' {
+            # Other authors' loose files earlier packs shipped as ours, by the
+            # bytes they had (#1178). Publish-Update turns each into a gone
+            # line the launcher acts on only while the file still matches, so
+            # every path is a file under Data and nothing that climbs out.
+            $files = Get-ThornswoodRecordProp $Doc 'files'
+            $out += @(Get-ThornswoodFilesMapProblems $files 'files')
+            if ($null -ne $files -and $files -is [psobject] -and $files -isnot [array] -and $files -isnot [string]) {
+                foreach ($p in $files.PSObject.Properties) {
+                    if ($p.Name -notmatch '^Data\\[^\\/:*?"<>|]' -or $p.Name -match '(^|\\)\.\.?(\\|$)' -or $p.Name -match '[/:*?"<>|]' -or $p.Name.Contains('\\') -or $p.Name.EndsWith('\')) { $out += "files.$($p.Name) is not a file under Data" }
+                }
+            }
+        }
         'generated' {
-            # What Build-Generated builds before a Ship (#1247). Either part may
-            # be left out; what is there must be the shape Generated.ps1 reads.
+            # What the launcher builds on each computer (#1247, #3715). Either
+            # part may be left out; what is there must be the shape Generated.cs
+            # reads (GeneratedList.Parse, which the launcher holds it to as well).
             $pan = Get-ThornswoodRecordProp $Doc 'pandora'
             $bod = Get-ThornswoodRecordProp $Doc 'bodyslide'
             if ($null -eq $pan -and $null -eq $bod) { $out += 'it has neither pandora nor bodyslide, so it builds nothing' }

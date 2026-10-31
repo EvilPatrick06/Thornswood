@@ -474,8 +474,8 @@ yes('the front takes session:end from the relay into update, with the sentence',
     /if \(what === 'session:end'\) \{\s*if \(!sessionEndAsked\) \{ sessionEndAsked = String\(a\[2\] \|\| /.test(front));
 yes('and ends only a connection that is up', /function sessionEnded\(sentence\) \{\s*let up = false;\s*try \{ up = !!sp\.mpClientPlugin\.isConnected\(\); \}/.test(front));
 yes('the page is given the sentence, and no place in line',
-    /if \(menuAgain\.ended\) \{ list\.ended = String\(menuAgain\.ended\); \} else \{ list\.away = menuAgain; \}/.test(front));
-yes('picking on the way back connects again through relogAs', /if \(menuAgain\) \{ relogAs\(id\); \}/.test(front));
+    /if \(menuAgain\.ended\) \{ list\.ended = String\(menuAgain\.ended\); \}\s*else if \(menuAgain\.switched\) \{[^]*?\}\);\s*\}\s*else \{ list\.away = menuAgain; \}/.test(front));
+yes('picking on the way back connects again through relogAs', /if \(menuAgain\) \{ pickedAgain\(id\); relogAs\(id\); \}/.test(front));
 
 // =================================================================== the menu
 function pageRun(list) {
