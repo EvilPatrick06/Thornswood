@@ -321,6 +321,27 @@
   var elStatus = root.querySelector('.status');
 
   /*
+    STILL LOADING UNTIL THE FRONT IS IN (#5140). The engine shows this page
+    as the game starts, about 25 seconds before the plugins run, and it does
+    not hand the page the mouse until the front plugin focuses it: a pick
+    goes to the front first (the seat check below), so nothing on the page
+    can act before then. On 31 Oct the page was focused from the start with
+    no cursor and looked frozen, and a click at the middle picked the
+    character drawn there. So until the front has said anything to this
+    page, the line under the slots says it is still loading, and the cursor
+    comes with the front. LIST.front is set when the front itself wrote the
+    list (a page it reloads or brings back), which it only does once it is in.
+  */
+  var LOADING_WORDS = 'The game is still loading. Your characters can be picked in a moment.';
+  var frontIn = LIST.front === true;
+  function frontHere() {
+    if (frontIn) return;
+    frontIn = true;
+    if (!sent && elStatus.textContent === LOADING_WORDS) elStatus.textContent = '';
+    tell('the front is in, so the slots can be picked');
+  }
+
+  /*
     The scroll, Djinn, 24 September. Up first unless this person ticked
     "Start without the scroll next time" (the launcher passes intro:false
     then, from Data/Platform/thornswood-intro.txt, which the plugin writes).
@@ -710,7 +731,7 @@
       };
       elList.appendChild(card);
     });
-    if (!sent) elStatus.textContent = '';
+    if (!sent) elStatus.textContent = frontIn ? '' : LOADING_WORDS;
   }
 
   /* Put the confirm strip up on a slot, by index, and by id when it is known. */
@@ -808,6 +829,7 @@
   });
   /* What the line says, from the front (finding, launcher) or the server (place, pass). */
   function lineSays(what) {
+    frontHere();
     what = what || {};
     if (!waiting) {
       waiting = true;
@@ -894,6 +916,7 @@
   }, 500);
   /* A seat: the pick goes to the client, and the world loads. */
   function go() {
+    frontHere();
     if (cleared || !picked) return;
     cleared = true;
     if (waiting) {
@@ -914,6 +937,8 @@
   }
   function play() {
     if (sent) return;
+    // Nothing picks before the front is in (#5140): the line says still loading.
+    if (!frontIn) { tell('a pick before the front was in was not taken'); return; }
     var list = slots();
     var e = list[at];
     if (!e || !e.id) return;
@@ -1011,6 +1036,7 @@
     }, KEY_ASK_MS);
   }
   function keysSay(on, ask) {
+    frontHere();
     keysHere = !!on;
     keysSaidAt = Date.now();
     if (!heldKeys.length) return;

@@ -1168,6 +1168,9 @@
       }
       else { list.away = menuAgain; }
     }
+    // Written by the front, so the page knows the front is in and does not
+    // say it is still loading (#5140).
+    list.front = true;
     if (has !== 'list' || menuAgain) { T.js('window.THORNSWOOD_SELECT=' + JSON.stringify(list) + ';'); }
     inject('thornswood-select.js');
     menuPhase = 2; menuAt = Date.now(); menuBeatAt = Date.now();

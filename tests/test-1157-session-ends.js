@@ -526,7 +526,8 @@ function pageRun(list) {
 }
 
 {
-  const P = pageRun({ characters: [{ profileId: 4242, name: 'Bjorn', slot: 1 }], intro: false, ended: SENTENCE });
+  // The front writes an ended page's list itself, so it says front (#5140).
+  const P = pageRun({ characters: [{ profileId: 4242, name: 'Bjorn', slot: 1 }], intro: false, ended: SENTENCE, front: true });
   yes('the choice page runs with LIST.ended' + (P.threw ? ': ' + P.threw : ''), !P.threw);
   yes('the sentence is over the slots', !!P.ended && P.ended.textContent === SENTENCE && P.ended.style.display === 'block');
   yes('and the page says so to the front log',
