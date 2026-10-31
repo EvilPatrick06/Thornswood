@@ -136,8 +136,9 @@ function Find-DevNoteRelease($tags, [string]$date) {
 # note proves its own: its sourceCommit, or when it has none (written before
 # that field existed, or by a release built with uncommitted files), the dev
 # release it came with (Find-DevNoteRelease), and for a release built with
-# uncommitted files, a later clean one (Is-Settled). Headline changes
-# therefore cannot leave completed work marked Dev-only.
+# uncommitted files, a later clean one (Is-Settled). A note below one whose
+# own commit main has is settled by it. Headline changes therefore cannot
+# leave completed work marked Dev-only.
 function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
     if ($null -eq $mainDoc) { return }
     $mainRelease = $mainDoc.PSObject.Properties['release']
@@ -329,9 +330,42 @@ function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
             else { Remove-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue }
         }
     }
+    # Newest first, as every feed keeps its notes (Publish-Update puts each new
+    # one on top). The first note whose own commit main has, and whose dev
+    # release was built from that commit with nothing uncommitted, settles
+    # every note below it: the dev build was built whole from that commit, so
+    # whatever an older dev release carried is either in that commit, which
+    # main has, or no longer in the dev build at all. Either way "dev has it
+    # and main does not" is false, which is Is-Settled's reasoning (#2401,
+    # option B) with the release that settles it named by its own note.
+    #
+    # Clean is read from the release tags at that commit, every one of them
+    # clean and at least one there, never from the note: the 12 Oct dev feed
+    # carried sourceCommit on notes of releases built with uncommitted files
+    # (20261003-192349-dev among them), and a clone with no tags proves
+    # nothing, so there the old notes keep their marks as before.
+    #
+    # Until 31 Oct an older note with no proof of its own kept its mark for
+    # good. Measured on the dev feed that day against main 20261031-144725
+    # (90026c6c), with the old ids judged by their tags as above: "Loading
+    # screens show the painting" (22 Oct 2:42 PM) and "Loading screen test
+    # returns" (5:51 PM) stayed DEV, though the test was taken off dev at
+    # 9:23 PM and main has the commit of every dev build up to 31 Oct 2:30 PM.
+    # No release tag's span holds either note's time, so nothing else could
+    # clear them. Settled by a commit, never by a date: a note's date and a
+    # tag's time can be on different clocks (Get-TeamNow in Release-Name.ps1).
+    $settled = $false
     foreach ($n in @($news)) {
         $commit = Get-DevNewsVal $n 'sourceCommit'
-        if ($commit -and $held.Contains($commit)) { $published = Is-Published $commit }
+        if ($settled) { $published = $true }
+        elseif ($commit -and $held.Contains($commit)) {
+            $published = Is-Published $commit
+            if ($published) {
+                if ($null -eq $devTags) { $devTags = @(Get-DevReleaseTags $sourceRepo) }
+                $at = @($devTags | Where-Object { $_.Commit -eq $commit })
+                $settled = ($at.Count -gt 0 -and @($at | Where-Object { -not $_.Clean }).Count -eq 0)
+            }
+        }
         else {
             if ($null -eq $devTags) { $devTags = @(Get-DevReleaseTags $sourceRepo) }
             $rel = Find-DevNoteRelease $devTags (Get-DevNewsVal $n 'date')
