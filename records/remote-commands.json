@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  76,
-    "callCount":  304,
+    "callCount":  306,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -1832,6 +1832,24 @@
                       "does":  "seeds the server root",
                       "class":  "admin",
                       "reason":  "first install, writes outside any stage"
+                  },
+                  {
+                      "script":  "scripts/release/Publish-Server.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "\"\\reads', '\" + $lastBox.Run + \"\\made' | Out-Null\")",
+                      "does":  "makes the reads and made folders in the run's own folder, where a -FromStore publish makes Thornswood-Last.esp (#2791)",
+                      "class":  "stage",
+                      "reason":  "writes a stage folder the run owns"
+                  },
+                  {
+                      "script":  "scripts/release/Publish-Server.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Send-ThornswoodArtifactFile",
+                      "anchor":  "Send-ThornswoodArtifactFile $src $target $ssh ($lastBox.Far + '/reads/' + (Split-Path -Leaf $src))",
+                      "does":  "uploads our plugins, as the payload carries them, to the run's folder, read first by the make of Thornswood-Last.esp (#2791)",
+                      "class":  "stage",
+                      "reason":  "writes a stage folder the run owns"
                   },
                   {
                       "script":  "scripts/release/Sign-OnGitHub.ps1",

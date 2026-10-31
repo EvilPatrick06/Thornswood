@@ -725,19 +725,25 @@ function New-StorePayload {
     Set-MaxPlayers $st $mostOnline
     [IO.File]::WriteAllText((Join-Path $dir 'server-settings.json'), ($st | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding($false)))
     $ours = @()
-    # Thornswood-Last.esp is the running server's, which -FromStore keeps: it
-    # is made on the box by the deploy that puts it there (#2791), so a
-    # publish whose server holds another than this commit's recipe makes
-    # waits for that deploy.
+    # Thornswood-Last.esp is never sent (#2791): it is made on the box from
+    # this commit's recipe. When the running server's is that one, -FromStore
+    # keeps it. When it is not, this publish makes it on the box after the
+    # copy, from our plugins as this payload carries them and then the
+    # server's own, and the installer takes it into the stage held to
+    # game\data\last-plugin.json. Waiting for a deploy to make it first could
+    # never end when the pin moved too: Deploy-DevGamemode.ps1 sends a
+    # gamemode only to a server that already runs this commit's build (#2076).
+    $script:LastMake = $null
+    $script:LastReads = @()
     $lastWant = Get-ThornswoodLastPluginWant (Join-Path $Here '..\..')
     if ($lastWant -and (@($box.Order) -icontains $ThornswoodLastPlugin)) {
         $boxLast = Get-ThornswoodServerPlugin $box $ThornswoodLastPlugin
         if (-not (Test-ThornswoodContentSame $boxLast $lastWant.Bytes $lastWant.Sha)) {
-            $deploy = if ($IsDev) { '.\scripts\deploy\Deploy-DevGamemode.ps1 -LoadOrder' } else { '.\scripts\deploy\Deploy-Server.ps1 -GamemodeOnly' }
-            Die (("the $Channel server holds a $ThornswoodLastPlugin of {0:N0} bytes, sha256 {1}, and this commit's recipe makes {2:N0} bytes, sha256 {3}. " -f $boxLast.Bytes, $(if ($boxLast.Sha) { $boxLast.Sha.Substring(0, 12) } else { 'none' }), $lastWant.Bytes, $lastWant.Sha.Substring(0, 12)) +
-                 "-FromStore keeps the running server's plugins, and the deploy makes it on the box first: $deploy. Nothing was sent.")
+            $script:LastMake = $lastWant
+            Say (("  the $Channel server holds a $ThornswoodLastPlugin of {0:N0} bytes, sha256 {1}, and this commit's recipe makes {2:N0} bytes, sha256 {3}: it will be made on the box" -f $boxLast.Bytes, $(if ($boxLast.Sha) { $boxLast.Sha.Substring(0, 12) } else { 'none' }), $lastWant.Bytes, $lastWant.Sha.Substring(0, 12))) 'Yellow'
+        } else {
+            Say ("  $ThornswoodLastPlugin is the running server's, the one this commit's recipe makes") 'DarkGray'
         }
-        Say ("  $ThornswoodLastPlugin is the running server's, the one this commit's recipe makes") 'DarkGray'
     }
     foreach ($n in $ThornswoodRepoPlugins) {
         if ($n -ieq $ThornswoodLastPlugin) { continue }
@@ -746,6 +752,7 @@ function New-StorePayload {
         if (-not (@($box.Order) -icontains $n)) { Say "  $n is ours and the $Channel server's load order does not name it, so it stays out" 'DarkGray'; continue }
         Copy-Item -LiteralPath $src -Destination (Join-Path $dir ('plugins\' + $n))
         $ours += $n
+        $script:LastReads += $src
     }
     Say ('  the gamemode artifact and its stamp, the record, how many it holds, and ' + $(if ($ours.Count) { 'our ' + ($ours -join ', ') } else { 'none of our plugins' }) +
          '; the running server keeps its ' + @($box.Order).Count + ' plugins and their order') 'Green'
@@ -947,7 +954,30 @@ if ($FreshWorld) {
     Say 'starting with no world, as asked; the old one stays in the previous folder' 'Yellow'
     $instArgs += ' -FreshWorld'
 }
-Invoke-Installer $instArgs
+# Thornswood-Last.esp, made on the box for this commit (#2791, New-StorePayload
+# says when): into a folder the box holds for this run, from our plugins as the
+# payload carries them, read first, and then the running server's own.
+$lastBox = $null
+if ($FromStore -and $script:LastMake) {
+    Head "Making $ThornswoodLastPlugin on the box"
+    . (Join-Path $Here '..\deploy\LastPluginOnBox.ps1')
+    $lastBox = Open-ThornswoodOnBoxFolder -Target $target -SshArgs $ssh
+    if (-not $lastBox.Made) { Die ('could not make a folder on the box to make ' + $ThornswoodLastPlugin + ' in: ' + (($lastBox.Said | Select-Object -Last 3) -join ' | ') + '. The server up there was not touched.') }
+    $made = $null
+    try {
+        $null = Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script ("New-Item -ItemType Directory -Force -Path '" + $lastBox.Run + "\reads', '" + $lastBox.Run + "\made' | Out-Null")
+        foreach ($src in $script:LastReads) { Send-ThornswoodArtifactFile $src $target $ssh ($lastBox.Far + '/reads/' + (Split-Path -Leaf $src)) }
+        $made = Invoke-ThornswoodLastPluginMake -Target $target -SshArgs $ssh -RepoDir (Join-Path $Here '..\..') `
+            -Reads @(($lastBox.Run + '\reads'), $VpsRoot.TrimEnd('\') + '\plugins') -Into ($lastBox.Run + '\made') -Want $script:LastMake
+    } catch {
+        $null = Close-ThornswoodOnBoxFolder $lastBox
+        Die ($_.Exception.Message + '. The server up there was not touched.')
+    }
+    Say ('  {0}, made on the box: {1:N0} bytes, sha256 {2}' -f $ThornswoodLastPlugin, $made.Bytes, $made.Sha.Substring(0, 12)) 'Green'
+    $instArgs += (" -LastPlugin '" + $lastBox.Run + '\made\' + $ThornswoodLastPlugin + "' -LastSha256 " + $made.Sha)
+}
+try { Invoke-Installer $instArgs }
+finally { if ($lastBox) { $null = Close-ThornswoodOnBoxFolder $lastBox } }
 
 Head 'Recording what it runs'
 Save-ServerRecords

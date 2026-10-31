@@ -29,7 +29,10 @@
     D  By the source: both deploys make the plugin into the stage they send
        and hold it to the manifest's sha256 with what they sent; no deploy,
        release or builder reads it from game\content; the tools the box is
-       sent are all in the repository.
+       sent are all in the repository. Publish-Server.ps1 -FromStore, when
+       the running server's is not this recipe's, makes it on the box from our
+       plugins and the server's and hands it to the installer, which holds it
+       to its sha256 and takes it into the stage only with -FromStore.
 
   Reads the repository; writes only its own folder under the scratch folder.
   M needs Python and prints SKIP without it.
@@ -202,6 +205,15 @@ foreach ($rel in @('scripts\deploy\Deploy-DevGamemode.ps1', 'scripts\deploy\Depl
 $chain = (Read-Text 'scripts\mods\content-tables.json') | ConvertFrom-Json
 $lastStep = @($chain.steps | Where-Object { $_.tool -eq 'scripts/mods/Build-LastPlugin.py' })[0]
 Yes 'D6 the content chain''s Build-LastPlugin.py step writes the recipe and manifest, not the plugin' ($lastStep -and @($lastStep.writes) -contains 'game/data/last-plugin.recipe' -and -not (@($lastStep.writes) -match 'Thornswood-Last\.esp').Count)
+$pub = Read-Text 'scripts\release\Publish-Server.ps1'
+Yes 'D8 Publish-Server.ps1 -FromStore makes it on the box when the running server''s is not this recipe''s, and does not stop' ($pub -match [regex]::Escape('$script:LastMake = $lastWant') -and $pub -notmatch [regex]::Escape('the deploy makes it on the box first'))
+Yes '    from our plugins as the payload carries them, read before the server''s own' ($pub -match [regex]::Escape("-Reads @((`$lastBox.Run + '\reads'), `$VpsRoot.TrimEnd('\') + '\plugins') -Into (`$lastBox.Run + '\made') -Want `$script:LastMake"))
+Yes '    and hands the installer the plugin with the sha256 the box made' ($pub -match [regex]::Escape("-LastPlugin '") -and $pub -match [regex]::Escape("-LastSha256 `" + `$made.Sha"))
+Yes '    and lets its folder on the box go after the install, whatever the install did' ($pub -match [regex]::Escape('finally { if ($lastBox) { $null = Close-ThornswoodOnBoxFolder $lastBox } }'))
+$inst = Read-Text 'scripts\deploy\Install-ThornswoodServer.ps1'
+Yes 'D9 the installer takes -LastPlugin only with -FromStore' ($inst -match [regex]::Escape("if (`$LastPlugin -and -not `$FromStore) { Refuse"))
+Yes '    holds it to -LastSha256 before it goes into the stage' ($inst -match '(?s)\$lastSum -ne \$LastSha256\.ToLowerInvariant\(\)\) \{ Refuse.*Copy-Item -LiteralPath \$LastPlugin -Destination \(Join-Path \$plugDir ''Thornswood-Last\.esp''\)')
+Yes '    and puts it there before the running server''s plugins, so the old one is not taken' ($inst.IndexOf('Copy-Item -LiteralPath $LastPlugin') -gt 0 -and $inst.IndexOf('Copy-Item -LiteralPath $LastPlugin') -lt $inst.IndexOf('foreach ($p in @($s.loadOrder)) {'))
 $onBox = Read-Text 'scripts\mods\OnBox.ps1'
 Yes 'D7 a box run makes this commit''s plugin in its data folder first' ($onBox -match [regex]::Escape('(Join-Path `$repo ''scripts\mods\Make-LastPlugin.py'') --data `$data --recipe `$lastRecipe'))
 
