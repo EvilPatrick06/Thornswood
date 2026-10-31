@@ -9,16 +9,15 @@
   Windows) before it replaces the one people download.
 
       .\scripts\release\Publish-InstallerFromGitHub.ps1
-      .\scripts\release\Publish-InstallerFromGitHub.ps1 -Tag v1.2.8   start installer.yml on this tag
 
   Ship.ps1 -FromFeed -Package runs it after the release is out, and its
   "did not rebuild" line names it, so the same command puts a failed one right.
 
-  WHY A TAG. Only a run on a v tag gets the signing identity (installer.yml,
-  HOW TO START IT). Without -Tag it is the tag of the launcher main's feed
-  offers, the one whose draft holds the setup program. A tag made before
-  installer.yml merged does not have it, and this says so before it starts
-  anything.
+  ON MAIN, NOT A TAG (31 Oct). Only a run of main's own workflow gets the
+  signing identity (installer.yml, HOW TO START IT), so installer.yml is
+  started on main. The installer goes on the draft of the launcher main's
+  feed offers, the one that holds the setup program, and is taken from there.
+  It took -Tag until then, and the release environment refused every v tag.
 
   It talks to GitHub through gh, REST only (Ship.ps1, FOUND THROUGH REST, NOT
   GRAPHQL), with Ship.ps1's own gh helpers lifted out of it by the parser so
@@ -29,7 +28,6 @@ param(
     # Where the installer is put before it is sent: the folder
     # Package-Thornswood.ps1 builds into (Where.ps1 Package) unless given.
     [string]$OutDir = (& (Join-Path $PSScriptRoot 'Where.ps1') Package),
-    [string]$Tag = '',
     # Bounds the wait for the installer.yml run, in seconds.
     [int]$WaitSeconds = 3600,
     # Passed on to Publish-Installer.ps1 (#2118). Loud.
@@ -77,11 +75,8 @@ $api = {
 
 $repo = Get-SourceRepo $RepoDir
 $launcherTag = Get-InstallerLauncherTag
-if (-not $Tag) { $Tag = $launcherTag }
 
-$why = Get-InstallerWorkflowRefusal $repo $Tag
-if ($why) { throw ($why + ' Nothing was published.') }
-$why = Invoke-InstallerOnGitHub -Repo $repo -Tag $Tag -WaitSeconds $WaitSeconds
+$why = Invoke-InstallerOnGitHub -Repo $repo -WaitSeconds $WaitSeconds
 if ($why) { throw ($why + ' Nothing was published.') }
 
 $rel = Find-InstallerRelease $api $repo $launcherTag

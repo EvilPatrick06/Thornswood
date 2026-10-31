@@ -8,15 +8,19 @@
 # no main release had. Package-Thornswood -FromFeed builds it from what main's
 # newest release recorded, on any machine (the header there).
 #
-# HOW TO START IT. On a v tag, because only a refs/tags/v ref gets the
-# "release" environment, whose subject is the one the Azure federated
-# credential trusts (release.yml, HOW IT SIGNS). Normally the tag of the
-# launcher main's feed offers, after the Ship that published the release:
-#   gh workflow run installer.yml --ref v<launcher version>
-# The tag has to be on main (Resolve-ReleaseTag.ps1). What is built does not
-# come from the tag: the scripts are main's, and the files are the ones main's
-# feed names, each held to its sha256 (New-FeedRoot.ps1), so starting it on
-# any v tag builds the same installer.
+# HOW TO START IT. On main, as release.yml is started (#3930, docs\
+# SIGNED-RELEASES.md "only main's own workflow signs"): only a run of main's
+# own workflow gets the "release" environment, whose subject is the one the
+# Azure federated credential trusts and whose deployment rule allows the
+# branch main only. After the Ship that published the release:
+#   gh workflow run installer.yml --ref main
+# Until 31 Oct this was started on a v tag and took the environment on
+# refs/tags/v; the environment had moved to main only, so its first run here
+# (v1.2.13, run 41200879330) was refused before a step ran: "Tag v1.2.13 is
+# not allowed to deploy to release". What is built never came from the tag:
+# the scripts are main's, the draft is the one for the launcher main's feed
+# offers (Get-InstallerLauncherTag), and the files are the ones main's feed
+# names, each held to its sha256 (New-FeedRoot.ps1).
 #
 # WHAT IT DOES. Checks out main, fetches the setup program release.yml built
 # beside the launcher main's feed offers (held to that draft's SHA256SUMS),
@@ -43,7 +47,7 @@
 # Every action is named by a full length commit SHA with its tag in the
 # comment, for the reason build.yml gives.
 name: Release installer
-run-name: Installer from main's feed (${{ github.ref_name }})
+run-name: Installer from main's feed
 on:
   workflow_dispatch:
 # The draft is read and written with the repository token, which needs write
@@ -51,7 +55,7 @@ on:
 # id-token: write for itself only.
 permissions:
   contents: write
-# One installer build at a time, whichever tag started it: they all build
+# One installer build at a time: they all build
 # main's newest release, and two would race for the same draft's files.
 concurrency:
   group: installer
@@ -60,7 +64,9 @@ jobs:
   installer:
     name: Build and sign the installer from main's feed
     runs-on: windows-latest
-    environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'release' || '' }}
+    # The "release" environment only in a run of main's own workflow, as
+    # release.yml's launcher job (header, HOW TO START IT).
+    environment: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && 'release' || '' }}
     permissions:
       contents: write
       id-token: write
@@ -76,20 +82,17 @@ jobs:
           submodules: false
           fetch-depth: 0
 
-      # The run's ref is what unlocks the signing identity, so it has to be a
-      # v tag on main; then main is what is built from (header, HOW TO START IT).
-      - name: Confirm the run is on a release tag on main, then check out main
+      # The run's ref is what unlocks the signing identity, so it has to be
+      # main, started by hand; main is what is built from (header, HOW TO
+      # START IT).
+      - name: Confirm the run is main's own, then check out main
         shell: pwsh
         run: |
-          if ($env:GITHUB_REF -notlike 'refs/tags/v*') { Write-Host ('::error::start this on a v tag, which is what the signing identity is given to: gh workflow run installer.yml --ref v<launcher version> (this run is on ' + $env:GITHUB_REF + ')'); exit 1 }
-          . .\scripts\release\Resolve-ReleaseTag.ps1
-          try { $commit = Resolve-ThornswoodReleaseTag -Tag $env:GITHUB_REF_NAME -RepoDir . -MainRef origin/main }
-          catch { Write-Host ('::error::' + $_.Exception.Message); exit 1 }
-          if ($commit -ne $env:GITHUB_SHA) { Write-Host "::error::tag $($env:GITHUB_REF_NAME) is $commit, and this run is on $($env:GITHUB_SHA)"; exit 1 }
+          if ($env:GITHUB_EVENT_NAME -ne 'workflow_dispatch' -or $env:GITHUB_REF -ne 'refs/heads/main') { Write-Host ('::error::start this on main, which is what the signing identity is given to: gh workflow run installer.yml --ref main (this run is ' + $env:GITHUB_EVENT_NAME + ' on ' + $env:GITHUB_REF + ')'); exit 1 }
           git checkout --force --detach origin/main
           if ($LASTEXITCODE -ne 0) { Write-Host '::error::could not check out origin/main'; exit 1 }
           git clean -ffdx
-          Write-Host ("on tag {0}; building from main at {1}" -f $env:GITHUB_REF_NAME, "$(git rev-parse HEAD)".Trim())
+          Write-Host ("building from main at {0}" -f "$(git rev-parse HEAD)".Trim())
 
       - name: Fetch the setup program beside the launcher main's feed offers
         id: stub
