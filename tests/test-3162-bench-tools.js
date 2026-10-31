@@ -328,12 +328,14 @@ attempt('the bench doors', function () {
   r.give(ITEMS.ironIngot || '5ace4:Skyrim.esm', 1);
   r.give(lineOf(/^const HANDLE_DESC = '([^']+)'/m).split("'")[1], 1);
   yes('B1 and forges a hammer there with none in the pack', r.craft(hammerRow) !== false && r.count(TOOLS.smith.give) === 1);
+  // A tailor's rows are at the loom since #3120 moved them off the forge.
+  const loom = baseFor('6ce000:Update.esm');
   const t = rig(person('tailor', 'haberdasher', 'novice'));
-  const shut = t.api.benchGate(t.A, forge);
-  yes('B1 a tailor with no shears is turned away from the forge, told which tool and who makes one (' + shut + ')',
+  const shut = loom ? t.api.benchGate(t.A, loom) : null;
+  yes('B1 a tailor with no shears is turned away from the loom, told which tool and who makes one (' + shut + ')',
       shut === 'You need a pair of shears in your pack for that. ' + TOOLS.tailor.where);
   t.give(TOOLS.tailor.give, 1);
-  yes('B1 and the forge opens with a pair in the pack', t.api.benchGate(t.A, forge) === null);
+  yes('B1 and the loom opens with a pair in the pack', !!loom && t.api.benchGate(t.A, loom) === null);
 
   const lab = baseFor('alchemy');
   const ench = baseFor('enchanting');

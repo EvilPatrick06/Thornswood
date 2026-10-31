@@ -262,8 +262,8 @@
   },
   {
    "name": "Thornswood-Content.esp",
-   "sha256": "f4bd6cbce6d08d38be1df6416772aeb6a69ece669bf801c1c76a7a893913d724",
-   "size": 282765
+   "sha256": "2bba714c2595335883e13f848ec74c9b4837af0194b27b3a1f90ba51be1338e1",
+   "size": 283849
   },
   {
    "name": "FNIS.esp",
@@ -527,8 +527,8 @@
   },
   {
    "name": "Thornswood-Last.esp",
-   "sha256": "95d85507c11962b592dacf1ace067677f5309b75d0cd7d9caadf1e502909cca0",
-   "size": 12998852
+   "sha256": "a3dfabe1d2fddd148f09b44548325728dfa65e9caa37a448f210e42356e8e3b6",
+   "size": 13398406
   }
  ],
  "issue": 3160,

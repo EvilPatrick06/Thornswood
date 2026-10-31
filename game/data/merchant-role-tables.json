@@ -3,7 +3,7 @@
   "active": false,
   "builtBy": "scripts/dev/Build-MerchantRoleTables.py",
   "sources": {
-    "game/data/recipes.json": "c67a328b09a0f0f35abf9bbe2bf9a1268ada07af7ebe1a68cfd3e52568e991e0",
+    "game/data/recipes.json": "0edb55c0c77c9d8e0acfb9d00c035a3085e0ec8f7be426b7012b6c842880bab9",
     "game/data/harvests.json": "bf392d0c999644f35b82a0436a834bd5978e070a908dae435d3db668a1043208",
     "game/data/hunts.json": "a14a63951d87341652bc0749b98bc9433b08a78c990a2d24a59219779c904920",
     "game/data/items.json": "c292372a724a1155b0713028c92b9f464ddbaf497928b8594cc30ea8cc6e5677",
@@ -272,7 +272,7 @@
     },
     {
       "name": "Thornswood-Content.esp",
-      "sha256": "f4bd6cbce6d08d38be1df6416772aeb6a69ece669bf801c1c76a7a893913d724",
+      "sha256": "2bba714c2595335883e13f848ec74c9b4837af0194b27b3a1f90ba51be1338e1",
       "repository": true
     },
     {
@@ -537,7 +537,7 @@
     },
     {
       "name": "Thornswood-Last.esp",
-      "sha256": "95d85507c11962b592dacf1ace067677f5309b75d0cd7d9caadf1e502909cca0",
+      "sha256": "a3dfabe1d2fddd148f09b44548325728dfa65e9caa37a448f210e42356e8e3b6",
       "repository": false
     }
   ],
@@ -1956,6 +1956,24 @@
       "edid": "ArmorFallenDawnguard",
       "winner": "cheddars_mashups.esl"
     },
+    "1b000:Thornswood-Content.esp": {
+      "type": "MISC",
+      "flags": 0,
+      "edid": "ThornswoodMiscToolShears",
+      "winner": "Thornswood-Content.esp"
+    },
+    "1b001:Thornswood-Content.esp": {
+      "type": "MISC",
+      "flags": 0,
+      "edid": "ThornswoodMiscToolAlembic",
+      "winner": "Thornswood-Content.esp"
+    },
+    "1b002:Thornswood-Content.esp": {
+      "type": "MISC",
+      "flags": 0,
+      "edid": "ThornswoodMiscToolRuneKnife",
+      "winner": "Thornswood-Content.esp"
+    },
     "1b39f:Skyrim.esm": {
       "type": "ARMO",
       "flags": 0,
@@ -2996,6 +3014,12 @@
       "winner": "Gourmet.esp",
       "food": true
     },
+    "319e5:Skyrim.esm": {
+      "type": "MISC",
+      "flags": 0,
+      "edid": "WoodenLadle01",
+      "winner": "Skyrim.esm"
+    },
     "31:cheddars_mashups.esl": {
       "type": "ARMO",
       "flags": 0,
@@ -3940,6 +3964,12 @@
       "flags": 0,
       "edid": "ArmorSteelVigilantA",
       "winner": "cheddars_mashups.esl"
+    },
+    "5cae1:Skyrim.esm": {
+      "type": "MISC",
+      "flags": 0,
+      "edid": "BlacksmithHammer01",
+      "winner": "Skyrim.esm"
     },
     "5d:cheddars_mashups.esl": {
       "type": "ARMO",
@@ -6089,6 +6119,9 @@
         "1:cheddars_mashups.esl",
         "1a4:cheddars_mashups.esl",
         "1a8:cheddars_mashups.esl",
+        "1b000:Thornswood-Content.esp",
+        "1b001:Thornswood-Content.esp",
+        "1b002:Thornswood-Content.esp",
         "1b39f:Skyrim.esm",
         "1b3a0:Skyrim.esm",
         "1b3a1:Skyrim.esm",
@@ -6212,6 +6245,7 @@
         "5ada1:Skyrim.esm",
         "5c06c:Skyrim.esm",
         "5c:cheddars_mashups.esl",
+        "5cae1:Skyrim.esm",
         "5d:cheddars_mashups.esl",
         "5e:cheddars_mashups.esl",
         "5f:cheddars_mashups.esl",
@@ -6435,6 +6469,9 @@
         "1:cheddars_mashups.esl",
         "1a4:cheddars_mashups.esl",
         "1a8:cheddars_mashups.esl",
+        "1b000:Thornswood-Content.esp",
+        "1b001:Thornswood-Content.esp",
+        "1b002:Thornswood-Content.esp",
         "1b39f:Skyrim.esm",
         "1b3a0:Skyrim.esm",
         "1b3a1:Skyrim.esm",
@@ -6558,6 +6595,7 @@
         "5ada1:Skyrim.esm",
         "5c06c:Skyrim.esm",
         "5c:cheddars_mashups.esl",
+        "5cae1:Skyrim.esm",
         "5d:cheddars_mashups.esl",
         "5e:cheddars_mashups.esl",
         "5f:cheddars_mashups.esl",
@@ -6739,6 +6777,7 @@
         "2623b:Dragonborn.esm",
         "287f:PlayFluteLuteDrum.esp",
         "2b06b:Dragonborn.esm",
+        "319e5:Skyrim.esm",
         "38340:Skyrim.esm",
         "38341:Skyrim.esm",
         "3ad57:Skyrim.esm",
@@ -6806,6 +6845,7 @@
         "2623b:Dragonborn.esm",
         "287f:PlayFluteLuteDrum.esp",
         "2b06b:Dragonborn.esm",
+        "319e5:Skyrim.esm",
         "38340:Skyrim.esm",
         "38341:Skyrim.esm",
         "3ad57:Skyrim.esm",
@@ -9547,6 +9587,7 @@
       "Smith:recipe:1548d:Thornswood-Content.esp:input:1",
       "Smith:recipe:1548e:Thornswood-Content.esp:input:1",
       "Smith:recipe:15492:Thornswood-Content.esp:input:1",
+      "Smith:recipe:1b003:Thornswood-Content.esp:input:1",
       "Woodworker:recipe:15491:Thornswood-Content.esp:out"
     ],
     "15494:Thornswood-Content.esp": [
@@ -9802,6 +9843,15 @@
     "1a8:cheddars_mashups.esl": [
       "Enchanter:wardweaver:public-wearable",
       "Smith:recipe:1a9:cheddars_mashups.esl:out"
+    ],
+    "1b000:Thornswood-Content.esp": [
+      "Smith:recipe:1b004:Thornswood-Content.esp:out"
+    ],
+    "1b001:Thornswood-Content.esp": [
+      "Smith:recipe:1b005:Thornswood-Content.esp:out"
+    ],
+    "1b002:Thornswood-Content.esp": [
+      "Smith:recipe:1b006:Thornswood-Content.esp:out"
     ],
     "1b39f:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
@@ -10520,6 +10570,9 @@
       "Cook:recipe:811:Gourmet.esp:input:0",
       "Cook:recipe:812:Gourmet.esp:input:0",
       "Cook:recipe:813:Gourmet.esp:input:0"
+    ],
+    "319e5:Skyrim.esm": [
+      "Woodworker:recipe:1b007:Thornswood-Content.esp:out"
     ],
     "31:cheddars_mashups.esl": [
       "Enchanter:wardweaver:public-wearable",
@@ -11384,6 +11437,10 @@
       "Smith:recipe:1a9:cheddars_mashups.esl:input:2",
       "Smith:recipe:1aa:cheddars_mashups.esl:input:2",
       "Smith:recipe:1ab:cheddars_mashups.esl:input:1",
+      "Smith:recipe:1b003:Thornswood-Content.esp:input:0",
+      "Smith:recipe:1b004:Thornswood-Content.esp:input:0",
+      "Smith:recipe:1b005:Thornswood-Content.esp:input:0",
+      "Smith:recipe:1b006:Thornswood-Content.esp:input:0",
       "Smith:recipe:24:cheddars_mashups.esl:input:1",
       "Smith:recipe:27:cheddars_mashups.esl:input:3",
       "Smith:recipe:2b04f:Dragonborn.esm:input:0",
@@ -11896,6 +11953,9 @@
     "5c:cheddars_mashups.esl": [
       "Enchanter:wardweaver:public-wearable",
       "Smith:recipe:63:cheddars_mashups.esl:out"
+    ],
+    "5cae1:Skyrim.esm": [
+      "Smith:recipe:1b003:Thornswood-Content.esp:out"
     ],
     "5d:cheddars_mashups.esl": [
       "Enchanter:wardweaver:public-wearable",
@@ -12504,6 +12564,7 @@
       "Woodworker:recipe:19fb4:Playable Rieklings.esp:input:1",
       "Woodworker:recipe:19fb7:Playable Rieklings.esp:input:1",
       "Woodworker:recipe:19fb8:Playable Rieklings.esp:input:1",
+      "Woodworker:recipe:1b007:Thornswood-Content.esp:input:0",
       "Woodworker:recipe:3cf53:Dragonborn.esm:input:0",
       "Woodworker:recipe:3cf54:Dragonborn.esm:input:0",
       "Woodworker:recipe:8f0:MoreCraftableEquipment.esp:input:1",
@@ -12677,6 +12738,7 @@
       "Smith:recipe:1a9:cheddars_mashups.esl:input:0",
       "Smith:recipe:1aa:cheddars_mashups.esl:input:0",
       "Smith:recipe:1ab:cheddars_mashups.esl:input:0",
+      "Smith:recipe:1b006:Thornswood-Content.esp:input:1",
       "Smith:recipe:23190:Hothtrooper44_ArmorCompilation.esp:input:2",
       "Smith:recipe:23195:Hothtrooper44_ArmorCompilation.esp:input:2",
       "Smith:recipe:2319a:Hothtrooper44_ArmorCompilation.esp:input:1",
@@ -14153,13 +14215,13 @@
   },
   "counts": {
     "Smith": {
-      "buy": 344,
-      "sell": 344,
+      "buy": 348,
+      "sell": 348,
       "supply": 42
     },
     "Woodworker": {
-      "buy": 65,
-      "sell": 65,
+      "buy": 66,
+      "sell": 66,
       "supply": 16
     },
     "Tailor": {
