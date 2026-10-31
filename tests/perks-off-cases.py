@@ -17,7 +17,9 @@ made here, without the game:
   3  a record that tests no perk, or joins one by OR, is refused;
   4  over a load order: a winning recipe that tests a perk is chosen, a
      deleted one, one that tests none, and one of a never-copied plugin are
-     not (that one is counted), and one joined by OR stops the build, named;
+     not (that one is counted), unless that plugin's row says
+     perkRecipesCopied, as Immersive Armors' does, and one joined by OR
+     stops the build, named;
   5  the recipe table reads the same end state: it takes the policy's
      never-copied plugins, reads conditions from below the last plugin, and
      fails on a perk test joined by OR.
@@ -29,6 +31,7 @@ tests/test-4826-perks-off.js runs it on the build check.
 Prints PASS or FAIL per check and exits 1 when any fails.
 """
 import importlib.util
+import json
 import os
 import struct
 import sys
@@ -148,6 +151,26 @@ yes('4 the manifest counts it, its condition, its winner and the perk tested',
     stats['tested'] == {'cb40d:Skyrim.esm': 1})
 yes('4 the never-copied plugin keeps its own recipe and the one it wins, counted',
     stats['notCopied'] == {'Hothtrooper44_ArmorCompilation.esp': 2})
+# Immersive Armors' row says perkRecipesCopied (Patrick, 31 Oct 2026, A on
+# q-4826-ia-perk-recipes): its recipes that test a perk are copied the same
+# way, and counted as copied from a never-copied plugin.
+here, stats = bl.perk_entries(plugins, win, canon, blocked, frozenset(blocked))
+yes('4 with perkRecipesCopied, its own perk recipe and the one it wins are copied too',
+    sorted(e.fid for e in here) == [0x10, 0x14, 0x01000020] and stats['notCopied'] == {} and
+    stats['byWinner'] == {'Skyrim.esm': 1, 'Hothtrooper44_ArmorCompilation.esp': 2} and
+    stats['copiedFromNeverCopied'] == {'Hothtrooper44_ArmorCompilation.esp': 2})
+yes('4 the copy has only its perk test taken out',
+    bl.without_perks(perky, 'IA COBJ') == [(b'EDID', b'Perky\x00')])
+policy = json.load(open(os.path.join(ROOT, 'game', 'data', 'last-plugin-policy.json'), encoding='utf-8'))
+yes('4 the policy copies Immersive Armors\' perk recipes and no other never-copied plugin\'s',
+    bl.perk_recipes_copied(policy) == frozenset({'hothtrooper44_armorcompilation.esp'}) and
+    bl.perk_recipes_copied({'notCopiedFrom': [{'plugin': 'X.esp'}, {'plugin': 'Y.esp', 'perkRecipesCopied': 'yes'}]})
+    == frozenset())
+yes('4 a recipe kept by one blocked plugin stays kept even when the other copies',
+    bl.perks_kept('Hothtrooper44_ArmorCompilation.esp', ('x.esp', 1), {'x.esp', 'hothtrooper44_armorcompilation.esp'},
+                  frozenset({'hothtrooper44_armorcompilation.esp'})) and
+    not bl.perks_kept('Hothtrooper44_ArmorCompilation.esp', ('skyrim.esm', 1), {'hothtrooper44_armorcompilation.esp'},
+                      frozenset({'hothtrooper44_armorcompilation.esp'})))
 sky.records[0x15] = ored
 win[(b'COBJ', ('skyrim.esm', 0x15))] = entry(0x15, 0)
 said = stops(bl.perk_entries, plugins, win, canon, blocked)
@@ -158,6 +181,8 @@ yes('4 a winning recipe that joins a perk test by OR stops the build, named', '1
 table = open(os.path.join(ROOT, 'scripts', 'dev', 'Build-RecipeTable.ps1'), encoding='utf-8-sig').read()
 yes('5 the recipe table takes the never-copied plugins from the last plugin\'s policy',
     "game\\data\\last-plugin-policy.json" in table and '.notCopiedFrom' in table)
+yes('5 it keeps the perk tests only of a never-copied plugin whose row does not copy its perk recipes',
+    '$row.perkRecipesCopied -ne $true' in table)
 yes('5 it reads a recipe\'s conditions from below Thornswood-Last.esp',
     '$pl -eq $LAST_PLUGIN -and $recipes.Contains($desc)' in table and '$condList = $recipes[$desc].Conditions' in table)
 yes('5 a perk test on a recipe whose perks come off is not one of its needs',

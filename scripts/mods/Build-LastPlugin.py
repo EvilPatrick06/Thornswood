@@ -161,8 +161,14 @@ WHAT IT PUTS IN THE PLUGIN
      record with only those conditions taken out (and the strings that
      follow one, CIS1 and CIS2), so the server alone decides who makes what
      (the craft gate, and the recipes it hides from each person). A recipe
-     of a plugin the policy never copies from keeps its perks and is counted
-     (perks.notCopied). A perk test joined to another condition by OR stops
+     of a plugin the policy never copies from is copied only when its row
+     says perkRecipesCopied (Immersive Armors: Patrick, 31 Oct 2026, A on
+     q-4826-ia-perk-recipes), and then the same way, with only its perk
+     tests taken out; its counts and bench stay its own here and are set in
+     each person's game as before (6, 8). The copy is made on each machine
+     from that machine's own copy of the plugin (#2791), so none of its
+     bytes are handed on. One of a plugin whose row does not say it keeps
+     its perks and is counted (perks.notCopied). A perk test joined to another condition by OR stops
      the build, because taking it out would change what the other one
      means; each such recipe is decided rather than guessed. A recipe
      re-costed (6), moved (8) and freed of its perks is one record carrying
@@ -1297,8 +1303,12 @@ def build(data_dir):
     # Patrick allowed. Immersive Armors carries none (Patrick, 22 Oct 2026,
     # q-613-ia-recipes: the 6 floor items it places and their 5 cell and
     # world headers were never his to carry); those floor items are held off
-    # by the server (heldByServer below).
+    # by the server (heldByServer below). The one other thing copied out of
+    # such a plugin is its recipes that test a perk, with only those tests
+    # taken out, when its row says perkRecipesCopied (9; Patrick, 31 Oct
+    # 2026, A on q-4826-ia-perk-recipes).
     blocked = {row['plugin'].lower() for row in policy.get('notCopiedFrom', [])}
+    perks_off = perk_recipes_copied(policy)
     carried = {r.lower(): r for row in policy.get('notCopiedFrom', []) for r in row.get('carried', [])}
     used = set()
     below = {}
@@ -1452,7 +1462,7 @@ def build(data_dir):
                                         blocked, carries)
 
     # 9. The recipes freed of Skyrim's perks (#4826).
-    perk_recipes, perk_stats = perk_entries(plugins, win, canon, blocked)
+    perk_recipes, perk_stats = perk_entries(plugins, win, canon, blocked, perks_off)
 
     # 6. Nothing is copied out of a plugin the policy never copies from
     # (notCopiedFrom, above) but what it carries; anything else it would
@@ -1782,13 +1792,30 @@ def without_perks(pairs, what):
     return out
 
 
-def perk_entries(plugins, win, canon, blocked):
+def perk_recipes_copied(policy):
+    """The never-copied plugins whose recipes that test a perk are copied all
+    the same, to take the tests out (perkRecipesCopied on the plugin's
+    notCopiedFrom row, #4826), lower case."""
+    return frozenset(row['plugin'].lower() for row in policy.get('notCopiedFrom', [])
+                     if row.get('perkRecipesCopied') is True)
+
+
+def perks_kept(src_name, gid, blocked, perks_off):
+    """Whether a winning recipe keeps its perk tests: it does when the plugin
+    that wins it, or the one that made it, is never copied from and its row
+    does not copy its perk recipes."""
+    return any(n in blocked and n not in perks_off for n in (src_name.lower(), gid[0]))
+
+
+def perk_entries(plugins, win, canon, blocked, perks_off=frozenset()):
     """Every winning recipe that tests one of Skyrim's perks (#4826): the
     entries copied here to take the tests out, and what the manifest says of
     them. One a never-copied plugin has or wins keeps its tests and is only
-    counted; one whose test is joined by OR stops the build."""
+    counted, unless that plugin's row copies its perk recipes (perks_off);
+    one whose test is joined by OR stops the build."""
     here, joined = [], []
     by_plugin, perks, not_copied = collections.Counter(), collections.Counter(), collections.Counter()
+    copied_anyway = collections.Counter()
     conditions = 0
     for (tag, gid), e in sorted(win.items()):
         if tag != b'COBJ' or e.flags & DELETED:
@@ -1798,7 +1825,7 @@ def perk_entries(plugins, win, canon, blocked):
         at, is_joined = perk_tests(pairs)
         if not at:
             continue
-        if src.name.lower() in blocked or gid[0] in blocked:
+        if perks_kept(src.name, gid, blocked, perks_off):
             not_copied[src.name] += 1
             continue
         if is_joined:
@@ -1806,6 +1833,8 @@ def perk_entries(plugins, win, canon, blocked):
             continue
         here.append(e)
         by_plugin[src.name] += 1
+        for n in sorted({src.name.lower(), gid[0]} & blocked):
+            copied_anyway[canon.get(n, n)] += 1
         conditions += len(at)
         for i in at:
             perks[desc_of(src.gid(struct.unpack_from('<I', pairs[i][1], 12)[0]), canon)] += 1
@@ -1816,7 +1845,8 @@ def perk_entries(plugins, win, canon, blocked):
     stats = {'recipes': len(here), 'conditions': conditions,
              'byWinner': dict(sorted(by_plugin.items())),
              'tested': dict(sorted(perks.items(), key=lambda kv: (-kv[1], kv[0]))),
-             'notCopied': dict(sorted(not_copied.items()))}
+             'notCopied': dict(sorted(not_copied.items())),
+             'copiedFromNeverCopied': dict(sorted(copied_anyway.items()))}
     return here, stats
 
 
@@ -2129,7 +2159,9 @@ def verify(data_dir, plugin_bytes, manifest):
         return ['the plugin is not flagged light']
     plugins = plugins + [last]
     win = winners(plugins, {b'ACHR', b'REFR', b'QUST', b'LCTN', b'CELL', b'FLOR', b'COBJ'} | set(FLOOR_TYPES))
-    blocked = {row['plugin'].lower() for row in json.load(open(POLICY, encoding='utf-8')).get('notCopiedFrom', [])}
+    policy = json.load(open(POLICY, encoding='utf-8'))
+    blocked = {row['plugin'].lower() for row in policy.get('notCopiedFrom', [])}
+    perks_off = perk_recipes_copied(policy)
     fails = []
     # Every re-costed recipe (#613) wins here, asking the counts the manifest says.
     for row in manifest.get('recost', []):
@@ -2147,7 +2179,7 @@ def verify(data_dir, plugin_bytes, manifest):
                 plugins[e.pi].gid(struct.unpack_from('<I', bnam, 0)[0]) != ref_key(row['to']):
             fails.append('recipe %s %s is not at %s' % (row['recipe'], row['editorId'], row['to']))
     # No winning recipe tests a perk (#4826), but one a never-copied plugin
-    # has or wins, which the manifest counts.
+    # has or wins whose perk recipes are not copied, which the manifest counts.
     kept = 0
     for (tag, gid), e in win.items():
         if tag != b'COBJ' or e.flags & DELETED:
@@ -2155,7 +2187,7 @@ def verify(data_dir, plugin_bytes, manifest):
         at, _ = perk_tests(subrecords(plugins[e.pi].data(e)))
         if not at:
             continue
-        if plugins[e.pi].name.lower() in blocked or gid[0] in blocked:
+        if perks_kept(plugins[e.pi].name, gid, blocked, perks_off):
             kept += 1
         else:
             fails.append('recipe %s still tests a perk' % desc_of(gid, canon))

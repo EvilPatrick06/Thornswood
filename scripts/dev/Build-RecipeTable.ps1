@@ -618,8 +618,10 @@ $CONDITION_FUNCTIONS_THE_SERVER_HAS = @{
 # hides a row the server allows. This table reads the end state in one pass:
 # a perk test on a recipe the last plugin copies is not one of the row's
 # needs. A recipe of a plugin the last plugin never copies from
-# (notCopiedFrom in game\data\last-plugin-policy.json, Immersive Armors)
-# keeps its perk tests, and those rows are still counted as behind a perk.
+# (notCopiedFrom in game\data\last-plugin-policy.json) keeps its perk tests,
+# and those rows are still counted as behind a perk, unless that plugin's row
+# says perkRecipesCopied: Immersive Armors' does (Patrick, 31 Oct 2026, A on
+# q-4826-ia-perk-recipes), so its perk tests come off like everybody's.
 # Thornswood-Last.esp's own copy of a recipe is never read for its
 # conditions: the ones below it are, the way its bench is (#3120), so the
 # table is the same whether the box's last plugin is from before this or
@@ -636,7 +638,7 @@ $PERKS_OFF_IN_LAST_PLUGIN = $true
 $LAST_POLICY_FILE = Join-Path $PSScriptRoot '..\..\game\data\last-plugin-policy.json'
 $PERKS_KEPT_IN = @{}
 foreach ($row in @(([IO.File]::ReadAllText($LAST_POLICY_FILE) | ConvertFrom-Json).notCopiedFrom)) {
-    if ($row -and $row.plugin) { $PERKS_KEPT_IN[([string]$row.plugin).ToLowerInvariant()] = $true }
+    if ($row -and $row.plugin -and $row.perkRecipesCopied -ne $true) { $PERKS_KEPT_IN[([string]$row.plugin).ToLowerInvariant()] = $true }
 }
 
 # HOW A CONDITION IS READ OUT LOUD. The operator is the top three bits of the
@@ -3394,7 +3396,7 @@ function ConditionRead($cond, $masters, [string]$plugin) {
 
 # Whether Thornswood-Last.esp takes this recipe's perk tests out (#4826): yes,
 # unless the record or the plugin that carries it below the last plugin is
-# one the last plugin never copies from.
+# one the last plugin never copies from and does not copy the perk recipes of.
 function PerksComeOff($r) {
     if (-not $PERKS_OFF_IN_LAST_PLUGIN) { return $false }
     if ($PERKS_KEPT_IN.ContainsKey(([string]$r.Plugin).ToLowerInvariant())) { return $false }
