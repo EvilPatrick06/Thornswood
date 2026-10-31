@@ -10,11 +10,11 @@
   the publish gate on the box before it replaces the one people download.
 
   What it checks:
-    1. Get-InstallerWorkflowRefusal with a stand-in gh: a tag with
-       installer.yml is fine; one made before it merged is refused, saying to
-       Ship from One; any other answer is refused as not known.
+    1. (Gone on 31 Oct: installer.yml is started on main, which always has
+       it, so nothing asks whether a tag carries it.)
     2. Invoke-InstallerOnGitHub with a stand-in gh: it starts installer.yml on
-       the tag, waits for that run, and is '' only for a green one.
+       main (the only ref the release environment allows, #3930), waits for
+       that run, and is '' only for a green one.
     3. Get-SignedBoxFileRefusal with a stand-in box: the check script names
        the file already on the box and carries no copy of it; the box's
        answer comes back as Get-SignedFileRefusal's does.
@@ -22,8 +22,8 @@
        site does not serve, is held to the gate there, is taken off again when
        it is refused, and is moved into files only once it passes, before
        files.json is written. On Windows the gate is the local one as before.
-    5. Ship.ps1: -Package is no longer refused from the feed; installer.yml on
-       the tag is asked about before anything is published; the release runs
+    5. Ship.ps1: -Package is no longer refused from the feed; nothing asks
+       about installer.yml on a tag any more; the release runs
        Publish-InstallerFromGitHub.ps1 and names it to put a failure right;
        and the launcher is not put into a folder for a local packager.
     6. Publish-InstallerFromGitHub.ps1 parses and finds the Ship.ps1 helpers
@@ -58,16 +58,8 @@ function Done {
 . (Join-Path $Repo 'scripts\release\Sign-OnGitHub.ps1')
 . (Join-Path $Repo 'scripts\release\Installer-OnGitHub.ps1')
 
-# ---- 1. installer.yml on the tag ------------------------------------------------
-$script:asked = @()
-$ghHas = { $script:asked += , @($args); return '{"name":"installer.yml"}' }
-Yes 'a tag that has installer.yml: nothing to refuse' ((Get-InstallerWorkflowRefusal 'o/r' 'v1.2.8' $ghHas) -eq '')
-Yes '  asked for that file at that tag' (($script:asked[0] -join ' ') -eq 'api repos/o/r/contents/.github/workflows/installer.yml?ref=v1.2.8')
-$gh404 = { throw 'gh api exited 1: gh: Not Found (HTTP 404)' }
-$why = Get-InstallerWorkflowRefusal 'o/r' 'v1.2.7' $gh404
-Yes 'a tag made before it merged: refused, saying to Ship -Package from One for this one' ($why -match 'v1\.2\.7 was made before installer\.yml merged' -and $why -match 'Ship this one with -Package from One')
-$ghDown = { throw 'gh api exited 1: connection reset' }
-Yes 'any other answer: refused as not known' ((Get-InstallerWorkflowRefusal 'o/r' 'v1.2.8' $ghDown) -match 'could not be read: gh api exited 1: connection reset')
+# ---- 1. no tag to ask about ------------------------------------------------------
+Yes 'nothing asks whether a tag carries installer.yml: it runs on main' (-not (Get-Command Get-InstallerWorkflowRefusal -ErrorAction SilentlyContinue))
 
 # ---- 2. the run ------------------------------------------------------------------
 $calls = New-Object System.Collections.ArrayList
@@ -79,20 +71,19 @@ function New-RunGh([string]$conclusion) {
         [void]$seen.Add(($args -join ' '))
         if ($args[0] -eq 'workflow') { return '' }
         $made = (Get-Date).ToUniversalTime().ToString('o')
-        return ('[{"databaseId":41,"displayTitle":"Installer from main''s feed (v1.2.8)","headBranch":"v1.2.8","status":"completed","conclusion":"' + $c +
+        return ('[{"databaseId":41,"displayTitle":"Installer from main''s feed","headBranch":"main","status":"completed","conclusion":"' + $c +
                 '","url":"https://github.invalid/runs/41","createdAt":"' + $made + '"},' +
                 '{"databaseId":40,"displayTitle":"x","headBranch":"v1.2.7","status":"in_progress","conclusion":"","url":"u","createdAt":"' + $made + '"}]')
     }.GetNewClosure()
 }
 $gh = New-RunGh 'success'
-$why = Invoke-InstallerOnGitHub -Repo 'o/r' -Tag 'v1.2.8' -Gh $gh -WaitSeconds 5 -Poll 1
-Yes ("a green run on the tag: '' ('{0}')" -f $why) ($why -eq '')
-Yes '  it started installer.yml on the tag' ($calls.Count -ge 2 -and $calls[0] -eq 'workflow run installer.yml -R o/r --ref v1.2.8')
+$why = Invoke-InstallerOnGitHub -Repo 'o/r' -Gh $gh -WaitSeconds 5 -Poll 1
+Yes ("a green run on main: '' ('{0}')" -f $why) ($why -eq '')
+Yes '  it started installer.yml on main' ($calls.Count -ge 2 -and $calls[0] -eq 'workflow run installer.yml -R o/r --ref main')
 Yes '  and read the workflow_dispatch runs of installer.yml' ($calls.Count -ge 2 -and $calls[1] -match '^run list -R o/r -w installer\.yml -e workflow_dispatch ')
 $gh = New-RunGh 'failure'
-$why = Invoke-InstallerOnGitHub -Repo 'o/r' -Tag 'v1.2.8' -Gh $gh -WaitSeconds 5 -Poll 1
+$why = Invoke-InstallerOnGitHub -Repo 'o/r' -Gh $gh -WaitSeconds 5 -Poll 1
 Yes 'a red run: refused, with the run' ($why -match 'ended failure' -and $why -match 'runs/41')
-Yes 'not a release tag: refused before anything is started' ((Invoke-InstallerOnGitHub -Repo 'o/r' -Tag 'main' -Gh $ghHas -WaitSeconds 1) -match 'not a release tag')
 
 # ---- 3. the gate on the box, for a file already there ----------------------------
 $script:sent = ''
@@ -130,12 +121,9 @@ Yes '  and is not sent into files a second time' ($pi.Contains('if (-not $checkO
 # ---- 5. Ship.ps1 -----------------------------------------------------------------
 $ship = [IO.File]::ReadAllText((Join-Path $Repo 'scripts\release\Ship.ps1')) -replace "`r`n", "`n"
 Yes '-Package is no longer refused from the feed' (-not $ship.Contains('Ship -Package from One. Nothing was built.'))
-$aAsk = $ship.IndexOf("Get-InstallerWorkflowRefusal (Get-SourceRepo `$RepoDir) ('v' + `$target)")
-$aPub = $ship.IndexOf("Head 'Publishing'")
-Yes 'installer.yml on the tag is asked about before anything is published' ($aAsk -gt 0 -and ($aPub -lt 0 -or $aAsk -lt $aPub))
-Yes '  and a refusal stops the release, put back' ($ship -match "(?s)Get-InstallerWorkflowRefusal.*?if \(\`$why\) \{\s*Unbump 'the installer cannot be built on GitHub for this tag'\s*Die")
-Yes 'the release runs Publish-InstallerFromGitHub.ps1 on the launcher''s tag' ($ship -match "(?s)elseif \(\`$Package -and \`$FromFeed\) \{.*?Publish-InstallerFromGitHub\.ps1.*?\}\s*elseif \(\`$Package\) \{" -and
-    $ship.Contains("`$pubArgs = @{ OutDir = `$DistDir; Tag = ('v' + `$target) }"))
+Yes 'nothing in the Ship asks about installer.yml on a tag' (-not $ship.Contains('Get-InstallerWorkflowRefusal'))
+Yes 'the release runs Publish-InstallerFromGitHub.ps1, which starts installer.yml on main' ($ship -match "(?s)elseif \(\`$Package -and \`$FromFeed\) \{.*?Publish-InstallerFromGitHub\.ps1.*?\}\s*elseif \(\`$Package\) \{" -and
+    $ship.Contains("`$pubArgs = @{ OutDir = `$DistDir }"))
 Yes '  and names it to put a failure right' ($ship.Contains("Say `$(if (`$FromFeed) { '  .\scripts\release\Publish-InstallerFromGitHub.ps1' }"))
 Yes 'the feed''s launcher is not put into a folder for a local packager from the feed' ($ship.Contains('if ($Package -and -not $Dev -and -not $DryRun -and $ModsOnly -and -not $FromFeed) {'))
 
