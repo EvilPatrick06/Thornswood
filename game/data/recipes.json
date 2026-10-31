@@ -22,8 +22,8 @@
   "default": "a recipe id this table does not carry is one nobody owns, and anybody may make it",
   "movedFrom": "on a row its mod put at a bench its trade does not work at (TRADE_BENCHES, #3120): the bench keyword the mod put it at, and movedFromName its editor id. bench and benchName are where it is made now, its trade's home bench. scripts\\mods\\Build-LastPlugin.py carries the move in Thornswood-Last.esp, or hands it to each person's game for a plugin it never copies from.",
   "fires": "false means the server is never asked about this recipe. CraftService::RecipeItemsMatch throws out the armour table (adb78) and the sharpening wheel (88108) before it considers anything, so tempering never reaches onCraft.",
-  "count": 4572,
-  "owned": 3749,
+  "count": 4764,
+  "owned": 3941,
   "unownedCount": 588,
   "refusedCount": 235,
   "itemsNothingHandsOut": {

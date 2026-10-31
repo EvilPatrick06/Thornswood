@@ -26640,8 +26640,8 @@
  },
  "recipe": {
   "name": "last-plugin.recipe",
-  "size": 4123579,
-  "sha256": "f6f540f9444485b246e064054b813c3febf358c387a1f38ded1bfbbf5d663efc",
+  "size": 4124171,
+  "sha256": "0adfd50ac559fe786da47df64bbf2727115afc00cf20b9acdb6843663b9f252f",
   "sources": 68,
   "records": 102792,
   "ownBytes": 2725596,

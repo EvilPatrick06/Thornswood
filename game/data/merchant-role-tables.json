@@ -3,9 +3,9 @@
   "active": false,
   "builtBy": "scripts/dev/Build-MerchantRoleTables.py",
   "sources": {
-    "game/data/recipes.json": "af7d0764512822ec1144f15d60726b992bf609c763a7d3f266d1cca79a66af21",
-    "game/data/harvests.json": "b977670daf535dede75a5eaa794365865953d85f554c3ca6f8cf0b6dbcb657a1",
-    "game/data/hunts.json": "6618519178eb470173f7312c56527a3bc844ed53f0f93b23f7563c77202557a2",
+    "game/data/recipes.json": "c67a328b09a0f0f35abf9bbe2bf9a1268ada07af7ebe1a68cfd3e52568e991e0",
+    "game/data/harvests.json": "bf392d0c999644f35b82a0436a834bd5978e070a908dae435d3db668a1043208",
+    "game/data/hunts.json": "a14a63951d87341652bc0749b98bc9433b08a78c990a2d24a59219779c904920",
     "game/data/items.json": "c292372a724a1155b0713028c92b9f464ddbaf497928b8594cc30ea8cc6e5677",
     "docs/systems/cut-items.json": "56d1f5ba2372c46eaf1b5e49f7a027a4a548c314cb05dc0f73b8a1a66fd2364d"
   },
@@ -3269,6 +3269,18 @@
       "winner": "Skyrim.esm",
       "food": false
     },
+    "3:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorVampireBattlemaster",
+      "winner": "cheddars_mashups.esl"
+    },
+    "3a:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorVampireStalker",
+      "winner": "cheddars_mashups.esl"
+    },
     "3ad52:Skyrim.esm": {
       "type": "MISC",
       "flags": 0,
@@ -3459,6 +3471,12 @@
       "edid": "MAG_FoodAshHopperLeg",
       "winner": "Gourmet.esp",
       "food": true
+    },
+    "3d:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "CultistMaskSkull",
+      "winner": "cheddars_mashups.esl"
     },
     "3eadd:Skyrim.esm": {
       "type": "ALCH",
@@ -10842,6 +10860,14 @@
     "39be8:Skyrim.esm": [
       "Alchemist:recipe:154f7:Thornswood-Content.esp:out"
     ],
+    "3:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:2b:cheddars_mashups.esl:out"
+    ],
+    "3a:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:3b:cheddars_mashups.esl:out"
+    ],
     "3ad52:Skyrim.esm": [
       "Smith:recipe:8d7:MoreCraftableEquipment.esp:input:2",
       "Smith:recipe:ab72:Hothtrooper44_ArmorCompilation.esp:input:0",
@@ -11026,6 +11052,10 @@
       "Cook:hunts:28e89:Dragonborn.esm:3",
       "Cook:hunts:30f26:Dragonborn.esm:3",
       "Cook:recipe:81b:Gourmet.esp:input:3"
+    ],
+    "3d:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Tailor:recipe:3e:cheddars_mashups.esl:out"
     ],
     "3eadd:Skyrim.esm": [
       "Alchemist:recipe:154f0:Thornswood-Content.esp:out"

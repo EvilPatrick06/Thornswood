@@ -6,7 +6,7 @@ Everything in the world has a recipe except named uniques and quest items (Patri
 
 What the world hands out and who makes it both come from [Where every item comes from](item-sources.md) (`game/data/item-sources.json`). A maker is a recipe in the open book (not cut and not tempering), a class that gathers the item, or the scarce work or rare seam a class works. A bottle the alchemy lab brews is a new form, not a record, so the lab is the maker of no record. The build fails when the world hands out something with no maker that `scripts/dev/Check-Makers.waiting.json` does not name with the issue that will give it one.
 
-280 items handed out. 162 have a maker. 118 have none yet.
+283 items handed out. 164 have a maker. 119 have none yet.
 
 ## Nobody makes these yet
 
@@ -248,6 +248,7 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Tundra Cotton | Asked for by a recipe | Gatherer, novice | `3f7f8:Skyrim.esm` |
 | Vale Sabre Cat Hide | Asked for by a recipe | Hunter, novice | `1199a:Dawnguard.esm` |
 | White Cap | Asked for by a recipe | Gatherer, novice | `4da22:Skyrim.esm` |
+| Wolf Pelt | Asked for by a recipe | Hunter, novice | `3ad74:Skyrim.esm` |
 | Yellow Mountain Flower | Asked for by a recipe | Gatherer, advanced | `2a78:Dawnguard.esm` |
 | Amethyst | Dungeon and body loot | Miner, master, only while the gem work is open | `63b46:Skyrim.esm` |
 | Baked Potatoes | Dungeon and body loot | Cook/Hearthcook, novice | `64b3a:Skyrim.esm` |

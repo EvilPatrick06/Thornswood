@@ -266,6 +266,41 @@
    "size": 282765
   },
   {
+   "name": "FNIS.esp",
+   "sha256": "3b2787c18fd55dab83d5ac23cef56493d583b805b519e1df563daecbbfddef03",
+   "size": 180
+  },
+  {
+   "name": "3BBB.esp",
+   "sha256": "ce4f554616458a10b4809f705828f9d3e3e2d1457abe73ee32fe5f8f044a8549",
+   "size": 20257
+  },
+  {
+   "name": "AwBaldandShavedHair.esp",
+   "sha256": "8a9ca8843e8fe3f3dbe58c2ac5e6a04b222b21f94b50867aacce9016ecf0645a",
+   "size": 2701
+  },
+  {
+   "name": "HIMBO.esp",
+   "sha256": "9a6db51267dadf54d86788bcd6a113a63172f374037d3fa8888834bca574ed2a",
+   "size": 3432
+  },
+  {
+   "name": "RaceMenuMorphsHIMBO.esp",
+   "sha256": "8fb650a1617b743ef9f5058f558e2ecce093ac5290a2f63de9e69121bff9243b",
+   "size": 375
+  },
+  {
+   "name": "BeardMaskFix.esp",
+   "sha256": "a3566fdf94acc82695809e80cfc06289bf0a3bfe9c87b64e594d9fb998e902db",
+   "size": 3853
+  },
+  {
+   "name": "BetterThirdPersonSelection.esp",
+   "sha256": "ee71a4609f67a007e2fb038e90b448197a2f5949bf817d9409c8377b40658d8e",
+   "size": 413
+  },
+  {
    "name": "Populated Cities Towns Villages Legendary.esp",
    "sha256": "bca3715242f4188566cd65764f494f707bb158ff4b883d4d02656f60b0ad6fb8",
    "size": 2065137
@@ -481,9 +516,19 @@
    "size": 468573
   },
   {
+   "name": "KS_Hairdo's_Lite_NoNPCs.esp",
+   "sha256": "3dc7ac33b2e1dbbb150e0ae080177ba4858609c0677a779fe65b9e0fe0580787",
+   "size": 13800
+  },
+  {
+   "name": "Water for ENB - Patch - Generic Landscape Patch.esp",
+   "sha256": "d535e088e0b2996ccc76832323476a87281e178e4aa10c567250402fc4b7562e",
+   "size": 133302
+  },
+  {
    "name": "Thornswood-Last.esp",
-   "sha256": "9d2fe9d6c00fdf03e279f348c295b052039425bb31c4a21a4b0f75b96b8a4a11",
-   "size": 12901082
+   "sha256": "95d85507c11962b592dacf1ace067677f5309b75d0cd7d9caadf1e502909cca0",
+   "size": 12998852
   }
  ],
  "issue": 3160,
