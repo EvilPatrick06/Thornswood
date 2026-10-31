@@ -294,8 +294,17 @@ function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
     # 31 Oct 2026 gave every commit on main a new id and moved the release
     # tags with them, but the notes already in the dev feed kept the old ids.
     # Each read as a commit main lacked, so after main 20261031-144725, which
-    # carried all of them, 12 of the 17 notes stayed DEV (#5133). Asked of
-    # git once for every note: which of the ids are commits here.
+    # carried all of them, 12 of the 17 notes stayed DEV (#5133).
+    #
+    # Held means in this clone's history: reachable from a branch, a
+    # remote-tracking branch or a tag, not only somewhere in its object
+    # store. The gate's checkout on the box was made before the
+    # rewrite and fetched main one commit deep on every run, so it still
+    # keeps the old main tips as loose objects that no ref reaches. Read as
+    # held, each went to Holds, which found no history shared with main, and
+    # the first dev Ship with the rule above (20261031-155402-dev) still left
+    # 13 of 18 marked. Asked of git twice for every note: which of the ids
+    # are commits here, and which of those no branch or tag reaches.
     $devTags = $null
     $marked = 0
     $named = @(@($news) | ForEach-Object { Get-DevNewsVal $_ 'sourceCommit' } | Where-Object { $_ -match '^[0-9a-f]{40}$' } | Select-Object -Unique)
@@ -303,12 +312,22 @@ function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
     if ($named.Count) {
         $hadCode = Test-Path -LiteralPath 'variable:global:LASTEXITCODE'
         $was = if ($hadCode) { $global:LASTEXITCODE } else { 0 }
-        try { $g = Invoke-ReleaseGit $sourceRepo (@('log', '--no-walk=unsorted', '--ignore-missing', '--format=%H') + $named) }
+        try {
+            $g = Invoke-ReleaseGit $sourceRepo (@('log', '--no-walk=unsorted', '--ignore-missing', '--format=%H') + $named)
+            $here = @(if ($g.Code -eq 0) { @($g.Lines) | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ } })
+            if ($here.Count) {
+                $u = Invoke-ReleaseGit $sourceRepo (@('rev-list') + $here + @('--not', '--branches', '--remotes', '--tags'))
+                if ($u.Code -eq 0) {
+                    $loose = New-Object 'System.Collections.Generic.HashSet[string]'
+                    foreach ($l in @($u.Lines)) { [void]$loose.Add(([string]$l).Trim()) }
+                    foreach ($c in $here) { if (-not $loose.Contains($c)) { [void]$held.Add($c) } }
+                }
+            }
+        }
         finally {
             if ($hadCode) { $global:LASTEXITCODE = $was }
             else { Remove-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue }
         }
-        if ($g.Code -eq 0) { foreach ($l in @($g.Lines)) { [void]$held.Add(([string]$l).Trim()) } }
     }
     foreach ($n in @($news)) {
         $commit = Get-DevNewsVal $n 'sourceCommit'
