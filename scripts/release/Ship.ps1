@@ -1887,12 +1887,7 @@ if ($GameDir -and -not (Get-Command node -ErrorAction SilentlyContinue)) {
 
 # ------------------------------------------------------------ build
 if (-not $ModsOnly) {
-    # The exe's time going in, so a build that put nothing in place is told
-    # from one that did.
     $launchDir = Join-Path $Root 'Launcher'
-    $before = [datetime]::MinValue
-    $p = Get-LauncherExe $launchDir
-    if (Test-Path -LiteralPath $p) { $before = (Get-Item -LiteralPath $p).LastWriteTimeUtc }
 
     # The build and the install are two scripts since 24 September (To Do List
     # entry 243). The build compiles into a folder of its own, so csc never
@@ -2025,9 +2020,20 @@ if (-not $ModsOnly) {
              '. Nothing was published. The errors are above.')
     }
 
+    # In place means the exe there is the one built or checked above, byte for
+    # byte. Until 31 Oct 2026 it meant "written after the one that was there",
+    # and a launcher taken from release.yml's run artifact (#2841) keeps the
+    # write time its zip gives it: the runner's UTC clock, read on the box as
+    # Mountain time, six hours ahead. So main 20261031-144725's 1.2.14 sat in
+    # main's ship root dated past every later write, and Ship-Main from
+    # eb6ab3f6 put the launcher dev tried there and stopped on "not in place"
+    # (#5156).
     $exe = Get-LauncherExe $launchDir
-    $inPlace = Test-Path -LiteralPath $exe
-    if ($inPlace) { $inPlace = ((Get-Item -LiteralPath $exe).LastWriteTimeUtc -gt $before) }
+    $meant = Join-Path $buildOut 'Thornswood.exe'
+    $inPlace = (Test-Path -LiteralPath $exe) -and (Test-Path -LiteralPath $meant)
+    if ($inPlace) {
+        $inPlace = ((Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $meant -Algorithm SHA256).Hash)
+    }
     if (-not $inPlace) {
         Unbump 'nothing was put in place'
         Die 'The launcher is not in place. Look at the errors above.'
