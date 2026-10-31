@@ -32,10 +32,11 @@
   Install-Bot), and Restart-Server, Reset-Character, Deploy-Docs,
   Install-Bridge, Install-Voice, Install-Gate, Install-AdminService,
   Bot-Service (through Install-Bot), Setup-Domain, Wipe-Saves and Go send it
-  with their own stops. Install-ThornswoodServer.ps1 and vps-freeze.ps1 run on
-  the box and carry a copy between marker lines; the test fails when a copy
-  differs. A stop by hand in a run note uses Hold-Server.ps1, which sends it
-  the same way.
+  with their own stops. Install-ThornswoodServer.ps1 runs on the box and
+  carries a copy between marker lines; the test fails when the copy differs.
+  vps-freeze.ps1 holds nothing: it turns the watchdog off for a move longer
+  than any hold may be. A stop by hand in a run note uses Hold-Server.ps1,
+  which sends it the same way.
 
   Each script writes its hold just before it stops the server and removes it
   once it has started it again (and, where the script waits for it, once it
