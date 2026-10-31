@@ -16,8 +16,9 @@ out, a field set, a condition added, a compressed source record), and holds:
   a copy written as our own stops the recipe;
   a source that is not the bytes the recipe names, or is missing, makes
   nothing;
-  and the committed recipe names the committed plugin's size and sha256, and
-  reads to its end.
+  and the committed recipe names the size and sha256 of the plugin
+  game/data/last-plugin.json names (no repository holds the plugin since
+  #2791 step 3), and reads to its end.
 """
 import hashlib
 import importlib.util
@@ -222,17 +223,16 @@ class RecipeCases(unittest.TestCase):
 
 
 class Committed(unittest.TestCase):
-    """The committed recipe names the committed plugin, and reads to its end."""
+    """The committed recipe names the manifest's plugin, and reads to its end."""
 
     def test_names_the_plugin(self):
         path = ROOT / 'game' / 'data' / 'last-plugin.recipe'
         if not path.exists():
             self.skipTest('no committed recipe yet: the next build of Thornswood-Last.esp writes it')
         recipe = path.read_bytes()
-        plugin = (ROOT / 'game' / 'content' / 'Thornswood-Last.esp').read_bytes()
         manifest = json.loads((ROOT / 'game' / 'data' / 'last-plugin.json').read_text(encoding='utf-8'))
         size, sha, sources, r = R.read_header(recipe)
-        self.assertEqual((size, sha.hex()), (len(plugin), hashlib.sha256(plugin).hexdigest()))
+        self.assertEqual((size, sha.hex()), (manifest['plugin']['size'], manifest['plugin']['sha256']))
         self.assertEqual(manifest['recipe']['sha256'], hashlib.sha256(recipe).hexdigest())
         built = {row['name'].lower(): row for row in manifest['builtAgainst']}
         for kind, name, n, want in sources:

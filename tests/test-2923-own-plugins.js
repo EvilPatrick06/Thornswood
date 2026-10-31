@@ -11,7 +11,9 @@
 
   H  the three helpers (scripts/dev/OwnPlugins.js, OwnPlugins.ps1,
      own_plugins.py) say the same thing: a file in game/content is read from
-     there, any other plugin from the Data folder.
+     there, any other plugin from the Data folder. Thornswood-Last.esp, in no
+     repository since #2791 step 3, is read from the Data folder, where its
+     recipe makes it, and all three still call it ours.
   F  Build-FoodTable.js, given a Data folder holding a stale content plugin,
      builds from the repository's.
   R  no builder that reads a load order joins the Data folder with a plugin
@@ -65,37 +67,47 @@ fs.mkdirSync(DATA);
 const OWN = fs.readdirSync(OWN_DIR).filter((n) => fs.statSync(path.join(OWN_DIR, n)).isFile());
 
 // ---------------------------------------------------------------- H
-yes('H0 game/content holds Thornswood-Content.esp and Thornswood-Last.esp',
-    ['Thornswood-Content.esp', 'Thornswood-Last.esp'].every((n) => OWN.indexOf(n) >= 0));
+yes('H0 game/content holds Thornswood-Content.esp, and not Thornswood-Last.esp (#2791)',
+    OWN.indexOf('Thornswood-Content.esp') >= 0 && OWN.indexOf('Thornswood-Last.esp') < 0);
 const js = require(path.join(DEV, 'OwnPlugins.js'));
 yes('H1 OwnPlugins.js reads every file in game/content from there (' + OWN.length + ')',
     OWN.every((n) => path.resolve(js.pluginPath(DATA, n)) === path.resolve(OWN_DIR, n)));
 yes('H2 and any other plugin from the Data folder',
     path.resolve(js.pluginPath(DATA, 'Skyrim.esm')) === path.resolve(DATA, 'Skyrim.esm'));
 
-const want = OWN.map((n) => path.resolve(OWN_DIR, n)).concat([path.resolve(DATA, 'Skyrim.esm')]);
-const names = OWN.concat(['Skyrim.esm']);
+yes('H2b Thornswood-Last.esp from the Data folder, where its recipe makes it, and still ours',
+    path.resolve(js.pluginPath(DATA, 'Thornswood-Last.esp')) === path.resolve(DATA, 'Thornswood-Last.esp') &&
+    js.isOwn('Thornswood-Last.esp') && js.isOwn('Thornswood-Content.esp') && !js.isOwn('Skyrim.esm'));
+
+const want = OWN.map((n) => path.resolve(OWN_DIR, n)).concat([path.resolve(DATA, 'Skyrim.esm'), path.resolve(DATA, 'Thornswood-Last.esp')]);
+const names = OWN.concat(['Skyrim.esm', 'Thornswood-Last.esp']);
 const py = run(['python', 'py', 'python3'], ['-c',
   'import sys; sys.path.insert(0, sys.argv[1]); import own_plugins\n' +
-  'for n in sys.argv[3:]: print(own_plugins.plugin_path(sys.argv[2], n))', DEV, DATA].concat(names));
+  'for n in sys.argv[3:]: print(own_plugins.plugin_path(sys.argv[2], n))\n' +
+  'print(own_plugins.is_own("Thornswood-Last.esp"), own_plugins.is_own("Skyrim.esm"))', DEV, DATA].concat(names));
 if (!py) {
   console.log('SKIP  H3: no python here');
 } else {
-  const got = py.stdout.trim().split(/\r?\n/).map((l) => path.resolve(l.trim()));
+  const lines = py.stdout.trim().split(/\r?\n/);
+  const got = lines.slice(0, -1).map((l) => path.resolve(l.trim()));
   yes('H3 own_plugins.py says the same for each', py.status === 0 && JSON.stringify(got) === JSON.stringify(want));
+  yes('H3b and calls Thornswood-Last.esp ours, and Skyrim.esm not', lines[lines.length - 1].trim() === 'True False');
   if (py.status !== 0) { console.log(py.stderr); }
 }
 const asks = path.join(TMP, 'asks.ps1');
 fs.writeFileSync(asks, 'param([string]$Dev, [string]$Data, [string]$Names)\n' +
   '. (Join-Path $Dev \'OwnPlugins.ps1\')\n' +
-  'foreach ($n in ($Names -split \',\')) { Get-PluginPath $Data $n }\n');
+  'foreach ($n in ($Names -split \',\')) { Get-PluginPath $Data $n }\n' +
+  '"$(Test-OwnPlugin \'Thornswood-Last.esp\') $(Test-OwnPlugin \'Skyrim.esm\')"\n');
 const ps = run(['pwsh', 'powershell'], ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', asks, '-Dev', DEV, '-Data', DATA,
   '-Names', names.join(',')]);
 if (!ps) {
   console.log('SKIP  H4: no PowerShell here');
 } else {
-  const got = ps.stdout.trim().split(/\r?\n/).map((l) => path.resolve(l.trim()));
+  const lines = ps.stdout.trim().split(/\r?\n/);
+  const got = lines.slice(0, -1).map((l) => path.resolve(l.trim()));
   yes('H4 OwnPlugins.ps1 says the same for each', ps.status === 0 && JSON.stringify(got) === JSON.stringify(want));
+  yes('H4b and calls Thornswood-Last.esp ours, and Skyrim.esm not', lines[lines.length - 1].trim() === 'True False');
   if (ps.status !== 0) { console.log(ps.stderr); }
 }
 
