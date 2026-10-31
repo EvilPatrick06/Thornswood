@@ -25,7 +25,17 @@
   "RecipeIngotSilver": {"Owner":"Smith","Half":"Platewright","Family":"Ingots","Why":"The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody's."},
   "RecipeIngotSteel": {"Owner":"Smith","Half":"Platewright","Family":"Ingots","Why":"The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody's."},
   "RecipeLeatherDeerHide02": {"Owner":"Smith","Half":"Platewright","Family":"Leather","Why":"The one row kept for this leather. Platewright work, as the smith page says. Not anybody's."},
-  "RecipeLeatherStrips": {"Owner":"Smith","Half":"Platewright","Family":"Leather","Why":"The one row kept for this leather. Platewright work, as the smith page says. Not anybody's."}
+  "RecipeLeatherStrips": {"Owner":"Smith","Half":"Platewright","Family":"Leather","Why":"The one row kept for this leather. Platewright work, as the smith page says. Not anybody's."},
+  "ThornswoodRecipePotionMinorHealing": {"Owner":"Alchemist","Half":"Physicker","Why":"Potion of Minor Healing, a Physicker's at the alchemy lab Thornswood-Content.esp ships (#3470)."},
+  "ThornswoodRecipePotionHealing": {"Owner":"Alchemist","Half":"Physicker","Why":"Potion of Healing, a Physicker's at the alchemy lab Thornswood-Content.esp ships (#3470)."},
+  "ThornswoodRecipePotionPlentifulHealing": {"Owner":"Alchemist","Half":"Physicker","Why":"Potion of Plentiful Healing, a Physicker's at the alchemy lab Thornswood-Content.esp ships (#3470)."},
+  "ThornswoodRecipePotionVigorousHealing": {"Owner":"Alchemist","Half":"Physicker","Why":"Potion of Vigorous Healing, a Physicker's at the alchemy lab Thornswood-Content.esp ships (#3470)."},
+  "ThornswoodRecipePotionMinorMagicka": {"Owner":"Alchemist","Half":"Physicker","Why":"Potion of Minor Magicka, a Physicker's at the alchemy lab Thornswood-Content.esp ships (#3470)."},
+  "ThornswoodRecipePotionMagicka": {"Owner":"Alchemist","Half":"Physicker","Why":"Potion of Magicka, a Physicker's at the alchemy lab Thornswood-Content.esp ships (#3470)."},
+  "ThornswoodRecipePotionMinorStamina": {"Owner":"Alchemist","Half":"Physicker","Why":"Potion of Minor Stamina, a Physicker's at the alchemy lab Thornswood-Content.esp ships (#3470)."},
+  "ThornswoodRecipePotionStamina": {"Owner":"Alchemist","Half":"Physicker","Why":"Potion of Stamina, a Physicker's at the alchemy lab Thornswood-Content.esp ships (#3470)."},
+  "ThornswoodRecipePotionResistFire": {"Owner":"Alchemist","Half":"Physicker","Why":"Potion of Resist Fire, a Physicker's at the alchemy lab Thornswood-Content.esp ships (#3470)."},
+  "ThornswoodRecipePotionResistShock": {"Owner":"Alchemist","Half":"Physicker","Why":"Potion of Resist Shock, a Physicker's at the alchemy lab Thornswood-Content.esp ships (#3470)."}
  },
  "rank": {
   "ThornswoodRecipeCharcoalTier1": {"Rank":"novice","Why":"the first of the four charcoal grades, a novice charburner's, as the charburner page ranks it."},
@@ -61,6 +71,16 @@
   "RecipeIngotSilver": {"Rank":"novice","Why":"the one smelt row kept for this ingot, smith work at novice (#1391, #1400)."},
   "RecipeIngotSteel": {"Rank":"novice","Why":"the one smelt row kept for this ingot, smith work at novice (#1391, #1400)."},
   "RecipeLeatherDeerHide02": {"Rank":"novice","Why":"the one row kept for this leather, Platewright work at novice (#1391, #1400)."},
-  "RecipeLeatherStrips": {"Rank":"novice","Why":"the one row kept for this leather, Platewright work at novice (#1391, #1400)."}
+  "RecipeLeatherStrips": {"Rank":"novice","Why":"the one row kept for this leather, Platewright work at novice (#1391, #1400)."},
+  "ThornswoodRecipePotionMinorHealing": {"Rank":"novice","Why":"Potion of Minor Healing: the weakest strength, novice (#3470)."},
+  "ThornswoodRecipePotionHealing": {"Rank":"advanced","Why":"Potion of Healing: one step up, advanced (#3470)."},
+  "ThornswoodRecipePotionPlentifulHealing": {"Rank":"expert","Why":"Potion of Plentiful Healing: two steps up, expert (#3470)."},
+  "ThornswoodRecipePotionVigorousHealing": {"Rank":"master","Why":"Potion of Vigorous Healing: the strongest, master (#3470)."},
+  "ThornswoodRecipePotionMinorMagicka": {"Rank":"novice","Why":"Potion of Minor Magicka: the weakest strength, novice (#3470)."},
+  "ThornswoodRecipePotionMagicka": {"Rank":"advanced","Why":"Potion of Magicka: one step up, advanced (#3470)."},
+  "ThornswoodRecipePotionMinorStamina": {"Rank":"novice","Why":"Potion of Minor Stamina: the weakest strength, novice (#3470)."},
+  "ThornswoodRecipePotionStamina": {"Rank":"advanced","Why":"Potion of Stamina: one step up, advanced (#3470)."},
+  "ThornswoodRecipePotionResistFire": {"Rank":"expert","Why":"Potion of Resist Fire: expert, its effect's rank in docs/systems/mixtures.md (#3470)."},
+  "ThornswoodRecipePotionResistShock": {"Rank":"expert","Why":"Potion of Resist Shock: expert, its effect's rank in docs/systems/mixtures.md (#3470)."}
  }
 }

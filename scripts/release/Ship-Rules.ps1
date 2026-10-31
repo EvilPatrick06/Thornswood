@@ -2190,9 +2190,13 @@ function Get-ShipFeedOrderProblem([string[]]$ServerOrder, [string[]]$Enabled) {
 }
 
 # WHAT SKYUI'S MENU CHECK READS, FROM THE FEED (#2754). Check-SkyUIMenus.js
-# reads SkyUI's script and its menus where the game takes them: loose under
-# Data\Scripts and Data\Interface, or inside an archive (*.bsa) the plugin list
-# loads, with the paths every release deletes read as gone. A release from the
+# reads SkyUI's script and its menus where the game takes them: a loose
+# script (*.pex) under Data\Scripts and a loose menu (*.swf) under
+# Data\Interface, or inside an archive (*.bsa) the plugin list loads, with the
+# paths every release deletes read as gone. Nothing else under Data\Interface
+# is read: on 31 Oct a cloud dev Ship stopped here for the content plugin's
+# string table, Data\Interface\Translations\Thornswood-Content_ENGLISH.txt,
+# which the check never opens. A release from the
 # feed has the collection's revision and the last release's plugin list (held
 # to the server's order above), and the last release passed the check: every
 # Ship runs it, on both channels, with no way past it. So when every file of
@@ -2203,7 +2207,7 @@ function Get-ShipFeedOrderProblem([string[]]$ServerOrder, [string[]]$Enabled) {
 # path means SkyUI's files moved, which the check has to read, against the
 # collection's archives, on One.
 function Test-ShipSkyUIInput([string]$Rel) {
-    return ($Rel -match '^(?i)Data\\(Scripts|Interface)\\' -or $Rel -match '(?i)\.bsa$')
+    return ($Rel -match '^(?i)Data\\Scripts\\.*\.pex$' -or $Rel -match '^(?i)Data\\Interface\\.*\.swf$' -or $Rel -match '(?i)\.bsa$')
 }
 
 function Get-ShipSkyUIFeedChange([string]$GameDir, [hashtable]$Record, [string[]]$Gone = @()) {

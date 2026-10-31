@@ -32,7 +32,9 @@
        there; the ops repository's tests\test-box-workflows.ps1 holds its
        shape.
     9. The seal (scripts\ops\Sealed.ps1) opens with its own key only, and a changed byte
-       is refused; the box half uses the signed ssh.exe by full path.
+       is refused; it comes back through the run's log as TWSEAL-LOG lines,
+       held to their count and sha256 (a stand-in gh serves the log); the
+       box half uses the signed ssh.exe by full path.
   Nothing connects anywhere and nothing outside the temp folder is touched.
 #>
 [CmdletBinding()]
@@ -402,6 +404,35 @@ Yes 'a deploy key goes into the gate account''s authorized_keys, and stops witho
 Yes 'its proof needs a refused command and GATE READY' ($grant.Contains("@('echo THORNSWOOD_OK', 'ping')") -and $grant.Contains("'^\| GATE READY'") -and $grant.Contains('($NoticesOnly -or $Deploy) -and @($proof | Where-Object { $_ -match ''THORNSWOOD_OK'' }).Count'))
 Yes 'it goes into DESK_KEY_B64 of a main-only environment' ($grant.Contains("if (`$Deploy) { 'DESK_KEY_B64' }") -and $grant.Contains('gh secret set $SecretName --env $ToEnvironment'))
 
+# ShipAccess.ps1 against a stand-in ship-access.js, run by the real node.
+if (Get-Command node -ErrorAction SilentlyContinue) {
+    . (Join-Path $Repo 'scripts/vps/admin/ShipAccess.ps1')
+    $fake = Join-Path ([IO.Path]::GetTempPath()) ('tw-2841-access-' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path ([IO.Path]::Combine($fake, 'scripts', 'vps', 'admin')) -Force | Out-Null
+    [IO.File]::WriteAllText([IO.Path]::Combine($fake, 'scripts', 'vps', 'admin', 'ship-access.js'), @'
+const c = process.env.TW_FAKE_ACCESS;
+if (c === 'long') { process.stdout.write('ghs_' + 'A1.b-'.repeat(60) + '\n'); }
+else if (c === 'refused') { process.stderr.write('ship-access: GitHub gave the App no token (HTTP 403: no)\n'); process.exit(1); }
+else if (c === 'silent') { process.exit(3); }
+else if (c === 'nothing') { }
+'@)
+    function Try-Access([string]$case) {
+        $env:TW_FAKE_ACCESS = $case
+        try { return @{ Token = (Get-ThornswoodShipAccess -Repo $fake -AdminState $fake); Why = '' } }
+        catch { return @{ Token = $null; Why = $_.Exception.Message } }
+        finally { Remove-Item -LiteralPath Env:\TW_FAKE_ACCESS -ErrorAction SilentlyContinue }
+    }
+    $r = Try-Access 'long'
+    Yes 'ShipAccess.ps1 takes the token by the stream it comes on, whatever its shape' ($r.Token -eq ('ghs_' + ('A1.b-' * 60)))
+    $r = Try-Access 'refused'
+    Yes '  a refusal throws with the exit code and what ship-access.js said' (-not $r.Token -and $r.Why -match '^ship-access\.js ended 1: ship-access: GitHub gave the App no token')
+    $r = Try-Access 'silent'
+    Yes '  an exit with nothing said throws saying so' ($r.Why -eq 'ship-access.js ended 3 and said nothing')
+    $r = Try-Access 'nothing'
+    Yes '  and an exit 0 with no token throws saying how many lines came' ($r.Why -match '^ship-access\.js ended 0 but printed 0 line')
+    Remove-Item -LiteralPath $fake -Recurse -Force -ErrorAction SilentlyContinue
+} else { Write-Host 'SKIP  ShipAccess.ps1 against a stand-in: there is no node here' }
+
 # ---- 8. box-run.yml, in the ops repository (#4013) ---------------------------
 Yes 'box-run.yml is not in this repository, which has no VPS runner once public' (-not (Test-Path -LiteralPath ([IO.Path]::Combine($Repo, '.github', 'workflows', 'box-run.yml'))))
 $br = Text 'scripts/vps/Box-Run.ps1'
@@ -421,6 +452,52 @@ Yes '  another key does not open it' $threw
 $bent = [byte[]]$sealed.Clone(); $bent[$bent.Length - 3] = $bent[$bent.Length - 3] -bxor 1
 $threw = $false; try { [void](Unprotect-ThornswoodSealed $bent ([Convert]::ToBase64String($rsa.ExportPkcs8PrivateKey()))) } catch { $threw = $true }
 Yes '  and a changed byte is refused' $threw
+# Through the run's log, with a stand-in gh serving one job and its log.
+$tmp = Join-Path ([IO.Path]::GetTempPath()) ('tw-2841-seal-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+$sealedPath = Join-Path $tmp 'box-run.sealed'
+[IO.File]::WriteAllBytes($sealedPath, $sealed)
+$written = @(Write-ThornswoodSealedLog $sealedPath 6>&1 | ForEach-Object { "$_" })
+Yes 'the runner writes the sealed file into its log as TWSEAL-LOG lines of 2000 characters' ($written.Count -ge 3 -and @($written | Where-Object { $_ -notmatch '^TWSEAL-LOG ' }).Count -eq 0 -and $written[0].Length -eq ('TWSEAL-LOG 1 '.Length + 2000))
+Yes '  and ends them with the count and the sha256' ($written[-1] -match ('^TWSEAL-LOG END ' + ($written.Count - 1) + ' [0-9a-f]{64}$'))
+Yes '  and with no sealed file writes only TWSEAL-LOG NONE' ((@(Write-ThornswoodSealedLog (Join-Path $tmp 'none.sealed') 6>&1 | ForEach-Object { "$_" }) -join '|') -eq 'TWSEAL-LOG NONE')
+$script:fakeLog = @("$([char]0xFEFF)2026-10-31T04:00:00.0000000Z Current runner version: '2.338.0'", '2026-10-31T04:00:01.0000000Z | GATE Ship-Dev exit 0') + @($written | ForEach-Object { '2026-10-31T04:00:02.0000000Z ' + $_ })
+function gh {
+    $global:LASTEXITCODE = 0
+    if ("$args" -match '/runs/\d+/jobs') { return '7' }
+    if ("$args" -match '/jobs/7/logs') { return $script:fakeLog }
+    $global:LASTEXITCODE = 1; return 'HTTP 404'
+}
+$l = Read-ThornswoodSealedLog 'o/r' 1
+Yes 'the session reads the sealed bytes back from the log' ($l.Bytes -and [Convert]::ToBase64String($l.Bytes) -eq [Convert]::ToBase64String($sealed))
+$keyPath = Join-Path $tmp 'run.key'
+[IO.File]::WriteAllText($keyPath, [Convert]::ToBase64String($rsa.ExportPkcs8PrivateKey()))
+$saved = Join-Path $tmp 'save'
+New-Item -ItemType Directory -Path (Join-Path $saved 'files') -Force | Out-Null
+[IO.File]::WriteAllText((Join-Path $saved 'output.txt'), 'the verb said this')
+[IO.File]::WriteAllText((Join-Path (Join-Path $saved 'files') 'a.log'), 'a server log')
+[void](Save-ThornswoodSealed $saved ([Convert]::ToBase64String($rsa.ExportSubjectPublicKeyInfo())) $sealedPath)
+$written = @(Write-ThornswoodSealedLog $sealedPath 6>&1 | ForEach-Object { "$_" })
+$script:fakeLog = @($written | ForEach-Object { '2026-10-31T04:00:02.0000000Z ' + $_ })
+$into = Join-Path $tmp 'opened'
+$o = Open-ThornswoodSealedRun -Repo 'o/r' -Run 1 -Artifact 'box-run-sealed' -File 'box-run.sealed' -KeyPath $keyPath -Into $into -FromLog
+Yes '  and -FromLog opens it to the output and the files' ($o.Ok -and ([IO.File]::ReadAllText((Join-Path $into 'output.txt'))) -eq 'the verb said this' -and (Test-Path -LiteralPath (Join-Path (Join-Path $into 'files') 'a.log')))
+$script:fakeLog = @($written | Where-Object { $_ -notmatch '^TWSEAL-LOG 1 ' } | ForEach-Object { '2026-10-31T04:00:02.0000000Z ' + $_ })
+$l = Read-ThornswoodSealedLog 'o/r' 1
+Yes '  a part missing from the log is refused' (-not $l.Bytes -and $l.Why -match 'lacks 1')
+$script:fakeLog = @($written | ForEach-Object { '2026-10-31T04:00:02.0000000Z ' + $_ })
+$p1 = $script:fakeLog[0]; $at = $p1.Length - 5
+$script:fakeLog[0] = $p1.Substring(0, $at) + $(if ($p1[$at] -eq 'A') { 'B' } else { 'A' }) + $p1.Substring($at + 1)
+$l = Read-ThornswoodSealedLog 'o/r' 1
+Yes '  a changed part is refused by the sha256' (-not $l.Bytes -and $l.Why -match 'sha256')
+$script:fakeLog = @('2026-10-31T04:00:02.0000000Z TWSEAL-LOG NONE')
+$l = Read-ThornswoodSealedLog 'o/r' 1
+Yes '  and a run that wrote none says so' (-not $l.Bytes -and $l.Why -eq 'the run wrote no sealed output')
+Remove-Item -LiteralPath function:\gh
+Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+$br = Text 'scripts/vps/Box-Run.ps1'
+Yes 'Box-Run.ps1 reads its sealed output from the run''s log, not an artifact' ($br.Contains("-KeyPath `$keyPath -Into `$dir -FromLog"))
+
 $small = [Security.Cryptography.RSA]::Create(2048)
 $threw = $false; try { [void](Protect-ThornswoodSealed $plain ([Convert]::ToBase64String($small.ExportSubjectPublicKeyInfo()))) } catch { $threw = $true }
 Yes '  a recipient key under 3072 bits is refused' $threw

@@ -59,19 +59,20 @@
     repo-settings   records/github-repo-settings.json on main (#3683,
                     Patrick's answers of 26 Oct 2026), { repositories: [{
                     repository, rulesets: [...],
-                    private_vulnerability_reporting, secret_scanning,
-                    secret_scanning_push_protection }] }, for Thornswood and
+                    private_vulnerability_reporting, immutable_releases,
+                    secret_scanning, secret_scanning_push_protection }] },
+                    for Thornswood and
                     the engine fork, EvilPatrick06/skymp, and no other
                     repository: each ruleset an entry names is on GitHub
                     with exactly its target, enforcement, conditions, rules
                     and bypass list, made or put back by name, and private
-                    vulnerability reporting, secret scanning and its push
-                    protection are each on or off as the entry says (left
-                    as they are when the entry does not say). A ruleset
-                    GitHub has that the record does not name is never
-                    deleted here; it stops the run, named, so a protection
-                    nobody wrote down is a pull request to the record or a
-                    deliberate removal, never a silent loss. A repository
+                    vulnerability reporting, immutable releases, secret
+                    scanning and its push protection are each on or off as
+                    the entry says (left as they are when the entry does not
+                    say). A ruleset GitHub has that the record does not name
+                    is never deleted here; it stops the run, named, so a
+                    protection nobody wrote down is a pull request to the
+                    record or a deliberate removal, never a silent loss. A repository
                     the App is not installed on stops the run for it, with
                     the link to the installation's settings, and the others
                     go on.
@@ -190,6 +191,15 @@ const SETTINGS_FILE = 'records/github-repo-settings.json';
 // The App reaches only those it is installed on, and this stops a record
 // naming any other even then.
 const SETTINGS_REPOS = [REPO, OWNER + '/skymp'];
+// The record's on-or-off switches that have an endpoint of their own, each
+// true or false: its path under the repository, and what a line calls it.
+// Immutable releases (Patrick, 26 Oct 2026, #3287): a published Release's
+// files and tag can no longer change; every release step here only fills a
+// draft, so nothing that runs breaks.
+const SWITCHES = {
+  private_vulnerability_reporting: { path: 'private-vulnerability-reporting', name: 'private vulnerability reporting' },
+  immutable_releases: { path: 'immutable-releases', name: 'immutable releases' },
+};
 // security_and_analysis keys the record may switch, each true or false.
 const SCANNING_KEYS = ['secret_scanning', 'secret_scanning_push_protection'];
 // What repo-settings' token for each repository may do: Thornswood's reads
@@ -372,7 +382,7 @@ function checkSettings(doc) {
     if (SETTINGS_REPOS.indexOf(repo) < 0) throw new Error(SETTINGS_FILE + ' names ' + (repo || 'a repository with no name') + ', and the only ones this changes are ' + SETTINGS_REPOS.join(' and '));
     if (seen[repo]) throw new Error(SETTINGS_FILE + ' names ' + repo + ' twice');
     seen[repo] = true;
-    for (const k of ['private_vulnerability_reporting'].concat(SCANNING_KEYS)) {
+    for (const k of Object.keys(SWITCHES).concat(SCANNING_KEYS)) {
       if (e[k] !== undefined && typeof e[k] !== 'boolean') throw new Error(SETTINGS_FILE + ', ' + repo + ': ' + k + ' is true or false, not ' + JSON.stringify(e[k]));
     }
     // GitHub has no push protection without the scanning it protects.
@@ -596,24 +606,27 @@ async function rulesets(token, repo, list, check) {
   return { ok, lines, changed, differs };
 }
 
-// Makes a repository's private vulnerability reporting on or off as its
-// entry says, or with check says only whether it differs.
-async function reporting(token, repo, want, check) {
+// Makes one of a repository's on-or-off switches (SWITCHES: private
+// vulnerability reporting, immutable releases) on or off as its entry says,
+// or with check says only whether it differs. GitHub answers each the same
+// way: GET says { enabled }, PUT switches it on and DELETE off, with 204.
+async function setSwitch(token, repo, key, want, check) {
   const auth = { Authorization: 'Bearer ' + token };
-  const url = API + '/repos/' + repo + '/private-vulnerability-reporting';
+  const url = API + '/repos/' + repo + '/' + SWITCHES[key].path;
+  const what = SWITCHES[key].name;
   const word = want ? 'on' : 'off';
   const read = async () => {
     const a = await call('GET', url, auth);
-    if (a.status !== 200 || !a.body || typeof a.body.enabled !== 'boolean') throw new Error('GitHub would not say whether private vulnerability reporting is on for ' + repo + ' (' + said(a) + ')');
+    if (a.status !== 200 || !a.body || typeof a.body.enabled !== 'boolean') throw new Error('GitHub would not say whether ' + what + ' is on for ' + repo + ' (' + said(a) + ')');
     return a.body.enabled;
   };
-  if ((await read()) === want) return { ok: true, lines: [repo + ': private vulnerability reporting is ' + word + ', as the record says'], changed: 0, differs: 0 };
-  if (check) return { ok: true, lines: [repo + ': private vulnerability reporting would be switched ' + word], changed: 0, differs: 1 };
+  if ((await read()) === want) return { ok: true, lines: [repo + ': ' + what + ' is ' + word + ', as the record says'], changed: 0, differs: 0 };
+  if (check) return { ok: true, lines: [repo + ': ' + what + ' would be switched ' + word], changed: 0, differs: 1 };
   const a = await call(want ? 'PUT' : 'DELETE', url, auth);
-  if (a.status !== 204) return { ok: false, lines: ['STOP ' + repo + ': GitHub did not switch private vulnerability reporting ' + word + ' (' + said(a) + ')'], changed: 0, differs: 1 };
+  if (a.status !== 204) return { ok: false, lines: ['STOP ' + repo + ': GitHub did not switch ' + what + ' ' + word + ' (' + said(a) + ')'], changed: 0, differs: 1 };
   // Read back rather than trust the call.
-  if ((await read()) !== want) return { ok: false, lines: ['STOP ' + repo + ': GitHub still has private vulnerability reporting ' + (want ? 'off' : 'on')], changed: 1, differs: 1 };
-  return { ok: true, lines: [repo + ': private vulnerability reporting switched ' + word], changed: 1, differs: 1 };
+  if ((await read()) !== want) return { ok: false, lines: ['STOP ' + repo + ': GitHub still has ' + what + ' ' + (want ? 'off' : 'on')], changed: 1, differs: 1 };
+  return { ok: true, lines: [repo + ': ' + what + ' switched ' + word], changed: 1, differs: 1 };
 }
 
 // Makes a repository's secret scanning and push protection on or off as its
@@ -663,7 +676,7 @@ async function repoSettings(held, now, check) {
         catch (err) { throw new Error(err.message + '; is the App installed on it? ' + WEB + '/settings/installations/' + inst.id); }
       }
       add(await rulesets(token, e.repository, e.rulesets, check));
-      if (typeof e.private_vulnerability_reporting === 'boolean') add(await reporting(token, e.repository, e.private_vulnerability_reporting, check));
+      for (const k of Object.keys(SWITCHES)) if (typeof e[k] === 'boolean') add(await setSwitch(token, e.repository, k, e[k], check));
       if (SCANNING_KEYS.some(k => typeof e[k] === 'boolean')) add(await scanning(token, e.repository, e, check));
     } catch (err) {
       add({ ok: false, lines: ['STOP ' + e.repository + ': ' + err.message + '; nothing more was changed there'], changed: 0, differs: 0 });
