@@ -16,7 +16,9 @@
 //      but actions, contents and pull-requests read; the launcher job waits
 //      for it and builds when it found nothing; the note is the last step of
 //      the checks, pull request only, under the name the script looks for,
-//      and no step of either build uploads an artifact.
+//      and counts only beside every share of the gate passed (the job
+//      "gate", 31 Oct 2026), and no step of either build uploads an
+//      artifact.
 //   3. why the tree is enough. One commit is checked out on both builds, so
 //      a check sees the same files and no history either way. What differs
 //      is the event, the ref, the commit's id: no check step and no harness
@@ -69,12 +71,17 @@ function run(id, extra) {
     repository: { full_name: REPO_NAME }, head_repository: { full_name: REPO_NAME } }, extra || {});
 }
 // The jobs of run <id>: <name> with job id <id>0, its last step the note
-// unless stepConclusion is null, and the check that reads its result.
-function jobs(id, name, conclusion, stepConclusion) {
-  const steps = [{ name: 'Run the gate harnesses', conclusion: 'success' }];
+// unless stepConclusion is null, the gate's five shares (all passed unless
+// shares is given), and the check that reads their results.
+function jobs(id, name, conclusion, stepConclusion, shares) {
+  const steps = [{ name: 'Lint (warnings only)', conclusion: 'success' }];
   if (stepConclusion !== null) { steps.push({ name: T.STEP, conclusion: stepConclusion || 'success' }); }
-  return [{ id: id * 10, name: name, conclusion: conclusion, steps: steps }, { id: 1, name: 'Build check result', conclusion: conclusion, steps: [] }];
+  const gate = shares || [1, 2, 3, 4, 5].map(n => ({ name: 'Gate harnesses (' + n + ' of 5)', conclusion: 'success' }));
+  return [{ id: id * 10, name: name, conclusion: conclusion, steps: steps }].concat(
+    gate.map((g, i) => Object.assign({ id: id * 100 + i, steps: [{ name: 'Run the gate harnesses', conclusion: g.conclusion }] }, g)),
+    [{ id: 1, name: 'Build check result', conclusion: conclusion, steps: [] }]);
 }
+function shares(fix) { return [1, 2, 3, 4, 5].map(n => ({ name: 'Gate harnesses (' + n + ' of 5)', conclusion: 'success' })).map(fix); }
 // A job's log as GitHub hands it over: timestamps, the step's echo of its
 // own script (which must not count), and the line itself.
 function jobLog(tree) {
@@ -124,6 +131,20 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   yes('a job whose note step failed does not', r.run === '');
   r = await ask(world(19, 'Some other job'));
   yes('a green job of another name does not', r.run === '');
+  // The gate runs beside the launcher job in shares (31 Oct 2026): the note
+  // counts only when every share of the same run passed.
+  r = await ask(world(21, null, { jobs: { 21: jobs(21, 'Launcher builds', 'success', 'success', shares((g, i) => i === 2 ? Object.assign(g, { conclusion: 'failure' }) : g)) } }));
+  yes('a run whose gate share failed does not: ' + r.why, r.run === '' && /gate share 3 of 5 did not pass/.test(r.why));
+  r = await ask(world(21, null, { jobs: { 21: jobs(21, 'Launcher builds', 'success', 'success', shares((g, i) => i === 4 ? Object.assign(g, { conclusion: 'cancelled' }) : g)) } }));
+  yes('nor one whose share was cancelled', r.run === '' && /gate share 5 of 5 did not pass/.test(r.why));
+  r = await ask(world(21, null, { jobs: { 21: jobs(21, 'Launcher builds', 'success', 'success', shares(g => g).slice(0, 4)) } }));
+  yes('nor one missing a share: ' + r.why, r.run === '' && /gate share 5 of 5 is not in it/.test(r.why));
+  r = await ask(world(21, null, { jobs: { 21: jobs(21, 'Launcher builds', 'success', 'success', []) } }));
+  yes('nor one with no gate at all: ' + r.why, r.run === '' && /no share of the gate ran/.test(r.why));
+  r = await ask(world(21, null, { jobs: { 21: jobs(21, 'Launcher builds', 'success', 'success', shares((g, i) => i === 0 ? Object.assign(g, { name: 'Gate harnesses (1 of 4)' }) : g)) } }));
+  yes('nor one whose shares disagree how many there are', r.run === '' && /do not agree/.test(r.why));
+  r = await ask(world(21, null, { jobs: { 21: jobs(21, 'Launcher builds', 'success', 'success', shares(g => g).concat([{ name: 'Gate harnesses (2 of 5)', conclusion: 'success' }])) } }));
+  yes('nor one with a share twice', r.run === '' && /ran twice/.test(r.why));
   r = await ask({ pulls: [pull()], runs: [run(16), run(11)], jobs: { 16: jobs(16, 'Launcher builds', 'failure'), 11: good.jobs[11] }, logs: good.logs });
   yes('a failed build of the head beside a green one: the green one counts', r.run.endsWith('/11'));
   r = await ask({ pulls: [pull()], runs: [run(11), run(20)], jobs: { 11: good.jobs[11], 20: jobs(20, 'Launcher builds', 'success') }, logs: { 110: jobLog(TREE), 200: jobLog(OTHER) } });
@@ -185,15 +206,26 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   yes('the note is the last step of the checks, under the name the script looks for', note.indexOf('- name: ' + T.STEP + '\n') === 6);
   // #3874 wrote it only on GitHub's hosted runner, so a VPS build left main
   // to be built and traced. Every build is on GitHub's runner since #4983.
-  yes('  on a pull request only, only when its gate step ran the whole gate (#3114)',
-      /\n        if: github\.event_name == 'pull_request' && steps\.gate\.outputs\.whole == 'true'\n/.test(note));
-  // #3114: a pull request built on the VPS may run only the gate harnesses
-  // its change can reach. Its tree is then not tested in full, so it keeps
-  // no note and main builds it in full (and is traced). Run-Gate.ps1 says
-  // whole=true only when it ran every gate harness.
-  const gateStep = steps.find(x => /^      - name: Run the gate harnesses\n/.test(x)) || '';
+  yes('  on a pull request only',
+      /\n        if: github\.event_name == 'pull_request'\n/.test(note));
+  // The gate runs in the job "gate" beside the launcher job, in shares
+  // (31 Oct 2026), and each share runs its part of the whole gate: no map
+  // chooses less. The script counts the note only when every share passed.
+  const gj = build.indexOf('\n  gate:\n');
+  const gateJob = gj < 0 ? '' : build.slice(gj, lj > gj ? lj : undefined);
+  const gateStep = (gateJob.split(/\n(?=      - )/).find(x => /^      - name: Run the gate harnesses\n/.test(x)) || '');
   const rg = read(path.join(REPO, 'scripts', 'dev', 'Run-Gate.ps1'));
-  yes('the gate step is "gate", and runs Run-Gate.ps1', /\n        id: gate\n/.test(gateStep) && /\.\\scripts\\dev\\Run-Gate\.ps1 /.test(gateStep));
+  yes('the gate is a job of its own before the launcher job, in shares the script reads by name',
+      gj > 0 && gj < lj && /\n    name: Gate harnesses \(\$\{\{ matrix\.shard \}\} of \$\{\{ strategy\.job-total \}\}\)\n/.test(gateJob) &&
+      T.GATE.test('Gate harnesses (1 of 5)') && /\n      fail-fast: false\n/.test(gateJob));
+  yes('  waiting for "tested" as the launcher job does', /\n    needs: tested\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' \}\}\n/.test(gateJob));
+  yes('the gate step is "gate", and runs its share through Run-Gate.ps1', /\n        id: gate\n/.test(gateStep) &&
+      /\.\\scripts\\dev\\Run-Gate\.ps1 -Shard \$env:SHARD -Of \$env:OF /.test(gateStep) &&
+      /\n          SHARD: \$\{\{ matrix\.shard \}\}\n          OF: \$\{\{ strategy\.job-total \}\}\n/.test(gateStep));
+  yes('  with no token: a share reads no map', !/GATE_MAP_TOKEN|github\.token/.test(gateJob));
+  yes('  and a share is a share of the whole gate, never a map\'s pick',
+      /\nif \(\$Of -gt 1\) \{\n[^\n]*\n    \$run = @\(for \(\$i = 0; \$i -lt \$gate\.Count; \$i\+\+\) \{ if \(\(\$i % \$Of\) -eq \(\$Shard - 1\)\) \{ \$gate\[\$i\] \} \}\)\n/.test(rg) &&
+      /\n\} elseif \(\$env:GITHUB_EVENT_NAME -eq 'pull_request'\) \{\n/.test(rg));
   yes('  which says whole=true only when it ran every gate harness',
       (rg.match(/Set-StepOutput 'whole'/g) || []).length === 1 && /\nif \(\$whole\) \{ Set-StepOutput 'whole' 'true' \}\n/.test(rg) &&
       /\n\$run = \$gate\n\$whole = \$true\n/.test(rg) && (rg.match(/\$whole = \$false/g) || []).length === 1 &&

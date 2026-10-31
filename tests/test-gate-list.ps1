@@ -164,7 +164,7 @@ Yes 'build.yml has a step that runs Run-Gate.ps1 (#3114)' ($null -ne $gate)
 if ($null -eq $gate) { Done }
 $g = Get-Named $gate
 Yes 'the gate step parses' ($g.Errors -eq 0)
-Yes 'it runs Run-Gate.ps1 with a throttle and a budget and fails when that does' ($gate -match "(?m)^\.\\scripts\\dev\\Run-Gate\.ps1 -Throttle [1-9]\d* -BudgetSeconds \d+\s*\r?\nexit \`$LASTEXITCODE\s*$")
+Yes 'it runs its share through Run-Gate.ps1 with a throttle and a budget and fails when that does' ($gate -match "(?m)^\.\\scripts\\dev\\Run-Gate\.ps1 -Shard \`$env:SHARD -Of \`$env:OF -Throttle [1-9]\d* -BudgetSeconds \d+\s*\r?\nexit \`$LASTEXITCODE\s*$")
 Yes ('the step names no harness itself' + $(if ($g.Named.Count) { ' (' + ($g.Named -join ', ') + ')' } else { '' })) ($g.Named.Count -eq 0)
 
 $runGate = Join-Path (Join-Path (Join-Path $Repo 'scripts') 'dev') 'Run-Gate.ps1'

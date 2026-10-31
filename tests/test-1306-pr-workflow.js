@@ -46,12 +46,23 @@ yes('no workflow runs a pull request on the VPS (' + (others.join(', ') || 'none
 // repository is public since 30 Oct, so it no longer waits for that.
 const result = /\n  result:\n([\s\S]*)$/.exec(code(pr));
 const rj = result ? result[1] : '';
-yes('a "Build check result" job needs the build (#3683)', /^    name: Build check result\n    needs: launcher\n/.test(rj));
+yes('a "Build check result" job needs the build and the gate\'s shares (#3683)', /^    name: Build check result\n    needs: \[launcher, gate\]\n/.test(rj));
 yes('  runs unless cancelled', /\n    if: \$\{\{ !cancelled\(\) \}\}\n/.test(rj));
 yes('  on GitHub\'s ubuntu-latest, never the box', /\n    runs-on: ubuntu-latest\n/.test(rj) && !/self-hosted|thornswood/.test(rj));
-yes('  with no checkout, action or secret: it reads only the build\'s result', !/uses:|secrets\.|checkout/.test(rj) &&
-    /BUILD: \$\{\{ needs\.launcher\.result \}\}/.test(rj));
-yes('  and passes only when it is success', /if \[ "\$BUILD" = success \]; then exit 0; fi\n[\s\S]*exit 1/.test(rj));
+yes('  with no checkout, action or secret: it reads only their results', !/uses:|secrets\.|checkout/.test(rj) &&
+    /BUILD: \$\{\{ needs\.launcher\.result \}\}/.test(rj) && /GATE: \$\{\{ needs\.gate\.result \}\}/.test(rj));
+yes('  and passes only when both are success', /if \[ "\$BUILD" = success \] && \[ "\$GATE" = success \]; then exit 0; fi\n[\s\S]*exit 1/.test(rj));
+// 31 Oct 2026: the gate runs in five shares beside the launcher job, each on
+// a hosted runner of its own, and both builds have the same shares.
+for (const [what, t] of [['main\'s build', build], ['the pull request build', pr]]) {
+  // The gate job runs from its key to the next line at the jobs' indent.
+  const at = t.indexOf('\n  gate:\n');
+  const rest = at < 0 ? '' : t.slice(at + '\n  gate:\n'.length);
+  const end = rest.search(/\n  \S/);
+  const g = end < 0 ? rest : rest.slice(0, end + 1);
+  yes(what + ' runs the gate in its own job on GitHub\'s hosted Windows runner', /\n    runs-on: windows-latest\n/.test(g) && !/self-hosted/.test(code(g)));
+  yes('  in shares, every one running to its end', /\n      fail-fast: false\n      matrix:\n        shard: \[1(, \d+)+\]\n/.test(g));
+}
 yes('  main\'s own build has no such job: only a pull request is held to it', !/\n  result:\n/.test(code(build)));
 let gen = null;
 try { gen = require(path.join(REPO, 'scripts', 'dev', 'Build-PrWorkflow.js')); } catch (e) { gen = null; }

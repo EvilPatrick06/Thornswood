@@ -16,7 +16,8 @@ on the VPS each night and open an issue when one fails; on a pull request,
 run the ones your change touches yourself.
 
 Most of them run on every pull request as well, in the build check
-(`.github/workflows/build.yml`, the step "Run the gate harnesses"): every
+(`.github/workflows/build.yml`, the job "gate", in five shares on five
+runners at once): every
 `test-*.js` and `test-*.ps1` here that `gate-excluded.txt` does not name, as
 `scripts\dev\Gate-Harnesses.ps1` lists them when the build runs (issue
 #3009). A new harness is on that gate the moment it is in this folder, and

@@ -31,7 +31,10 @@
        its check of an ask is run for real: an ask is refused unless it
        names a run never asked for, a full commit, a running process with
        its own start time, and a checkout inside that runner's own _work
-       folder reached through no link.
+       folder reached through no link;
+    6. -Shard n -Of N runs harness i of the gate when i mod N is n - 1,
+       says whole, reads no map and asks for no trace, and a share that is
+       not one exits 2 and runs nothing (build.yml's job "gate").
 
   Writes only its scratch folder, in the system's temp folder, and deletes it.
 #>
@@ -225,6 +228,28 @@ exit 0
     # ---- 4. by hand
     $r = Invoke-Gate 'workflow_dispatch' -extra @('-StartLog', (Join-Path $scratch 'hand.jsonl'))
     Yes 'a dispatch runs the whole gate with the -StartLog it was given (trace-gate.yml)' ($r.Asked -and $r.Asked.Only -eq 'test-a.js test-b.js test-c.js' -and $r.Asked.StartLog -eq (Join-Path $scratch 'hand.jsonl') -and $r.Whole)
+
+    # ---- 6. shares of the gate (31 Oct 2026): build.yml's job "gate" runs
+    # -Shard n -Of 5 on five hosted runners at once. Harness i of the list
+    # is share (i mod Of) + 1, every share is a share of the whole gate, and
+    # none reads a map or asks for a trace.
+    $union = @()
+    foreach ($n in 1, 2, 3) {
+        $r = Invoke-Gate 'pull_request' 'github-hosted' -extra @('-Shard', [string]$n, '-Of', '3')
+        $want = @('test-a.js', 'test-b.js', 'test-c.js')[$n - 1]
+        Yes ("share $n of 3 on a pull request runs its harness of the whole gate ($(if ($r.Asked) { $r.Asked.Only } else { 'nothing' }))") ($r.Code -eq 0 -and $r.Asked -and $r.Asked.Only -eq $want -and $r.Text -match "Share $n of 3 of the whole gate: 1 of its 3 harnesses")
+        Yes '  says whole, reads no map and asks Gate-Map.ps1 nothing' ($r.Whole -and -not (Test-Path -LiteralPath $tokenFile) -and $r.Text -notmatch 'traced map|The whole gate runs')
+        if ($r.Asked) { $union += @($r.Asked.Only -split ' ') }
+    }
+    Yes 'the shares together are the whole gate, each harness once' ((($union | Sort-Object) -join ' ') -eq 'test-a.js test-b.js test-c.js')
+    $r = Invoke-Gate 'pull_request' 'github-hosted' -extra @('-Shard', '1', '-Of', '2')
+    Yes 'share 1 of 2 takes the first and third' ($r.Asked -and $r.Asked.Only -eq 'test-a.js test-c.js' -and $r.Whole)
+    $r = Invoke-Gate 'push' -extra @('-Shard', '2', '-Of', '2')
+    Yes 'a share on main asks the trace task nothing' ($r.Asked -and $r.Asked.Only -eq 'test-b.js' -and -not $r.Asked.StartLog -and $r.Text -notmatch 'Traced|Not traced' -and -not (Test-Path -LiteralPath (Join-Path $trace 'ask.json')))
+    $r = Invoke-Gate 'pull_request' 'github-hosted' -extra @('-Shard', '3', '-Of', '2')
+    Yes 'a share that is not one runs nothing and exits 2' ($r.Code -eq 2 -and -not $r.Asked -and $r.Text -match '-Shard 3 -Of 2 names no share')
+    $r = Invoke-Gate 'pull_request' 'github-hosted' -extra @('-Shard', '2', '-Of', '3') -code 4
+    Yes 'a share''s exit code is the step''s' ($r.Code -eq 4)
 
     # ---- this build's share of the cores (#3860): the machine's cores over
     # the builds it runs at once. One's five builds took the box's count

@@ -53,10 +53,13 @@ function build(src) {
     is what makes that note, so its build has no such job and the launcher
     job needs nothing.
   */
-  const tested = /\n  # ALREADY TESTED \(#3182[\s\S]*?\n  tested:\n[\s\S]*?\n\n(?=  # The launcher build)/.exec(body);
-  if (!tested) { fail('build.yml no longer has its "tested" job before the launcher job'); }
+  const tested = /\n  # ALREADY TESTED \(#3182[\s\S]*?\n  tested:\n[\s\S]*?\n\n(?=  # )/.exec(body);
+  if (!tested) { fail('build.yml no longer has its "tested" job before the gate and launcher jobs'); }
   body = body.replace(tested[0], '\n');
-  body = swap(body, "    needs: tested\n    if: ${{ !cancelled() && needs.tested.outputs.run == '' }}\n", '', 'the launcher job\'s tested condition');
+  // The gate's shares and the launcher job both wait for it in build.yml.
+  const waits = "    needs: tested\n    if: ${{ !cancelled() && needs.tested.outputs.run == '' }}\n";
+  if (body.split(waits).length !== 3) { fail('build.yml no longer has the tested condition on exactly the gate and launcher jobs'); }
+  body = body.split(waits).join('');
   if (/needs\.tested|needs: \[?tested|^  tested:/m.test(code(body))) { fail('the pull request build still names the tested job'); }
   /*
     THE ONE CHECK MAIN'S PROTECTION REQUIRES (#3683, Patrick's A on
@@ -64,7 +67,10 @@ function build(src) {
     result", not "Launcher builds", because GitHub counts a skipped required
     check as passed. While the box built there were two builds and either
     could be skipped; since #4983 there is one, and this passes only when it
-    succeeded, so a skipped or cancelled build still cannot merge.
+    succeeded, so a skipped or cancelled build still cannot merge. Since
+    31 Oct 2026 the gate runs in shares beside it, in the job "gate", and
+    this needs both: a matrix job's result is success only when every share
+    succeeded.
 
     It runs on GitHub's ubuntu-latest: it is a pull request's job, and a
     fork's pull request brings its own copy of this file.
@@ -73,21 +79,24 @@ function build(src) {
   body = body.replace(/\n*$/, '\n') + [
     '',
     '  # The one check main\'s ruleset requires (#3683): passes only when the',
-    '  # build above succeeded. Written by Build-PrWorkflow.js, which says why.',
+    '  # build and every share of the gate above succeeded. Written by',
+    '  # Build-PrWorkflow.js, which says why.',
     '  result:',
     '    name: Build check result',
-    '    needs: launcher',
+    '    needs: [launcher, gate]',
     '    if: ${{ !cancelled() }}',
     '    runs-on: ubuntu-latest',
     '    timeout-minutes: 5',
     '    steps:',
-    '      - name: The launcher build passed',
+    '      - name: The launcher build and the gate passed',
     '        env:',
     '          BUILD: ${{ needs.launcher.result }}',
+    '          GATE: ${{ needs.gate.result }}',
     '        run: |',
     '          echo "Launcher builds: $BUILD"',
-    '          if [ "$BUILD" = success ]; then exit 0; fi',
-    '          echo "::error::the launcher build did not pass, so this pull request may not merge"',
+    '          echo "Gate harnesses, every share: $GATE"',
+    '          if [ "$BUILD" = success ] && [ "$GATE" = success ]; then exit 0; fi',
+    '          echo "::error::the launcher build or a share of the gate did not pass, so this pull request may not merge"',
     '          exit 1',
     '',
   ].join('\n');
@@ -99,7 +108,8 @@ function build(src) {
     '#\n' +
     '# Every pull request runs the same checks as build.yml, on GitHub\'s hosted\n' +
     '# windows-latest runner (#1306, #4983). No secrets, no live folders: every\n' +
-    '# scratch path is under RUNNER_TEMP. The job keeps the name "Launcher builds".\n';
+    '# scratch path is under RUNNER_TEMP. The job keeps the name "Launcher builds",\n' +
+    '# and the gate runs beside it in shares, "Gate harnesses (n of 5)".\n';
 
   return head + body;
 }
