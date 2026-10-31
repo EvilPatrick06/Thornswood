@@ -2620,7 +2620,7 @@
                       "script":  "scripts/deploy/LastPluginOnBox.ps1",
                       "scope":  "Invoke-ThornswoodLastPluginMake",
                       "via":  "Send-ThornswoodArtifactFile",
-                      "anchor":  "Send-ThornswoodArtifactFile $artifact.Zip $Target $SshArgs ($box.Far + \u0027/tools.zip\u0027)",
+                      "anchor":  "Send-ThornswoodArtifactFile $artifact.Zip $Target $strict ($box.Far + \u0027/tools.zip\u0027)",
                       "does":  "uploads the make\u0027s tools and the recipe (#2791) to the run\u0027s folder",
                       "class":  "stage",
                       "reason":  "writes a stage folder the run owns"
@@ -2629,7 +2629,7 @@
                       "script":  "scripts/deploy/LastPluginOnBox.ps1",
                       "scope":  "Invoke-ThornswoodLastPluginMake",
                       "via":  "Send-ThornswoodArtifactFile",
-                      "anchor":  "Send-ThornswoodArtifactFile $farFile $Target $SshArgs ($box.Far + \u0027/make.ps1\u0027)",
+                      "anchor":  "Send-ThornswoodArtifactFile $farFile $Target $strict ($box.Far + \u0027/make.ps1\u0027)",
                       "does":  "uploads the make\u0027s own script to the run\u0027s folder",
                       "class":  "stage",
                       "reason":  "writes a stage folder the run owns"

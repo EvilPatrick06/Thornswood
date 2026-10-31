@@ -88,21 +88,28 @@ function Invoke-ThornswoodLastPluginMake {
         [Parameter(Mandatory = $true)][string]$Into,
         [Parameter(Mandatory = $true)]$Want
     )
+    # Host key checking on (#450) for every ssh and scp this makes, whatever the
+    # caller passed. ssh takes the first value it is given for an option, so the
+    # strict one goes first, and a caller's weaker one is refused before
+    # anything is sent rather than quietly overridden.
+    $weak = @($SshArgs | Where-Object { $_ -match '(?i)StrictHostKeyChecking\s*=\s*(?!yes\b)' })
+    if ($weak.Count) { throw ('ssh options with host key checking turned down (' + ($weak -join ', ') + '). The plugin is made only on the box whose key is pinned. Nothing was sent.') }
+    $strict = @('-o', 'StrictHostKeyChecking=yes') + @($SshArgs)
     $artifact = New-ThornswoodArtifact -Component lastplugin -RepoDir $RepoDir -Paths $ThornswoodLastTools
     $local = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-lastplugin-' + [Guid]::NewGuid().ToString('N').Substring(0, 12))
     New-Item -ItemType Directory -Force -Path $local | Out-Null
     $box = $null
     $lines = @()
     try {
-        $box = Open-ThornswoodOnBoxFolder -Target $Target -SshArgs $SshArgs
+        $box = Open-ThornswoodOnBoxFolder -Target $Target -SshArgs $strict
         if (-not $box.Made) { throw ('could not make a folder on the box to make ' + $ThornswoodLastPlugin + ' in: ' + (($box.Said | Select-Object -Last 3) -join ' | ')) }
         $farFile = Join-Path $local 'make.ps1'
         [IO.File]::WriteAllText($farFile, (Get-ThornswoodLastMakeScript -Run $box.Run -Reads $Reads -Into $Into), (New-Object Text.UTF8Encoding($true)))
-        Send-ThornswoodArtifactFile $artifact.Zip $Target $SshArgs ($box.Far + '/tools.zip')
-        Send-ThornswoodArtifactFile $farFile $Target $SshArgs ($box.Far + '/make.ps1')
+        Send-ThornswoodArtifactFile $artifact.Zip $Target $strict ($box.Far + '/tools.zip')
+        Send-ThornswoodArtifactFile $farFile $Target $strict ($box.Far + '/make.ps1')
         $eap = $ErrorActionPreference
         $ErrorActionPreference = 'Continue'
-        try { $lines = @(Invoke-ThornswoodRemote -Target $Target -SshArgs $SshArgs -Bypass -Script ("& '" + $box.Run + "\make.ps1'") | Where-Object { $_ -is [string] } | ForEach-Object { $_.Trim() } | Where-Object { $_ }) }
+        try { $lines = @(Invoke-ThornswoodRemote -Target $Target -SshArgs $strict -Bypass -Script ("& '" + $box.Run + "\make.ps1'") | Where-Object { $_ -is [string] } | ForEach-Object { $_.Trim() } | Where-Object { $_ }) }
         finally { $ErrorActionPreference = $eap }
     } finally {
         if ($box) { $null = Close-ThornswoodOnBoxFolder $box }
