@@ -229,8 +229,8 @@ so the half that makes the kit can get its makings on day one:
                                   tanning rack. Tailor, Haberdasher.
 
 The owner and the half are not readable off a MISC at a forge or a tanning
-rack, so all three are named in $RECIPE_OWNER in
-scripts/dev/Build-RecipeTable.ps1, the same as the key mold. The rank is the
+rack, so all three are named in records/recipe-owners.json (RECIPE_OWNER
+in scripts/dev/Build-RecipeTable.ps1), the same as the key mold. The rank is the
 dearest input, which is novice for all three.
 
 The Sewing Kit was offered as linen wrap and leather strips. Linen wrap is
@@ -285,8 +285,8 @@ of each hold capital (WHERE THE STATIONS STAND, above), and carries ThornswoodCr
 until now. Skyrim's own alchemy lab cannot show a recipe at all: it brews from
 the effects ingredients share. So the physicker's two are made at this one.
 
-The owner and the half are named in $RECIPE_OWNER in
-scripts/dev/Build-RecipeTable.ps1, because none of the four can be read off a
+The owner and the half are named in records/recipe-owners.json (RECIPE_OWNER
+in scripts/dev/Build-RecipeTable.ps1), because none of the four can be read off a
 MISC at these benches. All four MISC records wear Skyrim's charcoal stick,
 like the kits, so no new mesh has to ship.
 
@@ -346,9 +346,12 @@ four Dragonborn bows/arrows, and our own three poles plus the fish trap) have th
 BNAM pointed at that keyword. The charcoal kiln is not used until #2337 is fixed.
 
 (i) The other 53 rows live in plugins that load after this one (or that would force
-a master renumber if added here). scripts/mods/Build-WoodworkerTrailOverrides.py
-and woodworker-trail-recipes.json prepare a small trailing plugin for the next
-collection revision. Until that ships, the server refusal stays the gate for those.
+a master renumber if added here). Their live ones are moved to the woodworking bench
+by Thornswood-Last.esp, which loads after them all: Build-RecipeTable.ps1 names the
+rows of a trade at a bench it does not work at, and Build-LastPlugin.py copies each
+with its BNAM pointed at the trade's own bench (#3120). That replaced the small
+trailing plugin (Thornswood-WoodworkerTrail.esp) this paragraph used to promise,
+which never shipped.
 
 Placements of the furniture in the world are Claude's: at least one beside a forge
 in every major hold and some minor towns. This script only adds the base records.
@@ -450,10 +453,11 @@ CONTENTS = (
     (r'(MISC ThornswoodMisc|COBJ ThornswoodRecipe)(Weapon|Armor|Sewing)Kit$', 'own', 'repair kits'),
     (r'(MISC ThornswoodMisc|COBJ ThornswoodRecipe)(Bandage|Splint|Poultice|Remedy)$', 'own', 'treatments'),
     (r'(MISC ThornswoodFurniture|COBJ ThornswoodRecipeFurniture)\w+$', 'own', 'furniture'),
-    # The teas, the burnt and fine meals and the festival feasts and brews
-    # (#3152) share one row, which keeps the description under its 512.
-    (r'(ALCH ThornswoodFood|COBJ ThornswoodRecipe)(Tea|Feast|Brew)\w+$|ALCH Thornswood(FoodBurntMeal|FoodFine\w+)$'
-     r'|MGEF Thornswood(TeaSteep|Burnt|Fine|Feast|Brew)Effect$', 'own', 'food and drink'),
+    # The teas, the burnt, fine and spoiled food (#3163) and the festival
+    # feasts and brews (#3152) share one row, which keeps the description
+    # under its 512.
+    (r'(ALCH ThornswoodFood|COBJ ThornswoodRecipe)(Tea|Feast|Brew)\w+$|ALCH Thornswood(FoodBurntMeal|FoodFine\w+|FoodSpoiled)$'
+     r'|MGEF Thornswood(TeaSteep|Burnt|Fine|Feast|Brew|Spoiled)Effect$', 'own', 'food and drink'),
     (r'(MISC ThornswoodQuest\w+|ACTI ThornswoodQuestLedgerSource)$', 'own', 'quest items'),
     (r'IMAD Thornswood(Drunk|High|Hangover|Withdrawal)Imod$', 'own', 'the screen looks'),
     (r'BOOK ThornswoodPassage\w+$', 'own', 'starting town passages'),
@@ -932,6 +936,28 @@ FINE_EFFECT_WORDS = 'A fine dish. The help a meal of it gives lasts 30 minutes, 
 BURNT_MEAL_EDID = 'ThornswoodFoodBurntMeal'
 BURNT_MEAL_NAME = 'Burnt Meal'
 BURNT_MEAL_LOOK = '721e8:Skyrim.esm'            # Cooked Beef
+
+# SPOILED FOOD (#3163). Patrick, 26 October 2026, C on his report page: food
+# that runs out of days stays in the pack, named for what it was and
+# "(spoiled)"; eating it fills nothing and starts food sickness, and no recipe
+# takes it. The client names what it eats by record alone, so the engine
+# cannot tell "Venison (spoiled)" from "Venison (3 days left)" when both are
+# the Venison record: a spoiled piece has to be a record of its own for the
+# server to know it was the spoiled one that went down. One record holds them
+# all, each entry named for its food by the spoilage block in the gamemode;
+# it is written from these numbers and wears the burnt meal's look, the
+# Cooked Beef mesh, so nothing here reads the masters. It is worth nothing,
+# carries no vendor keyword, and its one effect is a script effect with no
+# script, as the burnt meal's is, saying what the server does.
+SPOILED_FOOD = 0x5019100
+SPOILED_EFFECT = 0x5019003
+SPOILED_FOOD_EDID = 'ThornswoodFoodSpoiled'
+SPOILED_FOOD_NAME = 'Spoiled Food'
+SPOILED_EFFECT_WORDS = 'Spoiled. It fills nothing, and it turns the stomach.'
+SPOILED_MODEL = 'Clutter\\Ingredients\\BeefMeatCooked.nif'
+SPOILED_BOUNDS = (-5, -9, -2, 5, 9, 2)
+SPOILED_WEIGHT = 0.5
+SPOILED_EAT_SOUND = 0x000CAF94                  # the burnt meal's, Skyrim's eating sound
 # The subrecords of a dish's look this copies, and in each the offsets that
 # hold a form id. ENIT is worth, flags, addiction, addiction chance and the
 # eating sound; the addiction is not copied, a dish has none.
@@ -1247,6 +1273,7 @@ def needs_records():
     out.append(look_imad(HANGOVER_IMOD, 'ThornswoodHangoverImod', HANGOVER_LOOK))
     out.append(look_imad(WITHDRAWAL_IMOD, 'ThornswoodWithdrawalImod', WITHDRAWAL_LOOK))
     out += quality_effects()
+    out += spoiled_records()
     # The verb on the crosshair says what activating it does.
     out.append(own_record(b'ACTI', WELL_BUCKET, [
         (b'EDID', zstr('ThornswoodActivatorWellBucket')), (b'OBND', bounds(WELL_BUCKET_BOUNDS)),
@@ -1268,6 +1295,23 @@ def quality_effects():
         for fid, edid, name, words in (
             (BURNT_EFFECT, 'ThornswoodBurntEffect', 'Burnt', BURNT_EFFECT_WORDS),
             (FINE_EFFECT, 'ThornswoodFineEffect', 'Fine', FINE_EFFECT_WORDS))]
+
+
+def spoiled_records():
+    """Spoiled food and its effect (#3163). See SPOILED_FOOD."""
+    data = bytearray(TEA_EFFECT_DATA)
+    struct.pack_into('<I', data, 0, TEA_EFFECT_FLAGS)
+    return [
+        own_record(b'MGEF', SPOILED_EFFECT, [
+            (b'EDID', zstr('ThornswoodSpoiledEffect')), (b'FULL', zstr('Spoiled')),
+            (b'DATA', bytes(data)), (b'SNDD', b''), (b'DNAM', zstr(SPOILED_EFFECT_WORDS))]),
+        own_record(b'ALCH', SPOILED_FOOD, [
+            (b'EDID', zstr(SPOILED_FOOD_EDID)), (b'OBND', bounds(SPOILED_BOUNDS)),
+            (b'FULL', zstr(SPOILED_FOOD_NAME)), (b'MODL', zstr(SPOILED_MODEL)),
+            (b'DATA', struct.pack('<f', SPOILED_WEIGHT)),
+            # Worth nothing, no auto calc and a food item, no addiction, the eating sound.
+            (b'ENIT', struct.pack('<iIIfI', 0, 0x3, 0, 0.0, SPOILED_EAT_SOUND)),
+            (b'EFID', struct.pack('<I', SPOILED_EFFECT)), (b'EFIT', struct.pack('<fII', 0.0, 0, 0))])]
 
 
 def quality_wanted(plugin_masters, plugin_name):

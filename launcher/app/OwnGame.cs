@@ -1001,10 +1001,15 @@ namespace Thornswood
         ///    Images\speaking.png and the ChainLink, NoticeIcon and VoiceIcon
         ///    sprite fonts) are left out, so a refresh cannot copy them back
         ///    after a pack deletes them. See Foreign, issue #2177.
+        /// 18: the two commercial sprite fonts (Fonts\DIN-Pro-bold and
+        ///    Fonts\Futura) are left out, so a refresh cannot copy them back
+        ///    after a pack deletes them, and so are the four Futura PT and
+        ///    DIN Pro faces under UI that records\ui-gone.json now lists.
+        ///    See Foreign, issue #1317.
         ///
         /// Every number from 14 on also gets a line in RuleTouches below.
         /// </summary>
-        const int Rules = 17;
+        const int Rules = 18;
 
         /// <summary>
         /// What each rule from 14 on can decide differently, as the start of
@@ -1027,6 +1032,7 @@ namespace Thornswood
             { 15, new string[] { "Data\\Platform\\UI\\" } },
             { 16, new string[] { "Data\\Platform\\UI\\" } },
             { 17, new string[] { "Data\\Platform\\Images\\", "Data\\Platform\\Fonts\\" } },
+            { 18, new string[] { "Data\\Platform\\Fonts\\", "Data\\Platform\\UI\\" } },
         };
 
         /// <summary>
@@ -2626,6 +2632,13 @@ namespace Thornswood
             // ones back in. Ship-Rules.ps1 carries the same five
             // ($ShipPlatformUnused); change the two together.
             if (Regex.IsMatch(rel, @"^Data\\Platform\\(Images\\(lock|speaking)\.png|Fonts\\(ChainLink|NoticeIcon|VoiceIcon)\.spritefont)$", I)) return true;
+            // Two sprite fonts of commercial faces, issue #1317: DIN-Pro-bold
+            // (FSI FontShop's DIN Pro Bold) and Futura (ParaType's Futura PT),
+            // which nothing gives Thornswood the right to hand on. The voice
+            // mark draws in Barlow-SemiBold since. Packs delete them, and this
+            // keeps a refresh from copying a Steam copy's back in. Ship-Rules.ps1
+            // carries the same two ($ShipCommercialFonts); change the two together.
+            if (Regex.IsMatch(rel, @"^Data\\Platform\\Fonts\\(DIN-Pro-bold|Futura)\.spritefont$", I)) return true;
             // The bundle is on ClientFiles and answered above in WhyLeft, so
             // here it is simply not ours to take from the Steam copy either.
             if (Regex.IsMatch(rel, @"^Data\\Platform\\Plugins\\[^\\]+\.js$", I))

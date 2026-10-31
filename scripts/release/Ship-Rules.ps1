@@ -307,6 +307,10 @@ $ShipOldSkyUIScripts = @(
 # files" row in THIRD-PARTY.md) are dead weight too: build.js names none of
 # them. They stop shipping and every pack deletes them from installs as well.
 #
+# So do the four Futura PT and DIN Pro faces main's older front build named
+# by hash (#1317): the front built from the fork names none of them since 20
+# Oct, and without a gone entry the installs that took them would keep them.
+#
 # WHAT IS OURS UNDER UI. Only index.html, build.js, thornswood-* files, and
 # the hashed assets build.js actually names. That last list is parsed from
 # build.js at ship time, never kept by hand. OwnGame.Foreign reads the list
@@ -314,7 +318,8 @@ $ShipOldSkyUIScripts = @(
 $ShipUiAssetsRel = 'Data\Platform\UI\thornswood-ui-assets.txt'
 $ShipUiHashedPattern = '^[0-9a-f]{8,32}\.(ttf|woff2?|eot|otf|svg|png|jpe?g|gif|wav|mp3|ogg|webp)$'
 # One record, records\ui-gone.json: the 37 Daedric names and sha256 values,
-# and the 42 unused fork names. OwnGame.Foreign reads the same file (Build-Launcher
+# and the 46 unused fork names (41 svgs and bg.png, and the four commercial
+# faces of #1317). OwnGame.Foreign reads the same file (Build-Launcher
 # embeds it). A second hand-copied list here would drift.
 $ShipUiGoneRecord = Join-Path $PSScriptRoot '..\..\records\ui-gone.json'
 if (-not (Test-Path -LiteralPath $ShipUiGoneRecord -PathType Leaf)) {
@@ -503,13 +508,13 @@ function Save-ShipUiHashedAssets([string]$GameFolder) {
 # repository, the game folder's skymp5-client.js, build.js or Modules, or the
 # fork names any of them. Skyrim Platform loads every sprite font in Fonts by
 # its name (DX11RenderHandler.cpp), and a font is drawn only when a script
-# names it: ours names DIN-Pro-bold, and Tavern is the default. Nothing
+# names it: ours names Barlow-SemiBold (#1317), and Tavern is the default. Nothing
 # reads Images. Nobody recorded who made them or on what terms.
 #
 # Test-ShipOtherServer calls them not ours, so no pack or installer carries
 # them, and they are on $ShipDeleteAlways below, so every pack deletes them
-# from the installs that have them. The other sprite fonts (Tavern,
-# DIN-Pro-bold, Futura) still ship. OwnGame.Foreign carries the same five so
+# from the installs that have them. Tavern and Barlow-SemiBold still ship;
+# DIN-Pro-bold and Futura are $ShipCommercialFonts below. OwnGame.Foreign carries the same five so
 # a refresh cannot copy them back from a Steam copy; change the two together.
 # tests\test-2177-platform-unused.ps1 holds both.
 $ShipPlatformUnused = @(
@@ -518,6 +523,24 @@ $ShipPlatformUnused = @(
     'Data\Platform\Fonts\ChainLink.spritefont',
     'Data\Platform\Fonts\NoticeIcon.spritefont',
     'Data\Platform\Fonts\VoiceIcon.spritefont'
+)
+
+# TWO SPRITE FONTS OF COMMERCIAL FACES, issue #1317. DIN-Pro-bold.spritefont
+# is FSI FontShop's DIN Pro Bold drawn into a sprite font, from upstream
+# SkyMP's client-deps; Futura.spritefont, dated 14 Sep, is by its name
+# ParaType's Futura PT and is in neither the fork nor upstream. Nothing gives
+# SkyMP or Thornswood the right to hand either face on. The one thing that drew
+# with either was the overhead voice mark, which draws its dot in
+# Barlow-SemiBold.spritefont since #1317 (game\ours, made by
+# scripts\mods\Build-SpriteFont.py from the OFL Barlow SemiBold the fork's
+# interface uses). They are not ours, so no pack or installer carries them,
+# and they are on $ShipDeleteAlways below, so every install loses them on the
+# next release. OwnGame.Foreign carries the same two so a refresh cannot copy
+# them back from a Steam copy; change the two together.
+# tests\test-1317-fonts.ps1 holds both.
+$ShipCommercialFonts = @(
+    'Data\Platform\Fonts\DIN-Pro-bold.spritefont',
+    'Data\Platform\Fonts\Futura.spritefont'
 )
 
 function Test-ShipOtherServer([string]$rel) {
@@ -574,6 +597,8 @@ function Test-ShipOtherServer([string]$rel) {
     if ($rel -ieq 'Data\Platform\Plugins\thornswood-chargen.js') { return $true }
     # The five files nothing uses (#2177, $ShipPlatformUnused above).
     foreach ($u in $ShipPlatformUnused) { if ($rel -ieq $u) { return $true } }
+    # The two commercial sprite fonts (#1317, $ShipCommercialFonts above).
+    foreach ($u in $ShipCommercialFonts) { if ($rel -ieq $u) { return $true } }
     # In Plugins only our overlays belong. The bundle was decided by its hash above.
     if ($rel -like 'Data\Platform\Plugins\*.js') {
         if ($leaf -like 'thornswood-*.js') { return $false }
@@ -819,8 +844,10 @@ function Test-ShipMadeFromGame([string]$rel) {
 #
 # An item on Thornswood has no gold price, and three of the collection's mods
 # draw one: SkyUI's item lists and item card, SkyHUD's line under an item
-# somebody looks at, and moreHUD's value to weight. The launcher makes these
-# five from each machine's own copy of those mods, out of their archives
+# somebody looks at, and moreHUD's value to weight. And SkyUI's journal puts
+# Quick Save, Save, Load, Help and the Creation Club on its System page, which
+# Thornswood does not use (#3127). The launcher makes these six from each
+# machine's own copy of those mods, out of their archives
 # (launcher\app\FromGameModMenus.cs, written by scripts\mods\Build-ModMenus.py),
 # the same way and at the same times as the three above. They are their
 # authors' files edited, so none of them may leave the machine either, and none
@@ -833,7 +860,8 @@ $ShipMadeFromMods = @(
     'Data\Interface\skyui\itemcard.swf',
     'Data\Interface\hudmenu.swf',
     'Data\Interface\AHZHudInfo.swf',
-    'Data\Interface\exported\AHZHudInfo.swf'
+    'Data\Interface\exported\AHZHudInfo.swf',
+    'Data\Interface\quest_journal.swf'
 )
 
 function Test-ShipMadeFromMods([string]$rel) {
@@ -1317,7 +1345,22 @@ $ShipOursFiles = @(
     # QuickLoot IE's settings file with its loot menu's columns weight only,
     # no gold value (#3113). QuickLoot IE is GPL-3.0-or-later (#3800), so its
     # file may go out changed, saying so.
-    'Data\SKSE\Plugins\QuickLootIE.json'
+    'Data\SKSE\Plugins\QuickLootIE.json',
+    # The crafting menu's groups (#3133): Crafting Categories reads every
+    # config named after a plugin in the load order, in load order, so this
+    # one, named for our content plugin, comes after the collection's own and
+    # moves weapons, armour and arrows each under a header of its own, with
+    # material groups inside. The English names of those groups beside it.
+    # Both are Thornswood's own; Go.ps1 writes them too ($oursMenuFiles).
+    'Data\SKSE\Plugins\CraftingCategories\Thornswood-Content.json',
+    'Data\Interface\Translations\Thornswood-Content_ENGLISH.txt',
+    # The sprite font the overhead voice mark draws its dot in, made from the
+    # OFL Barlow SemiBold by scripts\mods\Build-SpriteFont.py, and the OFL
+    # beside it, which a copy has to carry (#1317). Under Data\Platform these
+    # are ours anyway; they are named here because Go.ps1 writes them from
+    # game\ours with the others.
+    'Data\Platform\Fonts\Barlow-SemiBold.spritefont',
+    'Data\Platform\Fonts\Barlow-SemiBold-OFL.txt'
 )
 
 # BUILT ON EACH COMPUTER, NEVER SHIPPED (#3715).
@@ -1662,6 +1705,40 @@ function Test-ShipNotOurs([string]$rel, [int]$Revision = $ShipCollectionRevision
     return (-not (Test-ShipHeld $rel $Revision))
 }
 
+# OTHER AUTHORS' FILES OUR OLD PACKS SHIPPED, BY THEIR BYTES (#1178). The packs
+# carried them as ours until the scrub of 29 September, which took them out of
+# the packs and the records. #1261 (2 October) makes a release list such a file
+# as gone at the sha256 we shipped, but only when the release before it named
+# the file, and after the scrub none did. So every install the old packs reached
+# kept them: 166 files, 67.6 MB, on the main install on 12 October, among them
+# old MCM Helper scripts over the collection's newer ones and the other server's
+# haybale. records\shipped-not-ours.json names 165 of them with those bytes,
+# and Publish-Update puts every one in the record as gone. The haybale's path
+# would name the other server, which no tracked file may (#400), so the
+# launcher's Leaks.cs takes that one out by its shape and bytes. The launcher
+# deletes one only while it still has those bytes and Vortex does not deploy
+# the path, so a copy somebody installed themselves is never touched.
+#
+# Returns path -> lowercase sha256. Stops, naming them, on a record that does
+# not read, or on a path Ship-Rules does not call another author's: a delete
+# must never reach Bethesda's files, one machine's own, or a backup.
+$ShipShippedNotOursRecord = Join-Path $PSScriptRoot '..\..\records\shipped-not-ours.json'
+function Get-ShipShippedNotOurs {
+    $doc = Read-ThornswoodRecord -Path $ShipShippedNotOursRecord -Kind shipped-not-ours
+    $map = [ordered]@{}
+    $wrong = @()
+    foreach ($p in @($doc.files.PSObject.Properties)) {
+        $rel = $p.Name
+        if (-not (Test-ShipNotOurs $rel) -or (Test-ShipBethesda $rel) -or (Test-ShipOneMachine $rel) -or (Test-ShipBackup $rel)) { $wrong += $rel; continue }
+        $map[$rel] = ([string]$p.Value.sha256).ToLowerInvariant()
+    }
+    if ($wrong.Count) {
+        throw ("records\shipped-not-ours.json names {0} file(s) Ship-Rules does not call another author's loose file, so no release may delete them by it: {1}" -f
+               $wrong.Count, (($wrong | Select-Object -First 5) -join ', '))
+    }
+    return $map
+}
+
 # Where this build's reference plugins.txt and loadorder.txt are read from.
 #   no Root\Game         the Steam copy: Vortex writes them into AppData
 #   an own folder        Profile\OwnGame: the Vortex profile's lists as of the
@@ -1796,6 +1873,9 @@ $ShipDeleteAlways += $ShipUiGonePaths
 # The five files under Data\Platform nothing uses, issue #2177: every pack
 # deletes them, so the next release takes them off every install.
 $ShipDeleteAlways += $ShipPlatformUnused
+# The two commercial sprite fonts, issue #1317: every pack deletes them, so
+# the next release takes them off every install.
+$ShipDeleteAlways += $ShipCommercialFonts
 
 function Get-ShipDeleteAlways {
     $list = New-Object 'System.Collections.Generic.List[string]'

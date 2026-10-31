@@ -173,6 +173,9 @@ require('fs').writeFileSync('seen.json', JSON.stringify({
 # stands in as nothing. Without it the expansion threw before any check after
 # it ran (found while checking the voice line for #2166).
 function Get-ThornswoodServiceAccountScript { return '' }
+# It also pastes in scripts\vps\BoxFirewall.ps1's Sync-ThornswoodFirewall
+# (#3896), loaded here the way Install-Voice.ps1 loads it.
+. (Join-Path $RepoPath 'scripts\vps\BoxFirewall.ps1')
 # The service's command line, built the way the install builds it: the relay
 # lines lifted out of the script, then the remote here-string expanded, then
 # the line in it that the VPS runs.

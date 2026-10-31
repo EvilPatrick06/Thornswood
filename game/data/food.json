@@ -1,12 +1,12 @@
 {
  "builtBy": "scriptsdevBuild-FoodTable.js",
- "builtAt": "2026-10-27T06:52:25.693Z",
+ "builtAt": "2026-10-30T20:48:03.003Z",
  "source": "the ALCH records of the plugins in load order",
  "readFrom": "ENIT for the food and poison flags, FULL for the name",
  "note": "what a kind is WORTH is balance and lives in NEEDS in gamemode.js",
- "count": 537,
+ "count": 538,
  "byKind": {
-  "food": 148,
+  "food": 149,
   "drink": 62,
   "ale": 39,
   "potion": 208,
@@ -4161,6 +4161,15 @@
    "name": "Snowberry Tea",
    "kind": "drink",
    "gold": 5
+  },
+  "19100:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19100",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodSpoiled",
+   "name": "Spoiled Food",
+   "kind": "food",
+   "gold": 0
   },
   "1a010:Thornswood-Content.esp": {
    "file": "Thornswood-Content.esp",

@@ -97,7 +97,7 @@ Yes ('the script copies each of them to dev voice by name, with the program and 
     $copy.Success -and $named -contains 'voice-server.js' -and $named -contains 'server-log.js' -and
     @($required | Where-Object { $named -notcontains $_ }).Count -eq 0)
 Yes 'the script opens no firewall rule for dev voice' ($body -notmatch "Name = 'Thornswood Dev Voice'")
-Yes 'and takes an old one down' ($body -match "Remove-NetFirewallRule -DisplayName 'Thornswood Dev Voice'")
+Yes 'and takes an old one down' ($body -match "Remove-NetFirewallRule -PolicyStore localhost -DisplayName 'Thornswood Dev Voice'")
 Yes 'it never copies live''s private folder' ($body -match '& robocopy \$live \$dev [^\r\n]*/XD [^\r\n]*\bprivate\b')
 
 # ---- run -FilesOnly, on the box's Windows PowerShell -----------------------------

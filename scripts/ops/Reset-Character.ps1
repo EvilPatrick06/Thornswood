@@ -259,7 +259,7 @@ else {
         Say ("Done on the box. Whether {0}:{1} answers from here is not known: {2}." -f $VpsHost, $resPort, $outside.NotKnown) 'Yellow'
     } else {
         Say ("The box says the server answers, and {0}:{1} was {2} from here, though {3} on the box answers from here." -f $VpsHost, $resPort, $outside.Said, $witness) 'Red'
-        Say ("  .\scripts\vps\Remote.ps1 `"Get-NetFirewallPortFilter -Protocol TCP | Where-Object LocalPort -eq {0} | Get-NetFirewallRule | Format-Table DisplayName,Enabled,Action,Profile`"" -f $resPort) 'DarkGray'
+        Say ("  .\scripts\vps\Remote.ps1 `"Get-NetFirewallPortFilter -PolicyStore ActiveStore -Protocol TCP | Where-Object LocalPort -eq {0} | Get-NetFirewallRule | Format-Table DisplayName,Enabled,Action,Profile`"" -f $resPort) 'DarkGray'
         if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
         exit 1
     }

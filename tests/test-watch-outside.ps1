@@ -60,7 +60,7 @@ $ipLike = $null
 Yes 'the game''s name comes from scripts\vps\vps.json, a name and not the box''s address (#3690)' ($S.GameHost -and -not [Net.IPAddress]::TryParse($S.GameHost, [ref]$ipLike))
 Yes 'the certificate line is 14 days' ($S.CertDays -eq 14)
 Yes 'the webhook''s channel is #staff-updates, bot\staff-channel.txt''s id (#2501)' ($S.StaffChannel -eq '1549254991082946570')
-Yes 'the runners are the repository''s, from thornswood-vps' ($S.Repo -eq 'EvilPatrick06/Thornswood' -and $S.RunnerName -eq 'thornswood-vps')
+Yes 'the runners are Thornswood-Ops''s, where the box''s runners are registered since the flip (#4013), from thornswood-vps' ($S.Repo -eq 'EvilPatrick06/Thornswood-Ops' -and $S.RunnerName -eq 'thornswood-vps')
 Yes 'signing and the off-box copy are not asked from outside any more (#2755)' (-not $S.ContainsKey('SignAccount') -and -not $S.ContainsKey('BackupsFolder'))
 
 $dir = Join-Path $Temp ('thornswood-watchoutside-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -286,7 +286,7 @@ try {
   Yes 'runner offline for two runs: nothing yet, it restarts itself on updates' ((Posted '*build runner*') -eq 0)
   $null = Pass-Once
   Yes 'runner offline for three runs: one message' ((Posted '*build runners, thornswood-vps and the numbered ones, are not all online on GitHub*') -eq 1)
-  Yes 'it says what that stops' ((Posted '*Launcher builds*') -eq 1)
+  Yes 'it says what that stops: the box''s jobs on Thornswood-Ops (#4013)' ((Posted '*Thornswood-Ops*deploys through the gate*') -eq 1)
   $null = Pass-Once
   $script:runner = 'online'
   $null = Pass-Once; $null = Pass-Once

@@ -222,13 +222,13 @@ yes('the front takes afk:out from the page into update, where the main menu can 
 
 // Back in: the front connects again as the picked character.
 yes('picking on the way back connects again as that character: authGameData then createClient',
-    /if \(menuAgain\) \{ relogAs\(id\); \}/.test(front) &&
+    /if \(menuAgain\) \{ pickedAgain\(id\); relogAs\(id\); \}/.test(front) &&
     /sp\.storage\.authGameData = \{ local: \{ profileId: id \} \};[\s\S]{0,300}sp\.mpClientPlugin\.createClient\(host, port\);/.test(front) &&
     /try \{ up = !!sp\.mpClientPlugin\.isConnected\(\); \}/.test(front));
 yes('the menu shows the choice again even though a choice is on disk for this session',
     /if \(!menuAgain && chosenOnDisk\(\)\)/.test(front));
 yes('the page is given the character they were, with no scroll and no theme',
-    /if \(menuAgain\) \{\s*list\.intro = false; list\.music = '';\s*if \(menuAgain\.ended\) \{ list\.ended = String\(menuAgain\.ended\); \} else \{ list\.away = menuAgain; \}\s*\}/.test(front));
+    /if \(menuAgain\) \{\s*list\.intro = false; list\.music = '';\s*if \(menuAgain\.ended\) \{ list\.ended = String\(menuAgain\.ended\); \}\s*else if \(menuAgain\.switched\) \{[^]*?\}\);\s*\}\s*else \{ list\.away = menuAgain; \}\s*\}/.test(front));
 yes('arriving in the world ends it', /menuChosenId = 0;\s*menuAgain = null;/.test(front));
 yes('another character takes the place with "/line hand" before the connection becomes theirs',
     /if \(lineId\) \{ lineHand\(id\); return; \}/.test(front) &&

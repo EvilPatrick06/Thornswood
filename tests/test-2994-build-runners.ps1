@@ -62,15 +62,14 @@ $heavy = @{
     'build-pr.yml' = @('launcher-vps')
     'engine.yml'   = @('engine-vps')
     'nightly.yml'  = @('harnesses')
-    # The gate, run as build.yml runs it, under a trace (#3114).
-    'trace-gate.yml' = @('trace')
+    # trace-gate.yml's trace job, the gate under a trace (#3114), asks for
+    # it too, in the private ops repository since #4013, where
+    # tests\test-box-workflows.ps1 holds it. release.yml's verify job asks
+    # for none: it runs on GitHub's runner since #4013.
     # Named harnesses or the gate, on a branch as well as main, so never on
     # the runner that signs (#3550).
     'harnesses.yml' = @('harnesses')
 }
-# release.yml's verify is light. It asked for a build runner until #3956,
-# since those are never the runner that signs; it asks for the check label
-# (records\check-runners.json) now, so it never waits behind a build.
 function Get-Jobs([string]$text) {
     $text = $text -replace "`r`n", "`n"
     $body = $text.Substring($text.IndexOf("`njobs:`n") + 7)
@@ -96,7 +95,10 @@ foreach ($f in Get-ChildItem -LiteralPath $wfDir -Filter *.yml) {
         else { Yes ("{0} {1} is light and runs on any VPS runner ({2})" -f $f.Name, $k, $runsOn) (-not $has) }
     }
 }
-Yes "every heavy job named here is on the box ($seen found)" ($seen -ge 4)
+# build-pr.yml's fallback asks for the build label alone, for One's runners
+# too (#3861), and is held below; every other one named is on the box.
+$named = @($heavy.Values | ForEach-Object { $_ }).Count
+Yes "every heavy job named here but build-pr.yml's is on the box ($seen of $($named - 1) found)" ($seen -ge ($named - 1))
 # The pull request build's fallback needs nothing of the box, so it asks for
 # records\pr-build-runners.json's label alone, which One's off-box build
 # runners carry too (26 Oct 2026). On the box only runner 2 carries it, so

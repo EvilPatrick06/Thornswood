@@ -184,8 +184,10 @@ function Grant-ThornswoodServiceFolder {
 
 # The SID Windows gives NT TASK\<name>, worked out from the name the way it
 # does (S-1-5-87- and the SHA-1 of the name in upper case as UTF-16, read as
-# five 32 bit numbers, as for NT SERVICE in Bot-Service.ps1), so a grant can
-# name it before the task is registered. Checked on the box on 27 Oct 2026
+# five 32 bit numbers, as for NT SERVICE in Bot-Service.ps1), so an action
+# or a rule can name it from the name alone. icacls still refuses to grant it
+# until the task is registered, because only then does Windows map it
+# (#4968, #4973). Checked on the box on 27 Oct 2026
 # against what Windows said for Thornswood Bridge and Thornswood Docs.
 function Get-ThornswoodTaskSidFromName {
     param([string]$TaskName)

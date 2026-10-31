@@ -138,14 +138,14 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 | Stormcloak Cloak | 1 | advanced | Other armour and clothing | TanningRack | 2 Linen Wrap |  | yes | `2e0f:Cloaks&Capes.esp` |
 | Whiterun Guard Cloak | 1 | advanced | Other armour and clothing | TanningRack | 2 Linen Wrap |  | yes | `2e0e:Cloaks&Capes.esp` |
 | Winterhold Guard Cloak | 1 | advanced | Other armour and clothing | TanningRack | 2 Linen Wrap |  | yes | `2e10:Cloaks&Capes.esp` |
-| Dwarven Mage Unarmored Robe | 1 | expert | Robes and body wear | SmithingForge | 1 Troll Fat, 3 Leather Strips, 3 Leather, 2 Dwarven Metal Ingot |  | yes | `37306:Hothtrooper44_ArmorCompilation.esp` |
-| Shaman Unarmored Robe | 1 | expert | Robes and body wear | SmithingForge | 2 Linen Wrap, 3 Troll Fat, 2 Leather Strips, 3 Leather, 2 Fur Plate |  | yes | `82ec2:Hothtrooper44_ArmorCompilation.esp` |
-| Tribunal Unarmored Robe Black | 1 | expert | Robes and body wear | SmithingForge | 1 Common Soul Gem, 2 Linen Wrap, 5 Troll Fat, 3 Leather Strips, 9 Leather |  | yes | `231d5:Hothtrooper44_ArmorCompilation.esp` |
-| Tribunal Unarmored Robe Blue | 1 | expert | Robes and body wear | SmithingForge | 1 Common Soul Gem, 2 Linen Wrap, 5 Troll Fat, 3 Leather Strips, 9 Leather |  | yes | `231d6:Hothtrooper44_ArmorCompilation.esp` |
-| Tribunal Unarmored Robe Green | 1 | expert | Robes and body wear | SmithingForge | 1 Common Soul Gem, 2 Linen Wrap, 5 Troll Fat, 3 Leather Strips, 9 Leather |  | yes | `231d7:Hothtrooper44_ArmorCompilation.esp` |
-| Ebony Mage Unarmored Robe | 1 | master | Robes and body wear | SmithingForge | 4 Troll Fat, 2 Ebony Ingot, 3 Leather Strips, 6 Leather |  | yes | `37301:Hothtrooper44_ArmorCompilation.esp` |
-| Tribunal Unarmored Robe Red | 1 | master | Robes and body wear | SmithingForge | 1 Common Soul Gem, 2 Linen Wrap, 5 Troll Fat, 3 Leather Strips, 9 Leather |  | yes | `231d8:Hothtrooper44_ArmorCompilation.esp` |
-| Tribunal Unarmored Robe White | 1 | master | Robes and body wear | SmithingForge | 1 Common Soul Gem, 2 Linen Wrap, 5 Troll Fat, 3 Leather Strips, 9 Leather |  | yes | `231d9:Hothtrooper44_ArmorCompilation.esp` |
+| Dwarven Mage Unarmored Robe | 1 | expert | Robes and body wear | MCE_CraftingLoom | 1 Troll Fat, 3 Leather Strips, 3 Leather, 2 Dwarven Metal Ingot |  | yes | `37306:Hothtrooper44_ArmorCompilation.esp` |
+| Shaman Unarmored Robe | 1 | expert | Robes and body wear | MCE_CraftingLoom | 2 Linen Wrap, 3 Troll Fat, 2 Leather Strips, 3 Leather, 2 Fur Plate |  | yes | `82ec2:Hothtrooper44_ArmorCompilation.esp` |
+| Tribunal Unarmored Robe Black | 1 | expert | Robes and body wear | MCE_CraftingLoom | 1 Common Soul Gem, 2 Linen Wrap, 5 Troll Fat, 3 Leather Strips, 9 Leather |  | yes | `231d5:Hothtrooper44_ArmorCompilation.esp` |
+| Tribunal Unarmored Robe Blue | 1 | expert | Robes and body wear | MCE_CraftingLoom | 1 Common Soul Gem, 2 Linen Wrap, 5 Troll Fat, 3 Leather Strips, 9 Leather |  | yes | `231d6:Hothtrooper44_ArmorCompilation.esp` |
+| Tribunal Unarmored Robe Green | 1 | expert | Robes and body wear | MCE_CraftingLoom | 1 Common Soul Gem, 2 Linen Wrap, 5 Troll Fat, 3 Leather Strips, 9 Leather |  | yes | `231d7:Hothtrooper44_ArmorCompilation.esp` |
+| Ebony Mage Unarmored Robe | 1 | master | Robes and body wear | MCE_CraftingLoom | 4 Troll Fat, 2 Ebony Ingot, 3 Leather Strips, 6 Leather |  | yes | `37301:Hothtrooper44_ArmorCompilation.esp` |
+| Tribunal Unarmored Robe Red | 1 | master | Robes and body wear | MCE_CraftingLoom | 1 Common Soul Gem, 2 Linen Wrap, 5 Troll Fat, 3 Leather Strips, 9 Leather |  | yes | `231d8:Hothtrooper44_ArmorCompilation.esp` |
+| Tribunal Unarmored Robe White | 1 | master | Robes and body wear | MCE_CraftingLoom | 1 Common Soul Gem, 2 Linen Wrap, 5 Troll Fat, 3 Leather Strips, 9 Leather |  | yes | `231d9:Hothtrooper44_ArmorCompilation.esp` |
 
 <!-- detail:end -->
 

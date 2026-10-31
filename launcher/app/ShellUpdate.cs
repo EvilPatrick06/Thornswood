@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Windows;
 
@@ -15,6 +16,9 @@ namespace Thornswood
         static bool selfUpdateOffered;
         static bool retryQueued;
         static bool checkingInPlay = false;
+        // True from the moment RunUpdate starts one until it has gone in or
+        // failed (#3202). A new launcher closes the window instead.
+        static bool updating;
         // #2440: one long-poll tip to /feed/watch while the shell is up.
         static bool feedWatchStarted;
         static volatile bool feedWatchStop;
@@ -83,7 +87,7 @@ namespace Thornswood
                 // The news file the feed names, if any, here on the check's own
                 // thread, so the News tab has it (#1050, FeedNews.cs). Never throws.
                 Updater.FillNews(cfg, v);
-                win.Dispatcher.BeginInvoke(new Action(delegate { OnVersionDoc(v, loud); }));
+                win.Dispatcher.BeginInvoke(new Action(delegate { OnVersionDoc(v, loud); UpdateBySelf(); }));
                 // Whether the release's signed manifest vouches for every
                 // asset the feed names (#2163, FeedManifest.cs). Only said in
                 // launcher.log for now (phase C), once per manifest, on a
@@ -171,9 +175,6 @@ namespace Thornswood
                 feedSaid = Updater.LastFeedUrl;
                 LogOnly("Update checks read " + feedSaid + ".");
             }
-
-            bool install = installWhenSeen;
-            installWhenSeen = false;
 
             bool moved = false;
             if (!string.IsNullOrEmpty(v.serverAddress) && v.serverAddress != cfg.ServerAddress) { cfg.ServerAddress = v.serverAddress; moved = true; }
@@ -285,12 +286,12 @@ namespace Thornswood
             {
                 collectionBarUp = false;
             }
-            btnInstallNow.Content = "Install now";
+            InstallLabel("Install now");
 
             if (pendingPacks.Count == 0 && !newLauncher)
             {
                 updateBar.Visibility = Visibility.Collapsed;
-                btnInstallNow.Visibility = Visibility.Collapsed;
+                InstallShown(Visibility.Collapsed);
                 updatePending = false;
                 updateAnswered = true;
                 DrawStatus();
@@ -311,17 +312,62 @@ namespace Thornswood
                 note += "  ·  " + pendingPacks[0].notes;
             txtUpdateNote.Text = note;
             updateBar.Visibility = Visibility.Visible;
-            btnInstallNow.Visibility = Visibility.Visible;
-            Log("Update available. Install it from the card above the Play button, or in Settings.");
+            InstallShown(Visibility.Visible);
+            Log(cfg.AutoUpdate
+                ? "Update available."
+                : "Update available. Install it from the card above the Play button, or in Settings.");
+        }
 
-            // The game was just closed for this. With automatic updates on it
-            // goes in now, so the person is back in the world in a minute
-            // rather than looking at a card.
-            if (install && cfg.AutoUpdate)
+        /// <summary>
+        /// Automatic updates (#3202): an update the check found goes in by
+        /// itself, the same as one press of Install now, when the setting
+        /// is on, which it is unless somebody switched it off. Called after
+        /// every update check's answer (CheckUpdatesBackground): the
+        /// launcher's start, the feed watch seeing a Ship, Check now, the
+        /// retry after a check that failed, and the check after the game
+        /// closed for an update. Not after Scan's or Fix's own reading of the
+        /// feed: Scan only looks, and Fix takes the update itself, last.
+        ///
+        /// Until this the setting did one thing: after the game had been
+        /// closed for an update, that update went in. The update found when
+        /// the launcher opened, or seen by the feed watch while it sat open,
+        /// waited on the card for a press of Install now, so with the
+        /// setting on nothing updated by itself unless a game was running
+        /// when the Ship went out. Patrick, 21 Oct, 6:30 PM: "the app needs
+        /// to auto update by default and fix the auto update as I believe
+        /// it's not working".
+        /// </summary>
+        static void UpdateBySelf()
+        {
+            if (!cfg.AutoUpdate) return;
+            if (!updatePending || (pendingPacks.Count == 0 && !selfUpdateOffered)) return;
+            // The in-play check has its own clock: the server counts down,
+            // the game closes, and the check after the close comes back here.
+            if (playing) return;
+            // One update at a time. The one going in is followed by Fix,
+            // which takes a newer one last (FixRest).
+            if (updating) return;
+            // An update never closes a game nobody asked it to. A Skyrim the
+            // launcher did not start is not "playing", and RunUpdate would
+            // ask to close it; the card waits for Install now instead.
+            if (Checks.GameRunning())
             {
-                Log("Installing it now.");
-                RunUpdate();
+                Log("Skyrim is open, so the update waits. Close the game and press Install now on the card above Play.");
+                return;
             }
+            // The update tried last is never taken again by itself, whether it
+            // went in or failed: doing the same thing again is not a fix for
+            // why it did not hold, and every later check would otherwise
+            // take it again. Install now still can.
+            if (updateTried != null && updateTried.IsSupersetOf(UpdateParts(pendingPacks, pendingDoc, selfUpdateOffered)))
+            {
+                Log(updateTriedWentIn
+                    ? "The update that went in is still on the feed as waiting, so it is not taken again by itself. Send the launcher log to the Discord: this one needs looking at."
+                    : "The update that did not go in is not taken again by itself. Its own line in the log says why; Install now takes it once that is put right.");
+                return;
+            }
+            Log("Installing it now, because automatic updates are on (Settings, Updates).");
+            UpdateNow();
         }
 
         /// <summary>
@@ -430,15 +476,92 @@ namespace Thornswood
             });
         }
 
-        static void RunUpdate() { RunUpdate(null); }
+        /// <summary>
+        /// Install now, on the card above Play and in Settings, and the
+        /// automatic update (UpdateBySelf, #3202): the whole
+        /// update in one press (#3201). The update goes in, then Fix's whole
+        /// path runs on the folder as the update left it: it scans everything
+        /// again, puts right what it can and says what is left, so Diagnostics
+        /// and Ready to launch show the install after the update, not before
+        /// it. An update that failed still gets the rest of Fix, and is not
+        /// taken again (FixRest). A new launcher restarts the launcher; the
+        /// new one runs the same Fix once its window is up (Shell.cs,
+        /// win.ContentRendered).
+        ///
+        /// Patrick, 21 Oct, 6:30 PM: "when you click update now it should let
+        /// you click it only once and do it all and not have to click twice
+        /// like I just did". Until this the update went in and stopped: Scan's
+        /// lists were the ones from before it, Play went by them, and what
+        /// Scan had found stayed for a second press, of Fix.
+        /// </summary>
+        static void UpdateNow()
+        {
+            RunUpdate(FixAfterUpdate);
+        }
 
-        /// <param name="after">Run on the window's thread when the update has gone in or failed without restarting the launcher, or null. Fix takes the update last and scans again after it (#2627).</param>
-        static void RunUpdate(Action after)
+        /// <summary>
+        /// The card's button above Play and the one in Settings: opens the
+        /// collection while the card is about the mods, and otherwise is
+        /// Install now (UpdateNow).
+        /// </summary>
+        static void InstallNowPressed()
+        {
+            if (collectionBarUp || (collectionNoteUp && !updatePending))
+            {
+                // Ahead has nothing to open (#4115): the button is hidden
+                // for it, and a press that slips in before the redraw
+                // must not send this copy to another revision.
+                if (collectionBarUp && CollectionProblem() == "ahead") return;
+                try { Process.Start(new ProcessStartInfo(CollectionLink()) { UseShellExecute = true }); }
+                catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
+                return;
+            }
+            UpdateNow();
+        }
+
+        /// <summary>Whether both of those buttons show, so the card's is hidden where Settings' is, as for a collection ahead of the server (#4115).</summary>
+        static void InstallShown(Visibility shown)
+        {
+            if (btnInstallNow != null) btnInstallNow.Visibility = shown;
+            if (btnUpdate != null) btnUpdate.Visibility = shown;
+        }
+
+        /// <summary>What both of those buttons say, so the card's never says Install now over a card about the mods.</summary>
+        static void InstallLabel(string text)
+        {
+            if (btnInstallNow != null) btnInstallNow.Content = text;
+            if (btnUpdate != null) btnUpdate.Content = text;
+        }
+
+        /// <summary>
+        /// What the last update tried to put in (UpdateParts) and whether it
+        /// went in, so Fix after it can tell a new update on the feed from the
+        /// one it just tried, and never takes that one a second time (FixRest).
+        /// </summary>
+        static HashSet<string> updateTried = null;
+        static bool updateTriedWentIn;
+
+        /// <summary>Each pack of <paramref name="packs"/>, by id and checksum, and the feed's launcher when <paramref name="launcher"/>.</summary>
+        static HashSet<string> UpdateParts(List<Pack> packs, VersionDoc v, bool launcher)
+        {
+            var parts = new HashSet<string>(StringComparer.Ordinal);
+            if (packs != null) foreach (Pack p in packs) if (p != null) parts.Add(p.id + "@" + p.sha256);
+            if (launcher && v != null) parts.Add("launcher " + v.launcherVersion);
+            return parts;
+        }
+
+        /// <param name="after">Run on the window's thread when the update has gone in (true) or failed (false) without restarting the launcher, or null. Fix takes the update last and scans again after it (#2627); Install now runs Fix after it (#3201).</param>
+        static void RunUpdate(Action<bool> after)
         {
             if (playing) { Log("Quit the game first."); return; }
+            // One at a time (#3202): an automatic update and a press of
+            // Install now or Fix could otherwise each start one, and two
+            // downloads would write the same packs.
+            if (updating) { Log("An update is already going in."); return; }
             // An update writes into the build. A game still holding files open
             // down there turns that into a half written install.
             if (!ClearStuckGame(true)) return;
+            updating = true;
             btnUpdate.IsEnabled = false;
             btnInstallNow.IsEnabled = false;
             btnPlay.IsEnabled = false;
@@ -498,16 +621,19 @@ namespace Thornswood
                     win.Dispatcher.BeginInvoke(new Action(delegate
                     {
                         updateBar.Visibility = Visibility.Collapsed;
-                        btnInstallNow.Visibility = Visibility.Collapsed;
+                        InstallShown(Visibility.Collapsed);
                         Stats.LastUpdate = DateTime.Now.ToString("d MMM HH:mm");
                         Stats.Save();
                         BuildStatRow();
                         btnUpdate.IsEnabled = true;
                         PlayProgress.End();
                         updatePending = false;
+                        updating = false;
                         DrawStatus();
+                        updateTried = UpdateParts(packs, doc, withLauncher);
+                        updateTriedWentIn = true;
                         Log("Update finished.");
-                        if (after != null) after();
+                        if (after != null) after(true);
                     }));
                 }
                 catch (Exception ex)
@@ -523,12 +649,15 @@ namespace Thornswood
                         // wrote over, so a later Remove leaves its own files.
                         pendingPacks = Updater.Pending(doc);
                         txtUpdateTitle.Text = "Update failed";
+                        updating = false;
                         btnUpdate.IsEnabled = true;
                         btnInstallNow.IsEnabled = true;
                         PlayProgress.End();
                         DrawStatus();
                         Log("Play stays off until the update goes through, because the server is expecting the newer mod list.");
-                        if (after != null) after();
+                        updateTried = UpdateParts(packs, doc, withLauncher);
+                        updateTriedWentIn = false;
+                        if (after != null) after(false);
                     }));
                 }
                 finally { PlayProgress.Second(false); }

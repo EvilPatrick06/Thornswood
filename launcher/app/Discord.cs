@@ -721,9 +721,13 @@ namespace Thornswood
         /// somebody is suspended, and evidence the accused can overwrite is
         /// not evidence.
         ///
-        /// Nothing here is read from the person: these are the launcher's own
-        /// log and the game's own logs. Called from a pool thread, after
-        /// SessionEnd so the row it attaches to exists.
+        /// These are the launcher's own log and the game's own logs, and they
+        /// are read from the person's PC, so what they can hold is named file
+        /// by file on the privacy page (site\data\site\privacy.md, "The logs
+        /// sent when a session ends"), and tests\test-session-logs.js fails
+        /// when this list names a file that page does not (#3627). Every file
+        /// and every line of the scan goes through Scrub first. Called from a
+        /// pool thread, after SessionEnd so the row it attaches to exists.
         /// </summary>
         public static void SessionLogs()
         {
@@ -750,7 +754,6 @@ namespace Thornswood
                     new string[] { "thornswood-voice.log",       Path.Combine(plat, "thornswood-voice.log") },
                     new string[] { "thornswood-emotes.log",      Path.Combine(plat, "thornswood-emotes.log") },
                     new string[] { "thornswood-input.log",       Path.Combine(plat, "thornswood-input.log") },
-                    new string[] { "thornswood-dress.log",       Path.Combine(plat, "thornswood-dress.log") },
                     new string[] { "thornswood-loadorder.txt",   Path.Combine(plat, "thornswood-loadorder.txt") },
                     new string[] { "thornswood-plugins-light.txt", Path.Combine(plat, "thornswood-plugins-light.txt") },
                     // Skyrim Platform's own log: the browser, the native calls
@@ -838,7 +841,7 @@ namespace Thornswood
                 {
                     if (i == null) continue;
                     if (n > 0) sb.Append(",");
-                    sb.Append("{\"text\":\"").Append(Escape(i.Text)).Append("\"");
+                    sb.Append("{\"text\":\"").Append(Escape(Scrub(i.Text))).Append("\"");
                     sb.Append(",\"blocking\":").Append(i.Blocking ? "true" : "false");
                     sb.Append(",\"absent\":").Append(i.Absent ? "true" : "false");
                     if (!string.IsNullOrEmpty(i.Plugin))
@@ -875,8 +878,8 @@ namespace Thornswood
                 {
                     if (c == null || c.Ok) continue;   // only what was wrong
                     if (n > 0) sb.Append(",");
-                    sb.Append("{\"name\":\"").Append(Escape(c.Name)).Append("\"");
-                    sb.Append(",\"detail\":\"").Append(Escape(c.Detail)).Append("\"}");
+                    sb.Append("{\"name\":\"").Append(Escape(Scrub(c.Name))).Append("\"");
+                    sb.Append(",\"detail\":\"").Append(Escape(Scrub(c.Detail))).Append("\"}");
                     n++;
                     if (n >= 40) break;
                 }
@@ -1054,8 +1057,26 @@ namespace Thornswood
         /// "v2.profile.minted.nonce.signature" from voice-server.js
         /// signToken (#1322), the older "v1.profile.until.signature", and
         /// "tk1.body.signature" from the site.
+        ///
+        /// And who the PC belongs to (#3627). The launcher's log names files
+        /// under the Windows user folder (a .NET error names the full path of
+        /// the file it failed on, and Vortex keeps everything under AppData),
+        /// the voice page logs its own file:// address, and the folder's name
+        /// is usually the Windows account's, often a real name. None of that
+        /// helps anybody read a fault, and the privacy page promises it is
+        /// taken out, so the user folder, any other folder under a Users
+        /// folder, the account name as a folder and the PC's name are all
+        /// replaced here, the one place every log and scan line leaves by.
+        /// The values are read here and not kept, so a test can hand
+        /// ScrubFor its own.
         /// </summary>
         static string Scrub(string text)
+        {
+            return ScrubFor(text, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                            Environment.UserName, Environment.MachineName);
+        }
+
+        static string ScrubFor(string text, string profile, string user, string machine)
         {
             if (string.IsNullOrEmpty(text)) return "";
             string s = Regex.Replace(text, @"\bv1\.[0-9]+\.[0-9]+\.[A-Za-z0-9_-]{16,}", "v1.[join token removed]");
@@ -1063,6 +1084,31 @@ namespace Thornswood
             s = Regex.Replace(s, @"\btk1\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}", "tk1.[ticket removed]");
             // The join pass (#937), "jp1.body.signature" from the site's makePass.
             s = Regex.Replace(s, @"\bjp1\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}", "jp1.[join pass removed]");
+
+            // This PC's user folder, however a log wrote it: with backslashes,
+            // doubled in JSON, with forward slashes and %20 for a space in a
+            // file:// address. Not when the next letter carries the name on,
+            // so a folder named Al is not taken out of one named Alba.
+            string[] parts = (profile ?? "").Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 2)
+            {
+                var sep = new string[parts.Length];
+                for (int i = 0; i < parts.Length; i++) sep[i] = Regex.Escape(parts[i]).Replace("\\ ", "(?: |%20)");
+                s = Regex.Replace(s, string.Join(@"[\\/]{1,2}", sep) + @"(?![\w-])", "%USERPROFILE%", RegexOptions.IgnoreCase);
+            }
+            // Any other folder under a Users folder: another account on this
+            // PC, or this one by its short 8.3 name, spaces and all, up to the
+            // separator before the next folder. Public and Default belong to
+            // nobody.
+            s = Regex.Replace(s, @"(\b[A-Za-z]:[\\/]{1,2}Users[\\/]{1,2})(?!(?:Public|Default)[\\/])[^\\/:*?""<>|\r\n\t ]+(?: [^\\/:*?""<>|\r\n\t ]+)*(?=[\\/])",
+                              "$1[user]", RegexOptions.IgnoreCase);
+            // The account's name as a folder anywhere else, D:\Games\<name>\.
+            if (!string.IsNullOrEmpty(user))
+                s = Regex.Replace(s, @"(?<=[\\/])" + Regex.Escape(user) + @"(?=[\\/]|$|[\s""'])", "[user]",
+                                  RegexOptions.IgnoreCase | RegexOptions.Multiline);
+            // The PC's own name, wherever it stands as a word.
+            if (!string.IsNullOrEmpty(machine))
+                s = Regex.Replace(s, @"(?<![\w-])" + Regex.Escape(machine) + @"(?![\w-])", "[pc]", RegexOptions.IgnoreCase);
             return s;
         }
 

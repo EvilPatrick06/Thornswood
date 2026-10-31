@@ -91,6 +91,9 @@ if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 # The account the task runs as and what it may reach (#2578), sent inside
 # the script that installs it.
 . (Join-Path $Here 'ServiceAccount.ps1')
+# Where the box keeps its firewall rules, and the refresh that makes the
+# firewall take a change to them (#3896).
+. (Join-Path $Here '..\vps\BoxFirewall.ps1')
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -343,11 +346,16 @@ if (-not `$AsSystem) {
 # loopback only and needs nothing opened either way.
 # Checked under the same name it is created under. This used to look for
 # 'Thornswood Voice' and create '$TaskName', so installing dev found the live
-# rule already there and never opened 7789 at all.
+# rule already there and never opened 7789 at all. The rule lives in the
+# box's own policy store, the only one the firewall takes rules from, and
+# Group Policy is refreshed after a change (scripts\vps\BoxFirewall.ps1, #3896).
+$(Get-ThornswoodFirewallScript)
+`$fwHas = [bool](Get-NetFirewallRule -PolicyStore localhost -DisplayName '$TaskName' -EA SilentlyContinue)
 if ('$Bind' -eq '127.0.0.1') {
-    Remove-NetFirewallRule -DisplayName '$TaskName' -EA SilentlyContinue
-} elseif (-not (Get-NetFirewallRule -DisplayName '$TaskName' -EA SilentlyContinue)) {
-    New-NetFirewallRule -DisplayName '$TaskName' -Direction Inbound -Protocol TCP -LocalPort $Port -Action Allow | Out-Null
+    if (`$fwHas) { Remove-NetFirewallRule -PolicyStore localhost -DisplayName '$TaskName'; Sync-ThornswoodFirewall }
+} elseif (-not `$fwHas) {
+    New-NetFirewallRule -PolicyStore localhost -DisplayName '$TaskName' -Direction Inbound -Protocol TCP -LocalPort $Port -Action Allow | Out-Null
+    Sync-ThornswoodFirewall
 }
 
 # THORNSWOOD_SITE is what lets /choose check that a character creation choice
@@ -727,8 +735,9 @@ if (Get-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue) {
     try { Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false -EA Stop; 'took off the task $TaskName' }
     catch { 'could not take off the task ${TaskName}: ' + `$_.Exception.Message; 'NOT REMOVED'; exit 1 }
 }
-if (Get-NetFirewallRule -DisplayName '$TaskName' -EA SilentlyContinue) {
-    try { Remove-NetFirewallRule -DisplayName '$TaskName' -EA Stop; 'took away the firewall rule $TaskName' }
+$(Get-ThornswoodFirewallScript)
+if (Get-NetFirewallRule -PolicyStore localhost -DisplayName '$TaskName' -EA SilentlyContinue) {
+    try { Remove-NetFirewallRule -PolicyStore localhost -DisplayName '$TaskName' -EA Stop; Sync-ThornswoodFirewall; 'took away the firewall rule $TaskName' }
     catch { 'could not take away the firewall rule ${TaskName}: ' + `$_.Exception.Message; 'NOT REMOVED'; exit 1 }
 }
 if (Test-Path -LiteralPath '$Root') {
@@ -860,7 +869,7 @@ if ($Bind -eq '127.0.0.1') {
 } else {
     Say "Installed, but ${VpsHost}:$Port was $voiceTry from out here, though voice answers on the box and the game server answers from here." 'Red'
     Say "  The firewall rule '$TaskName' up there, or something between, is not letting it in." 'Red'
-    Say "  .\scripts\vps\Remote.ps1 `"Get-NetFirewallRule -DisplayName '$TaskName' | Get-NetFirewallPortFilter`"" 'DarkGray'
+    Say "  .\scripts\vps\Remote.ps1 `"Get-NetFirewallRule -PolicyStore ActiveStore -DisplayName '$TaskName' | Get-NetFirewallPortFilter`"" 'DarkGray'
 }
 # The service's files are in place: the box records that it runs this
 # artifact, and /health says so from then on (Artifact.ps1).

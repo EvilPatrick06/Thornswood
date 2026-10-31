@@ -132,7 +132,9 @@ is not built.
 
 [Temperature and weather](systems/temperature.md). One meter, 0 to 100,
 comfort at 50. Place, wind, sky, night, height, fire, water and clothing.
-A season changes the odds of the sky. Winter is not all snow.
+A season changes the odds of the sky. Winter is not all snow. Winter
+cools a quarter faster under the sky, and a harvest gives a quarter
+more in summer and a quarter less in winter.
 
 [Injury](systems/injury.md). Cuts, breaks, burns, bites, and going down
 before a death. Lasting harm is part of this, not a separate switch.
@@ -156,6 +158,10 @@ of you can end it.
 Kit. The right half repairs to 120%, at Master for the two smith
 kits. Anyone else repairs to 100%.
 Worn gear loses 1% a hit. At 0%, a worn piece can break.
+
+[Spoilage](systems/spoilage.md). Raw food keeps a real week, a dish
+two, salted or smoked food never. A pack spoils only while its owner
+is online. A cook salts or smokes raw meat and fish on a panel.
 
 [Cut items](systems/cut-items.md). What leaves the open book, and the
 references kept so a row can come back. The recipe file is not
@@ -243,6 +249,11 @@ not a recipe and not a mint.
 [Property](systems/property.md). A claim at the door, a deed, locks, keys,
 rent, and what a home is for.
 
+[Market stalls](systems/stalls.md). The stalls already in the towns'
+markets, claimed like a building for nothing. The keeper lays out goods
+at their own price, in gold or in goods, and a stall sells only while
+its keeper is standing at it.
+
 [Gold](systems/gold.md). 40 gold once for a person. A guild trader
 starts with 250, once. A scene quest creates the gold written on it,
 on that quest's cooldown. A company sale can take some coin out of
@@ -303,6 +314,9 @@ the East Empire Company.
 
 [Carriages and ferries](systems/carriages.md). How you travel with fast
 travel off. A fade, not a ride that has to stay in sync.
+
+[Trade carts](systems/carts.md). Goods between holds on carts people drive,
+lost only to a raid.
 
 ## Where a number comes from
 

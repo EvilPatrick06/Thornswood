@@ -109,7 +109,9 @@ try {
   yes('each one is a line naming the copy and the day it was set aside',
       said.length === 7 && said.every((l) => /^set-aside copies: deleted .+, set aside \d{4}-\d{2}-\d{2}, more than 30 days ago$/.test(l)) &&
       said.some((l) => l.indexOf('world-before-restore-' + OLD) >= 0 && l.indexOf(dayText) >= 0));
-  yes('  and never what is in it', !said.some((l) => /5001|Mine|hello/.test(l)));
+  // The copy's name carries its stamp, and a stamp's time can hold 5001
+  // (3:00:10 PM is 150010), so the stamp comes out before the content is looked for.
+  yes('  and never what is in it', !said.some((l) => /5001|Mine|hello/.test(l.split(OLD).join(''))));
   yes('a second pass finds nothing and says nothing', SL.ageAside(R, NOW).length === 0);
   yes('a pass with a longer keep deletes nothing more', (build(), SL.ageAside(R, NOW, 60)).length === 0 && there(path.join(R, 'world-before-' + OLD)));
 

@@ -61,9 +61,10 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [deploy/ServerReadyWait.ps1](deploy/ServerReadyWait.ps1) | How long a started game server has to answer on its ports before a deploy puts the old files back. |
 | [deploy/ServerSettings.ps1](deploy/ServerSettings.ps1) | Which settings a game server install takes from the release, and which it keeps from the server it replaces. |
 | [deploy/ServiceAccount.ps1](deploy/ServiceAccount.ps1) | The account the services that run code we deploy run as (#2578): both game servers, both voice services and Caddy. |
-| [deploy/Set-BuildRunners.ps1](deploy/Set-BuildRunners.ps1) | Makes the labels on GitHub's VPS runners match the runner records on main (records\<name>-runners.json): records\build-runners.json caps how many builds run on the box at once, records\sign-runners.json says which runner may sign a release launcher, records\check-runners.json which runners may check a signed draft (#3956). |
+| [deploy/Set-BuildRunners.ps1](deploy/Set-BuildRunners.ps1) | Makes the labels on GitHub's VPS runners match the runner records on main (records\<name>-runners.json): records\build-runners.json caps how many builds run on the box at once. |
 | [deploy/Set-DiscordLogin.ps1](deploy/Set-DiscordLogin.ps1) | Points the site at your Discord, which is what decides who gets in anywhere. |
 | [deploy/Set-DiscordOnboarding.ps1](deploy/Set-DiscordOnboarding.ps1) | Sets Discord's onboarding (Server Settings, Onboarding) with the bot, from bot\Build-Onboarding.py: the default channels, the questions and what each answer gives, every role and channel looked up by name on the server when it runs. |
+| [deploy/Set-Public.ps1](deploy/Set-Public.ps1) | The flip (#4013, #3721): makes EvilPatrick06/Thornswood public through the box's GitHub App, after taking off it the copies of the box's secrets that moved to the private ops repository with the box's workflows (#4039). |
 | [deploy/Set-RepoAbout.ps1](deploy/Set-RepoAbout.ps1) | Makes the repository's About box on GitHub (the line under its name, the website and the topics) match records\repo-about.json on main. |
 | [deploy/Set-Turnstile.ps1](deploy/Set-Turnstile.ps1) | Puts Cloudflare Turnstile's two keys for the report form into the site's config.json on the VPS and restarts the site, so /report draws the check and the site asks Cloudflare about every pass (#3216, Patrick's answer on 22 Oct 2026). |
 | [deploy/Setup-Discord.ps1](deploy/Setup-Discord.ps1) | Builds the Thornswood Discord: roles, categories, channels, permissions and the words in the read only channels, in one run. |
@@ -132,7 +133,9 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [mods/LoadOrder.ps1](mods/LoadOrder.ps1) | The load order as the game counts it, and how to put a plugin list into the server's order. |
 | [mods/New-CollectionPluginRecord.ps1](mods/New-CollectionPluginRecord.ps1) | Writes records\collection-plugins.json, the collection's plugins with the size and sha256 of each, which the full deploys hold the plugins they send to (#2019, CollectionPlugins.ps1). |
 | [mods/OnBox.ps1](mods/OnBox.ps1) | The two scripts Run-OnBox.ps1 sends to the box (issue #2899): the keeper, which makes the run's folder and removes it, and the run. |
+| [mods/PluginRuleLoops.ps1](mods/PluginRuleLoops.ps1) | The plugin rules of a collection that LOOT can never keep, because they go against an order the game itself sets. |
 | [mods/Rebuild-ContentTables.ps1](mods/Rebuild-ContentTables.ps1) | Rebuilds every table that is read out of the plugins of the load order, in the order they read each other, after a change to one of Thornswood's own plugins in game\content, and says what changed. |
+| [mods/Rebuild-OnBox.ps1](mods/Rebuild-OnBox.ps1) | The deploy gate's Rebuild-ContentTables verb (#2841): the whole content chain, scripts\mods\Rebuild-ContentTables.ps1, run by Run-OnBox.ps1 against a server's plugins on the box, from main as main is when the gate reads it. |
 | [mods/Remove-DeadRecords.ps1](mods/Remove-DeadRecords.ps1) | Deletes records from Thornswood-Content.esp that nothing uses any more, and refuses to delete one that anything still points at. |
 | [mods/Remove-Plugin.ps1](mods/Remove-Plugin.ps1) | RETIRED. DO NOT RUN. Issue #1179: took one plugin out of the build by hand. |
 | [mods/Run-OnBox.ps1](mods/Run-OnBox.ps1) | Runs one of the repository's content tools on the VPS box, against the game plugins a game server there already holds, and brings back what the tool wrote into the repository's game\, records\ and docs\systems\ folders. |
@@ -197,6 +200,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Go.ps1](release/Go.ps1) | Installs the front, the overlays and the plugins, then reports what the server is doing. |
 | [release/Install-Launcher.ps1](release/Install-Launcher.ps1) | Puts a launcher that Build-Launcher.ps1 has already built into an install, and does the things around it that only an install should do. |
 | [release/Install-NexusRevision.ps1](release/Install-NexusRevision.ps1) | Lays out one revision of the Thornswood collection on Nexus Mods (slug 7essxf) into a game folder, the way Vortex installs and deploys it, without Vortex (#2754). |
+| [release/Installer-OnGitHub.ps1](release/Installer-OnGitHub.ps1) | What .github\workflows\installer.yml does with GitHub's releases, as functions a harness can drive with a stand-in GitHub (#3412). |
 | [release/LogHandBack.ps1](release/LogHandBack.ps1) | A file handed back from a workflow run in its job's log rather than as an artifact. |
 | [release/New-ClientBuildRecord.ps1](release/New-ClientBuildRecord.ps1) | Records what the client runtime is and which fork commit it was built from, into records\client-build.json. |
 | [release/New-ClientLicenceRecord.ps1](release/New-ClientLicenceRecord.ps1) | Records which libraries are in the client files, vcpkg's and the others, with each one's licence text, into records\client-licences.json and records\client-licences\. |
@@ -213,6 +217,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Package-Thornswood.ps1](release/Package-Thornswood.ps1) | Turns the built install at C:\Thornswood into the single file your friends run. |
 | [release/Publish-FridaSources.ps1](release/Publish-FridaSources.ps1) | The source of what is inside frida-gum.lib, on one permanent Release of this repository (#3287, Patrick's answer C of 26 Oct 2026). |
 | [release/Publish-Installer.ps1](release/Publish-Installer.ps1) | Puts the current installer on the docs site so friends always have the newest one without anybody sending files around. |
+| [release/Publish-InstallerFromGitHub.ps1](release/Publish-InstallerFromGitHub.ps1) | Puts the installer for main's newest release on the site from any machine, the cloud included (#3412). installer.yml builds it from main's feed and signs it on GitHub's runner, and a second GitHub runner checks it. |
 | [release/Publish-Pack.ps1](release/Publish-Pack.ps1) | Builds the optional packs listed in optional-packs.txt, sends them to the site, and adds them to version.json so every launcher offers them under Add-ons on its Diagnostics page. |
 | [release/Publish-PostShip.ps1](release/Publish-PostShip.ps1) | Runs what follows a published tip: the host feed remirror. VirusTotal is no longer part of publish; use Publish-VirusTotal.ps1 by hand if you want a report. |
 | [release/Publish-ReleaseFiles.ps1](release/Publish-ReleaseFiles.ps1) | Puts every file one release names on a GitHub Release of this repository, on the release's own tag, so downloads and updates come from Releases (#3686, Patrick's decision of 26 Oct for going public). |
@@ -252,6 +257,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [vps/Bootstrap-VPS.ps1](vps/Bootstrap-VPS.ps1) | Run this ON THE VPS, once, in the PowerShell 5.1 that ships with Windows Server 2022. |
 | [vps/Bot-Service.ps1](vps/Bot-Service.ps1) | Runs the Thornswood bot as a Windows service under its own account, and stops and starts it by name (issue #465). |
 | [vps/Box-Run.ps1](vps/Box-Run.ps1) | Runs one verb of the deploy gate on the box (#2841), from any session gh is signed in on, a cloud thread included, with no key to the box. |
+| [vps/BoxFirewall.ps1](vps/BoxFirewall.ps1) | Where the box keeps its firewall rules, and how a change to them takes effect (#3896). |
 | [vps/BoxGuard.ps1](vps/BoxGuard.ps1) | What a box script asks before it changes anything: is this the box? |
 | [vps/Check-LiveGamemode.ps1](vps/Check-LiveGamemode.ps1) | Says whether the gamemode running on the VPS is the one in this repo. |
 | [vps/Check-Load.ps1](vps/Check-Load.ps1) | Answers the only question worth asking before paying for a bigger server: what is this one actually running out of. |
@@ -295,7 +301,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [vps/Seal.ps1](vps/Seal.ps1) | How a secret held by GitHub reaches the box without passing through any session, chat or log in a form anybody can read (#3216, Patrick's A of 22 Oct 2026). |
 | [vps/Send-Script.ps1](vps/Send-Script.ps1) | The one way a script here runs PowerShell on the VPS. |
 | [vps/Send-Secret.ps1](vps/Send-Secret.ps1) | How a secret goes to the VPS: on ssh's standard input, never on a command line. |
-| [vps/Set-InboundRules.ps1](vps/Set-InboundRules.ps1) | Turns off every enabled inbound Allow firewall rule on the box that records\prod-parity.json does not list ("inboundRules"), WinRM from any address among them, and says which (#3807). |
+| [vps/Set-InboundRules.ps1](vps/Set-InboundRules.ps1) | Turns off every enabled inbound Allow firewall rule on the box that records\prod-parity.json does not list ("inboundRules"), WinRM from any address among them, and says which (#3807); with -Own, moves the rules the box keeps into its own firewall policy and has the firewall ignore local rules (#3896). |
 | [vps/Set-SshScope.ps1](vps/Set-SshScope.ps1) | Limits which addresses may reach ssh on the VPS (port 22), after proving key login, refusing a list that leaves this machine out, and with a put back the box runs by itself if the new login fails. |
 | [vps/Set-TimeWait.ps1](vps/Set-TimeWait.ps1) | Sets TcpTimedWaitDelay to 30 seconds on the VPS, so the box stops dropping connections from the cloud before TLS (#2946), and restarts the box for it when asked and nobody is on either server. |
 | [vps/Set-Vps.ps1](vps/Set-Vps.ps1) | Renames the game's own name, the one name everything reaches the box by. |
@@ -307,6 +313,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [vps/Upgrade-OpenSsh.ps1](vps/Upgrade-OpenSsh.ps1) | Upgrades the box's OpenSSH for Windows to a release with a post-quantum key exchange, keeping the pinned host keys: proves key login, swaps sshd on the box, proves a new login with the pinned key negotiates a post-quantum key exchange, and only then keeps it. |
 | [vps/vps-capture-443.ps1](vps/vps-capture-443.ps1) | Captures the SYN and RST packets on port 443 at the box's network card for a set time, so #2946 can see whether the TLS connects from a cloud session that stall and then reset ever reach the box, and whether the box answers them. |
 | [vps/vps-dev-instance.ps1](vps/vps-dev-instance.ps1) | Runs ON the VPS. Makes the dev game server and the dev voice server beside the live ones, from copies of the live installs, on their own ports, with their own scheduled tasks and firewall rules. |
+| [vps/vps-firewall-policy.ps1](vps/vps-firewall-policy.ps1) | Runs ON THE VPS, sent there by Set-InboundRules.ps1 -Own: moves every rule the box keeps into its own firewall policy and tells the firewall to ignore local rules, so no installer can open a port on the box (#3896). |
 | [vps/vps-freeze.ps1](vps/vps-freeze.ps1) | Runs ON the old VPS on the day the server moves: stops everything that writes what a backup takes, then takes the last backup. |
 | [vps/vps-harden.ps1](vps/vps-harden.ps1) | Runs ON THE VPS, sent there by Harden-VPS.ps1: turns ssh password login off, turns Remote Desktop off and the Windows services and telemetry the box never uses, and moves Windows Update and its maintenance to 4 AM, leaving ssh on port 22 alone. |
 | [vps/vps-inbound-rules.ps1](vps/vps-inbound-rules.ps1) | Runs ON THE VPS, sent there by Set-InboundRules.ps1: turns off every enabled inbound Allow firewall rule that is not on the box's list, and says which (#3807). |

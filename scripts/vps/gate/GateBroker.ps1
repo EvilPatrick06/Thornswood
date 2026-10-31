@@ -18,13 +18,17 @@
        name a branch, a commit or a file;
     2. runs the verb's script from that checkout with PowerShell 7, with the
        verb's fixed words and the parameters the line gave, each held to its
-       rule. The script reaches the box the way it does from One, as
+       rule. A live verb (verbs.json "build") runs only when that tip is
+       the exact commit the line named with -Build, which only ever holds
+       it to main's tip, never runs another commit. The script reaches the
+       box the way it does from One, as
        Administrator over ssh, here over loopback with the gate's own key
        (from="127.0.0.1", thornswood-gate), because the deploy scripts'
        box halves need administrator (the ops repo's DEPLOY-IDENTITIES.md,
        section 2a);
     3. sends every line the script prints back as it comes, the files of a
-       verb that writes some (Get-Logs), and its exit code.
+       verb that writes some (Get-Logs, Rebuild-ContentTables), and its exit
+       code.
 
   One verb at a time: the pipe takes one connection, and a second caller
   waits for it or is told the gate is busy. A run that outlives its verb's
@@ -62,13 +66,47 @@ function Log([string]$m) {
 }
 
 # The pipe, for thornswood-deploy and SYSTEM, and for no other machine.
-function New-GatePipe {
+# Windows itself refuses every other machine: the pipe is made with
+# PIPE_REJECT_REMOTE_CLIENTS, which .NET's own constructor does not set, so
+# it is made here and handed to .NET. Its access list allows SYSTEM and the
+# deploy account and denies nothing. Until 30 Oct it denied NETWORK
+# (S-1-5-2) to keep other machines out, but sshd logs a key in as a network
+# logon, which puts NETWORK in thornswood-deploy's token too, and a deny
+# beats an allow: the first ping through the gate was "Access to the path
+# is denied". FILE_FLAG_FIRST_PIPE_INSTANCE: nothing else may hold the name
+# first.
+$GatePipeCode = @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+namespace ThornswoodGate {
+    public static class Pipe {
+        [StructLayout(LayoutKind.Sequential)]
+        struct SecurityAttributes { public int Length; public IntPtr Descriptor; public int Inherit; }
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        static extern IntPtr CreateNamedPipeW(string name, uint openMode, uint pipeMode, uint instances, uint outSize, uint inSize, uint timeout, ref SecurityAttributes sa);
+        const uint Duplex = 0x3, FirstInstance = 0x80000, Overlapped = 0x40000000, RejectRemote = 0x8;
+        public static IntPtr Create(string name, byte[] descriptor) {
+            GCHandle pinned = GCHandle.Alloc(descriptor, GCHandleType.Pinned);
+            try {
+                SecurityAttributes sa = new SecurityAttributes();
+                sa.Length = Marshal.SizeOf(typeof(SecurityAttributes));
+                sa.Descriptor = pinned.AddrOfPinnedObject();
+                IntPtr h = CreateNamedPipeW(@"\\.\pipe\" + name, Duplex | FirstInstance | Overlapped, RejectRemote, 1, 4096, 4096, 0, ref sa);
+                if (h == new IntPtr(-1)) { throw new Win32Exception(Marshal.GetLastWin32Error()); }
+                return h;
+            } finally { pinned.Free(); }
+        }
+    }
+}
+'@
+function New-GatePipe([string]$Name = 'thornswood-gate') {
+    if (-not ('ThornswoodGate.Pipe' -as [type])) { Add-Type -TypeDefinition $GatePipeCode }
     $sec = New-Object IO.Pipes.PipeSecurity
-    $sec.AddAccessRule((New-Object IO.Pipes.PipeAccessRule((New-Object Security.Principal.SecurityIdentifier('S-1-5-2')), [IO.Pipes.PipeAccessRights]::FullControl, [Security.AccessControl.AccessControlType]::Deny)))
     $sec.AddAccessRule((New-Object IO.Pipes.PipeAccessRule((New-Object Security.Principal.SecurityIdentifier('S-1-5-18')), [IO.Pipes.PipeAccessRights]::FullControl, [Security.AccessControl.AccessControlType]::Allow)))
     $sec.AddAccessRule((New-Object IO.Pipes.PipeAccessRule((New-Object Security.Principal.SecurityIdentifier([string]$Cfg.deploySid)), [IO.Pipes.PipeAccessRights]::ReadWrite, [Security.AccessControl.AccessControlType]::Allow)))
-    return (New-Object IO.Pipes.NamedPipeServerStream('thornswood-gate', [IO.Pipes.PipeDirection]::InOut, 1,
-        [IO.Pipes.PipeTransmissionMode]::Byte, [IO.Pipes.PipeOptions]::None, 4096, 4096, $sec))
+    $handle = New-Object Microsoft.Win32.SafeHandles.SafePipeHandle([ThornswoodGate.Pipe]::Create($Name, $sec.GetSecurityDescriptorBinaryForm()), $true)
+    return (New-Object IO.Pipes.NamedPipeServerStream([IO.Pipes.PipeDirection]::InOut, $true, $false, $handle))
 }
 
 # Sending to a caller that may have gone: once a write fails, the run goes
@@ -203,6 +241,9 @@ function Invoke-Request($Pipe) {
     $commit = Update-Checkout
     if (-not $commit) { Send '@END 66'; Log ('END ' + $id + ' 66 main could not be read'); return }
     Send ('| main at ' + $commit)
+    # A live verb runs only on the build it was named for (GateRules.ps1,
+    # Build): a merge that landed after Patrick gave his word is not that build.
+    if ($req.Build -and $req.Build -cne $commit) { Send ('@REFUSED main is at ' + $commit + ' now, not ' + $req.Build + ', the build this run was named for. Nothing was run.'); Send '@END 64'; Log ('END ' + $id + ' 64 main moved past the named build ' + $req.Build); return }
 
     $script = Join-Path $Repo ($req.Script.Replace('/', '\'))
     if (-not (Test-Path -LiteralPath $script)) { Send ('@REFUSED main has no ' + $req.Script + ' now. Nothing was run.'); Send '@END 64'; Log ('END ' + $id + ' 64 no script'); return }
