@@ -68390,7 +68390,19 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       adds the crash again." All six drugs on the approved list
       (issuecomment-6127545395) take it. Real minutes.
     */
-    drug: { holdMinutes: 10, crashRest: 30, crashFood: 10 },
+    drug: { holdMinutes: 10, crashRest: 30, crashFood: 10,
+      /*
+        WITHDRAWAL (#3153). Patrick, 22 Oct 2026, A on his report page:
+        "Withdrawal after 3 uses in a day: stamina and magicka regen down 10%
+        for 30 minutes." docs/systems/exhaustion.md, A stimulant. A use is a
+        dose; the day is the last 24 real hours, the way every other number
+        here is real time. When the window of a dose that is the third or
+        more inside that day ends, withdrawal runs for its 30 minutes from
+        that end, on top of the crash.
+      */
+      withdrawal: { uses: 3, dayHours: 24, minutes: 30,
+                    cost: { staminaRateMult: -10, magickaRateMult: -10 },
+                    line: 'Your hands shake and you want another dose. Withdrawal sets in.' } },
     /*
       TEA (#1382). docs/systems/exhaustion.md, A stimulant: "A tea holds the
       rest drain at half for 20 real minutes, then costs 15 rest more than
@@ -68450,13 +68462,20 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     */
     ale: { drink: 30, rest: -8, food: -6, worse: 0.6, less: 0.25, sober: 45,
       /*
-        THE HELP AND THE HANGOVER (#1382), docs/systems/drink.md: "The first
-        two also give +0.05 melee damage for 5 real minutes. The third and
-        after do not." And: "If you drank three or more and log out without a
-        bed, the next time you are in the world before you have slept you are
-        hung over: rest is treated as weary even if the meter is higher".
+        THE HELP (#1382), docs/systems/drink.md: "The first two also give
+        +0.05 melee damage for 5 real minutes. The third and after do not."
       */
-      help: 0.05, helpMinutes: 5, helpThrough: 2, hangoverFrom: 3,
+      help: 0.05, helpMinutes: 5, helpThrough: 2,
+      /*
+        THE HANGOVER (#3153). Patrick, 22 Oct 2026, A on his report page:
+        "Hangover: stamina regen down 25% for 10 minutes." It is what being
+        drunk leaves when it wears off: the 45 minutes pass, in the world or
+        while logged out (then it starts on the way back in). A night in a
+        bed sleeps it off instead, and a physicker's remedy ends it early.
+        docs/systems/drink.md.
+      */
+      hangoverMinutes: 10, hangover: { staminaRateMult: -25 },
+      hungLine: 'Your head pounds and your legs are slow. You are hung over.',
       /*
         DRUNK (#1382), docs/systems/drink.md: "Drunk, from the third ale until
         you sleep or the 45 minutes pass: the client draws a sway and a soft
@@ -68614,6 +68633,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       // A drug's window and the crashes it owes (#1382), kept across reads.
       drugUntil: Number(v.drugUntil) || 0,
       drugCrash: Number(v.drugCrash) || 0,
+      // When each dose of the last day went down, and when withdrawal ends
+      // (#3153, NEEDS.drug.withdrawal).
+      doses: dosesKept(v.doses),
+      withdrawalUntil: Number(v.withdrawalUntil) || 0,
       // Whether that window is still open, for the HUD's high icon (#3143).
       drugged: !!v.drugged,
       // And a tea's (#1382).
@@ -68651,9 +68674,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       // with its water, so the 3 minutes of wet survive a read (#1382).
       wetFrom: Number(v.wetFrom) || 0,
       wetPlace: (typeof v.wetPlace === 'number') ? v.wetPlace : null,
-      // The first two ales' damage help, and a hangover (#1382).
+      // The first two ales' damage help (#1382), and when a hangover ends (#3153).
       aleHelpUntil: Number(v.aleHelpUntil) || 0,
-      hangover: !!v.hangover,
+      hangoverUntil: Number(v.hangoverUntil) || 0,
+      // Which after-effect or high the screen shows, for the HUD script (#3153).
+      look: String(v.look || ''),
       // A cooked meal's warmth or stamina help and when it ends (#2682).
       // The disease guard is kept by the injury block, not here.
       mealHelp: String(v.mealHelp || ''),
@@ -68819,9 +68844,23 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     n.rest = gone ? awayDrain(n.rest, restRate * share * drained, floor)
                   : clamp(n.rest + gain * hours - restRate * share * drained);
     // The window over: the crash, once for every dose that added one.
+    var pulled = false;
     if (n.drugCrash > 0 && now >= n.drugUntil) {
       n.rest = clamp(n.rest - NEEDS.drug.crashRest * n.drugCrash);
       n.food = clamp(n.food - NEEDS.drug.crashFood * n.drugCrash);
+      /*
+        AND WITHDRAWAL, when the last dose was the third or more in a day
+        (#3153, NEEDS.drug.withdrawal). From the window's end, or from the way
+        back in for somebody whose window ended while they were away, as a
+        hangover is.
+      */
+      var W = NEEDS.drug.withdrawal;
+      if (usesOfDay(n.doses) >= W.uses) {
+        var wasPulled = n.withdrawalUntil > now;
+        var pullFrom = arriving ? now : n.drugUntil;
+        n.withdrawalUntil = Math.max(n.withdrawalUntil, pullFrom + W.minutes * 60000);
+        pulled = !wasPulled && n.withdrawalUntil > now;
+      }
       n.drugCrash = 0;
       n.drugUntil = 0;
     }
@@ -68874,29 +68913,41 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     }
 
     // A night in a bed, on top of the time away settled above (#1606).
-    // Three ales or more still counting when they left, and not in a bed
-    // (#1382). drink.md: "If you drank three or more and log out without a
-    // bed". Until #3136 a bed only counted once it gave a night, so lying
-    // down drunk and coming back inside 24 minutes was a hangover; now it is
-    // still being drunk, until the 45 minutes pass or a night is slept.
-    var leftDrunk = arriving && !inBed(n.resting) &&
-      (Number(n.ale) || 0) >= NEEDS.ale.hangoverFrom &&
-      typeof n.aleAt === 'number' && (n.at - n.aleAt) <= NEEDS.ale.sober * 60000;
     var slept = arriving ? arrived(actorId, n, away) : '';
-    // A night in a bed ends a hangover; leaving drunk without one starts it.
-    var hungBefore = !!n.hangover;
-    // A night's sleep also ends being drunk (drink.md: "until you sleep").
-    if (slept) { n.hangover = false; n.ale = 0; }
-    else if (leftDrunk) { n.hangover = true; n.ale = 0; }
+    var hungBefore = n.hangoverUntil > now;
+    /*
+      DRUNK WEARS OFF INTO A HANGOVER (#3153). n.drunk is still what the last
+      settle wrote, so drunk then and not now is the 45 minutes passing. In
+      the world the hangover runs from the moment they passed; for somebody
+      who left drunk, from the way back in, because a hangover is felt in the
+      world. A night's sleep ends being drunk (drink.md: "until you sleep")
+      and sleeps the hangover off, one already running as well.
+    */
+    if (slept) { n.hangoverUntil = 0; n.ale = 0; }
+    else if (n.drunk && !drunkNow(n, now)) {
+      var soberAt = arriving ? now : n.aleAt + NEEDS.ale.sober * 60000;
+      n.hangoverUntil = Math.max(n.hangoverUntil, soberAt + NEEDS.ale.hangoverMinutes * 60000);
+    }
     n.drunk = drunkNow(n, now);
+    var hung = n.hangoverUntil > now;
+    n.look = lookNow(n, now);
     // High while a drug's window is open (#3143); the crash above closes it.
     n.drugged = n.drugUntil > now;
 
     n.at = now;
     write(actorId, n);
-    // A hangover starting or ending changes what there is to tend (#1382).
-    // It changes what the character pays as well (effects reads it).
-    if (hungBefore !== !!n.hangover) { pushEffects(actorId); hangoverCare(actorId); }
+    // A hangover starting or ending changes what there is to tend (#1382),
+    // and what the character pays (effects reads it).
+    if (hungBefore !== hung) {
+      pushEffects(actorId);
+      hangoverCare(actorId);
+      if (hung) { notify(actorId, NEEDS.ale.hungLine); say(actorId, NEEDS.ale.hungLine); }
+    }
+    if (pulled) {
+      pushEffects(actorId);
+      notify(actorId, NEEDS.drug.withdrawal.line);
+      say(actorId, NEEDS.drug.withdrawal.line);
+    }
     if (slept) {
       /*
         Up, in the beds' book as well, so the property block does not go on
@@ -69615,6 +69666,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     n.ale = had + 1;
     n.aleAt = now;
     n.drunk = drunkNow(n, now);
+    n.look = lookNow(n, now);
     if (had < NEEDS.ale.helpThrough) { n.aleHelpUntil = now + NEEDS.ale.helpMinutes * 60000; }
     write(actorId, n);
     if (had < NEEDS.ale.helpThrough) { pushEffects(actorId); }
@@ -69990,8 +70042,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     /*
       A DISEASE READS AS THE METER IT IS CLOSEST TO (#1383). disease.md: ill is
       the weary penalties of that meter and bad is the bad ones, so the meter
-      counts as at least that band while it lasts, the way a hangover counts
-      rest as weary. The injury block answers which, and what a broken or
+      counts as at least that band while it lasts. The injury block answers which, and what a broken or
       crooked limb and an agreed loss add on top.
     */
     var hurt = { floors: {}, add: {} };
@@ -70007,8 +70058,6 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var meters = ['food', 'drink', 'rest'];
     for (var i = 0; i < meters.length; i++) {
       var floor = floors[meters[i]];
-      // A hangover reads rest as weary at the least (#1382).
-      if (meters[i] === 'rest' && n.hangover) { floor = atLeast('weary', floor); }
       add(COST[meters[i]][atLeast(bandOf(n[meters[i]]), floor)] || {});
     }
     // And temperature, which is read as a distance from comfort in either
@@ -70034,6 +70083,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (Date.now() < (Number(n.burntUntil) || 0)) {
       add({ staminaRateMult: NEEDS.cookQuality.burnt.stamina });
     }
+    // A hangover: -25% stamina recovery for its 10 minutes (#3153).
+    if (Date.now() < (Number(n.hangoverUntil) || 0)) { add(NEEDS.ale.hangover); }
+    // Withdrawal: -10% stamina and magicka recovery for its 30 minutes (#3153).
+    if (Date.now() < (Number(n.withdrawalUntil) || 0)) { add(NEEDS.drug.withdrawal.cost); }
     return out;
   }
 
@@ -70500,8 +70553,65 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var now = Date.now();
     n.drugUntil = now + NEEDS.drug.holdMinutes * 60000;
     n.drugCrash = (Number(n.drugCrash) || 0) + 1;
+    // Counted toward withdrawal (#3153).
+    n.doses = dosesOfDay(n.doses, now).concat([now]);
+    n.look = lookNow(n, now);
     n.drugged = true;
     write(actorId, n);
+  }
+
+  /*
+    THE DOSES OF THE LAST DAY (#3153): when each went down, in order, the ones
+    older than NEEDS.drug.withdrawal.dayHours before now let go. Kept on the
+    needs record so a withdrawal is counted across logins.
+  */
+  function dosesOfDay(list, now) {
+    var from = now - NEEDS.drug.withdrawal.dayHours * 3600000;
+    var out = [];
+    if (!Array.isArray(list)) { return out; }
+    for (var i = 0; i < list.length; i++) {
+      var t = Number(list[i]);
+      if (t > from && t <= now) { out.push(t); }
+    }
+    return out;
+  }
+
+  /* The doses as stored, numbers only: dosed() is what lets old ones go. */
+  function dosesKept(list) {
+    var out = [];
+    if (!Array.isArray(list)) { return out; }
+    for (var i = 0; i < list.length; i++) {
+      var t = Number(list[i]);
+      if (t > 0 && isFinite(t)) { out.push(t); }
+    }
+    return out;
+  }
+
+  /* How many of the doses fall in the day that ends with the last one. */
+  function usesOfDay(list) {
+    if (!list || !list.length) { return 0; }
+    var last = list[list.length - 1];
+    var from = last - NEEDS.drug.withdrawal.dayHours * 3600000;
+    var count = 0;
+    for (var i = 0; i < list.length; i++) { if (list[i] > from) { count++; } }
+    return count;
+  }
+
+  /*
+    WHAT THE SCREEN SHOWS (#3153). Patrick, 22 Oct 2026: "I also want visual
+    affects" for drunk, high, hangover and withdrawal. One at a time, because
+    Skyrim keeps one cross fade modifier: the high over being drunk, because
+    it is the shorter and sharper of the two and the drunk is still there
+    when it ends, and either of those over an after-effect. The HUD script
+    hands the word to the front plugin, which draws the content plugin's
+    record for it.
+  */
+  function lookNow(n, now) {
+    if (n.drugUntil > now) { return 'high'; }
+    if (n.drunk) { return 'drunk'; }
+    if (n.withdrawalUntil > now) { return 'withdrawal'; }
+    if (n.hangoverUntil > now) { return 'hangover'; }
+    return '';
   }
 
   /*
@@ -70532,13 +70642,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   */
   function hungOver(actorId) {
     var n = read(actorId);
-    return !!(n && n.hangover);
+    return !!(n && n.hangoverUntil > Date.now());
   }
 
   function soberUp(actorId) {
     var n = settle(actorId);
-    if (!n.hangover) { return false; }
-    n.hangover = false;
+    var now = Date.now();
+    if (!(n.hangoverUntil > now)) { return false; }
+    n.hangoverUntil = 0;
+    n.look = lookNow(n, now);
     write(actorId, n);
     pushEffects(actorId);
     hangoverCare(actorId);
@@ -70654,15 +70766,6 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     kind = String(kind || '');
     if (kind && Object.prototype.hasOwnProperty.call(NEEDS.away, kind)) { return NEEDS.away[kind]; }
     return NEEDS.away.up;
-  }
-
-  /*
-    Whether a kind of rest is a bed or a bedroll (#3136): one whose row puts
-    rest back after a night, which is every bed and bedroll whoever's it is,
-    and no seat. The same table as the night, so the two cannot disagree.
-  */
-  function inBed(kind) {
-    return (Number(awayRow(kind).rest) || 0) > 0;
   }
 
   /*
@@ -70863,6 +70966,19 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
           write(who, n);
           pushEffects(who);
         }
+        // And a hangover or withdrawal running out (#3153). A hangover over
+        // is also nothing left for a remedy to tend.
+        if (n.hangoverUntil && Date.now() >= n.hangoverUntil) {
+          n.hangoverUntil = 0;
+          write(who, n);
+          pushEffects(who);
+          hangoverCare(who);
+        }
+        if (n.withdrawalUntil && Date.now() >= n.withdrawalUntil) {
+          n.withdrawalUntil = 0;
+          write(who, n);
+          pushEffects(who);
+        }
         var line = crossed(who, was, n);
         if (line) {
           try { notify(who, line); } catch (e) { }
@@ -70997,15 +71113,16 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       '    var st = ctx.state;',
       '    if (!st) { return; }',
       /*
-        DRUNK, HANDED TO THE FRONT PLUGIN (#1382), which draws the screen
-        effect. Edge triggered, and only marked as handed over once the
-        plugin's hook is there to take it, so a hook that loads after this
-        script first runs still gets told.
+        THE LOOK, HANDED TO THE FRONT PLUGIN (#1382, #3153): drunk, high,
+        hangover, withdrawal or nothing (lookNow), and the plugin draws the
+        screen effect for it. Edge triggered, and only marked as handed over
+        once the plugin's hook is there to take it, so a hook that loads after
+        this script first runs still gets told.
       */
-      '    var drunk = !!v.drunk && !v.creating;',
-      '    if (st.thornswoodDrunk !== drunk && typeof globalThis !== "undefined" && globalThis.thornswoodDrunk) {',
-      '      globalThis.thornswoodDrunk(drunk);',
-      '      st.thornswoodDrunk = drunk;',
+      '    var look = v.creating ? "" : String(v.look || "");',
+      '    if (st.thornswoodLook !== look && typeof globalThis !== "undefined" && globalThis.thornswoodLook) {',
+      '      globalThis.thornswoodLook(look);',
+      '      st.thornswoodLook = look;',
       '    }',
       /*
         IN CREATION THE BARS COME OFF, once, and stay off. settle() writes
@@ -71031,6 +71148,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         DRUNK AND HIGH ARE IN THE SIGNATURE (#3143), so the icon comes and
         goes the moment either does, even when no meter moved.
       */
+      '    var drunk = !!v.drunk;',
       '    var high = !!v.drugged;',
       '    var sig = food + "|" + drink + "|" + rest + "|" + temp + "|" + (drunk ? "d" : "") + (high ? "h" : "");',
       '    if (st.thornswoodHud === sig) { return; }',
@@ -72185,9 +72303,9 @@ module.exports = {
 
     "Ill. The weary penalties of the closest meter: cold for a chill, hunger
     for food sickness, thirst for fouled water, and both hunger and rest for a
-    fever." Read the way the drink page reads a hangover: the meter counts as
-    at least weary while you are ill, and at least bad while you are badly ill,
-    so a disease never stacks a second copy of a penalty you already have.
+    fever." Read as a floor: the meter counts as at least weary while you are
+    ill, and at least bad while you are badly ill, so a disease never stacks a
+    second copy of a penalty you already have.
 
     lasts is minutes, and from says what it is counted from: a chill clears in
     2 hours from catching it; food sickness and fouled water last 30 and 45
@@ -83949,7 +84067,7 @@ module.exports.orchardPlots = ORCHARD_PLOTS;
 module.exports.orchardSources = function () { return {"version":1,"quest":"orchard","sources":[{"reference":"141084:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32734.08984375,-10301.1953125,-4197.89208984375],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"141083:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32458.767578125,-10103.2978515625,-4139.51171875],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"141082:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32243.041015625,-11261.99609375,-4217.8154296875],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"141080:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32016.349609375,-11102.0615234375,-4172.181640625],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1699d7:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32340.267578125,-12131.546875,-4276.1220703125],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831a6:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[29450.37890625,-12450.99609375,-4248.1787109375],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831a3:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[30332.349609375,-12917.0849609375,-4313.6650390625],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1699d6:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[32620.939453125,-12295.2822265625,-4265.97998046875],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831a0:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[30051.677734375,-12753.349609375,-4311.63037109375],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831ad:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[29923.47265625,-13003.6845703125,-4364.17578125],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0}]}; };
 module.exports.createQuestOrchardSources = QUEST_FISHING_SOURCES.createQuestOrchardSources;
 module.exports.huntBundles = QUEST_HUNT_BUNDLES;
-module.exports.retrievalSources = function () { return {"version":1,"loadOrderSha256":"9c4e3d7191783dc8a79f2c1affde95427c4bf24c68b4a1ff93d03451fbd4baf5","contentSha256":"20c5479f925d2aab75171a9190a68b2535e085c6414907af959447c79cb8b535","sources":[{"quest":"satchel","reference":"17dfdc:JK's Whiterun's Outskirts.esp","base":"97f54:Skyrim.esm","baseType":"CONT","cell":"961b:Skyrim.esm","world":"3c:Skyrim.esm","spaceType":"WRLD","position":[17712.54296875,-9893.69921875,-4385.83154296875],"item":"17000:Thornswood-Content.esp","itemType":"MISC","merchant":"1a681:Skyrim.esm","destination":"1a681:Skyrim.esm","role":"Woodworker","hold":"Whiterun","destinationHold":"whiterun","gold":20,"hours":3,"provenance":{"fileIndex":23,"plugin":"JK's Whiterun's Outskirts.esp","pluginSha256":"c5cf1d6649be524627917fa5ebdcb64a082a16da150605e6387dd478f1512c04","recordSha256":"a311f2019f6136c9ce29a1092545f9d4bd54ad2211d0708249e0b5670e04f164","rawId":85450716}},{"quest":"ledger","reference":"17208:Thornswood-Content.esp","base":"17100:Thornswood-Content.esp","baseType":"ACTI","cell":"133c9:Skyrim.esm","world":"133c9:Skyrim.esm","spaceType":"CELL","position":[173.47137451171875,-99.40931701660156,329.3854064941406],"item":"17001:Thornswood-Content.esp","itemType":"MISC","merchant":"1a672:Skyrim.esm","destination":"1a672:Skyrim.esm","role":"Enchanter","hold":"Whiterun","destinationHold":"whiterun","gold":30,"hours":6,"provenance":{"fileIndex":51,"plugin":"Thornswood-Content.esp","pluginSha256":"20c5479f925d2aab75171a9190a68b2535e085c6414907af959447c79cb8b535","recordSha256":"c5ac0bc9fba89a9ac07e7c2622993cc6e105658e82544f201268c56c2fa0870a","rawId":83980808}},{"quest":"signet","reference":"c2a35:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15224:Skyrim.esm","world":"15224:Skyrim.esm","spaceType":"CELL","position":[557.8475341796875,2999.47119140625,-48.614261627197266],"item":"17002:Thornswood-Content.esp","itemType":"MISC","merchant":"1a67c:Skyrim.esm","destination":"1a67c:Skyrim.esm","role":"Smith","hold":"Whiterun","destinationHold":"whiterun","gold":40,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ab3c0c3a3f2e1c4092eae7ba559fde2ebacc1fa9d09b7e5fb7ee20f9e2501439","rawId":797237}},{"quest":"locket","reference":"3906d:Skyrim.esm","base":"1c4ac:Skyrim.esm","baseType":"CONT","cell":"371de:Skyrim.esm","world":"371de:Skyrim.esm","spaceType":"CELL","position":[1996.83251953125,-3406.302001953125,-1791.9287109375],"item":"17003:Thornswood-Content.esp","itemType":"MISC","merchant":"1939ba:aaaGraniteHill.esp","destination":"1939ba:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","destinationHold":"falkreath","gold":45,"hours":10,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ba7c8317b892d3c59ad19624377802f95f9eb7b7b3ded3e6562ab798d9a1679d","rawId":233581}},{"quest":"case","reference":"ea73b:Skyrim.esm","base":"ea722:Skyrim.esm","baseType":"CONT","cell":"165a0:Skyrim.esm","world":"165a0:Skyrim.esm","spaceType":"CELL","position":[-47.07603073120117,575.0079345703125,84.99999237060547],"item":"17004:Thornswood-Content.esp","itemType":"MISC","merchant":"1a684:Skyrim.esm","destination":"1a684:Skyrim.esm","role":"Tailor","hold":"Whiterun","destinationHold":"whiterun","gold":50,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"c3639954bd7aa4372ef9ecd715f466d5e19d31e074563d32be0b5cf5c516a681","rawId":960315}},{"quest":"dispatch","reference":"547e8:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"43fab:Skyrim.esm","world":"43fab:Skyrim.esm","spaceType":"CELL","position":[1555.78857421875,643.3175659179688,-715.6051635742188],"item":"17005:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66e:Skyrim.esm","destination":"1b11a:Skyrim.esm","role":"Cook","hold":"Whiterun","destinationHold":"windhelm","gold":60,"hours":12,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"7d3da1377ca635164f431cc9e31220472ab68a30066c62d81144b5a7afcc2a0f","rawId":346088}},{"quest":"seal","reference":"53ff6:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15211:Skyrim.esm","world":"15211:Skyrim.esm","spaceType":"CELL","position":[1207.1614990234375,-1561.430419921875,64.8089828491211],"item":"17006:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66d:Skyrim.esm","destination":"1a66d:Skyrim.esm","role":"Alchemist","hold":"Whiterun","destinationHold":"whiterun","gold":70,"hours":14,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"17d7ec3629d485d898445318a98003736ecfae5743e2da886b3e52a6bea0424d","rawId":344054}}]}; };
+module.exports.retrievalSources = function () { return {"version":1,"loadOrderSha256":"9c4e3d7191783dc8a79f2c1affde95427c4bf24c68b4a1ff93d03451fbd4baf5","contentSha256":"2d47578f3f303e4995e866aed4de677fbd348bc603f1195f3f0a6b0283ca4fad","sources":[{"quest":"satchel","reference":"17dfdc:JK's Whiterun's Outskirts.esp","base":"97f54:Skyrim.esm","baseType":"CONT","cell":"961b:Skyrim.esm","world":"3c:Skyrim.esm","spaceType":"WRLD","position":[17712.54296875,-9893.69921875,-4385.83154296875],"item":"17000:Thornswood-Content.esp","itemType":"MISC","merchant":"1a681:Skyrim.esm","destination":"1a681:Skyrim.esm","role":"Woodworker","hold":"Whiterun","destinationHold":"whiterun","gold":20,"hours":3,"provenance":{"fileIndex":23,"plugin":"JK's Whiterun's Outskirts.esp","pluginSha256":"c5cf1d6649be524627917fa5ebdcb64a082a16da150605e6387dd478f1512c04","recordSha256":"a311f2019f6136c9ce29a1092545f9d4bd54ad2211d0708249e0b5670e04f164","rawId":85450716}},{"quest":"ledger","reference":"17208:Thornswood-Content.esp","base":"17100:Thornswood-Content.esp","baseType":"ACTI","cell":"133c9:Skyrim.esm","world":"133c9:Skyrim.esm","spaceType":"CELL","position":[173.47137451171875,-99.40931701660156,329.3854064941406],"item":"17001:Thornswood-Content.esp","itemType":"MISC","merchant":"1a672:Skyrim.esm","destination":"1a672:Skyrim.esm","role":"Enchanter","hold":"Whiterun","destinationHold":"whiterun","gold":30,"hours":6,"provenance":{"fileIndex":51,"plugin":"Thornswood-Content.esp","pluginSha256":"2d47578f3f303e4995e866aed4de677fbd348bc603f1195f3f0a6b0283ca4fad","recordSha256":"c5ac0bc9fba89a9ac07e7c2622993cc6e105658e82544f201268c56c2fa0870a","rawId":83980808}},{"quest":"signet","reference":"c2a35:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15224:Skyrim.esm","world":"15224:Skyrim.esm","spaceType":"CELL","position":[557.8475341796875,2999.47119140625,-48.614261627197266],"item":"17002:Thornswood-Content.esp","itemType":"MISC","merchant":"1a67c:Skyrim.esm","destination":"1a67c:Skyrim.esm","role":"Smith","hold":"Whiterun","destinationHold":"whiterun","gold":40,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ab3c0c3a3f2e1c4092eae7ba559fde2ebacc1fa9d09b7e5fb7ee20f9e2501439","rawId":797237}},{"quest":"locket","reference":"3906d:Skyrim.esm","base":"1c4ac:Skyrim.esm","baseType":"CONT","cell":"371de:Skyrim.esm","world":"371de:Skyrim.esm","spaceType":"CELL","position":[1996.83251953125,-3406.302001953125,-1791.9287109375],"item":"17003:Thornswood-Content.esp","itemType":"MISC","merchant":"1939ba:aaaGraniteHill.esp","destination":"1939ba:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","destinationHold":"falkreath","gold":45,"hours":10,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ba7c8317b892d3c59ad19624377802f95f9eb7b7b3ded3e6562ab798d9a1679d","rawId":233581}},{"quest":"case","reference":"ea73b:Skyrim.esm","base":"ea722:Skyrim.esm","baseType":"CONT","cell":"165a0:Skyrim.esm","world":"165a0:Skyrim.esm","spaceType":"CELL","position":[-47.07603073120117,575.0079345703125,84.99999237060547],"item":"17004:Thornswood-Content.esp","itemType":"MISC","merchant":"1a684:Skyrim.esm","destination":"1a684:Skyrim.esm","role":"Tailor","hold":"Whiterun","destinationHold":"whiterun","gold":50,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"c3639954bd7aa4372ef9ecd715f466d5e19d31e074563d32be0b5cf5c516a681","rawId":960315}},{"quest":"dispatch","reference":"547e8:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"43fab:Skyrim.esm","world":"43fab:Skyrim.esm","spaceType":"CELL","position":[1555.78857421875,643.3175659179688,-715.6051635742188],"item":"17005:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66e:Skyrim.esm","destination":"1b11a:Skyrim.esm","role":"Cook","hold":"Whiterun","destinationHold":"windhelm","gold":60,"hours":12,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"7d3da1377ca635164f431cc9e31220472ab68a30066c62d81144b5a7afcc2a0f","rawId":346088}},{"quest":"seal","reference":"53ff6:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15211:Skyrim.esm","world":"15211:Skyrim.esm","spaceType":"CELL","position":[1207.1614990234375,-1561.430419921875,64.8089828491211],"item":"17006:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66d:Skyrim.esm","destination":"1a66d:Skyrim.esm","role":"Alchemist","hold":"Whiterun","destinationHold":"whiterun","gold":70,"hours":14,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"17d7ec3629d485d898445318a98003736ecfae5743e2da886b3e52a6bea0424d","rawId":344054}}]}; };
 module.exports.scarceLongfin = function () { return {"version":1,"quest":"longfin","label":"Haafingar northern sea","sources":[{"reference":"17200:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143811.796875,143993.71875,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17201:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143934.40625,143937.03125,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17202:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143814.453125,143875.390625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17203:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-144130,143301.265625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17204:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-150180.328125,141408.5625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17205:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-150292.5,141505.890625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17206:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-128727.5390625,141360.34375,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17207:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-124530.8671875,145979.84375,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240}]}; };
 module.exports.scarceGeodes = function () { return {"version":1,"quest":"geode","label":"Blackreach geodes","loadOrderSha256":"9c4e3d7191783dc8a79f2c1affde95427c4bf24c68b4a1ff93d03451fbd4baf5","sources":[{"reference":"10fc57:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[10850.224609375,6743.7685546875,1174.552734375],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10eb24:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[4929.0908203125,18396.95703125,1021.5740966796875],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e994:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[7638.52783203125,17578.05078125,1624.3555908203125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e955:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6554.4755859375,17093.744140625,1441.29345703125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e8bb:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6002.3837890625,17703.9375,1296.7362060546875],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10fc4c:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[14032.8125,-3727.707763671875,-1492.2423095703125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30}]}; };
 module.exports.scarceHarvest = function () { return {"version":1,"quest":"crimson","label":"Blackreach","loadOrderSha256":"9c4e3d7191783dc8a79f2c1affde95427c4bf24c68b4a1ff93d03451fbd4baf5","sources":[{"reference":"f3b51:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6737.6865234375,7109.41552734375,985.5054321289062],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b54:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[1864.7017822265625,1518.39697265625,992.927490234375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b5d:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22377.798828125,13522.2265625,1997.456787109375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffac:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22487.3359375,11976.064453125,2067.111572265625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffaf:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[20627.134765625,7700.14599609375,1233.974609375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffb0:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[17847.103515625,6733.818359375,1515.8726806640625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b56:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[20210.73828125,5823.5986328125,970.6233520507812],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffa9:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22159.330078125,16684.431640625,1486.5172119140625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10}]}; };
