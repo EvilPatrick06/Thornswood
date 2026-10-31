@@ -202,11 +202,21 @@ if ($OnWindows) {
         # error, and without -ErrorAction Stop it said False and the path was
         # passed over as not there. Only SYSTEM is let in; the owner, this
         # account, may still put its rules back for the clean-up.
+        # Every rule but SYSTEM's comes off, its own as well as the inherited
+        # ones: on GitHub's runners TEMP passes nothing down, so the folders
+        # hold their maker's default rules, Administrators among them, as
+        # their own, and an elevated run still looked in (#5062). The inner
+        # folder keeps only what it inherits, so SYSTEM's alone.
         $hidden = Join-Path $scratch 'hidden'
         $null = New-Item -ItemType Directory -Path (Join-Path $hidden 'private') -Force
+        $null = & icacls (Join-Path $hidden 'private') /reset
         $null = & icacls $hidden /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F'
-        $null = & icacls $hidden /remove:g ('*' + $me)
+        foreach ($r in @((Get-Acl -LiteralPath $hidden).GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]))) {
+            if ($r.IdentityReference.Value -ne 'S-1-5-18') { $null = & icacls $hidden /remove:g ('*' + $r.IdentityReference.Value) }
+        }
         try {
+            $left = @((Get-Acl -LiteralPath $hidden).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | ForEach-Object { $_.IdentityReference.Value } | Sort-Object -Unique)
+            Yes ('  the folder it may not look into lets SYSTEM alone in (' + ($left -join ', ') + ')') (($left -join ',') -eq 'S-1-5-18')
             $why = @(Test-ThornswoodServiceCannotReach @((Join-Path $hidden 'private')))
             Yes ('the fail-safe refuses a path it may not look for, rather than passing it over (' + ($why -join ' | ') + ')') (
                 $why.Count -eq 1 -and $why[0] -match 'could not be checked')
