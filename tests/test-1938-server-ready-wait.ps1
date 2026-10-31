@@ -200,16 +200,37 @@ function MakeStage([string]$name, [string]$gamemode) {
     }
     return $want
 }
+# Each time the swap asks the task to stop or start, the stand-in task writes
+# the moment down in stamps.txt, so a case times the swap from the moment it
+# took the server down (or started the new one) and not from when Windows
+# PowerShell was asked to start. Before the first stop the swap loads
+# StopAndMove.ps1's C# (Add-Type runs the compiler) and lists the ports, with
+# the old server still up. On 31 Oct 2026 a GitHub runner four of whose cores
+# were 81% busy took 69 s over that (PR #5143, the old server's stand-in was
+# ended 69 s after the run began), and the case timed from the start called
+# a 6 s swap 75 s.
+$stampLog = Join-Path $work 'stamps.txt'
+function Stamps {
+    if (-not (Test-Path -LiteralPath $stampLog)) { return @() }
+    return @(Get-Content -LiteralPath $stampLog | Where-Object { $_ -match '^(stop|start) \d+$' } | ForEach-Object {
+        $f = $_ -split ' '
+        [pscustomobject]@{ Kind = $f[0]; At = [DateTime]::new([long]$f[1], [DateTimeKind]::Utc) }
+    })
+}
 function RunFar([string]$stageName, [string]$prevName, [int]$wait, $want) {
     $mock = @"
 function Get-ScheduledTask { [CmdletBinding()] param([string]`$TaskName) }
 function Set-ScheduledTask { [CmdletBinding()] param([Parameter(ValueFromPipeline = `$true)]`$InputObject) }
-function Stop-ScheduledTask { [CmdletBinding()] param([string]`$TaskName) }
+function Stop-ScheduledTask { [CmdletBinding()] param([string]`$TaskName)
+  [IO.File]::AppendAllText('$stampLog', 'stop ' + [DateTime]::UtcNow.Ticks + "``r``n")
+}
 function Start-ScheduledTask { [CmdletBinding()] param([string]`$TaskName)
+  [IO.File]::AppendAllText('$stampLog', 'start ' + [DateTime]::UtcNow.Ticks + "``r``n")
   Start-Process -FilePath '$($node.Source)' -WindowStyle Hidden -ArgumentList '"$stub" watch "$root" "$pidLog"'
 }
 
 "@
+    Remove-Item -LiteralPath $stampLog -Force -EA SilentlyContinue
     $body = (SwapVars $root 'Thornswood Test 1938' $stageName $prevName $wait $want) + $mock + $swapBlock
     $f = Join-Path $work ('far-' + [Guid]::NewGuid().ToString('N') + '.ps1')
     [IO.File]::WriteAllText($f, $body, (New-Object Text.UTF8Encoding($true)))
@@ -329,16 +350,20 @@ try {
 
     # A start that never becomes ready still rolls back within the ceiling.
     $w = MakeStage '.stage-never' '// new gamemode, udp-only'
-    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $began = [DateTime]::UtcNow
     $out = RunFar '.stage-never' '.prev-never' 4 $w
-    $sw.Stop()
+    $ended = [DateTime]::UtcNow
+    $down = @(Stamps | Where-Object { $_.Kind -eq 'stop' } | Select-Object -First 1)
     $said = $out -join "`n"
     $failed = $script:fail
     Yes 'a start that never opens the resources port is SWAP ROLLED BACK' ($out -contains 'SWAP ROLLED BACK')
     Yes '  and it says FAIL, naming both ports and the 4 s ceiling' (
         $said -match ('FAIL: nothing answered on UDP ' + $P + ' and ' + ($P + 1) + ' within 4 seconds'))
-    Yes ("  and the swap finished in {0:n1} s, within the 4 s ceiling plus the put-back, not the old 60 s" -f $sw.Elapsed.TotalSeconds) (
-        $sw.Elapsed.TotalSeconds -lt 50 -and $sw.Elapsed.TotalSeconds -ge 3)
+    $swapS = -1
+    if ($down.Count) { $swapS = ($ended - $down[0].At).TotalSeconds }
+    Yes '  and the swap asked the task to stop' ($down.Count -eq 1)
+    Yes ("  and from taking the server down it finished in {0:n1} s, within the 4 s ceiling plus the put-back, not the old 60 s ({1:n1} s before that, with the old server up)" -f $swapS, $(if ($down.Count) { ($down[0].At - $began).TotalSeconds } else { -1 })) (
+        $swapS -lt 50 -and $swapS -ge 3)
     Yes '  and the old gamemode is back' (
         (Get-FileHash -LiteralPath (Join-Path $root 'gamemode.js') -Algorithm SHA256).Hash -eq $before)
     Yes '  and the old server is answering again' (WaitUp $P)
@@ -354,16 +379,18 @@ try {
     $logFrom = LogLength
     $running = Ident $P
     $w = MakeStage '.stage-slow' '// new gamemode, slow-start-past-60'
-    $sw = [Diagnostics.Stopwatch]::StartNew()
     $out = RunFar '.stage-slow' '.prev-slow' (Get-ThornswoodServerReadyWait) $w
-    $sw.Stop()
+    $ended = [DateTime]::UtcNow
+    $up = @(Stamps | Where-Object { $_.Kind -eq 'start' } | Select-Object -First 1)
+    $waitS = -1
+    if ($up.Count) { $waitS = ($ended - $up[0].At).TotalSeconds }
     $said = $out -join "`n"
     $failed = $script:fail
     Yes 'a start that answers after 61 s, past the old 60 s wait, is SWAP OK' ($out -contains 'SWAP OK')
     Yes '  and says PASS from the resources port' (
         $said -match ('PASS: the server is answering on ' + ($P + 1) + ', game port ' + $P))
-    Yes ("  and that wait took {0:n1} s, past 60 s and inside the shared ceiling" -f $sw.Elapsed.TotalSeconds) (
-        $sw.Elapsed.TotalSeconds -ge 60 -and $sw.Elapsed.TotalSeconds -lt (Get-ThornswoodServerReadyWait))
+    Yes ("  and from starting the new server that wait took {0:n1} s, past 60 s and inside the shared ceiling" -f $waitS) (
+        $waitS -ge 60 -and $waitS -lt (Get-ThornswoodServerReadyWait))
     Yes '  and the new gamemode is the one answering' (
         ([IO.File]::ReadAllText((Join-Path $root 'gamemode.js'))) -match 'slow-start-past-60' -and
         (Answers $P) -and ((Ident $P) -ne $running))
