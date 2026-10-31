@@ -14,8 +14,9 @@ offers. A node socket left paused could not: its kernel kept taking more as
 the receive window grew, so the service saw it drain a second or more after
 it stopped, and the harness measured whatever the runner's kernel did then
 rather than a socket that had stopped (31 Oct, GitHub's hosted Windows
-runner). With the window fixed, a write the kernel has not taken stays
-untaken until this reads again.
+runner). With the window fixed, this end takes nothing more until it reads
+again, so once the service's own send buffer is full too, its socket stays
+backed.
 
 Only the standard library. Writes nothing but stdout.
 """
