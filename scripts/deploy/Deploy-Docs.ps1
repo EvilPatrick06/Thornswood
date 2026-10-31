@@ -1035,14 +1035,19 @@ $ownerVars = $siteAccountHelpers + "`$Owner = '" + $owner + "'`r`n"
 # is every service's.
 if ($appUnchanged -and $ownerNew -and -not $PutBack) {
   $restartVars = "`$Root = '" + $Root.Replace('/', '\').Replace("'", "''") + "'`r`n`$Wait = " + $Wait + "`r`n" +
-                 "`$Task = '" + $Task.Replace("'", "''") + "'`r`n`$Port = " + $Port + "`r`n"
+                 "`$Task = '" + $Task.Replace("'", "''") + "'`r`n`$Port = " + $Port + "`r`n" +
+                 "`$HoldBy = '" + (Get-ThornswoodHoldBy 'Deploy-Docs.ps1').Replace("'", "''") + "'`r`n"
   $eap = $ErrorActionPreference
   $ErrorActionPreference = 'Continue'
   try {
-    $restartOut = @(Remote ($ownerVars + $restartVars + $ThornswoodStopAndMoveText + $siteHooks + @'
+    $restartOut = @(Remote ($ownerVars + $restartVars + $ThornswoodHoldText + $ThornswoodStopAndMoveText + $siteHooks + @'
+# Held while it is stopped (#5155, ServerHold.ps1), so the watchdog leaves it.
+Set-ThornswoodHold -Target $Task -Why 'restarting the site to start it through its launcher' -By $HoldBy
 StopIt
 StartIt
-if (Healthy) { 'PASS: ' + (Answer); 'RESTART OK' } else { 'FAIL: it did not answer within ' + $Wait + ' seconds'; Why }
+$ok = Healthy
+Clear-ThornswoodHold -Target $Task
+if ($ok) { 'PASS: ' + (Answer); 'RESTART OK' } else { 'FAIL: it did not answer within ' + $Wait + ' seconds'; Why }
 '@) | ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
   } finally { $ErrorActionPreference = $eap }
   if ($restartOut -notcontains 'RESTART OK') {
@@ -1052,7 +1057,7 @@ if (Healthy) { 'PASS: ' + (Answer); 'RESTART OK' } else { 'FAIL: it did not answ
   }
 }
 if ($PutBack -or -not $appUnchanged) {
-$vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @()) +
+$vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @() $Task) +
         ("`$Task = '" + $Task.Replace("'", "''") + "'`r`n`$Port = " + $Port + "`r`n") +
         ('$Gone = @(' + ((@($gonePublic) | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ', ') + ")`r`n")
 $pick = ''

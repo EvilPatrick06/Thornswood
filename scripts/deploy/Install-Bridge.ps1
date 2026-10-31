@@ -116,6 +116,8 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here 'ServiceAccount.ps1')
+# The hold the install writes while it has the bridge stopped (#5155).
+. (Join-Path $Here '..\vps\ServerHold.ps1')
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 
@@ -173,7 +175,7 @@ if (Test-Path -LiteralPath '$log') { ''; '--- bridge.log, last 15 ---'; Get-Cont
 # and leaves in $stopOk whether everything of ours exited and the port is
 # free: a function that returned that as well as saying lines gave its caller
 # the lines, and a stop that failed was never refused.
-$stopIt = [IO.File]::ReadAllText((Join-Path $Here 'StopAndMove.ps1')) + "`r`n" + @"
+$stopIt = (Get-ThornswoodHoldScript -Script 'Install-Bridge.ps1') + [IO.File]::ReadAllText((Join-Path $Here 'StopAndMove.ps1')) + "`r`n" + @"
 function StopIt {
     `$all = @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue)
     `$mine = @(`$all | Where-Object { `$_.CommandLine -and `$_.CommandLine -like ('*' + '$log' + '*') })
@@ -367,8 +369,11 @@ function Answers([string[]]`$Lines) {
     return `$false
 }
 
+# Held while it is stopped (#5155, ServerHold.ps1), so the watchdog leaves
+# it; every way out below takes the hold away.
+Set-ThornswoodHold -Target '$TaskName' -Why 'installing new bridge files' -By `$HoldBy
 StopIt
-if (-not `$stopOk) { 'BRIDGE REFUSED'; exit 1 }
+if (-not `$stopOk) { Clear-ThornswoodHold -Target '$TaskName'; 'BRIDGE REFUSED'; exit 1 }
 New-Item -ItemType Directory -Force -Path '$Root\$prev' | Out-Null
 foreach (`$f in `$want.Keys) {
     `$live = Join-Path '$Root' `$f
@@ -397,6 +402,7 @@ Start-ScheduledTask -TaskName '$TaskName'
 if (Answers @('$Plain')) {
     'the bridge answers on 127.0.0.1:$Port'
     if (-not @(Get-ChildItem -LiteralPath '$Root\tokens' -File -EA SilentlyContinue).Count) { 'there are no tokens yet, so it refuses everybody until Grant-BoxAccess.ps1 gives somebody one' }
+    Clear-ThornswoodHold -Target '$TaskName'
     'BRIDGE OK'; exit 0
 }
 'it did not answer on 127.0.0.1:$Port within $Wait seconds. bridge.log says:'
@@ -416,6 +422,7 @@ if (`$oldXml) {
     Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false -EA SilentlyContinue
     'there was no bridge before this, so none is left registered'
 }
+Clear-ThornswoodHold -Target '$TaskName'
 'BRIDGE ROLLED BACK'; exit 1
 "@
 
