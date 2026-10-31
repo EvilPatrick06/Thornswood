@@ -129,7 +129,8 @@ function Test-Held([string]$Dir, [string]$Sha) {
 # cannot be read stops the run: a refusal it was meant to lift would read as
 # work being lost.
 $Rewritten = @{}
-foreach ($m in $RewriteMap) {
+# pwsh -File hands "a,b" over as one string, so a comma separates maps too.
+foreach ($m in @($RewriteMap | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })) {
     if (-not (Test-Path -LiteralPath $m)) { Die "-RewriteMap $m is not there." }
     foreach ($l in [IO.File]::ReadAllLines($m)) {
         $p = $l.Trim() -split '\s+'

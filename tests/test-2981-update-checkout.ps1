@@ -307,8 +307,9 @@ try {
     $r = Run $one @('-RewriteMap', $map)
     Yes "6e. a rewrite map whose new id nothing holds: still refused (exit $($r.Code))" ($r.Code -eq 1 -and $r.Out -match ('HEAD is at ' + (Short $mine)) -and (Rev $one) -eq $mine)
     Set-Content -LiteralPath $map -Value @('old                                      new', "$mine $h")
-    $r = Run $one @('-RewriteMap', $map)
-    Yes "6e. a rewrite map giving it a new id main holds: moves to main (exit $($r.Code))" (
+    # Both maps in one argument, the way pwsh -File hands "a,b" over.
+    $r = Run $one @('-RewriteMap', "$map,$smap")
+    Yes "6e. a rewrite map giving it a new id main holds: moves to main, both maps named in one argument (exit $($r.Code))" (
         $r.Code -eq 0 -and $r.Out -match ('HEAD at ' + (Short $mine) + ' is ' + (Short $h) + ' since the history rewrite') -and (Rev $one) -eq $t5)
     Yes '6e. and makes no archive branch' (@(G $one branch --list 'archive/*').Count -eq 0)
     $r = Run $one @('-RewriteMap', (Join-Path $tmp 'no-such-map.txt'))
