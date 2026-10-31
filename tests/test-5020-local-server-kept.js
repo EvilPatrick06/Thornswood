@@ -8,8 +8,8 @@
   rehearsal in docs RESTORING.md points config.json at 127.0.0.1 and the port
   Restore-Server.ps1 -Rehearse printed, then presses Play. Before this,
   Shell.OnVersionDoc copied the feed's serverAddress and serverPort over
-  that on the first check (the main feed names play.thornswood.net and
-  7777), saved config.json and said "The server moved", so Play loaded the
+  that on the first check (the main feed names the public server's
+  address and 7777), saved config.json and said "The server moved", so Play loaded the
   live character instead of the restored one.
 
   It reads launcher\app\ShellUpdate.cs and checks:

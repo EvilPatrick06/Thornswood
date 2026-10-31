@@ -182,7 +182,7 @@ namespace Thornswood
             // A config pointing at a server on this machine was pointed there
             // by hand: a restore rehearsal (docs RESTORING.md, #5020) or a
             // developer's own server. The feed's address and ports are the
-            // public server's, and taking them here put play.thornswood.net
+            // public server's, and taking them here put the public address
             // back over 127.0.0.1 on the first check, so Play loaded the live
             // character instead of the restored one. They are left as they
             // are until the config names a server elsewhere again.
