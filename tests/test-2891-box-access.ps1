@@ -280,7 +280,7 @@ try {
         $acl = Get-Acl -LiteralPath $pf
         $me = [Security.Principal.WindowsIdentity]::GetCurrent().User
         $who = @($acl.Access | ForEach-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } | Sort-Object -Unique)
-        Yes ('  readable by this account alone, nothing inherited (rules for ' + ($who -join ', ') + '; protected ' + $acl.AreAccessRulesProtected + '; owner ' + $acl.Owner + ')') ($acl.AreAccessRulesProtected -and $who.Count -eq 1 -and $who[0] -eq $me.Value)
+        Yes '  readable by this account alone, nothing inherited' ($acl.AreAccessRulesProtected -and $who.Count -eq 1 -and $who[0] -eq $me.Value)
     }
 
     # ---- 7. order and secrets --------------------------------------------------
