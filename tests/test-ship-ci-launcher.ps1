@@ -436,6 +436,14 @@ Yes '  and keeps the same folder as the run''s artifact release-files, which Shi
 Yes 'a dev Ship from the feed takes main''s exe only for main''s own launcher, not for main''s number alone' (
     $src -match [regex]::Escape("if (`$MainsOwnLauncher) {") + '\s+Head "Main''s launcher, from main''s feed"' -and
     $src -notmatch [regex]::Escape("if (`$MainEquivalent) {") + '\s+Head "Main''s launcher, from main''s feed"')
+# 31 Oct: main from 63eefdd7 asked for v1.2.15, already tagged on 52ad5e1c by
+# the dev Ship that put that launcher out (#5156). A main Ship from the feed
+# takes the dev feed's launcher when it carries this number from these sources.
+Yes 'a main Ship from the feed takes the launcher dev tried, under this number and from these sources, and builds none (#5156)' (
+    $src -match [regex]::Escape("if (-not `$Dev -and `$FromFeed -and -not `$ModsOnly -and `$MainSourceAligned) {") -and
+    $src -match [regex]::Escape("`$devPub = Get-PublishedLauncher (Get-FeedStoreDir 'dev') 'dev'") -and
+    $src -match [regex]::Escape("if (`$devPub -and [string]`$devPub.Version -eq `$current -and (Test-LauncherUnchanged `$devPub `$LauncherInputs)) { `$DevTriedLauncher = `$devPub }") -and
+    $src -match ('(?s)\} elseif \(\$DevTriedLauncher\) \{\s+Head ''The launcher dev tried, from the dev feed''\s+\$why = Get-FeedLauncher \$DevTriedLauncher \$buildOut \$ciSigner \$hold.*?\} else \{\s+Head ''The launcher, built and signed on GitHub'''))
 Yes 'Ship fetches it for a main -Package, before the build and the publish' ($src -match '(?s)if \(\$Package -and -not \$Dev -and -not \$DryRun\) \{.*?Get-ReleaseStub.*?# -+ build')
 Yes '  and hands it to Package-Thornswood as -Stub' ($src -match [regex]::Escape("if (`$ciStub) { `$pkgArgs['Stub'] = `$ciStub }") -and $src -match [regex]::Escape("& (Join-Path `$Here 'Package-Thornswood.ps1') @pkgArgs"))
 # Issue #1213: the site carries the one file build, so -Package asks for it,

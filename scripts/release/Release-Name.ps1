@@ -75,7 +75,27 @@ function Get-FeedTakenIds($doc) {
     return ,$t
 }
 
-function New-ReleaseId($doc, [switch]$Dev, [datetime]$Now = (Get-Date)) {
+# The team's clock: Mountain time, Patrick's, whatever the clock of the
+# machine that ships. A release id and the date on its note are read as one
+# clock, with no zone written on either (Find-DevNoteRelease in Dev-News.ps1
+# puts a note in its release's span by them, and the News tab shows the date as
+# it is). Until 31 Oct both took the shipping machine's own clock: One and the
+# box keep Mountain time, a GitHub runner keeps UTC, so a note shipped from a
+# runner read six hours late. Measured on the dev feed that day: "The collection
+# link opens the server's revision" (release 20261030-115318-dev, tagged
+# 11:56 UTC) said 11:54 AM and sat below "The loading screen, the Master's mend
+# and the game name" (20261030-114538-dev, tagged 11:48 AM Mountain), which
+# said 11:47 AM and went out six hours after it; "Food spoils, gently" said
+# 6:05 PM for a Ship tagged at 12:12 PM Mountain. Mountain Standard Time is
+# Windows' name for the zone and follows its summer time; America/Denver is
+# the same zone's name everywhere else.
+function Get-TeamNow([datetime]$UtcNow = [datetime]::UtcNow) {
+    $onWindows = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
+    $zone = [TimeZoneInfo]::FindSystemTimeZoneById($(if ($onWindows) { 'Mountain Standard Time' } else { 'America/Denver' }))
+    return [TimeZoneInfo]::ConvertTimeFromUtc([datetime]::SpecifyKind($UtcNow, [DateTimeKind]::Utc), $zone)
+}
+
+function New-ReleaseId($doc, [switch]$Dev, [datetime]$Now = (Get-TeamNow)) {
     $taken = Get-FeedTakenIds $doc
     $suffix = if ($Dev) { '-dev' } else { '' }
     $t = $Now

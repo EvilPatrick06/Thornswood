@@ -187,17 +187,21 @@ file carries outside code and the file does not carry that project's notice.
 
 ## The SkyMP client runtime, built from the fork
 
+<!-- engine-pin:fork -->
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
 commit `50736fe6` (in full, `50736fe6183409b640218ac131742d16d738d550`). That
 is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
-top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
+top, and every one of those changes is in
+https://github.com/EvilPatrick06/skymp/compare/2849e676...50736fe6.
+<!-- /engine-pin:fork -->
+Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
 recorded build.
 
 The six client files and the native server were built by the fork's own
-Windows build (fork run 40454583407) and recorded by Thornswood's engine.yml
-(run 40458174415, #459, #3399). The native server and its
+Windows build of that commit and recorded by Thornswood's engine.yml (#459,
+#3399, #5148); the pull request that moved the pin names both runs. The native server and its
 JavaScript bundle were built from the same merged source, including the
 atomic quest inventory and state transaction. The generated client and
 server records give each file's hash and source commit. The older reuse
@@ -455,8 +459,12 @@ a hidden password in icomoon. What each one carries, read on 16 October:
 Since 20 October 2026 (#2754, #2931) every Ship builds `Data\Platform\UI\build.js`
 and the fonts, sounds and pictures beside it from the fork's `skymp5-front`
 at the engine pin, with webpack, and holds what it built to
-`records\front-build.json`: 67 files, 8,676,260 bytes, from commit
-`50736fe6`, the commit the client record names. Its build.js is 2,444,820
+`records\front-build.json`:
+<!-- engine-pin:front -->
+67 files, 8,676,260 bytes, from commit
+`50736fe6`, the commit the client record names.
+<!-- /engine-pin:front -->
+Its build.js is 2,444,820
 bytes, sha256
 `a67a1a146f104891d879d360c06d40e7c9051aac859bd6fd4d207f432be4416f`, and every
 font in it is one the record names. From `d258e53e` to `50736fe6` the one
@@ -1228,96 +1236,21 @@ rewrite takes it out (#3684).
 
 ## On our servers
 
+<!-- engine-pin:servers -->
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
   name `50736fe6183409b640218ac131742d16d738d550` on the public fork. The
   server module and the six client files were built from that commit, which
-  adds the 5 October security fixes (the RPC route, request bodies, metrics,
-  the login line, the settings files), the server's equipment write for a new
-  character, a saved character whose race cannot be read kept under its own
-  id, and the build fixes, and on top of those upstream's fixes of 5 October,
-  light plugins on the server and in the save the client loads, numbered
-  teleports so an old one is never carried out after a newer one, and the
-  server reading its source map while it starts. Since the build before it
-  (`e31a579a`) it also hands the gamemode what a craft used, so a soul gem
-  above a rank can be refused, lets the gamemode ask which saved characters
-  could not be read, sends a piece's new condition and name to whoever holds
-  it at once, and stops a key let go after a panel closes from repeating into
-  the page. Since `f1e18a4a` it also fences the server's delayed actor work
-  by each actor's lifecycle and owner, so a queued combat or quest write
-  never lands on an actor that was unloaded or reused (Thornswood #1373).
-  Since `ea523711` it also lets the gamemode weaken a potion before it lands
-  (Thornswood #1382), keeps a reference the server holds disabled when it
-  streams in again (#2328), names a brew's effects to the gamemode when it is
-  made (#1389), proves the offline login on the connection that logs in
-  (#1320) and plays a stagger that came over the network on that actor
-  (#489). Since `20083278` it also measures the keyboard instead of putting
-  focus back on a timer (#2131), and keeps every save it accepted until it is
-  written or said to have failed, through form destruction, index reuse and a
-  world's shutdown, with the outcome handed back to the gamemode (#1373). Since
-  `d360fc1f` it also gives the gamemode a write that replaces a whole file at
-  once, which readers never see half written, and its resource port serves
-  each file from the one handle it opened (#2740). Since `d1944169` it also
-  decides a block before it hands the gamemode the hit, so the hit's blocked
-  flag is the server's own and a block against a character the server runs is
-  seen (#1386), and lets a plugin keep a character from being slowed by what it
-  carries, here and on everybody else's screen (#1385). Since `14d9fcd2` it also
-  has a kept NPC take the reference its plugin placed instead of spawning a
-  second one (#2483), lets a cast hold its effects longer, counted on the
-  caster's machine and agreed by the server (#2848), and keeps the cursor
-  menu's queued show and hide until the game handles it (#2384). Since
-  `ba6d8911` it also redraws a character's hair when the server changes its
-  colour (#2867), since `cf4515d6` its front end is written with LF line
-  endings on every machine that builds it (#2754), since `d3091eb4` it
-  lets the gamemode name what a craft gives, so a cook can come out burnt or
-  fine (#2906), since `52194847` the name the item is given with too, so a
-  Master Weaver's garment is made with its mark (#3026), since
-  `f045afa6` the engine's AddItems keeps every entry after one that joins a
-  stack (#3069), since `445ded38` it refuses a stack past 4,294,967,295
-  before anything moves (#3074), since `839bcbf6` a container starts with
-  none of its plugin record's contents when the server settings name its
-  type in `forbiddenBaseContainer` (#3078), since `8a42d69c` a plant, a tree
-  or a crafting bench goes through the server before the game starts it
-  (#3080), since `fd2be02b` the server's own NPC movement never saves
-  on a timer (#3180), since `baf0aae3` the client logs the head parts
-  it puts on a record (#2025), since `44ad40da` a native crash of the
-  server is recorded by Windows (#1267), since `fdc21f33` the server
-  asks the gamemode before a health write kills (#1626) and an inventory
-  difference with a client closes instead of being left alone (#2146), and
-  since `9acd02c1` the server times its ticks only when /metrics can serve
-  them (#3181) and the build keeps the licence text of every library in a
-  client file (#3099), and since `4712e3eb` the server says after each
-  gamemode load whether it worked and whether a reload changed what
-  connected games run (#3196), and since `2b015d26` every game plugin and
-  the client share one storage again (#3333), and since `20bb0b88` the
-  gamemode may refuse an item before an equipment update puts it on (#2262),
-  a character's head parts and face data come from the game's own heap (#2025),
-  the menu's page is shown from the start and drawn over the loading screen
-  (#3129, #3130), a piece's condition and quality change how hard it hits and
-  holds (#1384, #3151), a bench draws from the containers the gamemode names
-  and a craft takes the time it names (#3159, #3161), the game's year is
-  Thornswood's (#3156), the save worker stops before a drained storage
-  is read again (#1273), eating and cooking take a named stack of the
-  same item (#3163), a dropped item keeps its name and the time it is
-  deleted across a restart (#3498), the client logs only the kind of a
-  message from the in-game page, never what it says (#3941), and the
-  server's resources port refuses masters, archives and scripts and its save
-  reader reads a list's size in 64 bits (#3927), and since `09a4b398` every
-  listener that serves /rpc refuses another machine (#1294), a person no
-  longer starts with the game's own Flames and Healing (#1688), each step of
-  an NPC's spawn is logged (#1287), and trees and flora show harvested by
-  their flag alone (#2382). `d258e53e` adds only the fork's own build
-  workflow keeping each push's engine build as a package (fork #131), and
-  `50736fe6` adds that inherited NPC equipment stays owned for combat and out
-  of loot (#3079), a brewed potion is kept as what is in it and built again
-  on arrival (#1649), the interface's font is Big Shoulders in
-  place of Bankir-Retro and icomoon, and Skyrim's own loading screen is
-  cleared under the page while the Loading Menu is open (#3130).
+  is upstream at `2849e676` with every change in
+  https://github.com/EvilPatrick06/skymp/compare/2849e676...50736fe6. Each change
+  is a merged pull request of the fork, and the pull request here that moved
+  the pin lists the ones it brought in.
   The server module's SHA256
   is `5c9ccedf791296cf4cbd7ea9d9789421eaa7fe657b8c83ebdcefdea9d87ae804`, built
   2026-10-31T22:15:09Z. This is the recorded next release, not a deployment
   claim. Main remains on `2008327879e6cad6369ec3afe1d6d1b8ecf37724` until this goes
   out.
+  <!-- /engine-pin:servers -->
   It goes to the dev server (Publish-Server -Channel dev) and to the dev
   feed's client files (a dev Ship) first.
   Section 13 of the AGPL asks that everybody who connects to a modified server
@@ -1350,11 +1283,13 @@ For the six recorded client files and the recorded game server module, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
+<!-- engine-pin:source -->
 https://github.com/EvilPatrick06/skymp/tree/50736fe6183409b640218ac131742d16d738d550
 
 For the engine Main runs until then:
 
 https://github.com/EvilPatrick06/skymp/tree/2008327879e6cad6369ec3afe1d6d1b8ecf37724
+<!-- /engine-pin:source -->
 
 It is on the branch `thornswood/engine-changes`, it is public, and the branch
 answered an anonymous request on 24 September. It builds with CMake and

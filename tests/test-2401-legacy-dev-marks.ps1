@@ -34,7 +34,10 @@
   its release's tag; a note whose sourceCommit is empty, as Publish-Update writes it
   for a release built with uncommitted files, is judged the same way and not
   as a commit main lacks; and a later clean release that does not hold the
-  dirty release's commit settles nothing.
+  dirty release's commit settles nothing. And a note with no proof of its own
+  is settled by the first note above it whose clean commit main has (31 Oct:
+  two 22 Oct loading screen notes stayed DEV for good), but not by one whose
+  release was built with uncommitted files, nor in a clone with no tags.
 
   Everything it writes is under its own temp folder, which it removes.
 #>
@@ -358,6 +361,54 @@ try {
     $r12 = Set-DevFeedMarks $dev12 $mainFeed $git
     Yes ("  and one the clone holds that no branch or tag reaches is judged by the tag too, and clears ({0} marked)" -f $r12.Marked) (
         @($r12.Cleared) -contains 'The launcher gets ready in seconds' -and $r12.Marked -eq 4)
+
+    # A note with no proof of its own, below one whose own clean commit main
+    # has, is settled by it: the dev build was rebuilt whole from that commit,
+    # so whatever the older release carried is on main or gone from dev. On
+    # 31 Oct "Loading screens show the painting" and "Loading screen test
+    # returns" (22 Oct, a test taken off dev that evening) stayed DEV for good:
+    # their ids are from before the #3684 rewrite and no tag's span holds
+    # their times. Stood in for here by two old notes given an id nothing holds
+    # and a time no tag covers.
+    $orphans = @('NPC populations and shared supplies', 'A lost server now returns you to the main menu')
+    function Orphaned {
+        $f = Feed
+        foreach ($n in @($f.news)) {
+            if ($orphans -contains $n.title) { $n.date = '10-1-2026 3:00 AM'; $n.channel = 'dev'; $n | Add-Member -NotePropertyName sourceCommit -NotePropertyValue ('ef' * 20) -Force }
+        }
+        return $f
+    }
+    $dev13 = Orphaned
+    $r13 = Set-DevFeedMarks $dev13 $mainFeed $git
+    Yes ("notes with no proof below one whose clean commit main has are settled by it, and clear ({0} marked)" -f $r13.Marked) (
+        $r13.Marked -eq 4 -and @($orphans | Where-Object { @($r13.Cleared) -notcontains $_ }).Count -eq 0)
+    $dev14 = Orphaned
+    [void](Set-DevFeedMarks $dev14 $atDirty $git)
+    Yes '  and with nothing above them on main, they keep their marks' (
+        @($dev14.news | Where-Object { $orphans -contains $_.title -and $_.channel -eq 'dev' }).Count -eq 2)
+    # A note whose release was built with uncommitted files settles nothing
+    # below it, though main has its commit: no commit says what the dev build
+    # carried then. Two notes, one on the other: "Covered bodies restored",
+    # carrying 20261003-185740-dev's commit (1 uncommitted), over a note with
+    # no proof; main at that commit. Then the same over the clean
+    # 20261003-180655-dev, main at its commit, which does settle it.
+    function Pair([string]$rel, [string]$title) {
+        return [pscustomobject][ordered]@{ launcherVersion = '1.2.3.2'; mainVersion = '1.2.3'; news = @(
+            [pscustomobject][ordered]@{ date = '10-3-2026 6:58 PM'; title = $title; body = ''; details = @('a line'); channel = 'dev'; sourceCommit = $commitOf[$rel] }
+            [pscustomobject][ordered]@{ date = '10-1-2026 3:00 AM'; title = 'No proof'; body = ''; details = @('a line'); channel = 'dev'; sourceCommit = ('ef' * 20) }) }
+    }
+    function MainAt([string]$rel) {
+        return [pscustomobject][ordered]@{ launcherVersion = '1.1.105'; news = @()
+            release = [pscustomobject][ordered]@{ id = '20261003-235900'; channel = 'main'; commit = $commitOf[$rel]; uncommitted = 0 } }
+    }
+    $dev15 = Pair '20261003-185740-dev' 'Covered bodies restored'
+    [void](Set-DevFeedMarks $dev15 (MainAt '20261003-185740-dev') $git)
+    Yes ("  under a note whose release was built with uncommitted files it keeps DEV, though main has that commit ({0} over {1})" -f $(if ($dev15.news[0].channel) { 'dev' } else { 'main' }), $dev15.news[1].channel) (
+        $dev15.news[0].channel -eq '' -and $dev15.news[1].channel -eq 'dev')
+    $dev16 = Pair '20261003-180655-dev' 'The start scroll responds again'
+    [void](Set-DevFeedMarks $dev16 (MainAt '20261003-180655-dev') $git)
+    Yes ("  and under a clean one main has it clears ({0})" -f $(if ($dev16.news[1].channel) { 'dev' } else { 'main' })) (
+        $dev16.news[0].channel -eq '' -and $dev16.news[1].channel -eq '')
 
     # A clone with no tags proves nothing about the old notes: they keep their marks.
     $made = G tag -l 'release/dev/*'

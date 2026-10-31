@@ -48,6 +48,7 @@ top:
 the branch `thornswood/engine-changes`. Anybody can read it or download it,
 with no account.
 
+<!-- engine-pin:credits -->
 The server's engine recorded for the next release, `scam_native.node`, is
 built from one commit,
 [`50736fe6`](https://github.com/EvilPatrick06/skymp/tree/50736fe6183409b640218ac131742d16d738d550).
@@ -55,6 +56,7 @@ That commit starts from
 [SkyMP](https://github.com/skyrim-multiplayer/skymp) at `2849e676`, and
 [every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...50736fe6)
 is the difference between the two.
+<!-- /engine-pin:credits -->
 
 The server's engine goes to our test server first, then to the main server.
 Each server records which commit it runs, and this page names it here once

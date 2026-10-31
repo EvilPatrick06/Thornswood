@@ -291,28 +291,28 @@ A change to the engine goes like this:
 2. The fork builds the merge itself: every push to `thornswood/engine-changes`
    builds the engine on GitHub's runner and keeps it as
    `thornswood-engine-<commit>` for 90 days. Wait for that build to be green.
-3. The records come from that build, in CI ("The engine built in CI",
-   below): `gh workflow run engine.yml --ref main -f commit=<commit>` records
-   it, and hands back `records\server-build.json`, `records\client-build.json`,
-   `records\client-licences.json` and the `records\client-licences` texts in
-   its log. A build made on a machine (`Build-Engine.ps1 -Fork <worktree>`,
-   then `Build-Server.ps1 -Fork <worktree>`) is for trying a change on that
-   machine; its records are never a pin's, because a Ship machine takes the
-   fork's own build, and a rebuild is never the same bytes (#3399). Then
-   `Build-Front.ps1 -Fork <fork> -Commit <commit> -Record`, which builds the
-   front from the same commit and writes `records\front-build.json` (#2754)
-   and the `records\front-licences` texts of the npm packages in build.js
-   (#3751).
-4. One pull request here with the new pin (`git update-index --cacheinfo
-   160000,<commit>,engine/skymp`, or `git -C engine/skymp checkout <commit>`
-   then `git add engine/skymp`), the records engine.yml handed back
-   (`.\scripts\release\Get-EngineRecords.ps1 -Run <its run id>` writes them,
-   and only when the index already pins that commit), `records\front-build.json`
-   with `records\front-licences`, and the commit named
-   in `THIRD-PARTY.md` (its fork section, "On our servers" with the server's
-   SHA256, and the link in "Where the source is") and in
-   `site\data\site\credits.md`. `tests\test-third-party.js` is red when any of
-   those is not the commit `records\server-build.json` names.
+3. Nothing by hand from here (#5148): `.github\workflows\engine-pin.yml`
+   looks every ten minutes, starts `engine.yml` for the new head once the
+   fork's build is green, and when that has recorded it, moves the pin on
+   the rolling branch `engine-pin/next` and opens or updates its pull
+   request ("The pin moves by itself", below).
+4. The Desk merges that pull request under the merge rule, like any other.
+   It carries the pin, the four records engine.yml handed back, the front
+   built again at the commit (`records\front-build.json` and
+   `records\front-licences`), the pin's lines of `THIRD-PARTY.md` and
+   `site\data\site\credits.md` written from the records, a Refs line for
+   every Thornswood issue the fork's pull requests name, and their Test
+   tasks. `tests\test-third-party.js` is red when either page names another
+   commit than `records\server-build.json`, and
+   `tests\test-5148-engine-pin.ps1` when a pin line differs from the records.
+   By hand, the same thing is one command on a branch from main, with the
+   engine.yml run that recorded the commit:
+   ```powershell
+   pwsh scripts/release/Update-EnginePin.ps1 -Commit <the fork commit> -Run <the engine.yml run id>
+   ```
+   which moves the pin in the index, runs `Get-EngineRecords.ps1`,
+   `Build-Front.ps1 -Record` and `Write-EnginePinText.ps1`, runs the checks
+   and stages the change.
 5. After it merges: the server to the dev server with `Publish-Server.ps1
    -Channel dev`, the client with the next dev Ship. A machine without that
    build puts it on from the store on the box, where the publish or deploy
@@ -352,6 +352,53 @@ upstream has fixes the fork does not. It goes green when each is merged into
 the fork branch (a fork pull request, then the steps above), or when
 `records\upstream-not-taken.json` lists it with the reason it is not being
 taken and who decided.
+
+## The pin moves by itself
+
+Issue #5148 (Patrick, 31 October 2026: "there has to be more efficient,
+faster, safer, more accurate, streamlined, and more dynamic" way). Until then
+every fork merge waited on six hand steps before a release could carry it,
+and the commit typed into the notices went stale between pins. Now
+`.github\workflows\engine-pin.yml` does them, and its header says each
+choice:
+
+- Every ten minutes it asks GitHub what the pin needs
+  (`scripts\release\EnginePin.ps1`, `Get-EnginePinStep`): nothing, when main
+  pins the fork's head or the fork is still building it; wait, when another
+  open pull request moves `engine/skymp` (a pin made by hand goes first);
+  start `engine.yml` for the head, when the fork built it green and nothing
+  recorded it; move the pin, when `engine.yml` recorded it green.
+- Moving the pin is `Update-EnginePin.ps1` in a job whose token only reads,
+  because the front's build runs npm code. A second job, which runs nothing
+  but this repository's scripts, holds the commit to one on main's head with
+  only a pin's paths, force pushes `engine-pin/next`, starts the build check
+  on it and opens or updates the pull request (`Open-EnginePinPr.ps1`). The
+  branch always starts from main as it is, so it never needs a merge.
+- An `engine.yml` run that ends red is never started again for that commit.
+  The tick goes red with its link until the cause is fixed and the run is
+  started by hand, or the fork's head moves on.
+- The run's own token opens the pull request, which GitHub allows while
+  Thornswood's Actions setting "Allow GitHub Actions to create and approve
+  pull requests" is on (`records\github-settings.json`, `workflow_token`;
+  Patrick's yes on 31 October 2026). Main's ruleset requires no review, so
+  the approving half gives the token nothing.
+- The pin lines of `THIRD-PARTY.md` (the fork section, the front, "On our
+  servers", "Where the source is") and `site\data\site\credits.md` sit
+  between `<!-- engine-pin:<name> -->` and `<!-- /engine-pin:<name> -->` lines.
+  `Write-EnginePinText.ps1` writes them from the records; never edit inside
+  one. Which engine main runs is read from "On our servers" and kept by a pin
+  move; after a main Ship that carried a new engine,
+  `pwsh scripts/release/Write-EnginePinText.ps1 -MainCommit <that commit>`
+  says so.
+- A fork pull request that fixes a Thornswood issue names it as
+  `Thornswood #N` in its title or body, and carries its Test task as
+  `Test task for Thornswood #N: <title>` with the steps under it, in the shape
+  `.github\pull_request_template.md` gives. The pin pull request copies both
+  over, so done-on-merge.yml moves the issue when the pin merges.
+
+From a fork merge to a pin pull request ready to merge: the fork's push build
+(20 to 45 minutes), a tick, the record (about 3), a tick, the pin (about 4)
+and the build check (about 5).
 
 ## The engine built in CI
 
@@ -405,8 +452,9 @@ store keeps for them (`server-<fork commit 12>-<zip hash 16>.zip`,
 `scripts\deploy\ServerArtifact.ps1`), which any machine makes again from the
 same record and the fork's build. The run commits nothing and sends nothing.
 
-The pin pull request from it, step 4 of "One engine", from the repository
-folder on a branch (any machine with gh, a cloud thread's too):
+The pin pull request from it by hand, step 4 of "One engine", the long way
+(Update-EnginePin.ps1 does all of it), from the repository folder on a branch
+(any machine with gh and pwsh, Windows or Linux, a cloud thread's too):
 
 ```powershell
 git update-index --cacheinfo 160000,<the fork commit>,engine/skymp

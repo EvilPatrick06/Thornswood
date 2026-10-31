@@ -90,7 +90,7 @@ try {
     # pull request build has no VPS fallback, and anything anyone can start
     # on a public repository (#3685), opening or closing their own issue, is
     # on GitHub's runner.
-    T ($x.Out -notmatch 'RISK  workflow build-pr\.yml runs on' -and $x.Report -match '\| workflow \| build-pr\.yml runs on \|[^\n]*triggers pull_request \|' -and $x.Report -notmatch '\| workflow \| build-pr\.yml runs on \|[^\n]*; on thornswood') 'the real build-pr.yml is not on the production label at all, and the check says ok (#4983)'
+    T ($x.Out -notmatch 'RISK  workflow build-pr\.yml runs on' -and $x.Report -match '\| workflow \| build-pr\.yml runs on \|[^\n]*triggers pull_request,workflow_dispatch \|' -and $x.Report -notmatch '\| workflow \| build-pr\.yml runs on \|[^\n]*; on thornswood') 'the real build-pr.yml is not on the production label at all, and the check says ok (#4983)'
     foreach ($n in 'area-label.yml', 'drop-claims.yml') {
         T ($x.Out -notmatch ('RISK  workflow ' + [regex]::Escape($n) + ' started by anyone') -and $x.Report -match ('\| workflow \| ' + [regex]::Escape($n) + ' started by anyone \|[^\n]*; not on thornswood-vps[^\n]*\| ok \|')) "the real $n is not on the production label, and the check says ok"
     }
