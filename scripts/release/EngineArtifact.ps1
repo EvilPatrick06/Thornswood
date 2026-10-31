@@ -149,7 +149,7 @@ $EngineArtifactPackage = 'evilpatrick06/thornswood-engine'
 function New-EnginePackageHttp {
     Add-Type -AssemblyName System.Net.Http
     # Windows PowerShell 5.1 offers TLS 1.0 first unless told.
-    try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
     return {
         param([string]$Url, [hashtable]$Headers, [string]$File)
         # The blob is sent on to GitHub's storage, which is given no token:
