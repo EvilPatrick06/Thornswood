@@ -55,8 +55,11 @@ yes('  and passes only when both are success', /if \[ "\$BUILD" = success \] && 
 // 31 Oct 2026: the gate runs in five shares beside the launcher job, each on
 // a hosted runner of its own, and both builds have the same shares.
 for (const [what, t] of [['main\'s build', build], ['the pull request build', pr]]) {
-  const gj = /\n  gate:\n((?:    .*\n|      .*\n|\n)*?)(?=\n  #|\n  [a-z]+:\n)/.exec(t);
-  const g = gj ? gj[1] : '';
+  // The gate job runs from its key to the next line at the jobs' indent.
+  const at = t.indexOf('\n  gate:\n');
+  const rest = at < 0 ? '' : t.slice(at + '\n  gate:\n'.length);
+  const end = rest.search(/\n  \S/);
+  const g = end < 0 ? rest : rest.slice(0, end + 1);
   yes(what + ' runs the gate in its own job on GitHub\'s hosted Windows runner', /\n    runs-on: windows-latest\n/.test(g) && !/self-hosted/.test(code(g)));
   yes('  in shares, every one running to its end', /\n      fail-fast: false\n      matrix:\n        shard: \[1(, \d+)+\]\n/.test(g));
 }
