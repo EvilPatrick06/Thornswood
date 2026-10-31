@@ -93,6 +93,11 @@ $null = New-Item -ItemType Directory -Force -Path $tmp
 $script:hosts = @()
 
 . $svcLib
+# The hold each stop writes (#5155), which Install-Bot sends in front of
+# Bot-Service.ps1. Pointed at no folder here, so nothing on the machine that
+# runs this is held.
+. (Join-Path $repo 'scripts\vps\ServerHold.ps1')
+$ThornswoodHoldRoot = ''
 $sid = Get-ThornswoodServiceSid 'ThornswoodBot'
 
 try {
@@ -860,7 +865,7 @@ if ($OnWindows) {
     Yes 'with no service, the restart says so by returning nothing, and touches nothing' ($null -eq (Restart-ThornswoodBotService -Name 'ThornswoodBot' -Root $root) -and (At '^Stop-|^Start-') -lt 0)
     $script:svc = [pscustomobject]@{ Name = 'ThornswoodBot'; Status = 'Running' }
     $root = InstallBox 'restart'
-    $out = @(Restart-ThornswoodBotService -Name 'ThornswoodBot' -Root $root)
+    $out = @(Restart-ThornswoodBotService -Name 'ThornswoodBot' -Root $root -WatchRoot '')
     $s1 = At '^Stop-Service ThornswoodBot$'; $s2 = At '^Stop-Process 101$'; $s3 = At '^Start-Service ThornswoodBot$'
     Yes 'the restart is: stop by name, sweep for a copy started by hand, start by name' ($s1 -ge 0 -and $s2 -gt $s1 -and $s3 -gt $s2)
     Yes 'and says each' (($out -join ' ') -match 'stopped the service ThornswoodBot' -and ($out -join ' ') -match 'stopped a copy of the bot no service started, pid 101' -and ($out -join ' ') -match 'started the service ThornswoodBot')

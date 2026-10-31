@@ -172,6 +172,9 @@ $ErrorActionPreference = 'Stop'   # before any file loads, so one that is missin
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here 'Release-List.ps1')
+# The hold it writes while the servers are stopped (#5155), so the watchdog
+# does not start them while their saves are moved.
+. (Join-Path $Here '..\vps\ServerHold.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
@@ -351,7 +354,10 @@ Head 'Stopping the servers'
 #>
 $out = Remote @"
 `$ErrorActionPreference = 'Continue'
+$(Get-ThornswoodHoldScript -Script 'Wipe-Saves.ps1')
 foreach (`$t in @($tasksLit)) {
+  # Held until "Starting them again" below takes it away (#5155).
+  Set-ThornswoodHold -Target `$t -Why 'wiping the saves' -By `$HoldBy
   `$null = & schtasks /end /tn `$t 2>&1
   'ended ' + `$t
 }
@@ -377,7 +383,14 @@ foreach ($l in $out) {
   if ("$l" -like 'STILLRUNNING|*') { $running = $true; Say ("  still running from a server folder after being stopped: process " + "$l".Substring(13)) 'Red' }
   else { Say "  $l" }
 }
-if ($running) { Die 'A server is still running, so nothing was moved. Find what holds the folder (the process above) and run this again.' }
+if ($running) {
+  # Nothing was moved and nothing will start them from here, so the watchdog
+  # watches them again at once (#5155).
+  Remote @"
+$(Get-ThornswoodHoldScript)
+foreach (`$t in @($tasksLit)) { Clear-ThornswoodHold -Target `$t }
+"@ | ForEach-Object { Say "  $_" }
+  Die 'A server is still running, so nothing was moved. Find what holds the folder (the process above) and run this again.' }
 
 Head 'Moving the old storage aside'
 $moved = Remote @"
@@ -438,8 +451,11 @@ if ($bad) {
 Head 'Starting them again'
 $out = Remote @"
 `$ErrorActionPreference = 'Continue'
+$(Get-ThornswoodHoldScript)
 foreach (`$t in @($tasksLit)) { `$null = & schtasks /run /tn `$t 2>&1 }
 Start-Sleep -Seconds 12
+# Started: the watchdog watches them again (#5155).
+foreach (`$t in @($tasksLit)) { Clear-ThornswoodHold -Target `$t }
 foreach (`$r in @($rootsLit)) {
   `$r
   `$cf = Join-Path `$r 'private\characters.json'

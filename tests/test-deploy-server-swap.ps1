@@ -82,6 +82,8 @@ Yes 'Swap.ps1 keeps the blocks that run on the box between their markers' ($a -g
 if ($a -lt 0 -or $b -le $a) { Done }
 $checkBlock = $null
 $swapBlock = $null
+# SwapVars names who holds the server it stops (#5155, ServerHold.ps1).
+. (Join-Path $Here 'scripts\vps\ServerHold.ps1')
 Invoke-Expression $lib.Substring($a, $b - $a)
 $c = $lib.IndexOf('# ==== put-back pick ====')
 $d = $lib.IndexOf('# ==== end put-back pick ====')
@@ -114,6 +116,18 @@ $swapBlock = [IO.File]::ReadAllText((Join-Path $Here 'scripts\deploy\StopAndMove
 Yes 'Swap.ps1 puts ServerFolderTurn.ps1 in front of the swap' (
     $lib.Substring($b).Contains('$swapBlock = $ThornswoodServerFolderTurnText + $swapBlock'))
 $swapBlock = [IO.File]::ReadAllText((Join-Path $Here 'scripts\deploy\ServerFolderTurn.ps1')) + "`r`n" + $swapBlock
+# And the hold (#5155), the same way, pointed at a watchdog folder that is
+# not there, so a run here holds nothing on whatever machine runs it: the
+# box's own C:\Thornswood-Watch is never written by this.
+Yes 'Swap.ps1 puts ServerHold.ps1 in front of the swap and the service swap' (
+    $lib.Substring($b).Contains('$swapBlock = $ThornswoodHoldText + $swapBlock') -and
+    $lib.Contains('$serviceSwapBlock = $ThornswoodHoldText + $serviceSwapBlock'))
+Yes 'the swap holds its server just before the stop and takes the hold away on every way out after it' (
+    $ownSwapBlock.IndexOf('Set-ThornswoodHold -Target $Task') -gt 0 -and
+    $ownSwapBlock.IndexOf('Set-ThornswoodHold -Target $Task') -lt $ownSwapBlock.IndexOf("`nStopOurs") -and
+    ([regex]::Matches($ownSwapBlock, 'Clear-ThornswoodHold -Target \$Task')).Count -eq 3 -and
+    ([regex]::Matches($ownSwapBlock, '(?m)^\s*exit ')).Count -eq ([regex]::Matches($ownSwapBlock.Substring($ownSwapBlock.IndexOf('Set-ThornswoodHold')), '(?m)^\s*exit ')).Count + 2)
+$swapBlock = (Get-ThornswoodHoldScript) + ('$ThornswoodHoldRoot = ''' + (Join-Path ([IO.Path]::GetTempPath()) ('ts-swap-no-watch-' + [Guid]::NewGuid().ToString('N'))) + '''') + "`r`n" + $swapBlock
 Yes 'Deploy-Server.ps1 loads Swap.ps1' ($src -match "\. \(Join-Path \`$Here 'Swap\.ps1'\)")
 # Which settings Deploy-Server takes from the build and which stay the live
 # server's (#1222), and the carry it runs on the box: ServerSettings.ps1.

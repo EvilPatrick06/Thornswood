@@ -146,6 +146,7 @@ $rights = @((RightOf 'stopAndMove'), (RightOf 'readyWait'), (RightOf 'run'))
 if (@($rights | Where-Object { $_ }).Count -eq 3) {
     $resetRun = & {
         $Here = Join-Path $Repo 'scripts\ops'
+        . (Join-Path $Repo 'scripts\vps\ServerHold.ps1')   # its hold goes in front (#5155)
         $stopAndMove = & ([scriptblock]::Create($rights[0]))
         $readyWait = & ([scriptblock]::Create($rights[1]))
         & ([scriptblock]::Create($rights[2]))
@@ -164,6 +165,9 @@ Yes ('B2 it opens the server on the root''s own port, then stops the task, waits
 Yes 'B3 a server still there, or one that could not be opened, moves nothing' (
     $resetRun -and $resetRun.Contains('STOP. The server has not exited, so nothing was thrown away') -and
     $resetRun.Contains('STOP. The server could not be opened to wait for it. Nothing was stopped or thrown away.'))
+Yes 'B3a it holds the server before it stops it, so the watchdog leaves it stopped (#5155)' (
+    (At 'Set-ThornswoodHold -Target $Task') -ge 0 -and (At 'Set-ThornswoodHold -Target $Task') -lt (At 'Stop-ScheduledTask -TaskName $Task') -and
+    $resetRun.LastIndexOf('Clear-ThornswoodHold -Target $Task') -gt (At 'Start-ScheduledTask -TaskName $Task'))
 Yes 'B4 nothing in the reset sleeps a fixed time or knocks on a fixed port from here' (
     $R.text -notmatch 'Start-Sleep -Seconds' -and $R.text -notmatch 'BeginConnect\(\$VpsHost' -and $R.text -notmatch 'Stop-Process')
 Yes 'B5 -UseLocal opens and waits on what it stops' (

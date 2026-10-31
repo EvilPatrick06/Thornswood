@@ -53,6 +53,8 @@
 . (Join-Path $PSScriptRoot 'ServerReadyWait.ps1')
 # Restore-SwapRecord sends its lock for the deploy store (Lock-Folder.ps1).
 . (Join-Path $PSScriptRoot '..\vps\Lock-Folder.ps1')
+# The hold both swap blocks write while they have a server stopped (#5155).
+. (Join-Path $PSScriptRoot '..\vps\ServerHold.ps1')
 
 # ==== deploy-server remote blocks ====
 #
@@ -358,6 +360,11 @@ if ($turnWhy) {
   'SWAP REFUSED'
   exit 1
 }
+# Held on purpose from here until this block ends (#5155, ServerHold.ps1), so
+# the watchdog does not start the old files in the middle of the swap. Every
+# way out below takes the hold away, once the server has been started again or
+# this has given up on it and left it to the watchdog.
+Set-ThornswoodHold -Target $Task -Why ('swapping in new files at ' + $Root) -By $HoldBy
 StopOurs
 $notGone = @($ThornswoodStillRunning) + @($ThornswoodNotHeld)
 if ($notGone.Count -or (Held)) {
@@ -365,6 +372,7 @@ if ($notGone.Count -or (Held)) {
   elseif ($heldWhy) { 'the UDP ports could not be listed after the stop (' + $heldWhy + '), so whether UDP ' + $port + ' let go is not known, and nothing was swapped' }
   else { 'UDP ' + $port + ' is still held by pid ' + ($heldBy -join ', ') + ' after the stop, so nothing was swapped' }
   if (-not $KeepStage) { Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue }
+  Clear-ThornswoodHold -Target $Task
   'SWAP REFUSED'
   exit 1
 }
@@ -433,6 +441,7 @@ if ($moved) {
         catch { 'PRUNE FAILED: could not remove ' + $pd.FullName + ', one of the old copies past the newest 2: ' + $_.Exception.Message }
       }
     }
+    Clear-ThornswoodHold -Target $Task
     'SWAP OK'
     exit 0
   }
@@ -453,6 +462,7 @@ else {
   if ($answerWhy) { 'the last try at ' + $resPort + ' said: ' + $answerWhy }
   if ($blindWhy) { $blindWhy }
 }
+Clear-ThornswoodHold -Target $Task
 if ($clean) {
   # A put-back's stage is the .prev folder it was putting back, full again.
   if (-not $KeepStage) { Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue }
@@ -486,6 +496,7 @@ function SwapVars([string]$farRoot, [string]$taskName, [string]$stageName, [stri
     ('$Wait  = ' + $waitSeconds),
     '$KeepStage = $false',
     $keysLine,
+    ('$HoldBy = ' + (& $q (Get-ThornswoodHoldBy ([IO.Path]::GetFileName($MyInvocation.ScriptName))))),
     '$Want  = [ordered]@{}'
   )
   foreach ($k in @($sums.Keys)) { $lines += ('$Want[' + (& $q $k) + '] = ' + (& $q $sums[$k])) }
@@ -511,6 +522,11 @@ $checkBlock = $ThornswoodRecordShapeText + $checkBlock
 # here, and of the service swap below.
 $ThornswoodStopAndMoveText = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'StopAndMove.ps1')) + "`r`n"
 $swapBlock = $ThornswoodStopAndMoveText + $swapBlock
+# And the hold (#5155): the server stopped on purpose says so, so the watchdog
+# leaves it alone while it is swapped. In front of the swap here, and of the
+# service swap below.
+$ThornswoodHoldText = Get-ThornswoodHoldScript
+$swapBlock = $ThornswoodHoldText + $swapBlock
 # And the server folders' turn (#3247), which the nightly backup takes as
 # well: in front of the game server swap only, the one whose folders it reads.
 $ThornswoodServerFolderTurnText = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'ServerFolderTurn.ps1')) + "`r`n"
@@ -669,6 +685,11 @@ foreach ($rel in @($Dirs)) {
 # started again as it was.
 $ThornswoodStillRunning = @()
 $ThornswoodNotHeld = @()
+# Held on purpose from here until this block ends (#5155, ServerHold.ps1),
+# under the task or service name the watchdog knows it by ($HoldTarget, from
+# ServiceSwapVars), so the watchdog does not start it in the middle of the
+# swap. Both ways out below take the hold away.
+if ($HoldTarget) { Set-ThornswoodHold -Target $HoldTarget -Why ('swapping in new files at ' + $Root) -By $HoldBy }
 StopIt
 $placed = @()
 $aside = @()
@@ -766,6 +787,7 @@ if ($moved) {
         catch { 'PRUNE FAILED: could not remove ' + $pd.FullName + ', one of the old copies past the newest 2: ' + $_.Exception.Message }
       }
     }
+    if ($HoldTarget) { Clear-ThornswoodHold -Target $HoldTarget }
     'SWAP OK'
     exit 0
   }
@@ -780,6 +802,7 @@ PutBack
 StartIt
 if (Healthy) { 'the previous files are back and it is answering again: ' + (Answer) }
 else { 'THE PREVIOUS FILES ARE BACK AND IT STILL IS NOT ANSWERING'; Why }
+if ($HoldTarget) { Clear-ThornswoodHold -Target $HoldTarget }
 if ($clean) {
   if (-not $KeepStage) { Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue }
   Remove-Item -LiteralPath $prevDir -Recurse -Force -EA SilentlyContinue
@@ -790,12 +813,16 @@ if ($clean) {
 }
 exit 1
 '@
-# The stop and the renames in front of it, as in front of $swapBlock above.
+# The stop and the renames in front of it, and the hold, as in front of
+# $swapBlock above.
 $serviceSwapBlock = $ThornswoodStopAndMoveText + $serviceSwapBlock
+$serviceSwapBlock = $ThornswoodHoldText + $serviceSwapBlock
 
 # The values the service blocks run with, the same way SwapVars does it for
 # the game server: quoted once here, every single quote doubled.
-function ServiceSwapVars([string]$farRoot, [string]$stageName, [string]$prevName, [int]$waitSeconds, $sums, [string[]]$parse) {
+# $holdTarget is the task or service name the watchdog knows it by, held while
+# the swap block has it stopped (#5155); '' for a block that stops nothing.
+function ServiceSwapVars([string]$farRoot, [string]$stageName, [string]$prevName, [int]$waitSeconds, $sums, [string[]]$parse, [string]$holdTarget = '') {
   $q = { param($s) "'" + ([string]$s).Replace("'", "''") + "'" }
   $lines = @(
     ('$Root  = ' + (& $q $farRoot.Replace('/', '\'))),
@@ -803,6 +830,8 @@ function ServiceSwapVars([string]$farRoot, [string]$stageName, [string]$prevName
     ('$Prev  = ' + (& $q $prevName)),
     ('$Wait  = ' + $waitSeconds),
     '$KeepStage = $false',
+    ('$HoldTarget = ' + (& $q $holdTarget)),
+    ('$HoldBy = ' + (& $q (Get-ThornswoodHoldBy ([IO.Path]::GetFileName($MyInvocation.ScriptName))))),
     '$Want  = [ordered]@{}'
   )
   foreach ($k in @($sums.Keys)) { $lines += ('$Want[' + (& $q $k) + '] = ' + (& $q $sums[$k])) }

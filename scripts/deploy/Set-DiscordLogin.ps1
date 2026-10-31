@@ -98,6 +98,8 @@ $ErrorActionPreference = 'Stop'   # before any file loads, so one that is missin
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here '..\vps\Send-Secret.ps1')
+# The hold the site's restart writes (#5155), sent in front of Write-BotToken.ps1.
+. (Join-Path $Here '..\vps\ServerHold.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
@@ -316,7 +318,7 @@ $clientSecret = $null; $botToken = $null
 Write-Host ''
 Write-Host 'Writing it to the VPS...'
 if (-not (Test-Path -LiteralPath $writer)) { Write-Host "  missing: $writer" -ForegroundColor Red; exit 1 }
-$wrote = @(Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $payload -Script ((Get-Content -LiteralPath $writer -Raw) + "`n" + @"
+$wrote = @(Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $payload -Script ((Get-ThornswoodHoldScript -Script 'Set-DiscordLogin.ps1') + (Get-Content -LiteralPath $writer -Raw) + "`n" + @"
 `$ErrorActionPreference = 'Stop'
 `$patch = `$null
 if (-not `$ThornswoodSecret) { 'NOTHING ARRIVED on standard input. Nothing written.'; return }
