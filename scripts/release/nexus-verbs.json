@@ -60,7 +60,8 @@
       "params": {
         "Revision": "^[0-9]{1,4}$",
         "Slug": "^[a-z0-9]{1,16}$",
-        "GameDomain": "^[a-z0-9]{1,40}$"
+        "GameDomain": "^[a-z0-9]{1,40}$",
+        "KeepPlugins": "switch"
       }
     },
     "Set-NexusDescription": {

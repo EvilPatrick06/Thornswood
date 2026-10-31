@@ -544,6 +544,7 @@ function Test-OtherServer([string]$rel) { return (Test-ShipOtherServer $rel) }
 # Other people's loose files as well (#1178): never packed, never recorded,
 # never listed as removed. What waits for the collection is asked at the
 # revision this release is built against.
+$script:FeedMoveFrom = 0
 if ($FromFeed) {
     # Nothing here has Vortex to ask: the revision is the one the feed says
     # its last release was built against, which only a collection Ship moves.
@@ -553,9 +554,16 @@ if ($FromFeed) {
     if ($ShipCollectionRevision -le 0) { Die "The $Channel feed names no collection revision, so which held files ship is not known. A collection Ship on One names it. Nothing was built." }
     # The last release's plugin list goes forward, so this release is on the
     # last release's revision, and the feed may only say the recorded one
-    # (#3597): when the collection has moved, the release that carries it is a
-    # Ship from One.
-    $revWhy = Get-ShipCollectionRevisionProblem -RepoDir $RepoDir -Built $ShipCollectionRevision -Source "the $Channel feed's last release" -Remedy 'A release from the feed carries that release''s plugin list, so it cannot move the revision: Ship from One, with Vortex on the recorded revision. Nothing was built.'
+    # (#3597). When the record is ahead, the release moves up to it with the
+    # servers' order as its plugin list (#4069, Get-ShipFeedMoveRevision and
+    # the feed's plugin list block below).
+    $feedMoveTo = Get-ShipFeedMoveRevision -RepoDir $RepoDir -Built $ShipCollectionRevision
+    if ($feedMoveTo) {
+        $script:FeedMoveFrom = $ShipCollectionRevision
+        $ShipCollectionRevision = $feedMoveTo
+        Say ("  the {0} feed's last release is on revision {1}; this release moves it to {2}" -f $Channel, $script:FeedMoveFrom, $feedMoveTo) 'Yellow'
+    }
+    $revWhy = Get-ShipCollectionRevisionProblem -RepoDir $RepoDir -Built $ShipCollectionRevision -Source "the $Channel feed's last release" -Remedy 'A release from the feed moves the revision only up to the recorded one, and only from a checkout with game\data\last-plugin.recipe and last-plugin.json. Nothing was built.'
     if ($revWhy) { Die $revWhy }
 } else {
     $ShipCollectionRevision = Get-ShipCollectionRevision $Root
@@ -881,8 +889,15 @@ if (-not $prev.Count) {
 # no pack moved it. What a Ship from One asks of the list is asked of the
 # server instead: Get-ShipFeedOrderProblem holds it to the order the channel's
 # server loads, read off the box, and Thornswood-Last.esp to that order.
+#
+# A RELEASE THAT MOVES THE REVISION (#4069) carries the servers' order in its
+# place, game\data\last-plugin.json's, written by New-ShipFeedMoveLists
+# (Ship-Rules.ps1) the way the last release's list is, and held to the
+# server below the same way. It goes in the pack and the record as a list
+# from One does, so every launcher takes it.
+$script:FeedMoveLists = $null
 if ($FromFeed) {
-    Head "The last release's plugin list"
+    Head $(if ($script:FeedMoveFrom) { "Revision $ShipCollectionRevision's plugin list" } else { "The last release's plugin list" })
     foreach ($k in @($prev.Keys | Where-Object { $_ -like ':profile:*' -or $_ -like ':order:*' })) { $now[$k] = [string]$prev[$k] }
     $fromPtr = $null
     if (Get-Variable -Name resolved -Scope Script -ErrorAction SilentlyContinue) { $fromPtr = $resolved.Pointer }
@@ -893,6 +908,20 @@ if ($FromFeed) {
     $feedGolden = Join-Path $DistDir 'feed-plugins.txt'
     try { [void](Get-FeedAssetFile (Get-RecordFileUrl ([string]$fromPtr.url) $feedGoldenSha) $feedGoldenSha $feedGolden (Get-FeedStoreSiteDir $SiteDir) $SiteUrl) }
     catch { Die ("The last release's plugin list could not be read back from the site, so nothing was built: " + $_.Exception.Message) }
+    if ($script:FeedMoveFrom) {
+        if (-not $prev.ContainsKey(':golden:loadorder.txt')) { Die "The $Channel feed's last release names no loadorder.txt on the site, so where the game's own plugins go in revision $ShipCollectionRevision's list is not known. Nothing was built." }
+        $feedLoSha = ([string]$prev[':golden:loadorder.txt']).Split(':')[1]
+        $feedLo = Join-Path $DistDir 'feed-loadorder.txt'
+        try { [void](Get-FeedAssetFile (Get-RecordFileUrl ([string]$fromPtr.url) $feedLoSha) $feedLoSha $feedLo (Get-FeedStoreSiteDir $SiteDir) $SiteUrl) }
+        catch { Die ("The last release's loadorder.txt could not be read back from the site, so nothing was built: " + $_.Exception.Message) }
+        try { $script:FeedMoveLists = New-ShipFeedMoveLists $RepoDir $feedGolden $feedLo (Join-Path $DistDir 'feed-move') }
+        catch { Die ("Revision $ShipCollectionRevision's plugin list could not be written, so nothing was built: " + $_.Exception.Message) }
+        $feedGolden = $script:FeedMoveLists.Plugins
+        $now[':profile:plugins.txt'] = (Get-FileHash $script:FeedMoveLists.Plugins -Algorithm SHA256).Hash
+        $now[':profile:loadorder.txt'] = (Get-FileHash $script:FeedMoveLists.LoadOrder -Algorithm SHA256).Hash
+        $now[':order:shippedPlugins'] = Get-ActiveOrderKey $script:FeedMoveLists.Plugins ''
+        Say ("  revision {0}'s list: {1} plugins from game\data\last-plugin.json, after the masters and {2}" -f $ShipCollectionRevision, $script:FeedMoveLists.Enabled.Count, $(if ($script:FeedMoveLists.Own.Count) { ($script:FeedMoveLists.Own.Count.ToString() + ' the game loads on its own') } else { 'nothing the game loads on its own' })) 'Green'
+    }
     $feedEnabled = @([IO.File]::ReadAllLines($feedGolden) | ForEach-Object { $_.Trim() } |
                      Where-Object { $_.StartsWith('*') } | ForEach-Object { $_.Substring(1).Trim() })
     $feedBox = $null
@@ -1283,6 +1312,16 @@ if ($changed.Count -or $removed.Count -or $profileChanged.Count) {
             # three, the same for the installer.
             # From the feed the list goes forward in the record alone (the
             # feed's plugin list block): it did not move, so no pack carries it.
+            # A release that moves the revision from the feed carries its
+            # new list as a pack from One does (#4069).
+            if ($part -eq $groups.Count -and $FromFeed -and $script:FeedMoveLists) {
+                foreach ($f in 'plugins.txt', 'loadorder.txt') {
+                    $src = if ($f -eq 'plugins.txt') { $script:FeedMoveLists.Plugins } else { $script:FeedMoveLists.LoadOrder }
+                    [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $src, "profile/$f", 'Optimal')
+                    New-Item -ItemType Directory -Force -Path $goldenDir | Out-Null
+                    Copy-Item -LiteralPath $src -Destination (Join-Path $goldenDir $f) -Force
+                }
+            }
             if ($part -eq $groups.Count -and -not $FromFeed) {
                 $ownGame = Join-Path $Root 'Game'
                 $isCollection = -not (Test-Path -LiteralPath $ownGame)
@@ -2555,7 +2594,10 @@ elseif ($blank.Count) {
 # logic belongs in one place. So this says whether the list the server is
 # configured with is older than the one just published, which is the whole
 # question, and names the two commands that settle it.
-if ($profileChanged.Count) {
+# From the feed the list was held to the order the server loads before
+# anything was built (the feed's plugin list block), and nothing here has
+# the collection's files to read, so this is a Ship from One's alone.
+if ($profileChanged.Count -and -not $FromFeed) {
     Head 'The server needs this too'
 
     # Not by dates any more. The pack's plugin list goes out in the server's

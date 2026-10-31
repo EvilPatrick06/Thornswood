@@ -181,6 +181,14 @@ names. No script reads them. `THIRD-PARTY.md` and
   and `tests\test-collection-permissions.js` fails on a page not read or a
   plugin from a mod the record does not list. The pages answer a cloud
   session with a 403, so they are read in a browser on One.
+- `collection-dropped.json`: the plugins a server may stop loading when it
+  moves to the revision `collection-plugins.json` names, because that
+  revision takes them out, each with why every form it added can go from a
+  running world (issue #4069). `Deploy-DevGamemode.ps1 -LoadOrder
+  -FromRecord` lets its order leave out these and no other plugin the
+  running server loads, and only while the two name the same revision.
+  Changed by hand in the pull request that moves the records to a new
+  revision.
 - `asset-provenance.json`: the asset provenance register (issue #2177). Every picture, video, sound, font, mesh, texture, interface file and plugin Thornswood hands to people or shows them: where it came from, who made it, its licence or permission, the credit it asks for, who approved it and when, where it is published and its sha256, or which of those is not recorded and who can answer. Files that ship from the game folder but are not in the repository are in it by name, and gallery uploads and the collection's mods are dispositioned. Operator only: nothing that builds a pack, the installer, the launcher or the site reads it. A permission itself is never written in it; an entry says where it is kept. No script writes it: it is changed by hand in the pull request that adds or changes an asset, and `tests	est-asset-provenance.js` fails on a tracked asset with no entry or a changed hash.
 - `merchant-runtime-provenance.md`: the server module built for merchant
   settlement, and why the six client files kept their e6534129 bytes (fork
