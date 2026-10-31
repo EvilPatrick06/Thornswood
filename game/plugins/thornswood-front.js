@@ -8432,16 +8432,17 @@
 
     A classic SkyUI menu keeps its choices in the save, and there is no save
     here, so Apocalypse, AHZmoreHUD, atlas map markers, Skyrim Unbound and
-    chfshVariousActions started from their defaults every session. What a
-    menu writes into a GLOB record can be read from here and put back, and
-    those are the 176 below, out of scripts\mods\Audit-ModMenus.js -v: plugin,
+    chfshVariousActions started from their defaults every session (Atlas
+    leaves the collection with revision 6, #3649, and its menu is no longer
+    kept). What a menu writes into a GLOB record can be read from here and put
+    back, and those are the 78 below, out of scripts\mods\Audit-ModMenus.js -v: plugin,
     editor id, and the id inside the plugin, which does not move when the load
     order does. The gamemode keeps the same table (test-mod-settings.js checks
     the two agree) and refuses any name that is not in it.
 
     READ WHEN THE JOURNAL OPENS AND CLOSES, where the menus live, and once a
     minute for the few a hotkey flips (AHZmoreHUD's widget toggle). Never per
-    frame: a read is 176 native calls. Only what moved since the last read is
+    frame: a read is 78 native calls. Only what moved since the last read is
     sent, as /modset Name=value lines over the chat socket like /place, packed
     under the 400 characters the voice service keeps of a line.
 
@@ -8499,45 +8500,6 @@
       AHZShowInventoryCountWithZero: 0x25831, AHZShowTargetWeight: 0x155dd, AHZShowVW: 0x19112,
       AHZShowWeightClass: 0x11aa2, AHZSideWidgetScale: 0x1b15c, AHZSideWidgetXPercent: 0xdf61,
       AHZSideWidgetYPercent: 0xdf60, AHZToggleState: 0x14b17
-    },
-    'atlas map markers.esp': {
-      ATLASGroupAltarGV: 0x83f, ATLASGroupAltarVanGV: 0x89b, ATLASGroupAnimalDenGV: 0x840,
-      ATLASGroupBLK1GV: 0x841, ATLASGroupBLK2GV: 0x842, ATLASGroupBLK3GV: 0x86d,
-      ATLASGroupBLKLiftsGV: 0x89c, ATLASGroupBYOHHousesGV: 0x89d, ATLASGroupCWCampImpGV: 0x847,
-      ATLASGroupCWCampSonsGV: 0xc72, ATLASGroupCampGV: 0x843, ATLASGroupCampVanGV: 0x89e,
-      ATLASGroupCaravanCampGV: 0x844, ATLASGroupCavesGV: 0x89f, ATLASGroupCityDocksGV: 0x8a0,
-      ATLASGroupCityGV: 0x824, ATLASGroupCityInnGV: 0x845, ATLASGroupCityShopGV: 0x846,
-      ATLASGroupCityStablesGV: 0x8a1, ATLASGroupClearingsGV: 0x8a2, ATLASGroupDB1GV: 0x883,
-      ATLASGroupDB2GV: 0x884, ATLASGroupDB3GV: 0x885, ATLASGroupDB4GV: 0x886,
-      ATLASGroupDG1GV: 0x84d, ATLASGroupDG2GV: 0x84e, ATLASGroupDGFV0GV: 0x84b,
-      ATLASGroupDGFV1GV: 0x848, ATLASGroupDGFV2GV: 0x849, ATLASGroupDGFV3GV: 0x84a,
-      ATLASGroupDGMainGV: 0x8c0, ATLASGroupDGSC1GV: 0x84c, ATLASGroupDGSC2GV: 0x850,
-      ATLASGroupDGSC3GV: 0x851, ATLASGroupDaedricShrinesGV: 0x8a3, ATLASGroupDoomstonesGV: 0x8a4,
-      ATLASGroupDragonGV: 0x852, ATLASGroupDragonLairGV: 0x8a5, ATLASGroupDunExitGV: 0x853,
-      ATLASGroupDwemerRuinsGV: 0x8a6, ATLASGroupFactionCOGV: 0x854, ATLASGroupFactionDBGV: 0x8a8,
-      ATLASGroupFactionDBVanGV: 0x8a9, ATLASGroupFactionMGGV: 0x8a7,
-      ATLASGroupFactionTGVanGV: 0x8aa, ATLASGroupFarmGV: 0x827, ATLASGroupFarmVanGV: 0x8ab,
-      ATLASGroupFishingFreezingGV: 0xc74, ATLASGroupFishingLakeGV: 0xc75,
-      ATLASGroupFishingStreamGV: 0xc76, ATLASGroupFishingUndergroundGV: 0xc77,
-      ATLASGroupFortsGV: 0x8ac, ATLASGroupGiantCampsGV: 0x8ad, ATLASGroupHallDeadGV: 0x855,
-      ATLASGroupImportantGV: 0x856, ATLASGroupImportantTownGV: 0x857,
-      ATLASGroupImportantVanGV: 0x8ae, ATLASGroupInnGV: 0x858, ATLASGroupLandmarkGV: 0x859,
-      ATLASGroupLandmarkVanGV: 0x8af, ATLASGroupLumberMillGV: 0x85a,
-      ATLASGroupLumberMillVanGV: 0x8b0, ATLASGroupMainCitiesGV: 0x8b2,
-      ATLASGroupMainTownsGV: 0x8b3, ATLASGroupMakerStonesGV: 0x8b4, ATLASGroupMineGV: 0x85b,
-      ATLASGroupMineVanGV: 0x8b1, ATLASGroupMntPassesGV: 0x8b5, ATLASGroupMoreCityGV: 0x85c,
-      ATLASGroupMoreCityVanGV: 0x8b6, ATLASGroupMoreTownGV: 0x85d, ATLASGroupNordicRuinsGV: 0x8b7,
-      ATLASGroupOrcHoldsGV: 0x8b8, ATLASGroupPOIGV: 0x85f, ATLASGroupPlayerHomeGV: 0x85e,
-      ATLASGroupRuinGV: 0x860, ATLASGroupShacksGV: 0x8b9, ATLASGroupShipwreckGV: 0x861,
-      ATLASGroupShipwreckVanGV: 0x8ba, ATLASGroupShopGV: 0x862,
-      ATLASGroupShrineAdditionalGV: 0xc7d, ATLASGroupShrineCityGV: 0xc7f,
-      ATLASGroupShrineGV: 0x863, ATLASGroupShrineStepsGV: 0x864, ATLASGroupSkillBookGV: 0x867,
-      ATLASGroupSmallSettlementsGV: 0x8bb, ATLASGroupSpecialLocGV: 0x8c4,
-      ATLASGroupStructuresGV: 0x865, ATLASGroupTempleGV: 0x866, ATLASGroupToSolstheimGV: 0x8bc,
-      ATLASGroupWaterGV: 0x869, ATLAS_CCORDetected: 0x8cb, ATLAS_CorundumToCopperVal: 0x8c6,
-      ATLAS_FishingMarkersEnabled: 0xc78, ATLAS_MalachiteToGlassVal: 0x8c7,
-      ATLAS_MalachiteToMoldaviteVal: 0x8c8, ATLAS_QuicksilverToMithrilVal: 0x8c9,
-      ATLAS_USKPDetected: 0x8ca
     },
     'Skyrim Unbound.esp': {
       DelayDragonLevel1: 0x1209c, DelayDragonLevel2: 0x1209d, DelayDragonMax: 0xfae4,

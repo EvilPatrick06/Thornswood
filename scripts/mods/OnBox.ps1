@@ -201,6 +201,18 @@ if (-not `$launcher) { 'STOP. there is no Python launcher (py) on the box.'; exi
 `$python = (& `$launcher.Source -3 -c 'import sys; print(sys.executable)' | Select-Object -First 1)
 if (-not `$python -or -not (Test-Path -LiteralPath `$python)) { 'STOP. py -3 named no Python on the box.'; exit 2 }
 `$env:PATH = (Split-Path -Parent `$python) + ';' + `$env:PATH
+# Thornswood-Last.esp is this commit's, made from its recipe out of the run's
+# data folder (#2791): the plugin is not in the repository, so what the copy
+# above put there is the server's, made from whichever recipe it last
+# deployed. When this commit's recipe does not make it here (a plugin it
+# reads is another copy, the content plugin of a pull request), the server's
+# stays and the line says so; Build-LastPlugin.py makes this commit's.
+`$lastRecipe = Join-Path `$repo 'game\data\last-plugin.recipe'
+if (Test-Path -LiteralPath `$lastRecipe) {
+  `$lastSaid = @(& `$python (Join-Path `$repo 'scripts\mods\Make-LastPlugin.py') --data `$data --recipe `$lastRecipe 2>&1 | ForEach-Object { "`$_".Trim() } | Where-Object { `$_ })
+  if (`$LASTEXITCODE -eq 0) { 'last      Thornswood-Last.esp made from this commit''s recipe: ' + (`$lastSaid -join ' ') }
+  else { 'last      Thornswood-Last.esp is the server''s copy, because this commit''s recipe does not make it here: ' + (`$lastSaid -join ' ') }
+}
 `$words = @()
 switch ('$kind') {
   '.py' { `$exe = `$python }

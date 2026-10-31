@@ -27,8 +27,9 @@
        one the recipe makes is. Makes names Thornswood-Last.esp only where a
        recipe is.
     4. The committed recipe, game\data\last-plugin.recipe, reads in the
-       launcher's code to the size and sha256 of game\content\Thornswood-Last.esp
-       and to the sources game\data\last-plugin.json counts.
+       launcher's code to the size and sha256 of the plugin
+       game\data\last-plugin.json names, and to the sources it counts. No
+       repository holds the plugin since #2791 step 3.
     5. It compiles at the build's C# version and at C# 5, which Windows
        PowerShell 5.1's Add-Type compiles for scripts\release\Go.ps1.
     6. By the source: the step kinds and the magic are last_recipe.py's;
@@ -191,14 +192,13 @@ namespace Thornswood
             Directory.CreateDirectory(Path.Combine(none, "Data"));
             Yes("  and nothing where no recipe is", !LastPlugin.Makes(none, LastPlugin.Name) && !LastPlugin.HasRecipe(none) && LastPlugin.Expected(none) == null);
 
-            if (args.Length > 2)
+            if (args.Length > 3)
             {
                 LastPlugin.Header head = LastPlugin.ReadHeader(File.ReadAllBytes(args[1]));
-                byte[] plugin = File.ReadAllBytes(args[2]);
-                string psha;
-                using (var h = SHA256.Create()) psha = Hex(h.ComputeHash(plugin));
-                Yes("the committed recipe names the committed plugin's size and sha256 (" + plugin.Length + " bytes, " + psha.Substring(0, 12) + "...)",
-                    head.Size == plugin.LongLength && Hex(head.Sha256) == psha);
+                long size = long.Parse(args[2]);
+                string psha = args[3];
+                Yes("the committed recipe names the size and sha256 last-plugin.json names (" + size + " bytes, " + psha.Substring(0, 12) + "...)",
+                    head.Size == size && Hex(head.Sha256) == psha);
                 Console.WriteLine("sources: " + head.Sources.Count);
             }
             return 0;
@@ -228,9 +228,12 @@ namespace Thornswood
     if (-not $built[$LauncherLangVersion]) { Done }
 
     $recipe = Join-Path $Repo 'game\data\last-plugin.recipe'
-    $plugin = Join-Path $Repo 'game\content\Thornswood-Last.esp'
+    $manifestPath = Join-Path $Repo 'game\data\last-plugin.json'
     $runArgs = @($games)
-    if ((Test-Path -LiteralPath $recipe) -and (Test-Path -LiteralPath $plugin)) { $runArgs += $recipe, $plugin }
+    if ((Test-Path -LiteralPath $recipe) -and (Test-Path -LiteralPath $manifestPath)) {
+        $named = (Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json).plugin
+        $runArgs += $recipe, ([string][int64]$named.size), ([string]$named.sha256).ToLowerInvariant()
+    }
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     $out = & (Join-Path $work ("last-plugin-test-{0}.exe" -f $LauncherLangVersion)) @runArgs 2>&1
     $ErrorActionPreference = $old

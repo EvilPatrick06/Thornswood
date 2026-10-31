@@ -61,7 +61,7 @@ function New-Tree([string]$name, [string]$lo) {
     # Read-JsonFile.ps1 and RecordShape.ps1 too: Deploy-Gamemode loads them
     # under Stop since #3006, so a tree without them stops on the load, where
     # before it printed an error and went on.
-    foreach ($rel in 'scripts\deploy\Deploy-Gamemode.ps1', 'scripts\deploy\MaxOnline.ps1', 'scripts\deploy\ServerOrder.ps1',
+    foreach ($rel in 'scripts\deploy\Deploy-Gamemode.ps1', 'scripts\deploy\MaxOnline.ps1', 'scripts\deploy\ServerOrder.ps1', 'scripts\deploy\LastPluginRecipe.ps1',
                      'scripts\release\BuildStamp.ps1', 'scripts\release\Read-JsonFile.ps1', 'scripts\release\RecordShape.ps1',
                      'records\most-online.json') {
         $to = Join-Path $t $rel

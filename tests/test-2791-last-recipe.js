@@ -12,9 +12,11 @@
   Without the game this runs tests/last-recipe-cases.py (the recipe made
   from small plugins written there, read back, and refused for a copy written
   as our own or a source that differs), and holds the committed recipe to the
-  committed plugin and manifest:
+  manifest. The plugin itself is in no repository since #2791 step 3: each
+  machine makes it from the recipe (scripts/mods/Make-LastPlugin.py), and
+  tests/test-2791-make-last.py makes it from small plugins the same way.
 
-    C1  the recipe names the plugin's size and sha256
+    C1  the recipe names the plugin the manifest names, by size and sha256
     C2  the manifest names the recipe's size and sha256
     C3  every plugin it reads is one the manifest was built against, at
         those bytes
@@ -26,7 +28,6 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const ROOT = path.join(__dirname, '..');
 const RECIPE = path.join(ROOT, 'game', 'data', 'last-plugin.recipe');
-const ESP = path.join(ROOT, 'game', 'content', 'Thornswood-Last.esp');
 const MANIFEST = path.join(ROOT, 'game', 'data', 'last-plugin.json');
 const CASES = path.join(ROOT, 'tests', 'last-recipe-cases.py');
 
@@ -47,7 +48,6 @@ if (!run || run.status !== 0) { console.log(run ? run.stdout + run.stderr : 'no 
 
 const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
 const recipe = fs.readFileSync(RECIPE);
-const plugin = fs.readFileSync(ESP);
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
 let p = 0;
 function varint() {
@@ -64,7 +64,9 @@ yes('C0 it is a version 1 recipe', recipe.slice(0, 5).equals(Buffer.from('TSLR\x
 p = 5;
 const size = recipe.readUInt32LE(p); p += 4;
 const made = recipe.slice(p, p + 32).toString('hex'); p += 32;
-yes('C1 it names the committed plugin, ' + plugin.length + ' bytes', size === plugin.length && made === sha(plugin));
+yes('C1 it names the plugin the manifest names, ' + (manifest.plugin && manifest.plugin.size) + ' bytes',
+    !!manifest.plugin && size === manifest.plugin.size && made === manifest.plugin.sha256);
+yes('C1 and no repository holds the plugin (#2791 step 3)', !fs.existsSync(path.join(ROOT, 'game', 'content', 'Thornswood-Last.esp')));
 yes('C2 the manifest names it', !!manifest.recipe && manifest.recipe.sha256 === sha(recipe) && manifest.recipe.size === recipe.length);
 const built = {};
 for (const row of manifest.builtAgainst) { built[row.name.toLowerCase()] = row; }

@@ -175,7 +175,12 @@ var over = Object.keys(CROPS).filter(function (d) { return CROPS[d].growMinutes 
 check('every wait is under the engine hour', over.length, '0');
 check('cabbage is a novice crop', CROPS[CABBAGE].rank, 'novice');
 check('the orchard is expert', CROPS[APPLE].rank, 'expert');
-check('crop count', Object.keys(CROPS).length, '14');
+// Fourteen until #3469 (#3141) added the six Hearthfires garden planters,
+// each a plot like the field crop it grows.
+['1045e', '1045f', '10460', '110b9', '110ba', '110cd'].forEach(function (id) {
+  check('the Hearthfires planter ' + id + ' is a crop (#3141)', own(CROPS, id + ':HearthFires.esm'), 'true');
+});
+check('crop count', Object.keys(CROPS).length, '20');
 check('tundra cotton is not a farm crop (#626)', own(CROPS, 'bb947:Skyrim.esm'), 'false');
 
 // 2. The rank gate is live (findings 8 and 14).
