@@ -813,8 +813,8 @@ function start(stateDir, ghPort) {
     const unesc = s => s.replace(/&quot;/g, '"').replace(/&#39;/g, '\'').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
     yes('the armed page, through Caddy, posts the manifest to GitHub with the state', r.status === 200 && form && unesc(form[1]) === 'http://127.0.0.1:' + ghPort + '/web/settings/apps/new?state=' + st);
     const mf = form ? JSON.parse(unesc(form[2])) : {};
-    yes('  the manifest: private, administration write, contents read, secrets and environments write for go-public (#4013), variables read, no webhook, back to /github-app/setup/done',
-      mf.public === false && JSON.stringify(mf.default_permissions) === '{"administration":"write","contents":"read","secrets":"write","actions_variables":"read","environments":"write"}' && mf.hook_attributes.active === false &&
+    yes('  the manifest: private, administration write, contents read, secrets and environments write for go-public (#4013), variables read, Actions write for the Ship verbs (#2841), no webhook, back to /github-app/setup/done',
+      mf.public === false && JSON.stringify(mf.default_permissions) === '{"administration":"write","contents":"read","secrets":"write","actions_variables":"read","environments":"write","actions":"write"}' && mf.hook_attributes.active === false &&
       mf.redirect_url === 'https://thornswood.net/github-app/setup/done' && (mf.default_events || []).length === 0);
     yes('  and the page is neither kept nor passed on', /no-store/.test(r.headers['cache-control'] || '') && r.headers['referrer-policy'] === 'no-referrer');
 
