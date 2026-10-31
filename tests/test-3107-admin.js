@@ -61,7 +61,8 @@
 //      switches the fork's private reporting as the record says and leaves
 //      it alone where the record says nothing, switches secret scanning and
 //      push protection in one PATCH of only the keys that differ (push
-//      protection only with scanning, each true or false), reads everything
+//      protection only with scanning, each true or false), switches
+//      immutable releases with PUT or DELETE as the record says, reads everything
 //      back, and a
 //      second run changes nothing; a ruleset the record does not name stops
 //      it and is never deleted; a repository the App is not installed on
@@ -285,6 +286,7 @@ yes('a record with no repositories stops', /names no repositories/.test(sstops({
 yes('another repository stops, named', /names EvilPatrick06\/other, and the only ones/.test(sstops({ repositories: [{ repository: 'EvilPatrick06/other', rulesets: [] }] })));
 yes('a repository named twice stops', /twice/.test(sstops({ repositories: [settings().repositories[1], settings().repositories[1]] })));
 yes('reporting that is not true or false stops', /true or false/.test(sstops({ repositories: [with_(settings().repositories[1], 'private_vulnerability_reporting', 'yes')] })));
+yes('immutable releases that is not true or false stops, named', /immutable_releases is true or false/.test(sstops({ repositories: [with_(settings().repositories[0], 'immutable_releases', 1)] })));
 yes('secret scanning that is not true or false stops, named', /secret_scanning is true or false/.test(sstops({ repositories: [with_(settings().repositories[1], 'secret_scanning', 'on')] })));
 yes('push protection without secret scanning stops', /secret_scanning_push_protection is on only with secret_scanning on too/.test(sstops({ repositories: [with_(settings().repositories[1], 'secret_scanning_push_protection', true)] })) &&
   sstops({ repositories: [Object.assign({}, settings().repositories[1], { secret_scanning: true, secret_scanning_push_protection: true })] }) === '');
@@ -349,6 +351,7 @@ const gh = {
   forkInstalled: true,
   sets: { Thornswood: [], skymp: [] },
   pvr: { Thornswood: false, skymp: false },
+  immutable: { Thornswood: false, skymp: false },
   forkRepo: { full_name: 'EvilPatrick06/skymp', security_and_analysis: { secret_scanning: { status: 'enabled' }, secret_scanning_push_protection: { status: 'enabled' } } },
   nextRuleset: 100,
 };
@@ -411,7 +414,7 @@ function standIn(req, res) {
     }
     let m = /^\/repos\/EvilPatrick06\/Thornswood\/contents\/records\/(.+)$/.exec(P);
     if (m && gh.records[m[1]] && u.searchParams.get('ref') === 'main') return send(200, { content: Buffer.from(JSON.stringify(gh.records[m[1]])).toString('base64') });
-    if (/^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/(rulesets|private-vulnerability-reporting)/.test(P) && !asAdmin()) return send(401, { message: 'Bad credentials' });
+    if (/^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/(rulesets|private-vulnerability-reporting|immutable-releases)/.test(P) && !asAdmin()) return send(401, { message: 'Bad credentials' });
     m = /^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/rulesets$/.exec(P);
     if (m && req.method === 'GET') {
       if (u.searchParams.get('includes_parents') !== 'false') return send(400, { message: 'ask for this repository\'s own' });
@@ -432,6 +435,12 @@ function standIn(req, res) {
       if (req.method === 'GET') return send(200, sets[i]);
       if (req.method === 'PUT') { sets[i] = ghCopy(body, sets[i].id); return send(200, sets[i]); }
       if (req.method === 'DELETE') { sets.splice(i, 1); return send(204); }
+    }
+    m = /^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/immutable-releases$/.exec(P);
+    if (m) {
+      if (req.method === 'GET') return send(200, { enabled: gh.immutable[m[1]], enforced_by_owner: false });
+      if (req.method === 'PUT') { gh.immutable[m[1]] = true; return send(204); }
+      if (req.method === 'DELETE') { gh.immutable[m[1]] = false; return send(204); }
     }
     m = /^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/private-vulnerability-reporting$/.exec(P);
     if (m) {
@@ -755,6 +764,28 @@ function start(stateDir, ghPort) {
     r = await askRs();
     yes('push protection switched off on GitHub is switched on again, sending only that key', r.status === 200 && r.json.changed === 1 && scan(gh.repo) === 'enabled/enabled' &&
       JSON.stringify(patches()[0].body) === '{"security_and_analysis":{"secret_scanning_push_protection":{"status":"enabled"}}}' && has(/^EvilPatrick06\/Thornswood: push protection switched on$/));
+
+    // Immutable releases (Patrick, 26 Oct 2026, #3287).
+    const immu = () => gh.calls.filter(c => c.path === '/repos/' + T + '/immutable-releases' && c.method !== 'GET');
+    gh.settingsRecord = settings();
+    gh.settingsRecord.repositories[0].immutable_releases = true;
+    gh.calls = [];
+    r = await askRs(true);
+    yes('a check says Thornswood\'s immutable releases would be switched on, and changes nothing', r.status === 200 && r.json.differs === 1 && immu().length === 0 &&
+      gh.immutable.Thornswood === false && has(/^EvilPatrick06\/Thornswood: immutable releases would be switched on$/));
+    gh.calls = [];
+    r = await askRs();
+    yes('a run switches them on with one PUT and Thornswood\'s token, and reads it back', r.status === 200 && r.json.ok && r.json.changed === 1 && gh.immutable.Thornswood === true &&
+      immu().length === 1 && immu()[0].method === 'PUT' && immu()[0].auth === 'Bearer ' + gh.aboutToken &&
+      gh.calls.filter(c => c.method === 'GET' && c.path === '/repos/' + T + '/immutable-releases').length === 2 && has(/^EvilPatrick06\/Thornswood: immutable releases switched on$/));
+    yes('  and the fork\'s, which its entry does not name, are not asked about', gh.immutable.skymp === false && !gh.calls.some(c => c.path === '/repos/' + S + '/immutable-releases'));
+    gh.calls = [];
+    r = await askRs();
+    yes('a second run changes nothing', r.status === 200 && r.json.changed === 0 && immu().length === 0 && has(/^EvilPatrick06\/Thornswood: immutable releases is on, as the record says$/));
+    gh.settingsRecord.repositories[0].immutable_releases = false;
+    gh.calls = [];
+    r = await askRs();
+    yes('  and a record that says off switches them off with DELETE', r.status === 200 && r.json.changed === 1 && gh.immutable.Thornswood === false && immu().length === 1 && immu()[0].method === 'DELETE');
     gh.settingsRecord = settings();
 
     const tokenSeen = sign(good());
