@@ -662,6 +662,8 @@ pwsh scripts/mods/Run-OnBox.ps1 scripts/dev/Build-NpcPopulation.py --settings '{
 
 `{data}` is the run's copy of the plugins with this commit's own in their place, `{plugins}` the server's load order as a plugins.txt and `{settings}` as a server-settings.json. The whole rebuild runs the same way (`Run-OnBox.ps1 scripts/mods/Rebuild-ContentTables.ps1 -Data '{data}' -PluginsTxt '{plugins}'`), and writes the tables a game PC writes: every builder reads the load order `game\data\npc-population.json` records, and the crime table reads the script pack in `records\papyrus-scripts.json` (#3105).
 
+From a cloud thread the deploy gate runs that whole rebuild with main's builders: `pwsh scripts/vps/Box-Run.ps1 -Line 'Rebuild-ContentTables -Pull <number> -Head <its full head commit>'` reads only the pull request's data files (the content plugin, `records\recipe-owners.json`, `game\data\last-plugin-policy.json` and `scripts\mods\content-salvaged.json`), never its code, so a change to a builder is merged on its own first. Add `-Stations` when the stations moved: it runs `Build-StationSites.py` and `Add-ContentRecords.py --masters` before the chain.
+
 #### Switch between branches
 
 The folder shows one branch at a time. The files in Visual Studio Code are the branch named in the status bar. Every other local branch stays on this PC with its own commits.

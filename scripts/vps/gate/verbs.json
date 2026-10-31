@@ -157,7 +157,8 @@
       "params": {
         "Server": "^(dev|main)$",
         "Pull": "^[1-9][0-9]{0,5}$",
-        "Head": "^[0-9a-f]{40}$"
+        "Head": "^[0-9a-f]{40}$",
+        "Stations": "switch"
       }
     },
     "Ship-Dev": {
