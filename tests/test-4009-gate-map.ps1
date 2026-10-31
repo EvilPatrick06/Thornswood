@@ -22,8 +22,8 @@
        token from GATE_MAP_TOKEN and leaves none in the environment, and
        nothing hands it one on a command line (#4079);
     4. build.yml no longer runs -Hand: only a main build on the box could,
-       and none runs there since #4983. Its gate step still reads the maps
-       main's builds handed on, with the job's token.
+       and none runs there since #4983. Since 31 Oct 2026 the gate runs in
+       shares that read no map, so none is given the job's token.
 
   Writes only its scratch folder, in the system's temp folder, and deletes it.
 #>
@@ -172,7 +172,9 @@ try {
 # ---- 4. build.yml
 $b = [IO.File]::ReadAllText((Join-Path (Join-Path (Join-Path $repo '.github') 'workflows') 'build.yml')).Replace("`r`n", "`n")
 Yes 'build.yml no longer hands a map on, since no build of it runs on the box (#4983)' (-not $b.Contains('Gate-Map.ps1 -Hand') -and $b.IndexOf("        id: gate`n") -gt 0)
-Yes '  and gives the gate step the job''s token' ($b.Contains('GATE_MAP_TOKEN: ${{ github.token }}'))
+# 31 Oct 2026: the gate runs in shares (the job "gate"), each a share of the
+# whole gate that reads no map, since none can be handed on.
+Yes '  and gives the gate''s shares no token, as they read no map' (-not $b.Contains('GATE_MAP_TOKEN:'))
 Yes '  and the build job may read another run''s job logs' (([regex]::Matches($b, '(?m)^    permissions:\n      actions: read\n      contents: read\n')).Count -ge 1)
 $rg = [IO.File]::ReadAllText((Join-Path (Join-Path (Join-Path $repo 'scripts') 'dev') 'Run-Gate.ps1'))
 Yes 'Run-Gate.ps1 hands Gate-Map.ps1 no token on its command line (#4079)' ($rg.Contains("& (Join-Path `$Here 'Gate-Map.ps1') -Fetch `$maps 2>&1") -and -not ($rg -match '-Token\b'))

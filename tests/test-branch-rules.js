@@ -87,8 +87,12 @@ yml.forEach(function (l) {
 // #1306: the hosted job is the build, the only one since #4983.
 // #3182: "tested" builds nothing; it only asks whether a pull request build
 // already passed main's tree, and the build job waits for its answer.
-const main = jobs.filter(function (j) { return j.id !== 'tested'; });
-yes('build.yml has exactly one build job, so one required check covers it (found ' + main.length + ')', main.length === 1);
+// 31 Oct 2026: "gate" runs the gate harnesses in shares beside the build;
+// the required "Build check result" (#3683, build-pr.yml) needs both.
+const main = jobs.filter(function (j) { return j.id !== 'tested' && j.id !== 'gate'; });
+yes('build.yml has exactly one build job beside its gate (found ' + main.length + ')', main.length === 1);
+const prYml = read('.github/workflows/build-pr.yml');
+yes('  and the required check of a pull request needs the build and the gate both', /\n    name: Build check result\n    needs: \[launcher, gate\]\n/.test(prYml));
 const CHECK = main.length ? main[0].name : null;
 yes('that job is named "Launcher builds" (found "' + CHECK + '")', CHECK === 'Launcher builds');
 

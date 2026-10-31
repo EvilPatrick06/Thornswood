@@ -219,7 +219,7 @@ try {
     'name: Build check', 'on:', '  push:', '    branches: [main]', 'permissions:', '  contents: read',
     'concurrency:', '  group: build-${{ github.ref }}', '  cancel-in-progress: false', 'jobs:',
     '  tested:', '    runs-on: ubuntu-latest', '    steps:', '      - run: echo look',
-    '  launcher:', '    name: Launcher builds', '    needs: tested', "    if: ${{ !cancelled() }}",
+    '  gate:', '    name: Gate harnesses (${{ matrix.shard }} of ${{ strategy.job-total }})', '    needs: tested', "    if: ${{ !cancelled() }}",
     '    runs-on: windows-latest', '    timeout-minutes: 60', '    steps:',
     '      - uses: actions/checkout@x # v7', '      # why the checks run', '      - name: Scan', '        run: |', '          .\\scripts\\dev\\Check-Secrets.ps1',
     '      - name: Run the gate harnesses', '        id: gate', '        run: |', '          .\\scripts\\dev\\Run-Gate.ps1 -Throttle 6',
@@ -234,15 +234,15 @@ try {
     ['the triggers', WF.replace('    branches: [main]', '    branches: [main, dev]')],
     ['the concurrency', WF.replace('cancel-in-progress: false', 'cancel-in-progress: true')],
     ['the tested job', WF.replace('      - run: echo look', '      - run: echo look again')],
-    ['the build job\'s condition and needs', WF.replace("    if: ${{ !cancelled() }}", "    if: ${{ !cancelled() && 1 }}").replace('    needs: tested\n', '    needs: [tested, other]\n')],
+    ['the gate job\'s condition and needs', WF.replace("    if: ${{ !cancelled() }}", "    if: ${{ !cancelled() && 1 }}").replace('    needs: tested\n', '    needs: [tested, other]\n')],
     ['a step after the gate', WF.replace('        run: echo note', '        if: runner.environment == \'github-hosted\'\n        run: echo note')],
-    ['a new job beside the build job', WF.replace('  launcher:\n', '  other:\n    runs-on: ubuntu-latest\n  launcher:\n')],
+    ['a new job beside the gate job', WF.replace('  gate:\n', '  launcher:\n    runs-on: windows-latest\n  gate:\n')],
   ]) { yes('  a change to ' + what + ' keeps it', sh(text) === base); }
   for (const [what, text] of [
     ['the gate step', WF.replace('-Throttle 6', '-Throttle 4')],
     ['a step before the gate', WF.replace('Check-Secrets.ps1', 'Check-Secrets.ps1 -Binary')],
     ['a new step before the gate', WF.replace('      - name: Run the gate harnesses', '      - name: Plant\n        run: echo x > game/x.js\n      - name: Run the gate harnesses')],
-    ['the build job\'s runner', WF.replace('runs-on: windows-latest', 'runs-on: windows-2025')],
+    ['the gate job\'s runner', WF.replace('runs-on: windows-latest', 'runs-on: windows-2025')],
     ['the permissions', WF.replace('  contents: read', '  contents: read\n  actions: read')],
     ['an env for every job', WF.replace('concurrency:', 'env:\n  X: 1\nconcurrency:')],
   ]) { yes('  a change to ' + what + ' changes it', sh(text) !== base); }

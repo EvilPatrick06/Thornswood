@@ -13,13 +13,13 @@
 // WHAT A PULL REQUEST BUILD LEAVES. The last step of build-pr.yml's checks
 // prints one line in its job's log, TESTED-TREE <tree> and the commit, the
 // pull request and its head. It is the last step, so it is only there when
-// every check before it passed, and it runs only when the gate step ran every
-// gate harness (#3114: a pull request built on the VPS may run only those its
-// change can reach, and then main builds in full and is traced), and only on
-// GitHub's hosted runner (#3874: on the VPS a whole gate means the traced map
-// could not serve the pull request, and a main build skipped here is not
-// traced, so the map stayed stale and every pull request after it ran the
-// whole gate as well). It was an
+// every check before it passed. The gate harnesses run beside it in shares
+// (31 Oct 2026), each a share of the whole gate with no map, so the note
+// counts only when every share of the same run passed too. Until then it was
+// written only when the gate step ran every gate harness (#3114: a pull
+// request built on the VPS could run only those its change could reach, and
+// then main built in full and was traced), and only on GitHub's hosted
+// runner (#3874). It was an
 // artifact, tested-tree-<tree>, until #3399: a private repository's artifact
 // storage is counted by the hour, this one used October's whole allowance by
 // 23 Oct 2026 (Patrick's billing report, on #3399), and from then every
@@ -34,7 +34,8 @@
 //
 // WHAT COUNTS AS TESTED. A TESTED-TREE line naming this tree, in the log of a
 // Launcher builds job that ended success with its "Write down the tree these
-// checks passed on" step success, in a run of .github/workflows/build-pr.yml
+// checks passed on" step success, beside every share of the gate ("Gate
+// harnesses (n of N)" for each n, since 31 Oct 2026) ended success, in a run of .github/workflows/build-pr.yml
 // for a pull_request whose head is this repository (a fork's run could name
 // any tree it liked), for the head of a
 // pull request merged as this commit. Anything less, or any answer from
@@ -58,6 +59,24 @@ const WORKFLOW = '.github/workflows/build-pr.yml';
 // so its name never counted for anything and is not read.
 const JOBS = ['Launcher builds'];
 const STEP = 'Write down the tree these checks passed on';
+// The gate runs beside the launcher job in shares since 31 Oct 2026 (build.yml,
+// the job "gate"): "Gate harnesses (n of N)", one job for each n from 1 to N.
+const GATE = /^Gate harnesses \((\d+) of (\d+)\)$/;
+
+// '' when the run's jobs hold every share of the gate, each passed, or why not.
+function gateShares(jobs) {
+  const shares = jobs.map(x => ({ m: GATE.exec(String(x && x.name || '')), x: x })).filter(s => s.m);
+  if (shares.length === 0) { return 'no share of the gate ran in it'; }
+  const of = Number(shares[0].m[2]);
+  const seen = new Set();
+  for (const s of shares) {
+    if (Number(s.m[2]) !== of) { return 'its gate shares do not agree how many there are'; }
+    if (s.x.conclusion !== 'success') { return 'gate share ' + s.m[1] + ' of ' + of + ' did not pass'; }
+    seen.add(Number(s.m[1]));
+  }
+  for (let n = 1; n <= of; n++) { if (!seen.has(n)) { return 'gate share ' + n + ' of ' + of + ' is not in it'; } }
+  return shares.length === of ? '' : 'a share of its gate ran twice';
+}
 const MARK = 'TESTED-TREE';
 const SHA = /^[0-9a-f]{40}$/;
 
@@ -100,10 +119,13 @@ async function find(o) {
         whys.push('run ' + id + ': its head is not this repository'); continue;
       }
       const j = await o.get('repos/' + o.repo + '/actions/runs/' + id + '/jobs?per_page=100');
-      const job = (j && Array.isArray(j.jobs) ? j.jobs : []).find(x =>
+      const all = j && Array.isArray(j.jobs) ? j.jobs : [];
+      const job = all.find(x =>
         JOBS.indexOf(x.name) >= 0 && x.conclusion === 'success' &&
         (Array.isArray(x.steps) ? x.steps : []).some(s => s.name === STEP && s.conclusion === 'success'));
       if (!job) { whys.push('run ' + id + ': no Launcher builds job passed through to its last step'); continue; }
+      const gate = gateShares(all);
+      if (gate) { whys.push('run ' + id + ': ' + gate); continue; }
       const trees = treesInLog(await o.getText('repos/' + o.repo + '/actions/jobs/' + job.id + '/logs'));
       if (trees.indexOf(o.tree) >= 0) {
         return { run: String(r.html_url || ''), why: 'pull request #' + p.number + ' passed every check on this tree' };
@@ -144,4 +166,4 @@ async function main(argv, env, get) {
 }
 
 if (require.main === module) { main(process.argv.slice(2), process.env).then(() => process.exit(0), () => process.exit(0)); }
-module.exports = { find: find, main: main, treesInLog: treesInLog, WORKFLOW: WORKFLOW, JOBS: JOBS, STEP: STEP, MARK: MARK };
+module.exports = { find: find, main: main, treesInLog: treesInLog, gateShares: gateShares, WORKFLOW: WORKFLOW, JOBS: JOBS, STEP: STEP, MARK: MARK, GATE: GATE };

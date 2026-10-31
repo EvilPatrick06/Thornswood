@@ -180,7 +180,7 @@ The words this guide uses. The long alphabetical list, with file names, is [docs
 | Creation Kit | Bethesda's tool for plugin records. A release does not ship the kit itself |
 | Node | The program that runs the website, the voice service, and `node tests\...` |
 | Bot | The Discord bot in the `bot` folder |
-| Launcher builds | The check on a pull request. Merge when it says pass |
+| Build check result | The check on a pull request: it passes only when Launcher builds and every share of the gate passed. Merge when it says pass |
 | Worktree | A second folder on this PC, checked out on its own branch |
 
 ## 1. First Time Setup
@@ -785,7 +785,7 @@ If the stop was a rebase rather than a merge, the last step is `git rebase --con
 
 #### Merge your own pull request
 
-Wait until the check named `Launcher builds` is green on the commit you are merging. Pending means it is still running. A red check means the branch is not ready. Fix it on the same branch and push again.
+Wait until the check named `Build check result` is green on the commit you are merging. It passes only when `Launcher builds` and the five `Gate harnesses (n of 5)` checks all passed. Pending means it is still running. A red check means the branch is not ready. Fix it on the same branch and push again.
 
 ```powershell
 gh pr checks
@@ -794,7 +794,7 @@ git switch main
 git pull
 ```
 
-When `Launcher builds` says pass, and you are confident in the change, merge it yourself. A merge gets no line in #staff-updates, and neither does the release that carries it. On the website the button is **Squash and merge**. GitHub deletes the branch after a squash merge. A green check is required. Merge a pull request you understand. Leave one you do not.
+When `Build check result` says pass, and you are confident in the change, merge it yourself. A merge gets no line in #staff-updates, and neither does the release that carries it. On the website the button is **Squash and merge**. GitHub deletes the branch after a squash merge. A green check is required. Merge a pull request you understand. Leave one you do not.
 
 What you run after the merge depends on what the pull request touched. A dev release is [section 3](#3-how-to-release-to-dev). A main release is [section 4](#4-how-to-release-to-main).
 
@@ -1372,7 +1372,7 @@ The short form of the rules. The same decisions, with the dates they were made, 
   GitHub. A hotfix leaves the dev feed alone. The fix also goes to main
   through its own pull request, or the next main release loses it. 1.1.93 was
   the first, built from 55ac6ef. A hotfix goes out on Patrick's word, the same as any live release, once
-  the fix's Launcher builds is green. Once it is live, its commit is kept as a tag, `live-<version>`,
+  the fix's Build check result is green. Once it is live, its commit is kept as a tag, `live-<version>`,
   and the branch is deleted, so no hotfix branch sits on GitHub: the next
   hotfix starts with `git checkout -b hotfix/<name> live-<version>` from the
   tag of the release that is live. None is kept today: `live-1.1.94` (25 Sep)
@@ -1387,7 +1387,7 @@ The short form of the rules. The same decisions, with the dates they were made, 
   `enforce_admins` is **off**, there is no required check, required
   approving reviews is **0**, and the code owner review is **off**.
   Patrick, that day: "we don't need the required check/reviewer at all anymore for anyone as long as we give verbal agreement and the VPS check goes through". So the rule is ours, not a setting:
-  anybody on the team merges their own pull request once `Launcher builds`
+  anybody on the team merges their own pull request once `Build check result`
   (the build check, on the VPS) is green and they are confident in the
   change. A merge gets no line in #staff-updates (Patrick, 22 Oct: that
   channel is only for what staff must act on). Nobody waits for Patrick. What GitHub does hold write
@@ -1396,7 +1396,7 @@ The short form of the rules. The same decisions, with the dates they were made, 
   to the admin account while `enforce_admins` is off.
   Because nothing enforces the build check, it has to be kept by hand: on 25 Sep 35 pull
   requests were merged with their VPS build red and 18 with no build at all,
-  and main went red with them. Wait for `Launcher builds` to say pass before
+  and main went red with them. Wait for `Build check result` to say pass before
   merging, every time, including your own and including a Claude's. The last
   GitHub setting, "require branches to be up to date" with no check listed,
   was removed on 27 Sep at Patrick's word ("we use the VPS's build checker"),
@@ -1544,20 +1544,24 @@ The short form of the rules. The same decisions, with the dates they were made, 
   `.github/workflows/build.yml`. build-pr.yml is generated from build.yml:
   change build.yml, then run `node scripts/dev/Build-PrWorkflow.js`
   (`tests\test-1306-pr-workflow.js` fails while the two differ). It is one job
-  of named steps, and it builds only; nothing is published. It scans for
+  of named steps beside the gate's five shares, and it builds only; nothing is
+  published. It scans for
   secrets, parses every PowerShell script and game script, checks the
   writing rules (see Words), the ownership page (`tests\test-ownership.js`,
   issue #752), the names that must stay out, that the engine is one commit and
-  the high-risk records, runs the gate harnesses (every `tests\test-*.js` and
-  `tests\test-*.ps1` that `tests\gate-excluded.txt` does not name, side by side
-  through `scripts\dev\Nightly-Harnesses.ps1`, issues #3009 and #3114) and the
-  voice service's health harness, checks our plugins are clean, the launcher
+  the high-risk records, runs the voice service's health harness, checks our plugins are clean, the launcher
   window and its UI thread, that the Python names only what exists (ruff,
   issue #1343) and the count of silent catches, and builds the launcher with
   MSBuild from its project files, held to its sources
-  (`tests\test-498-msbuild.ps1`, issue #498).
-- The check is **Launcher builds**, on GitHub's hosted Windows runner, and on
-  a pull request **Build check result** passes only when it did (#3683).
+  (`tests\test-498-msbuild.ps1`, issue #498). Beside it, the job "gate" runs
+  the gate harnesses (every `tests\test-*.js` and `tests\test-*.ps1` that
+  `tests\gate-excluded.txt` does not name, side by side through
+  `scripts\dev\Nightly-Harnesses.ps1`, issues #3009 and #3114) in five shares
+  on five hosted runners at once, `Gate harnesses (1 of 5)` to `(5 of 5)`,
+  so a pull request's checks take under ten minutes.
+- The checks are **Launcher builds** and the five **Gate harnesses**, on
+  GitHub's hosted Windows runners, and on a pull request **Build check
+  result** passes only when all of them did (#3683).
   The repository is public since 30 Oct 2026, so hosted minutes are free, and
   nothing builds on the VPS any more: no fallback job and no `BUILD_RUNNER`
   switch (#4983). A push
@@ -1731,7 +1735,7 @@ Ship already posts the note. These commands send nothing. They show what a secon
 
 ### What any developer may do
 
-Decided for the whole team: any developer may do every one of these, except the ones that change what is live. A main release, a hotfix and a live server or gamemode deploy go out only on Patrick's word, by whoever he names (Patrick, 30 Oct; How work moves). Confidence in the change, and a green `Launcher builds` check on the exact commit, are the gates for a merge. A dev release, a dev deploy, and a news post are the same people. Dev and Main each have one shared feed and one shared server, and the last Ship on a channel wins.
+Decided for the whole team: any developer may do every one of these, except the ones that change what is live. A main release, a hotfix and a live server or gamemode deploy go out only on Patrick's word, by whoever he names (Patrick, 30 Oct; How work moves). Confidence in the change, and a green `Build check result` check on the exact commit, are the gates for a merge. A dev release, a dev deploy, and a news post are the same people. Dev and Main each have one shared feed and one shared server, and the last Ship on a channel wins.
 
 The machine that runs `Ship.ps1` still has to sign the build. `records\signing\signing.json` has to be present and enabled, and the launcher tip has to be signed by the certificate the launcher already trusts. `.\scripts\release\Setup-ShipMachine.ps1` is how a machine gets there. Shipping from another machine, in First Time Setup, says which Azure sign-in can sign.
 
