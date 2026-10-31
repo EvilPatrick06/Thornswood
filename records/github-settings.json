@@ -6,7 +6,7 @@
   },
   "workflow_token": {
     "default_workflow_permissions": "read",
-    "can_approve_pull_request_reviews": false
+    "can_approve_pull_request_reviews": true
   },
   "sharing": {
     "access_level": "none"

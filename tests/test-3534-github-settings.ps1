@@ -101,7 +101,7 @@ function Matching {
 $d = @(Compare-GitHubSettings $record (Matching))
 Yes ("readings that match the record: nothing ($($d -join '; '))") ($d.Count -eq 0)
 $r = Matching
-$r.workflow_token = [pscustomobject]@{ default_workflow_permissions = 'write'; can_approve_pull_request_reviews = $false }
+$r.workflow_token = [pscustomobject]@{ default_workflow_permissions = 'write'; can_approve_pull_request_reviews = $record.workflow_token.can_approve_pull_request_reviews }
 $d = @(Compare-GitHubSettings $record $r)
 Yes 'a workflow token that writes by default: one line naming it' ($d.Count -eq 1 -and $d[0] -eq 'workflow_token.default_workflow_permissions is write, and the record says read')
 $r = Matching

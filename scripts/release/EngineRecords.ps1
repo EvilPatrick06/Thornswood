@@ -50,7 +50,7 @@ function New-EngineRecordsBundle([string]$Repo) {
         if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { throw "there is no records\$t to hand back" }
         $files['records/' + $t] = [IO.File]::ReadAllBytes($p)
     }
-    $texts = Join-Path $Repo 'records\client-licences'
+    $texts = Join-Path (Join-Path $Repo 'records') 'client-licences'
     foreach ($f in @(Get-ChildItem -LiteralPath $texts -File -ErrorAction SilentlyContinue)) { $files['records/client-licences/' + $f.Name] = [IO.File]::ReadAllBytes($f.FullName) }
     [string[]]$names = @($files.Keys)
     [Array]::Sort($names, [StringComparer]::Ordinal)
@@ -107,11 +107,11 @@ function Get-EngineRecordsCommit($Files) {
 # Writes the bundle's records into the checkout at $Repo: the three records
 # over the checkout's, and records\client-licences\ replaced whole.
 function Save-EngineRecords($Files, [string]$Repo) {
-    $texts = Join-Path $Repo 'records\client-licences'
+    $texts = Join-Path (Join-Path $Repo 'records') 'client-licences'
     if (Test-Path -LiteralPath $texts) { Remove-Item -LiteralPath $texts -Recurse -Force }
     $null = New-Item -ItemType Directory -Force -Path $texts
     foreach ($n in @($Files.Keys)) {
-        $to = Join-Path $Repo ($n.Replace('/', '\'))
+        $to = Join-Path $Repo ($n.Replace('/', [IO.Path]::DirectorySeparatorChar))
         [IO.File]::WriteAllBytes($to, $Files[$n])
     }
 }
