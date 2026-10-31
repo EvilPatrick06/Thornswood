@@ -43,7 +43,10 @@
 
   WHAT STAYS OPEN, each said by number:
     - an issue whose merge the shipped commit does not contain: its fix is not
-      on the main server yet, so the next main Ship that carries it closes it;
+      on the main server yet, so the next main Ship that carries it closes it.
+      That merge has to be on main, though: one that is not, such as an id from
+      before main's history was rewritten (#3684), no release will ever carry,
+      so it is a stop that names the comment to put the merge's id on main in;
     - an issue in Done with neither a done-on-merge comment nor a "Fixed by"
       line: nothing says which merge finishes it, so this cannot tell whether
       the release carries it, and whoever moved it there closes it.
@@ -274,15 +277,36 @@ foreach ($card in $done) {
     }
 
     $a = Invoke-Git @('merge-base', '--is-ancestor', $merge, $shipped)
-    if ($a.Code -eq 1 -or ($a.Code -ne 0 -and (Invoke-Git @('rev-parse', '--verify', '--quiet', ($merge + '^{commit}'))).Code -ne 0)) {
-        # Not an ancestor, or a commit this full checkout does not hold, which
-        # cannot be in the history of one it does.
-        Say ("  #{0}: stays open, pull request #{1}'s merge {2} is not in this release" -f $n, $pr, $merge) 'DarkGray'
-        $notCarried.Add("#$n"); continue
-    }
-    if ($a.Code -ne 0) {
+    $held = (Invoke-Git @('rev-parse', '--verify', '--quiet', ($merge + '^{commit}'))).Code -eq 0
+    if ($a.Code -ne 0 -and $held -and $a.Code -ne 1) {
         Say ("  #{0}: git could not say whether {1} carries {2}: {3}" -f $n, $shipped.Substring(0, 12), $merge, (($a.Lines | Select-Object -Last 1) -join '')) 'Red'
         $trouble.Add("#$n"); continue
+    }
+    if ($a.Code -ne 0) {
+        # Not in this release. That is only "not yet" when the merge is on
+        # main: after the shipped commit in this checkout, or else on main as
+        # GitHub has it (a merge newer than this checkout's fetch, or a
+        # release built off main's line). A merge that is not on main at all
+        # is never carried by any release, so the issue would stay open for
+        # ever without a word: the 21 issues in Done whose comments named
+        # merge ids from before main's history was rewritten (#3684) did
+        # exactly that through the main Ship of 31 Oct. Said as a stop instead.
+        $onMain = $held -and (Invoke-Git @('merge-base', '--is-ancestor', $shipped, $merge)).Code -eq 0
+        $why = ''
+        if (-not $onMain) {
+            try {
+                $cmp = Invoke-GitHub 'GET' ("repos/$GitHubRepo/compare/$merge...main?per_page=1") $null
+                $status = [string]$cmp.status
+                $onMain = $status -eq 'ahead' -or $status -eq 'identical'
+                if (-not $onMain) { $why = "GitHub says main and it have $status" }
+            } catch { $why = $_.Exception.Message }
+        }
+        if (-not $onMain) {
+            Say ("  #{0}: $whose names merge {1}, which is not on main ({2}). Its id is from before main's history was rewritten, or wrong. Put the id that merge has on main in that comment, then run this again." -f $n, $merge, $why) 'Red'
+            $trouble.Add("#$n"); continue
+        }
+        Say ("  #{0}: stays open, pull request #{1}'s merge {2} is not in this release" -f $n, $pr, $merge) 'DarkGray'
+        $notCarried.Add("#$n"); continue
     }
 
     if ($Check) {
