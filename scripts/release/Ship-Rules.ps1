@@ -321,8 +321,8 @@ $ShipOldSkyUIScripts = @(
 $ShipUiAssetsRel = 'Data\Platform\UI\thornswood-ui-assets.txt'
 $ShipUiHashedPattern = '^[0-9a-f]{8,32}\.(ttf|woff2?|eot|otf|svg|png|jpe?g|gif|wav|mp3|ogg|webp)$'
 # One record, records\ui-gone.json: the 37 Daedric names and sha256 values,
-# and the 46 unused fork names (41 svgs and bg.png, and the four commercial
-# faces of #1317). OwnGame.Foreign reads the same file (Build-Launcher
+# and the 48 unused fork names (41 svgs and bg.png, the four commercial
+# faces of #1317, and Bankir-Retro and icomoon, which fork #41 took out). OwnGame.Foreign reads the same file (Build-Launcher
 # embeds it). A second hand-copied list here would drift.
 $ShipUiGoneRecord = Join-Path $PSScriptRoot '..\..\records\ui-gone.json'
 if (-not (Test-Path -LiteralPath $ShipUiGoneRecord -PathType Leaf)) {
