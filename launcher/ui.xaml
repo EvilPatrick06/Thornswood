@@ -762,6 +762,15 @@
                       </StackPanel>
                     </Border>
                   </StackPanel>
+
+                  <StackPanel x:Name="QuickKeysCard" Visibility="Collapsed" Margin="0,18,0,0">
+                    <TextBlock Text="In game" Style="{StaticResource Eyebrow}"/>
+                    <Border Style="{StaticResource Slab}" Padding="14,12">
+                      <StackPanel x:Name="QuickKeys"/>
+                    </Border>
+                    <TextBlock Style="{StaticResource Small}" Margin="0,8,0,0" TextWrapping="Wrap"
+                               Text="Every key is changed in the game, on Settings at the foot of the help panel and of the K, P and J panels."/>
+                  </StackPanel>
                 </StackPanel>
             </Grid>
 
