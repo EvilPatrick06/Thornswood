@@ -968,7 +968,7 @@ if ($FromStore -and $script:LastMake) {
         $null = Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script ("New-Item -ItemType Directory -Force -Path '" + $lastBox.Run + "\reads', '" + $lastBox.Run + "\made' | Out-Null")
         foreach ($src in $script:LastReads) { Send-ThornswoodArtifactFile $src $target $ssh ($lastBox.Far + '/reads/' + (Split-Path -Leaf $src)) }
         $made = Invoke-ThornswoodLastPluginMake -Target $target -SshArgs $ssh -RepoDir (Join-Path $Here '..\..') `
-            -Reads @(($lastBox.Run + '\reads'), $VpsRoot.TrimEnd('\') + '\plugins') -Into ($lastBox.Run + '\made') -Want $script:LastMake
+            -Reads @(($lastBox.Run + '\reads'), ($VpsRoot.TrimEnd('\') + '\plugins')) -Into ($lastBox.Run + '\made') -Want $script:LastMake
     } catch {
         $null = Close-ThornswoodOnBoxFolder $lastBox
         Die ($_.Exception.Message + '. The server up there was not touched.')
