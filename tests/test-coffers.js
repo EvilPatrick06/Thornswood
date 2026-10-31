@@ -229,6 +229,10 @@ if (postBlock !== null && wordsBlock !== null) {
   yes('ordinary goods pass every container without consulting its property rules (#2298)',
       context.mp.onPutItem(111, 222, 15, 3) === undefined &&
       context.mp.onPutItem(333, 222, 12, 1) === undefined);
+  const putHook = (code.match(/mp\.onPutItem = guard\('onPutItem', function \([^)]*\) \{[\s\S]*?\n\}\);/) || [''])[0];
+  yes('and it asks the property block nothing: no container has a rule of its own (#2298); only the cuffs on a prisoner refuse a put (#2573)',
+      putHook !== '' && !/prop\.putIn|__thornswoodProperty|putIn\(/.test(putHook) &&
+      /__thornswoodCuffs/.test(putHook) && /mayLetGo\(/.test(putHook));
   yes('the board words are in the one list, and /box is not',
       /'\/evict', '\/rent',/.test(code) && /'\/notice', '\/job', '\/board',/.test(code) && !/'\/box'/.test(code));
   yes('and the dispatcher routes them, and never /box',
