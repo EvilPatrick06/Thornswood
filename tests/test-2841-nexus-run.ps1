@@ -157,7 +157,7 @@ if (Test-Path -LiteralPath (Join-Path $Repo $esp)) {
     $z.Dispose()
     Yes '  and its bytes are the repository''s' $same
     $f = New-NexusRunPack $Repo 'scripts' @('vps/gate') 'gate.zip' (Join-Path $T 'pc') $when
-    Yes 'a folder packs every file git tracks under it' ((($f.Entries) -join ',') -eq 'vps/gate/Gate.ps1,vps/gate/GateBroker.ps1,vps/gate/GateRules.ps1,vps/gate/verbs.json')
+    Yes 'a folder packs every file git tracks under it' ((($f.Entries) -join ',') -eq 'vps/gate/Gate.ps1,vps/gate/GateBroker.ps1,vps/gate/GateRules.ps1,vps/gate/Update-Gate.ps1,vps/gate/verbs.json')
 } else { Skip "the pack: $esp is not in this checkout" }
 $threw = $false; try { [void](New-NexusRunPack $Repo 'tests' @('no-such-file.esp') 'x.zip' (Join-Path $T 'pd') ([DateTimeOffset]::UtcNow)) } catch { $threw = $true }
 Yes 'a file git does not track is refused' $threw
