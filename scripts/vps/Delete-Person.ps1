@@ -435,13 +435,14 @@ function want(f, kind) {
 // game\gamemode.js reads it), with these profiles and form ids merged in and
 // what was done cleared, so every part runs for the new ids too. Its actors
 // are runtime form ids (#2870); a list still holding local ids, the shape
-// from before, is converted first, never merged into.
+// from a build before #2870, is not read and never merged into: it waits for
+// a person (docs\GAMEMODE.md).
 function mergeList(lf, P, A) {
   if (!lf.missing && !(isObj(lf.value) && Array.isArray(lf.value.profiles))) {
     stop(lf.p + ' is not a list of deleted characters, so nothing was changed');
   }
   if (!lf.missing && lf.value.actors !== undefined && !(Array.isArray(lf.value.actors) && lf.value.actors.every(isFormId))) {
-    stop(lf.p + ' holds form ids in the old shape (#2870). Run scripts\\ops\\Convert-FormIdShape.js on that server, stopped, then this again. Nothing was changed');
+    stop(lf.p + ' holds form ids in the old shape, from a build before #2870, and is not read; docs\\GAMEMODE.md says what to do. Nothing was changed');
   }
   const was = lf.missing ? {} : lf.value;
   const ids = (xs) => (Array.isArray(xs) ? xs : []).map(Number).filter((x) => Number.isSafeInteger(x) && x > 0);

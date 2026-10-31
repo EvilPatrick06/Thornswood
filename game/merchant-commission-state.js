@@ -23,8 +23,8 @@ function isFormId(n) {
 // A runtime character (formDesc the local hex alone) owns by its runtime form
 // id, [0xff000000 | local, '', profile]; a placed form (hex:plugin) keeps
 // [local, plugin, profile]. The merchant ledger stores these strings, so its
-// version is 2 from #2870 and scripts\ops\Convert-FormIdShape.js turned the
-// version 1 owners [local, '', profile] into this shape.
+// version is 2 from #2870. A version 1 ledger, whose owners were
+// [local, '', profile], is not read: the alpha reset replaces it.
 function owner(human) {
  if(!human||!integer(human.profileId,1,MAX_GOLD)||typeof human.desc!=='string')return '';
  const match=/^([0-9a-f]{1,6})(?::([^:/\\\x00-\x1f\x7f]+\.(?:esm|esp|esl)))?$/i.exec(human.desc);

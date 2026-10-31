@@ -288,7 +288,7 @@ try {
     $oldShape = '{"profiles":[1],"actors":[2561]}'
     Put $lst $oldShape
     $c = Run (@('-DiscordId', $ME, '-Delete', '-By', 'Tester') + $roots)
-    Yes 'a list of deleted characters in the old shape refuses the run, naming the converter, and is left as it is (#2870)' ($c -eq 1 -and (Said 'deleted-characters\.json holds form ids in the old shape \(#2870\)\. Run scripts\\ops\\Convert-FormIdShape\.js') -and (Get $lst) -eq $oldShape)
+    Yes 'a list of deleted characters in the old shape refuses the run, saying it is not read and where to look, and is left as it is (#2870)' ($c -eq 1 -and (Said 'deleted-characters\.json holds form ids in the old shape, from a build before #2870, and is not read; docs\\GAMEMODE\.md says what to do\. Nothing was changed') -and (Get $lst) -eq $oldShape)
     Remove-Item -LiteralPath $lst -Force
     $pend = Join-Path $Dev ('world-before-' + $Wipe + '\changeForms\.pending-batch')
     Put $pend '{}'

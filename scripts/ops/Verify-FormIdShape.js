@@ -2,13 +2,18 @@
 /*
   Verify-FormIdShape.js
 
-      node scripts\ops\Verify-FormIdShape.js --server <folder> [--before <file>]
+      node scripts\ops\Verify-FormIdShape.js --server <folder>
 
-  Read only. Counts, register by register, how many records name a character
-  by its runtime form id (0xff000000 | local, the one shape since #2870) and
-  how many by anything else, in the game server's privDir:
+  Read only. The deploy that carries #2870 runs it first on each server, with
+  that game server stopped, to know whether the server holds a version 1
+  merchant ledger and whether its release list names characters by the old
+  shape (docs\GAMEMODE.md says what is done with each). It counts, register
+  by register, how many records name a character by its runtime form id
+  (0xff000000 | local, the one shape since #2870) and how many by anything
+  else, in the game server's privDir:
 
-    list        deleted-characters.json actors: full, local, other
+    list        deleted-characters.json actors: full, local (the old shape),
+                other
     embassy     embassy.json rows (both rolls): full, local, other
     dungeon     dungeon-rewards-ledger.json chests: full, local, other,
                 released (an actor of 0, let go of by the release list)
@@ -21,14 +26,9 @@
                 owners full, local (the old [local, '', profile]), plugin
                 (a placed form, kept as it is) or other
 
-  Run it before scripts\ops\Convert-FormIdShape.js, sending what it prints to
-  a file, and after it with --before that file. With --before it exits 1 when
-  a register holds fewer records than it did, when an old shape is left
-  (local actors, desc supply waits or local owners), when the merchant ledger
-  is not version 2 or its sha256 does not match, or when a file cannot be
-  read. Without --before it exits 1 only on a file it cannot read. Run the
-  after check before the server starts again: a start lets go of the names
-  on the release list, so its counts fall and the list may go.
+  A merchants version of 1 is a ledger the gamemode refuses; list.actors.local
+  above 0 is a release list it does not read. Exits 1 on a file it cannot
+  read, 0 otherwise.
 
   Prints one JSON object. It writes nothing.
 */
@@ -172,51 +172,16 @@ function count(server) {
   return out;
 }
 
-const total = (o) => (o ? Object.keys(o).reduce((s, k) => s + o[k], 0) : 0);
-
-/* What is wrong with after, given before. An empty list is a pass. */
-function compare(before, after) {
-  const why = [];
-  for (const reg of ['list', 'embassy', 'dungeon', 'cargo', 'merchants']) {
-    if (after[reg] && after[reg].unreadable) why.push(reg + ' cannot be read: ' + after[reg].unreadable);
-  }
-  for (const reg of ['list', 'embassy', 'dungeon', 'cargo']) {
-    const b = before[reg] && before[reg].actors, a = after[reg] && after[reg].actors;
-    if (b && total(a) < total(b)) why.push(reg + ' held ' + total(b) + ' actors and holds ' + total(a));
-    if (a && a.local) why.push(reg + ' still holds ' + a.local + ' old shape actors');
-  }
-  const b = before.merchants || {}, a = after.merchants || {};
-  if (a.present && !a.unreadable) {
-    if (a.version !== 2) why.push('the merchant ledger is version ' + a.version + ', not 2');
-    if (!a.sha256) why.push('the merchant ledger does not match its sha256');
-    if (a.supply.desc) why.push('the merchant ledger still holds ' + a.supply.desc + ' supply waits keyed by formDesc');
-    if (a.owners.local) why.push('the merchant ledger still holds ' + a.owners.local + ' old shape commission owners');
-    if (b.supply && total(a.supply) < total(b.supply)) why.push('the merchant ledger held ' + total(b.supply) + ' supply waits and holds ' + total(a.supply));
-    if (b.owners && total(a.owners) < total(b.owners)) why.push('the merchant ledger held ' + total(b.owners) + ' commission records and holds ' + total(a.owners));
-    if (b.entries !== undefined && a.entries < b.entries) why.push('the merchant ledger held ' + b.entries + ' merchants and holds ' + a.entries);
-  } else if (b.present && !a.present) why.push('the merchant ledger is gone');
-  return why;
-}
-
-module.exports = { formIdOf, isFormId, count, compare };
+module.exports = { formIdOf, isFormId, count };
 
 if (require.main === module) {
   const args = process.argv.slice(2);
-  const at = args.indexOf('--server');
-  const server = at >= 0 ? args[at + 1] : '';
-  const bt = args.indexOf('--before');
-  if (!server || (bt >= 0 && !args[bt + 1]) || args.length !== (bt >= 0 ? 4 : 2)) {
-    console.error('Usage: node scripts\\ops\\Verify-FormIdShape.js --server <folder> [--before <file>]');
+  if (args.length !== 2 || args[0] !== '--server' || !args[1]) {
+    console.error('Usage: node scripts\\ops\\Verify-FormIdShape.js --server <folder>');
     process.exit(2);
   }
-  const now = count(server);
-  if (bt < 0) {
-    console.log(JSON.stringify(now, null, 2));
-    const bad = now.unreadable || ['list', 'embassy', 'dungeon', 'cargo', 'merchants'].some((k) => now[k] && now[k].unreadable);
-    process.exit(bad ? 1 : 0);
-  }
-  const before = JSON.parse(fs.readFileSync(args[bt + 1], 'utf8').replace(/^\uFEFF/, ''));
-  const why = now.unreadable ? ['server-settings.json cannot be read'] : compare(before, now);
-  console.log(JSON.stringify({ before, after: now, result: why.length ? 'failed' : 'passed', why }, null, 2));
-  process.exit(why.length ? 1 : 0);
+  const now = count(args[1]);
+  console.log(JSON.stringify(now, null, 2));
+  const bad = now.unreadable || ['list', 'embassy', 'dungeon', 'cargo', 'merchants'].some((k) => now[k] && now[k].unreadable);
+  process.exit(bad ? 1 : 0);
 }

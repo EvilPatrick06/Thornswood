@@ -37597,8 +37597,9 @@ log('gamemode loaded:',
   An actor is the character's runtime form id, 0xff000000 | the local hex its
   change form's formDesc holds (formDesc "a01" is 0xff000a01), the one number
   every register keeps (#2870, formIdOf below, game\form-id.js). A list with
-  an actor outside that range is the old shape, from before #2870, and is not
-  read: scripts\ops\Convert-FormIdShape.js turns it into this one.
+  an actor outside that range is the old shape, from a build before #2870,
+  and is not read: nothing is let go and the list is left as it is, for a
+  person (docs\GAMEMODE.md says what to do; nothing converts it).
 
   The part "saves" goes first, before the engine has started:
   server-log.js, which the task starts the server under, deletes their change
@@ -37721,8 +37722,9 @@ log('gamemode loaded:',
     if (!ok) {
       var old = !!list && typeof list === 'object' && Array.isArray(list.actors) &&
         list.actors.some(function (n) { return Number.isSafeInteger(n) && n > 0 && n <= 0xffffff; });
-      rlog(file + (old ? ' holds form ids in the old shape (#2870; scripts\\ops\\Convert-FormIdShape.js converts it)'
-        : ' is not a list of deleted characters') + ', so nothing was let go and it is left as it is');
+      rlog(file + (old ? ' holds form ids in the old shape, from a build before #2870, and is not read'
+        : ' is not a list of deleted characters') + ', so nothing was let go and it is left as it is' +
+        (old ? '; docs\\GAMEMODE.md says what to do' : ''));
       return st;
     }
     var P = {}, A = {};
@@ -79360,10 +79362,12 @@ function createNpcMerchantPurses(api,data,storage) {
   }
   // Version 2 from #2870: supply waits and commission owners name a runtime
   // character by its runtime form id. A version 1 ledger keyed them by
-  // formDesc and local form id, and is refused until
-  // scripts\ops\Convert-FormIdShape.js has turned it into version 2.
+  // formDesc and local form id. It is refused and never read: in the alpha
+  // nothing is carried over, so the deploy replaces it with the fresh
+  // version 2 ledger scripts\ops\New-AlphaMerchantLedger.js prints
+  // (docs\GAMEMODE.md), and merchant stock and purses start again.
   if(ledger && ledger.version===1)
-    throw new Error('Saved merchant ledger is version 1, from before #2870; run scripts\\ops\\Convert-FormIdShape.js with the server stopped');
+    throw new Error('Saved merchant ledger is version 1, from before #2870, and is not read; with this server stopped, replace it with what node scripts\\ops\\New-AlphaMerchantLedger.js --confirm-discard-alpha prints (the alpha reset: merchant stock and purses start fresh)');
   if(!ledger || ledger.version!==2 || !ledger.entries || typeof ledger.entries!=='object' || Array.isArray(ledger.entries))
     throw new Error('Saved merchant ledger cannot be verified');
   const references=new Map(Array.from(catalogue.values()).map(identity=>[identity.reference,identity]));
@@ -81299,8 +81303,8 @@ function isFormId(n) {
 // A runtime character (formDesc the local hex alone) owns by its runtime form
 // id, [0xff000000 | local, '', profile]; a placed form (hex:plugin) keeps
 // [local, plugin, profile]. The merchant ledger stores these strings, so its
-// version is 2 from #2870 and scripts\ops\Convert-FormIdShape.js turned the
-// version 1 owners [local, '', profile] into this shape.
+// version is 2 from #2870. A version 1 ledger, whose owners were
+// [local, '', profile], is not read: the alpha reset replaces it.
 function owner(human) {
  if(!human||!integer(human.profileId,1,MAX_GOLD)||typeof human.desc!=='string')return '';
  const match=/^([0-9a-f]{1,6})(?::([^:/\\\x00-\x1f\x7f]+\.(?:esm|esp|esl)))?$/i.exec(human.desc);

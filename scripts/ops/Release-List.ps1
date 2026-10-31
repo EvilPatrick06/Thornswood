@@ -33,8 +33,9 @@
   twin of game\form-id.js). A change form that will not parse, or a
   character's whose formDesc is not a runtime form, is named in a
   RELEASENOTE line, so nobody is left off the list without it being said.
-  A list there whose actors are local ids, the shape from before #2870, is
-  not one: scripts\ops\Convert-FormIdShape.js converts it.
+  A list there whose actors are local ids, the shape from a build before
+  #2870, is not read and is left as it is for a person; docs\GAMEMODE.md
+  says what to do.
 
   WHERE IT GOES. The privDir server-settings.json names, as the server reads
   it; private when the file names none or is not there. A server-settings.json
@@ -148,7 +149,7 @@ function Write-ThornswoodReleaseList {
   $file = Get-ThornswoodReleaseListPath $Root
   if (-not $file) { 'RELEASEBAD|' + (Join-Path $Root 'server-settings.json') + ' will not parse, so the server''s private folder is not known and no list was written'; return }
   $now = Read-ThornswoodReleaseList $file
-  if (-not $now.ok -and $now.old) { 'RELEASEBAD|' + $file + ' holds form ids in the old shape (#2870), so no list was written and it is left as it is; scripts\ops\Convert-FormIdShape.js converts it'; return }
+  if (-not $now.ok -and $now.old) { 'RELEASEBAD|' + $file + ' holds form ids in the old shape, from a build before #2870, and is not read, so no list was written and it is left as it is; docs\GAMEMODE.md says what to do'; return }
   if (-not $now.ok) { 'RELEASEBAD|' + $file + ' is not a list of deleted characters, so no list was written and it is left as it is'; return }
   $P = @($now.profiles)
   $A = @($now.actors) + @($Actors)
