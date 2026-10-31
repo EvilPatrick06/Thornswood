@@ -2,10 +2,15 @@
   RepoPlugins.ps1
 
   The plugins this repository builds and ships itself, in one list (#2486).
-  Each is made under game\content (Add-ContentRecords.py and friends for
-  Thornswood-Content.esp, Build-LastPlugin.py for Thornswood-Last.esp, #2468)
-  and sent from there, never from a Vortex folder, so a rebuild reaches the
-  servers and the packs with no collection revision.
+  Thornswood-Content.esp is made under game\content (Add-ContentRecords.py
+  and friends) and sent from there, never from a Vortex folder, so a rebuild
+  reaches the servers and the packs with no collection revision.
+  Thornswood-Last.esp (#2468) is built by Build-LastPlugin.py too, but since
+  #2791 it reaches them as its recipe, game\data\last-plugin.recipe: it
+  copies other authors' records, so no repository holds it, and the box and
+  each launcher make it from the recipe (Ship-Rules.ps1 $ShipMadeFromRecipe,
+  scripts\deploy\LastPluginOnBox.ps1). It is still ours in every place
+  below; Get-ThornswoodRepoPluginPath names no file for it.
 
   Every place that tells ours from the collection's reads this list:
     Ship-Rules.ps1           $ShipOursFiles, Ensure-ShipRequiredData
