@@ -29,7 +29,9 @@
   20261002-143545-dev, holds its commit and is on main (Patrick's answer on
   #2401, 12 Oct: option B). Until that is so, it keeps the mark it has.
 
-  Also driven: a note whose sourceCommit is empty, as Publish-Update writes it
+  Also driven: a note whose sourceCommit names a commit the clone does not
+  hold (the notes from before the #3684 history rewrite, #5133) is judged by
+  its release's tag; a note whose sourceCommit is empty, as Publish-Update writes it
   for a release built with uncommitted files, is judged the same way and not
   as a commit main lacks; and a later clean release that does not hold the
   dirty release's commit settles nothing.
@@ -318,6 +320,31 @@ try {
         news = @([pscustomobject][ordered]@{ date = '10-13-2026 10:00 AM'; title = 'Side work'; body = ''; details = @('a line'); channel = 'dev'; sourceCommit = '' }) }
     [void](Set-DevFeedMarks $dev9 $atLater $git)
     Yes ("a later clean release on main that does not hold the dirty commit settles nothing ({0})" -f $dev9.news[0].channel) ($dev9.news[0].channel -eq 'dev')
+
+    # Notes whose sourceCommit this clone does not hold, as every note written
+    # before the #3684 history rewrite of 31 Oct 2026 names an id main no
+    # longer has (#5133): each is judged by its release's tag, as a note with
+    # none is. "The launcher gets ready in seconds" came with
+    # 20261011-174543-dev, main's own commit, so it clears from a stale DEV;
+    # "Keys, deeds and forges" came with 20261011-221215-dev, which main does
+    # not have, so it keeps DEV. Until 31 Oct both read as commits main lacked.
+    $gone = @{ 'The launcher gets ready in seconds' = ('ab' * 20); 'Keys, deeds and forges' = ('cd' * 20) }
+    $dev10 = Feed
+    foreach ($n in @($dev10.news)) {
+        if ($gone.ContainsKey($n.title)) { $n.sourceCommit = $gone[$n.title]; $n.channel = 'dev' }
+    }
+    $r10 = Set-DevFeedMarks $dev10 $mainFeed $git
+    $ch10 = @{}; foreach ($n in @($dev10.news)) { $ch10[$n.title] = $n.channel }
+    Yes ("a sourceCommit the clone does not hold is judged by its release's tag: on main it clears ({0})" -f (@($r10.Cleared) -join '; ')) (
+        $ch10['The launcher gets ready in seconds'] -eq '' -and @($r10.Cleared) -contains 'The launcher gets ready in seconds')
+    Yes ("  and one whose release main does not have keeps DEV ({0} marked)" -f $r10.Marked) (
+        $ch10['Keys, deeds and forges'] -eq 'dev' -and $r10.Marked -eq 4)
+    $dev11 = Feed
+    foreach ($n in @($dev11.news)) { if ($gone.ContainsKey($n.title)) { $n.sourceCommit = $gone[$n.title] } }
+    $r11 = Set-DevFeedMarks $dev11 $older $git
+    $ch11 = @{}; foreach ($n in @($dev11.news)) { $ch11[$n.title] = $n.channel }
+    Yes '  and against a main before its release the one with no mark gains DEV, by the tag, as with its own id' (
+        $ch11['The launcher gets ready in seconds'] -eq 'dev' -and $r11.Marked -eq 6)
 
     # A clone with no tags proves nothing about the old notes: they keep their marks.
     $made = G tag -l 'release/dev/*'
