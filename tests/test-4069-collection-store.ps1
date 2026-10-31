@@ -268,7 +268,10 @@ exit 0
     Yes 'it takes -FromRecord and -DropPlugins' ($names -contains 'FromRecord' -and $names -contains 'DropPlugins')
     Yes '-FromRecord goes with -LoadOrder and never with -Dist' ($dg -match "if \(\`$FromRecord -and -not \`$LoadOrder\) \{ throw" -and $dg -match "if \(\`$FromRecord\) \{\s+if \(\`$Dist\) \{ throw")
     Yes 'the order is last-plugin.json''s and the plugins the store''s' ($dg -match "game\\data\\last-plugin\.json" -and $dg -match '\$Data = \$store\.Dir' -and $dg -match 'Get-ThornswoodCollectionStore -RecordPath \$recordPath')
-    Yes 'an order that drops a plugin the dev server loads is held as -Dist''s is' (([regex]::Matches($dg, 'Test-ThornswoodLoadOrderDrop')).Count -ge 2)
+    Yes 'the record''s order has the Last plugin on the end before it is held to the running one' ($dg -match 'Where-Object \{ \$_ -and \$_ -ine \$ThornswoodLastPlugin \}\) \+ \$ThornswoodLastPlugin\)' -and
+        $dg.IndexOf('-ine $ThornswoodLastPlugin }) + $ThornswoodLastPlugin)') -lt $dg.IndexOf('Test-ThornswoodLoadOrderDrop ([pscustomobject]@{ loadOrder = @($boxContent.Order) }) ([pscustomobject]@{ loadOrder = $pluginNames }) $mayDrop') -and
+        $dg.IndexOf('-ine $ThornswoodLastPlugin }) + $ThornswoodLastPlugin)') -gt 0)
+    Yes 'an order that drops a plugin the dev server loads is held as -Dist''s is'(([regex]::Matches($dg, 'Test-ThornswoodLoadOrderDrop')).Count -ge 2)
     Yes 'the order goes up over the dev server''s' ($dg -match 'if \(\$Dist -or \$FromRecord -or \$orderMoved\)')
     Yes 'what the move may drop is records\collection-dropped.json''s, for the record''s revision alone' ($dg -match "records\\collection-dropped\.json" -and $dg -match '\[string\]\$dd\.revision -eq \[string\]\$store\.Revision' -and $dg -match 'Test-ThornswoodLoadOrderDrop .+ \$mayDrop')
     $cd = (Text 'records\collection-dropped.json') | ConvertFrom-Json

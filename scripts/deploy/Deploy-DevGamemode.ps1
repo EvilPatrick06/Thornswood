@@ -533,8 +533,15 @@ if ($LoadOrder) {
     $Data = $store.Dir
     $lastDoc = Join-Path $repoRoot 'game\data\last-plugin.json'
     $built = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($lastDoc)) $lastDoc
-    $pluginNames = @(@($built.loadOrder) | ForEach-Object { [string]$_ } | Where-Object { $_ })
-    if (-not $pluginNames.Count) { throw "$lastDoc has no loadOrder, so there is no order to write. Nothing was sent and the dev server was not touched." }
+    # Thornswood-Last.esp on the end here, before the order is held to the
+    # running one: last-plugin.json's order never names the Last plugin, and
+    # the dev server loads it, so held without it the move read as dropping
+    # it (31 Oct 2026, gate run at d88ab73e: "leaves out 1 of the 103 the
+    # running server loads: Thornswood-Last.esp"). The same order the live
+    # move writes (Deploy-Server.ps1 -FromRecord, $recordOrder).
+    . (Join-Path $Here 'LastPluginRecipe.ps1')
+    $pluginNames = @(@(@($built.loadOrder) | ForEach-Object { [string]$_ } | Where-Object { $_ -and $_ -ine $ThornswoodLastPlugin }) + $ThornswoodLastPlugin)
+    if ($pluginNames.Count -lt 2) { throw "$lastDoc has no loadOrder, so there is no order to write. Nothing was sent and the dev server was not touched." }
     Write-Host ('  load order from {0} ({1} plugins, collection revision {2}), written over the dev server''s' -f 'game\data\last-plugin.json', $pluginNames.Count, $store.Revision) -ForegroundColor DarkGray
     # What the move may drop is the repository's word, not the caller's:
     # records\collection-dropped.json, for the revision the record names.
