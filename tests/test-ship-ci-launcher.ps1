@@ -110,6 +110,12 @@ try {
         [void](Run-Git -C $repoB remote add origin 'git@github.com:Some-Owner/Some-Repo.git')
         Yes "Get-SourceRepo reads owner/name off an ssh origin: '$(Get-SourceRepo $repoB)'" ((Get-SourceRepo $repoB) -eq 'Some-Owner/Some-Repo')
 
+        $repoD = Join-Path $work 'repoD'
+        New-Item -ItemType Directory -Force -Path $repoD | Out-Null
+        [void](Run-Git init -q $repoD)
+        [void](Run-Git -C $repoD remote add origin 'ssh://git@ssh.github.com:443/EvilPatrick06/Thornswood.git')
+        Yes "Get-SourceRepo reads owner/name off the gate's ssh origin on port 443, not the port: '$(Get-SourceRepo $repoD)'" ((Get-SourceRepo $repoD) -eq 'EvilPatrick06/Thornswood')
+
         $repoC = Join-Path $work 'repoC'
         New-Item -ItemType Directory -Force -Path $repoC | Out-Null
         [void](Run-Git init -q $repoC)
