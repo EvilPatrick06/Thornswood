@@ -30,6 +30,13 @@
 # never a VPS runner: it needs nothing from the box, and only reads the public
 # site. The run's own token (contents: write) is all it uses; no secret.
 #
+# THE DEPLOYMENT. A second job records the release as a GitHub Deployment
+# of this repository, to the Main or Dev environment, once the channel's
+# feed names it (scripts/release/Record-Deployment.ps1; Patrick, 30 Oct 2026:
+# use GitHub's Deployments once public). It runs beside the files job, not
+# after it: the release is live on its feed whether or not its Release is
+# filled yet. Its own token has deployments: write and nothing else.
+#
 # Every action is named by a full length commit SHA with its tag in the
 # comment, for the reason build.yml gives.
 name: Release files
@@ -71,4 +78,28 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           & ./scripts/release/Publish-ReleaseFiles.ps1 -Tag $env:RELEASE_TAG
+          exit $LASTEXITCODE
+
+  deployment:
+    name: Record the live release as a Deployment
+    if: ${{ github.event.repository.private == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Record the Deployment
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          LOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          & ./scripts/release/Record-Deployment.ps1 -Tag $env:RELEASE_TAG -LogUrl $env:LOG_URL
           exit $LASTEXITCODE
