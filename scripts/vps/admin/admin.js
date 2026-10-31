@@ -61,15 +61,15 @@
                     repository, rulesets: [...],
                     private_vulnerability_reporting, immutable_releases,
                     secret_scanning, secret_scanning_push_protection,
-                    collaborators: [login] }] },
+                    allow_auto_merge, collaborators: [login] }] },
                     for Thornswood and
                     the engine fork, EvilPatrick06/skymp, and no other
                     repository: each ruleset an entry names is on GitHub
                     with exactly its target, enforcement, conditions, rules
                     and bypass list, made or put back by name, and private
                     vulnerability reporting, immutable releases, secret
-                    scanning and its push protection are each on or off as
-                    the entry says (left as they are when the entry does not
+                    scanning and its push protection, and auto-merge, are
+                    each on or off as the entry says (left as they are when the entry does not
                     say). A ruleset GitHub has that the record does not name
                     is never deleted here; it stops the run, named, so a
                     protection nobody wrote down is a pull request to the
@@ -216,6 +216,12 @@ const SWITCHES = {
 const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/;
 // security_and_analysis keys the record may switch, each true or false.
 const SCANNING_KEYS = ['secret_scanning', 'secret_scanning_push_protection'];
+// The repository's own merge settings the record may switch, each true or
+// false, sent as top-level keys of one PATCH. allow_auto_merge (Patrick's A on
+// #5182, 31 Oct 2026): a pull request merges itself once the checks main's
+// ruleset requires are green, so nobody waits to press merge; the ruleset,
+// with no bypass, still refuses a merge past red for everybody.
+const MERGE_KEYS = ['allow_auto_merge'];
 // What repo-settings' token for each repository may do: Thornswood's reads
 // main's record too; the fork's only needs its settings.
 const HOME_PERMISSIONS = { administration: 'write', contents: 'read' };
@@ -396,7 +402,7 @@ function checkSettings(doc) {
     if (SETTINGS_REPOS.indexOf(repo) < 0) throw new Error(SETTINGS_FILE + ' names ' + (repo || 'a repository with no name') + ', and the only ones this changes are ' + SETTINGS_REPOS.join(' and '));
     if (seen[repo]) throw new Error(SETTINGS_FILE + ' names ' + repo + ' twice');
     seen[repo] = true;
-    for (const k of Object.keys(SWITCHES).concat(SCANNING_KEYS)) {
+    for (const k of Object.keys(SWITCHES).concat(SCANNING_KEYS, MERGE_KEYS)) {
       if (e[k] !== undefined && typeof e[k] !== 'boolean') throw new Error(SETTINGS_FILE + ', ' + repo + ': ' + k + ' is true or false, not ' + JSON.stringify(e[k]));
     }
     // GitHub has no push protection without the scanning it protects.
@@ -763,6 +769,34 @@ async function scanning(token, repo, e, check) {
   return { ok: true, lines: lines.concat(off.map(k => repo + ': ' + name(k) + ' switched ' + word(k))), changed: off.length, differs: off.length };
 }
 
+// Makes a repository's merge settings (MERGE_KEYS) what its entry says (only
+// the keys it gives), in one PATCH of the keys that differ, or with check
+// says only which differ. GitHub's repository read gives each as true or
+// false.
+async function mergeSettings(token, repo, e, check) {
+  const keys = MERGE_KEYS.filter(k => typeof e[k] === 'boolean');
+  const auth = { Authorization: 'Bearer ' + token };
+  const word = k => (e[k] ? 'on' : 'off');
+  const name = k => (k === 'allow_auto_merge' ? 'auto-merge' : k);
+  const read = async () => {
+    const a = await call('GET', API + '/repos/' + repo, auth);
+    if (a.status !== 200 || !a.body || keys.some(k => typeof a.body[k] !== 'boolean')) throw new Error('GitHub would not say whether ' + keys.map(name).join(' and ') + ' is on for ' + repo + ' (' + said(a) + ')');
+    return keys.filter(k => a.body[k] !== e[k]);
+  };
+  const off = await read();
+  const lines = keys.filter(k => off.indexOf(k) < 0).map(k => repo + ': ' + name(k) + ' is ' + word(k) + ', as the record says');
+  if (!off.length) return { ok: true, lines, changed: 0, differs: 0 };
+  if (check) return { ok: true, lines: lines.concat(off.map(k => repo + ': ' + name(k) + ' would be switched ' + word(k))), changed: 0, differs: off.length };
+  const body = {};
+  for (const k of off) body[k] = e[k];
+  const a = await call('PATCH', API + '/repos/' + repo, auth, body);
+  if (a.status !== 200) return { ok: false, lines: lines.concat(['STOP ' + repo + ': GitHub did not switch ' + off.map(name).join(' and ') + ' (' + said(a) + ')']), changed: 0, differs: off.length };
+  // Read back rather than trust the call.
+  const still = await read();
+  if (still.length) return { ok: false, lines: lines.concat(still.map(k => 'STOP ' + repo + ': GitHub still has ' + name(k) + ' ' + (e[k] ? 'off' : 'on'))), changed: off.length - still.length, differs: off.length };
+  return { ok: true, lines: lines.concat(off.map(k => repo + ': ' + name(k) + ' switched ' + word(k))), changed: off.length, differs: off.length };
+}
+
 // Makes every repository main's settings record names match its entry, or
 // with check says only what differs. One repository's stop does not keep
 // the others from being matched. { ok, lines, changed, differs }.
@@ -784,6 +818,7 @@ async function repoSettings(held, now, check) {
       add(await rulesets(token, e.repository, e.rulesets, check));
       for (const k of Object.keys(SWITCHES)) if (typeof e[k] === 'boolean') add(await setSwitch(token, e.repository, k, e[k], check));
       if (SCANNING_KEYS.some(k => typeof e[k] === 'boolean')) add(await scanning(token, e.repository, e, check));
+      if (MERGE_KEYS.some(k => typeof e[k] === 'boolean')) add(await mergeSettings(token, e.repository, e, check));
       if (Array.isArray(e.collaborators)) add(await collaborators(token, e.repository, e.collaborators, check));
     } catch (err) {
       add({ ok: false, lines: ['STOP ' + e.repository + ': ' + err.message + '; nothing more was changed there'], changed: 0, differs: 0 });
@@ -1253,5 +1288,5 @@ function serve() {
   return server;
 }
 
-module.exports = { verifyOidc, appJwt, planCollaborators, planPublic, publicStops, PUBLIC_DROPS, OPS_COPIES, PUBLIC_KEEPS, planLabels, planLeftovers, checkRecords, checkAbout, planAbout, runnerNumber, checkRulesets, checkSettings, planRulesets, rulesetBody, says, manifest, RULES, ASKS, REPO, RUNNERS_REPO, SETTINGS_REPOS, SCANNING_KEYS, SETTINGS_PERMISSIONS, SETTINGS_EXTRA, serve };
+module.exports = { verifyOidc, appJwt, planCollaborators, planPublic, publicStops, PUBLIC_DROPS, OPS_COPIES, PUBLIC_KEEPS, planLabels, planLeftovers, checkRecords, checkAbout, planAbout, runnerNumber, checkRulesets, checkSettings, planRulesets, rulesetBody, says, manifest, RULES, ASKS, REPO, RUNNERS_REPO, SETTINGS_REPOS, SCANNING_KEYS, MERGE_KEYS, SETTINGS_PERMISSIONS, SETTINGS_EXTRA, serve };
 if (require.main === module) serve();
