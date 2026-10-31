@@ -320,11 +320,13 @@ KIT_RECIPES.forEach(function (k) {
       JSON.stringify(ins) === JSON.stringify(k.inputs) && page.indexOf(k.words) !== -1);
 });
 {
-  const rt = fs.readFileSync(path.join(REPO_DIR, 'scripts', 'dev', 'Build-RecipeTable.ps1'), 'utf8');
-  yes('the three recipes are named to their halves in $RECIPE_OWNER, so the rebuilt table gates them',
-      /'ThornswoodRecipeWeaponKit'\s*=\s*@\{ Owner = 'Smith'; Half = 'Edgewright'/.test(rt) &&
-      /'ThornswoodRecipeArmorKit'\s*=\s*@\{ Owner = 'Smith'; Half = 'Platewright'/.test(rt) &&
-      /'ThornswoodRecipeSewingKit'\s*=\s*@\{ Owner = 'Tailor'; Half = 'Haberdasher'/.test(rt));
+  // RECIPE_OWNER's entries, which Build-RecipeTable.ps1 reads from records/recipe-owners.json.
+  const named = JSON.parse(fs.readFileSync(path.join(REPO_DIR, 'records', 'recipe-owners.json'), 'utf8')).owner;
+  const is = (edid, owner, half) => !!named[edid] && named[edid].Owner === owner && named[edid].Half === half;
+  yes('the three recipes are named to their halves in records/recipe-owners.json, so the rebuilt table gates them',
+      is('ThornswoodRecipeWeaponKit', 'Smith', 'Edgewright') &&
+      is('ThornswoodRecipeArmorKit', 'Smith', 'Platewright') &&
+      is('ThornswoodRecipeSewingKit', 'Tailor', 'Haberdasher'));
   const add = fs.readFileSync(path.join(REPO_DIR, 'scripts', 'mods', 'Add-ContentRecords.py'), 'utf8');
   yes('and Add-ContentRecords.py is what adds the six records',
       ['ThornswoodMiscWeaponKit', 'ThornswoodMiscArmorKit', 'ThornswoodMiscSewingKit',

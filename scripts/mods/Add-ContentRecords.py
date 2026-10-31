@@ -229,8 +229,8 @@ so the half that makes the kit can get its makings on day one:
                                   tanning rack. Tailor, Haberdasher.
 
 The owner and the half are not readable off a MISC at a forge or a tanning
-rack, so all three are named in $RECIPE_OWNER in
-scripts/dev/Build-RecipeTable.ps1, the same as the key mold. The rank is the
+rack, so all three are named in records/recipe-owners.json (RECIPE_OWNER
+in scripts/dev/Build-RecipeTable.ps1), the same as the key mold. The rank is the
 dearest input, which is novice for all three.
 
 The Sewing Kit was offered as linen wrap and leather strips. Linen wrap is
@@ -285,8 +285,8 @@ of each hold capital (WHERE THE STATIONS STAND, above), and carries ThornswoodCr
 until now. Skyrim's own alchemy lab cannot show a recipe at all: it brews from
 the effects ingredients share. So the physicker's two are made at this one.
 
-The owner and the half are named in $RECIPE_OWNER in
-scripts/dev/Build-RecipeTable.ps1, because none of the four can be read off a
+The owner and the half are named in records/recipe-owners.json (RECIPE_OWNER
+in scripts/dev/Build-RecipeTable.ps1), because none of the four can be read off a
 MISC at these benches. All four MISC records wear Skyrim's charcoal stick,
 like the kits, so no new mesh has to ship.
 

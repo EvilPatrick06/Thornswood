@@ -118,7 +118,7 @@ yes('TOOLS.fisher.accept lists at least the handout pole',
           'creditWork', 'cooldownLeft', 'stampCooldown', 'waitWord', 'randInt',
           'FISH_BY_BASE', 'FISH_TUNING', 'isFish', 'toolGate', 'withinResourceReach',
           'wearTool',
-          fishFn + '\nreturn fish;'
+          'function economyGathered() { }\n' + fishFn + '\nreturn fish;'
         )(
           function (actorId, verb) {
             trail.push('classGate:' + verb);

@@ -203,7 +203,7 @@ const handler = hAt < 0 ? '' : src.slice(hAt, src.indexOf('\n});', hAt));
   try {
     api = new Function('globalThis', 'withinResourceReach', 'classGate', 'rankStep', 'rankWord',
       'RANK_LADDER', 'randInt', 'addItemsAtomic', 'creditWork', 'waitWord', 'listItems',
-      "'use strict';\n" + parts.join('\n') + '\nreturn { game: game, isGame: isGame };')(
+      "'use strict';\n" + 'function economyGathered() { }\n' + parts.join('\n') + '\nreturn { game: game, isGame: isGame };')(
       { __thornswoodResourceStock: stock }, function () { return true; },
       function (a, verb) { rec.gates.push(verb); return a === 0x99 ? 'Only a fisher can fish. Ask one.' : null; },
       function (a, ladder) { rec.ladders.push(ladder); return 0; },

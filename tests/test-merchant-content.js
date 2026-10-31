@@ -70,7 +70,7 @@ assert.deepEqual(new Set([...records].filter(([,r])=>r.tag==='REFR').map(([id])=
   __thornswoodResourceStock:{left:()=>0,take(ref,span,give){return {ok:give()};}},
   classGate:()=>null,toolGate:()=>null,poleTooWeak:()=>null,rankStep:()=>3,rankWord:v=>v,
   RANK_LADDER:['novice','advanced','expert','master'],FISH_TUNING:{cooldownMs:{novice:600000,master:14400000},yieldByStep:{3:[2,4]}},
-  randInt:()=>4,addItemsAtomic:()=>{grants++;return true;},creditWork:()=>'',wearTool:()=>'',waitWord:String};
+  randInt:()=>4,addItemsAtomic:()=>{grants++;return true;},creditWork:()=>'',economyGathered:()=>{},wearTool:()=>'',waitWord:String};
  vm.runInNewContext(gm.slice(start,end),context);
  assert.match(context.fish(1,999999,longfin),/unavailable/);assert.equal(grants,0);
  assert.match(context.fish(1,999999,clam),/4 Clam Meat/);assert.equal(grants,1,'ordinary clams still work');
