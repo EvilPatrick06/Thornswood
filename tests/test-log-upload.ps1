@@ -75,6 +75,7 @@ $want = [ordered]@{
   PendingSince  = 'static DateTime PendingSince('
   CrashLogSince = 'static string CrashLogSince('
   Scrub         = 'static string Scrub('
+  ScrubFor      = 'static string ScrubFor('
   ReadLogTail   = 'static string ReadLogTail('
   CrashLogText  = 'static string CrashLogText('
   CrashLogHead  = 'static string CrashLogHead('
@@ -292,6 +293,47 @@ console.log(f ? (f.level + '|' + f.why + '|' + f.line) : 'NONE');
     Yes 'nothing at all is an empty string' ($T::Scrub($null) -ceq '')
   }
 
+  # ---- who the PC belongs to never leaves (#3627) ----------------------------
+  # launcher.log named the Windows user folder (OwnGame's Vortex profile line,
+  # a .NET error's path), and the voice log its file:// address. A made-up
+  # account first, in every shape a log writes a path, then this machine's own.
+  if ($T -and $have.ScrubFor) {
+    # Made up, and kept off C:\Users so the gate's own check for real profile
+    # accounts (test-3838-no-personal-details.js) has nothing to find here;
+    # the folder is passed in, so where it is changes nothing. tester and x
+    # are the names that check lets tests use under Users.
+    $prof = 'D:\Home\Tess Ro'
+    $S = { param($text) $T::ScrubFor($text, $prof, 'Tess Ro', 'DESKTOP-K9QX') }
+    $out = & $S 'OwnGame: Windows'' live plugins.txt differs from the Thornswood Vortex profile at D:\Home\Tess Ro\AppData\Roaming\Vortex\skyrimse\profiles\ZRT7NjhN_'
+    Yes "the user folder is replaced, the rest of the path kept: $out" ($out -ceq 'OwnGame: Windows'' live plugins.txt differs from the Thornswood Vortex profile at %USERPROFILE%\AppData\Roaming\Vortex\skyrimse\profiles\ZRT7NjhN_')
+    Yes 'whatever case Windows wrote it in' ((& $S 'd:\home\TESS RO\Documents') -ceq '%USERPROFILE%\Documents')
+    Yes 'doubled, the way a JSON line writes it' ((& $S '"D:\\Home\\Tess Ro\\AppData\\x"') -ceq '"%USERPROFILE%\\AppData\\x"')
+    Yes 'as a file:// address, with %20 for the space' ((& $S 'page file:///D:/Home/Tess%20Ro/Thornswood/voice.html') -ceq 'page file:///%USERPROFILE%/Thornswood/voice.html')
+    Yes 'at the end of a sentence' ((& $S 'the folder is D:\Home\Tess Ro.') -ceq 'the folder is %USERPROFILE%.')
+    $line = 'not D:\Home\Tess Rossi\x'
+    Yes 'a longer folder name that starts the same is not cut short' ((& $S $line) -ceq $line)
+    $out = & $S 'other C:\Users\tester\AppData\x and C:\Users\x y\z'
+    Yes "another account's folder under Users is taken out, spaces and all: $out" ($out -ceq 'other C:\Users\[user]\AppData\x and C:\Users\[user]\z')
+    $line = 'public C:\Users\Public\Documents and default C:\Users\Default\x'
+    Yes 'Public and Default, which belong to nobody, are left' ((& $S $line) -ceq $line)
+    Yes 'the account name as a folder elsewhere is taken out' ((& $S 'D:\Games\Tess Ro\Thornswood') -ceq 'D:\Games\[user]\Thornswood')
+    Yes 'and the name as an ordinary word is left' ((& $S 'Tess Ro said hello') -ceq 'Tess Ro said hello')
+    Yes 'the PC''s name is taken out as a word, and not out of a longer one' ((& $S 'on desktop-k9qx, not DESKTOP-K9QXY') -ceq 'on [pc], not DESKTOP-K9QXY')
+    $out = & $S 'D:\Home\Tess Ro\x with tk1.eyJkIjoiMTIzNDUiLCJuIjoiYSJ9.0123456789abcdef0123456789abcdef'
+    Yes "tokens still go in the same line: $out" ($out -ceq '%USERPROFILE%\x with tk1.[ticket removed]')
+  }
+  if ($T -and $have.Scrub) {
+    $me = [Environment]::GetFolderPath('UserProfile')
+    $user = [Environment]::UserName
+    $pc = [Environment]::MachineName
+    $out = $T::Scrub("Swap.Restore, moving $me\Documents\My Games\x.bak on $pc, then file:///" + ($me -replace '\\', '/' -replace ' ', '%20') + "/x.html, D:\Games\$user\y")
+    $left = $out -replace '%USERPROFILE%|\[user\]|\[pc\]', ''
+    Yes "this PC's own user folder, account and name are taken out by Scrub itself: $out" (
+      ($left.IndexOf($me, [StringComparison]::OrdinalIgnoreCase) -lt 0) -and
+      ($left -notmatch ('(?i)(?<![\w-])' + [regex]::Escape($pc) + '(?![\w-])')) -and
+      ($left -notmatch ('(?i)[\\/]' + [regex]::Escape($user) + '([\\/]|$)')))
+  }
+
   # ---- the upload uses them -------------------------------------------------
   # By text, because SessionLogs itself needs the whole launcher around it.
   $at = $src.IndexOf('public static void SessionLogs()')
@@ -299,6 +341,12 @@ console.log(f ? (f.level + '|' + f.why + '|' + f.line) : 'NONE');
   $body = if ($at -ge 0 -and $end -gt $at) { $src.Substring($at, $end - $at) } else { '' }
   Yes 'every log goes through Scrub before it is sent, the crash log with the launcher''s line on it (#2319)' (
     $body.Contains('Scrub(want[i][0] == "crash.log" ? CrashLogText(want[i][1]) : ReadLogTail(want[i][1]))'))
+  $cs = $src.Replace("`r`n", "`n")
+  Yes 'every line of the scan goes through Scrub too, issues and Play page rows (#3627)' (
+    $cs.Contains('Append(Escape(Scrub(i.Text)))') -and $cs.Contains('Append(Escape(Scrub(c.Name)))') -and $cs.Contains('Append(Escape(Scrub(c.Detail)))'))
+  $diag = [IO.File]::ReadAllText((Join-Path $Here 'launcher\app\Diag.cs'))
+  Yes 'the report zip''s summary names neither the Windows account nor the PC (#3627)' (
+    ($diag.IndexOf('Environment.UserName') -lt 0) -and ($diag.IndexOf('Environment.MachineName') -lt 0))
   Yes 'the crash log is picked from the SKSE folder by the session start' `
     ($body.Contains('CrashLogSince(Files.SkseLogDir, PendingSince(PendingFile, session))'))
   Yes 'skyrim-platform.log is read from the SKSE folder' `

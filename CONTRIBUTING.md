@@ -61,5 +61,13 @@ it can be merged.
 
 ## The licence
 
-[LICENSE](LICENSE) says what Thornswood's own work is under, and the terms for
-what you contribute. Read it before you send a change.
+Thornswood's own code is under the MIT licence in [LICENSE](LICENSE).
+[LICENSING.md](LICENSING.md) says what MIT does not cover (its lore, art,
+music and game content are under CC BY-NC-SA 4.0, and the name and logo are
+not licensed at all), and holds the terms for what you contribute. Read it
+before you send a change.
+
+Sign off every commit (`git commit -s`), which adds a `Signed-off-by:` line
+with your name and email. It says you can give the change under those terms,
+as the [Developer Certificate of Origin 1.1](https://developercertificate.org)
+puts it. The pull request's "Whose work" line says whose the change is.

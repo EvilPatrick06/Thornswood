@@ -12,6 +12,9 @@
 #     requirements.txt at the same version.
 #   - Install-Bot.ps1 and nightly.yml install it with --require-hashes and
 #     --only-binary :all:, and nothing installs it without them.
+#   - nightly.yml installs it in a job of its own that asks for the check
+#     label, so never on the signing runner, which reaches GitHub and the
+#     signing service only (#4914, Patrick's A on 30 Oct).
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $pass = 0; $fail = 0
@@ -57,6 +60,13 @@ $nyLines = @($ny -split "`n" | Where-Object { $_ -match 'pip install' -and $_ -m
 $weak = @(@($ibLines) + @($nyLines) | Where-Object { $_ -notmatch '--require-hashes' -or $_ -notmatch '--only-binary :all:' })
 Yes 'Install-Bot.ps1 installs requirements.txt with --require-hashes --only-binary :all:' ($ibLines.Count -ge 1 -and -not @($ibLines | Where-Object { $_ -notmatch '--require-hashes' -or $_ -notmatch '--only-binary :all:' }).Count)
 Yes 'nightly.yml installs it for the bot harnesses the same way' ($nyLines.Count -ge 1 -and -not @($nyLines | Where-Object { $_ -notmatch '--require-hashes' -or $_ -notmatch '--only-binary :all:' }).Count)
+# The job that installs it, by the job header above the install line.
+$nyJobs = @([regex]::Matches(($ny -split '(?m)^jobs:\s*$', 2)[1], '(?ms)^  ([A-Za-z0-9_-]+):\s*$(.*?)(?=^  [A-Za-z0-9_-]+:\s*$|\z)'))
+$installJobs = @($nyJobs | Where-Object { $_.Groups[2].Value -match 'pip install[^\n]*requirements\.txt' })
+$check = [IO.File]::ReadAllText((Join-Path $repo 'records\check-runners.json')) | ConvertFrom-Json
+Yes ('  in one job, which asks for the check label (' + $check.label + '), whose runners reach the package feeds (#4914)') (
+    $installJobs.Count -eq 1 -and $installJobs[0].Groups[2].Value -match ('(?m)^    runs-on: .*"thornswood-vps", "' + [regex]::Escape([string]$check.label) + '"') -and
+    @($check.runners).Count)
 $others = @()
 foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $repo 'scripts') -Recurse -File -Include *.ps1) + @(Get-ChildItem -LiteralPath (Join-Path $repo '.github\workflows') -File -Filter *.yml)) {
     foreach ($l in [IO.File]::ReadAllLines($f.FullName)) {

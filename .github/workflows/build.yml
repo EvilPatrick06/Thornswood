@@ -119,7 +119,7 @@ jobs:
   # it accepts, and why a tree is enough is in the script's header.
   tested:
     name: Already tested in its pull request
-    if: ${{ github.event_name == 'push' && vars.BUILD_RUNNER != 'vps' }}
+    if: ${{ github.event_name == 'push' && (!github.event.repository.private || vars.BUILD_RUNNER != 'vps') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -158,7 +158,7 @@ jobs:
   tested-vps:
     name: Already tested in its pull request (VPS fallback)
     needs: tested
-    if: ${{ !cancelled() && github.event_name == 'push' && needs.tested.result != 'success' }}
+    if: ${{ !cancelled() && github.event.repository.private && github.event_name == 'push' && needs.tested.result != 'success' }}
     runs-on: [self-hosted, Windows, thornswood-vps]
     timeout-minutes: 5
     permissions:
@@ -187,16 +187,18 @@ jobs:
   launcher-vps:
     name: Launcher builds (VPS fallback)
     needs: [tested, tested-vps, launcher]
-    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
+    if: ${{ !cancelled() && github.event.repository.private && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
     # thornswood-build (#2994): only the runners records/build-runners.json
     # lists carry it, so no more builds run on the box at once than its six
     # cores finish fastest. Seven at once on 21 Oct took 34 to 39 minutes for
     # the harness step alone and the limit below cancelled passing builds.
     # Main's build stays on the box: only the box's runners have the trace
     # task, and a main build is what leaves the gate map the next pull
-    # requests measure from (#3114, #3874). Build-PrWorkflow.js drops
-    # thornswood-vps for build-pr.yml only, so a pull request's fallback can
-    # also land on One's off-box build runners (#3860).
+    # requests measure from (#3114, #3874). Build-PrWorkflow.js gives
+    # build-pr.yml's fallback the pull request build label alone instead
+    # (records/pr-build-runners.json): box runner 2 and One's off-box runners
+    # carry it and runner 1 does not, so main's build never waits behind pull
+    # requests for runner 1 (#3860; #4010, Patrick's A, 27 Oct 2026).
     runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]
     # actions: read for the gate step off the box, which reads the map main's
     # build handed on in its log (#4009, scripts\dev\Gate-Map.ps1).
@@ -729,7 +731,7 @@ jobs:
   launcher:
     name: Launcher builds
     needs: [tested, tested-vps]
-    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
+    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && (!github.event.repository.private || (vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps')) }}
     runs-on: windows-latest
     # As the fallback's: the gate step reads the map main's build handed on.
     permissions:

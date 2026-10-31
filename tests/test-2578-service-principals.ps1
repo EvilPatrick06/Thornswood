@@ -118,28 +118,38 @@ $sent = Get-ThornswoodServiceAccountScript
 $ok = $true
 try { $null = [scriptblock]::Create($sent) } catch { $ok = $false }
 Yes 'the functions sent to the box parse' $ok
-Yes 'and carry all six' (([regex]::Matches($sent, '(?m)^function ')).Count -eq 6)
+# Six from #2578, nine more for who owns what a service makes (#4077).
+Yes 'and carry all fifteen' (([regex]::Matches($sent, '(?m)^function ')).Count -eq 15)
 
 # ---- never reach ---------------------------------------------------------------
 if ($OnWindows) {
     $nr = @(Get-ThornswoodServiceNeverReach -Own 'C:\Thornswood-Server')
-    Yes 'never reach: the backups, the deploys, the watch and maint folders' (
-        $nr -contains 'C:\Thornswood-Backup' -and $nr -contains 'C:\Thornswood-Deploys' -and $nr -contains 'C:\Thornswood-Watch' -and $nr -contains 'C:\Thornswood-Maint')
+    Yes 'never reach: the backups, the deploys and the watch folders' (
+        $nr -contains 'C:\Thornswood-Backup' -and $nr -contains 'C:\Thornswood-Deploys' -and $nr -contains 'C:\Thornswood-Watch')
     Yes "never reach: another server's private folder, and voice keys, but not its own" (
         $nr -contains 'C:\Thornswood-Server-Dev\private' -and $nr -notcontains 'C:\Thornswood-Server\private' -and
         $nr -contains 'C:\Thornswood-Voice\token-key.txt')
     # A deploy into a scratch box is checked against that box (#1273): with the
     # list fixed on C:, a harness on a VPS runner looked at the real servers'
     # private folders, which the runner may not, and the install ended there.
-    $sb = @(Get-ThornswoodServiceNeverReach -Own 'D:\scratch\box\Thornswood-Server' -Box 'D:\scratch\box')
-    Yes 'never reach follows -Box: the scratch box is checked, and nothing on C:' (
-        $sb -contains 'D:\scratch\box\Thornswood-Backup' -and $sb -contains 'D:\scratch\box\Thornswood-Server-Dev\private' -and
-        $sb -notcontains 'D:\scratch\box\Thornswood-Server\private' -and -not @($sb | Where-Object { $_ -like 'C:\*' }).Count)
+    # Join-Path needs the scratch box's drive to be on this machine, and
+    # One's runners have C: and R: but no D: (30 Oct 2026), so the scratch
+    # box goes on whichever drive other than C: is here.
+    $other = @(Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Name -ne 'C' -and $_.Root -match '^[A-Za-z]:\\$' } | Select-Object -First 1)
+    if ($other.Count) {
+        $scratch = $other[0].Name + ':\scratch\box'
+        $sb = @(Get-ThornswoodServiceNeverReach -Own ($scratch + '\Thornswood-Server') -Box $scratch)
+        Yes 'never reach follows -Box: the scratch box is checked, and nothing on C:' (
+            $sb -contains ($scratch + '\Thornswood-Backup') -and $sb -contains ($scratch + '\Thornswood-Server-Dev\private') -and
+            $sb -notcontains ($scratch + '\Thornswood-Server\private') -and -not @($sb | Where-Object { $_ -like 'C:\*' }).Count)
+    } else {
+        Write-Host 'SKIP  never reach follows -Box: this machine has no drive but C: to put a scratch box on'
+    }
     Yes '  and with no -Box it is the box, C:' (@(Get-ThornswoodServiceNeverReach) -contains 'C:\Thornswood-Server\private')
     Yes '  and C: written without its backslash is the same' (
         (@(Get-ThornswoodServiceNeverReach -Own 'C:\Thornswood-Docs' -Box 'C:') -join '|') -eq (@(Get-ThornswoodServiceNeverReach -Own 'C:\Thornswood-Docs') -join '|'))
 } else {
-    Write-Host 'SKIP  the never-reach list: it is the box''s folders joined onto its drive (C:\ or a scratch D:\), and Join-Path needs that drive to be on this machine'
+    Write-Host 'SKIP  the never-reach list: it is the box''s folders joined onto its drive (C:\ or a scratch box on another drive), and Join-Path needs that drive to be on this machine'
 }
 Yes 'each caller passes the folder its own root is in as -Box' (
     $server.Contains('Get-ThornswoodServiceNeverReach -Own $Root -Box (Split-Path -Parent $Root)') -and

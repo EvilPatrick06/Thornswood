@@ -1,0 +1,12 @@
+bin/
+obj/
+out/
+node_modules/
+target/
+build/
+dist/
+gen/
+electron/index.html
+electron/art.png
+electron/loop.wav
+wails/frontend/

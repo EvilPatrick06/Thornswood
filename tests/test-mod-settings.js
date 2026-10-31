@@ -7,7 +7,7 @@
 // here, so Apocalypse, AHZmoreHUD, atlas map markers, Skyrim Unbound and
 // chfshVariousActions started from their defaults every session. The front
 // plugin now reads the GLOB records wired to those menus (78 since Atlas Map
-// Markers left the collection with revision 6, #3649) and sends what
+// Markers' were dropped for revision 6, #3649) and sends what
 // moved as /modset lines; the gamemode keeps them in private\mod-settings.json
 // and puts them back through an owner-visible property when the character
 // comes in.

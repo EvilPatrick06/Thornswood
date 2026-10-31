@@ -212,8 +212,8 @@ try {
 }
 
 // ------------------------------------------------------------------- keys ----
-// A scan code, the same numbering the launcher's Controls page writes. 47 is
-// V, but the number is whatever it was rebound to.
+// A scan code, the same numbering the Settings panel in the game writes
+// (#3126). 47 is V, but the number is whatever it was rebound to.
 //
 // Push to talk and nothing else. There used to be a mute key as well, which
 // was a control for shutting a microphone that is already shut: push to talk
@@ -288,6 +288,26 @@ try {
 } catch (e) {
   log('could not read Thornswood.ini, using the default keys');
 }
+
+/*
+ * A key moved on the Settings panel in the game (#3126): the front writes
+ * Thornswood.ini and hands every plugin that reads it the new text, so the
+ * three voice keys are the file's from the next press. The defaults are the
+ * ones above.
+ */
+(function () {
+  const T = (globalThis.Thornswood = globalThis.Thornswood || {});
+  (T.settingsListeners = T.settingsListeners || []).push(function (text) {
+    const grab = function (key, fallback) {
+      const m = String(text || '').match(new RegExp('^\\s*' + key + '\\s*=\\s*(\\d+)', 'm'));
+      return m ? Number(m[1]) : fallback;
+    };
+    PTT_KEY = grab('PushToTalk', 47);
+    MODE_KEY = grab('VoiceModeKey', 48);
+    LOCK_KEY = grab('VoiceLockKey', 24);
+    log('keys read again: ptt', PTT_KEY, 'mode key', MODE_KEY, 'lock key', LOCK_KEY);
+  });
+})();
 
 log('profile', profileId, 'server', host || '(none)', 'voice port', VOICE_PORT, 'ptt', PTT_KEY,
     'mode key', MODE_KEY, 'microphone', MIC_ON ? 'on' : 'off',
@@ -371,11 +391,27 @@ function safeToOpenMic() {
   }
 }
 
+/*
+ * Who this game is now. The settings file holds the character played last,
+ * which the launcher writes before the game starts, and the character is
+ * picked after that, at the game's own menu, and can be picked again at the
+ * choice in the game (#3128). The front knows which, and says so through
+ * Thornswood.profile; the file is only for a front that does not.
+ */
+function currentProfile() {
+  const T = globalThis.Thornswood;
+  let id = 0;
+  try { id = (T && typeof T.profile === 'function') ? Number(T.profile()) || 0 : 0; } catch (e) { id = 0; }
+  return id || profileId;
+}
+let configuredAs = 0;    // the profile the page was last told
+
 function configure(micWanted) {
+  configuredAs = currentProfile();
   const o = {
     host: host,
     port: VOICE_PORT,
-    profileId: profileId,
+    profileId: configuredAs,
     name: myName(),
     pushToTalk: true,
     microphone: !!micWanted,
@@ -442,6 +478,16 @@ sp.on('update', guard('tick', () => {
     configure(false);
     if (tries >= CONFIGURE_TRIES) { phase = 2; log('configured'); }
     return;
+  }
+
+  // Another character picked at the choice in the game (#3128): the page is
+  // told who it is now, with the microphone as it stands. The page's
+  // configure takes a second call (see below), and the chat's socket, which
+  // voice rides on, joins again as that character by itself.
+  if (phase === 2 && currentProfile() !== configuredAs) {
+    const was = configuredAs;
+    configure(micOpened);
+    log('now profile', configuredAs, '(was', was + ')');
   }
 
   /*

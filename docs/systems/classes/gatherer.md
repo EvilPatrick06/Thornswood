@@ -13,12 +13,30 @@ the price a person posts.
 A plant above your rank is refused by name. You are told the rank it
 takes. You keep standing there. Nothing is picked.
 
+## The season of a plant
+
+Four plants give only in their two seasons (#3152): Lavender in spring
+and summer, Jazbay Grapes in summer and autumn, Snowberries in autumn
+and winter, Juniper Berries in winter and spring. Out of season the
+plant is bare. Nothing is picked, it is no piece of work, and it keeps
+no wait. The line says which seasons it gives in. Every other plant
+gives all year. The season is the farmer's, one for the province. Why
+these four: [Food](../food.md), "Seasonal food".
+
 ## What one pick gives
 
 One. The rank does not grow the handful. It only opens the plant.
 A master and a novice both take 1 blue mountain flower off a plant
 the novice is allowed to touch. The extra yield pairs on a carcass,
 a seam, a fish and a plot are not this verb.
+
+The season moves the one by a quarter, on average (#3144). In summer
+a pick gives 2 a quarter of the time, and the line says "Summer gives
+more." In winter a plant is bare a quarter of the time: nothing is
+picked, it is no piece of work, and the plant still waits its ten
+minutes, so pressing it again does not take the quarter back. The
+line says it has nothing to pick, and "Winter gives less." Spring and
+autumn give the one.
 
 One successful pick is one piece of work. There is no deposit of 20
 the way a seam has, so a hillside of flowers is more pieces per hour
@@ -79,10 +97,13 @@ maw and thorn hook are Creation Club plants, and Thornswood is Special
 Edition only, so nobody gathers them.
 
 Cabbage, carrot, gourds, leek, potato, and wheat are the farmer's
-crops. A chickens' nest and a churn are farmer verbs. A beehive is
-the farmer's. See [Farmer](farmer.md). A clam and a fish are the
-fisher's. A coin purse and an estate key are not a harvest. Mammoth
-cheese and a mead barrel stay off every ladder.
+crops, in a homestead's garden planter as much as in a field. A
+chickens' nest and a churn are farmer verbs. A beehive is the
+farmer's. See [Farmer](farmer.md). A clam and the fish laid out
+and hung up in Windhelm are the fisher's. A dead horker in the Skaal
+village is the hunter's. A coin purse and an estate key are not a
+harvest. A bowl of mammoth cheese is anybody's. A mead barrel and
+Bashir's clam at Oar's Rest are nobody's: nothing comes away.
 
 <!-- detail:begin -->
 
@@ -144,7 +165,9 @@ Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same r
 
 ## Where this is
 
-The verb, the ranks, the ten minutes, and the list are in the server.
+The verb, the ranks, the ten minutes, the four herbs' seasons, the
+season's quarter, and the
+list are in the server.
 The wait is the plant, for everybody: the next person cannot take it
 early. A press from someone who is not a gatherer is refused before
 the plant is consumed, and a gatherer below the plant's rank takes

@@ -52,7 +52,11 @@
     7. what each mod's page allows (#3649): a revision with a mod the
        permission record has not read, or does not have, is refused before
        anything is written, and so is publishing a draft with a mod whose
-       page does not allow it in a collection; a -WhatIf says so and goes on.
+       page does not allow it in a collection; a -WhatIf says so and goes on;
+    8. discarding a draft (#4070): -WhatIf names the mutation and sends
+       nothing; a revision that is not the draft, and -Discard with anything
+       else, are refused; the real run discards the draft with
+       discardRevision and reads back that no draft is waiting.
 
   Needs node. The collection part needs 7-Zip and says SKIP without it; the
   5.1 runs say SKIP where there is no Windows PowerShell. Everything it writes
@@ -205,7 +209,8 @@ $env:THORNSWOOD_NEXUS_STANDIN = $null; $env:LOCALAPPDATA = (Join-Path $T 'appdat
 $n0 = Count
 $r = Run 'Send-NexusFile.ps1' @('-Mod', '192762', '-Archive', $archive, '-Version', '1.0.1')
 $env:THORNSWOOD_NEXUS_STANDIN = $base; $env:LOCALAPPDATA = $realAppData
-YesR 'with no key on the machine a file upload stops, naming the variable and the file' ($r.Code -eq 1 -and $r.Out -match 'THORNSWOOD_NEXUS_API_KEY' -and $r.Out.Contains([IO.Path]::Combine('Thornswood', 'Nexus', 'api-key.txt')) -and $r.Out -match 'Nothing was changed on Nexus') $r
+# A cloud session holds no key since #2841: the stop names Nexus-Run.ps1, which runs it with the key, and One's file.
+YesR 'with no key on the machine a file upload stops, naming Nexus-Run.ps1 and the file' ($r.Code -eq 1 -and $r.Out -match 'Nexus-Run\.ps1' -and $r.Out.Contains([IO.Path]::Combine('Thornswood', 'Nexus', 'api-key.txt')) -and $r.Out -match 'Nothing was changed on Nexus') $r
 Yes 'and asks nothing first' ((Count) -eq $n0)
 
 $r = Run 'Set-NexusKey.ps1' @('-Check')
@@ -465,6 +470,31 @@ foreach ($case in @(
     Remove-Item -LiteralPath (Join-Path $T 'no.json') -ErrorAction SilentlyContinue
     $null = & $node.Source $js $cj $ptJson (Join-Path $T 'no.json') (Join-Path $T 'no-payload.json') 2>$null
     Yes ('a patch for ' + $case[1] + ' is refused, and nothing is written') ($LASTEXITCODE -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
+}
+
+# 27 Oct: revision 5 gave cheddars_mashups.esl, which the game loads as a
+# master, a rule after plugins that are not, and LOOT reported each as a
+# cyclic interaction. A rule entry replaces a plugin's rule and moves it in
+# the list to straight after the last plugin it names.
+$cjRule = Join-Path $T 'rule-collection.json'
+& $node.Source -e "const fs=require('fs');const b=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));b.plugins=['Water for ENB.esm','RaceCompatibility.esm','Immersive Weapons.esp','cheddars_mashups.esl'].map(n=>({name:n,enabled:true}));b.pluginRules.plugins=[{name:'immersive weapons.esp',after:['racecompatibility.esm']},{name:'cheddars_mashups.esl',after:['immersive weapons.esp']}];fs.writeFileSync(process.argv[2],JSON.stringify(b,undefined,2))" $cj $cjRule
+$ruJson = Join-Path $T 'rule.json'
+Put $ruJson '[{"rule":true,"name":"cheddars_mashups.esl","after":["RaceCompatibility.esm"]}]'
+$o1 = Join-Path $T 'rule-out.json'; $o2 = Join-Path $T 'rule-payload.json'
+$said = & $node.Source $js $cjRule $ruJson $o1 $o2
+Yes 'nexus-collection.js replaces a plugin''s rule and says what it was and is' ($LASTEXITCODE -eq 0 -and (@($said) -join '|') -eq ("cheddars_mashups.esl`trule`tafter immersive weapons.esp`tafter racecompatibility.esm"))
+& $node.Source -e "const fs=require('fs');const a=JSON.parse(fs.readFileSync(process.argv[1],'utf8')),b=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));if(b.plugins.map(p=>p.name).join('|')!=='Water for ENB.esm|RaceCompatibility.esm|cheddars_mashups.esl|Immersive Weapons.esp')process.exit(2);if(JSON.stringify(b.pluginRules.plugins)!==JSON.stringify([{name:'immersive weapons.esp',after:['racecompatibility.esm']},{name:'cheddars_mashups.esl',after:['racecompatibility.esm']}]))process.exit(3);a.plugins=b.plugins;a.pluginRules=b.pluginRules;process.exit(JSON.stringify(a)===JSON.stringify(b)?0:1)" $cjRule $o1
+Yes 'the plugin moves to straight after the plugin its rule names, the rule is lower case, and nothing else changes' ($LASTEXITCODE -eq 0)
+foreach ($case in @(
+        @('{"rule":true,"name":"Nowhere.esl","after":["RaceCompatibility.esm"]}', 'a plugin the list does not name', 'does not name Nowhere\.esl'),
+        @('{"rule":true,"name":"cheddars_mashups.esl","after":["Nowhere.esp"]}', 'a plugin to load after one the list does not name', 'after Nowhere\.esp, which the plugin list does not name'),
+        @('{"rule":true,"name":"cheddars_mashups.esl","after":["immersive weapons.esp"]}', 'the rule the plugin has already', 'already loads after'),
+        @('{"rule":true,"name":"cheddars_mashups.esl","after":["cheddars_mashups.esl"]}', 'a plugin to load after itself', 'after itself'),
+        @('{"rule":true,"name":"cheddars_mashups.esl","after":[]}', 'a rule with nothing to load after', 'says nothing to load after'))) {
+    Put $ruJson ('[' + $case[0] + ']')
+    Remove-Item -LiteralPath (Join-Path $T 'no.json') -ErrorAction SilentlyContinue
+    $err = (& $node.Source $js $cjRule $ruJson (Join-Path $T 'no.json') (Join-Path $T 'no-payload.json') 2>&1) -join ' '
+    Yes ('a rule for ' + $case[1] + ' is refused, saying so, and nothing is written') ($LASTEXITCODE -eq 1 -and $err -match $case[2] -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
 }
 
 # Issue #3649: a mod taken out, with the plugins its hashes put in Data.
@@ -734,6 +764,26 @@ foreach ($case in @(
 Layout '00000000000000000000000000000000'
 $r = Run 'New-NexusRevision.ps1' @('-From', $lightBase, '-SetLight', 'FishingInSkyrim.esp', '-Layout', $lay, '-WhatIf')
 YesR 'a layout of another archive is refused' ($r.Code -eq 1 -and $r.Out -match 'is the layout of revision 3 \(archive md5 0{32}\)') $r
+
+# Issue #4070: a draft that is missing a change is discarded and made again.
+Control @{ addRevision = @{ n = 4; id = 900004; status = 'draft'; archive = $draft3 } }
+$r = Run 'New-NexusRevision.ps1' @('-Discard', '3')
+YesR 'discarding a revision that is published is refused' ($r.Code -eq 1 -and $r.Out -match 'Revision 3 is published, not a draft, so there is nothing to discard') $r
+$r = Run 'New-NexusRevision.ps1' @('-Discard', '4', '-Rule', $ruJson)
+YesR '-Discard with a change is refused' ($r.Code -eq 1 -and $r.Out -match '-Discard throws away a draft that is already there') $r
+$r = Run 'New-NexusRevision.ps1' @('-Publish', '4', '-Discard', '4')
+YesR '-Publish with -Discard is refused' ($r.Code -eq 1 -and $r.Out -match 'so it takes no -Discard') $r
+$n0 = Count
+$r = Run 'New-NexusRevision.ps1' @('-Discard', '4', '-WhatIf')
+YesR '-Discard -WhatIf names the mutation and sends nothing' ($r.Code -eq 0 -and $r.Out -match 'discardRevision\(collectionId: "515846", revisionNumber: 4\)' -and @(Writes @(Since $n0)).Count -eq 0 -and (State).collection.draft -eq 4) $r
+$r = Run 'New-NexusRevision.ps1' @('-From', $lightBase, '-SetLight', 'FishingInSkyrim.esp', '-Layout', $lay)
+YesR 'while revision 4 is a draft, a run that writes says how to discard it' ($r.Code -eq 1 -and $r.Out -match 'Revision 4 is already a draft on Nexus\. Publish it with -Publish 4, or discard it with -Discard 4') $r
+$n0 = Count
+$r = Run 'New-NexusRevision.ps1' @('-Discard', '4')
+$mut = @((Since $n0) | Where-Object { $_.path -eq '/v2/graphql' -and ([string]$_.json.query).StartsWith('mutation') }) | Select-Object -First 1
+YesR '-Discard discards the draft with discardRevision and reads back that none is waiting' ($r.Code -eq 0 -and $r.Out -match 'Revision 4 is discarded, and no draft is waiting' -and $null -ne $mut -and $mut.key -eq 'right' -and [string]$mut.json.variables.collectionId -eq '515846' -and [int]$mut.json.variables.revisionNumber -eq 4 -and $null -eq (State).collection.draft -and $null -eq (State).collection.revisions.PSObject.Properties['4']) $r
+$r = Run 'New-NexusRevision.ps1' @('-Discard', '4')
+YesR 'discarding it again is refused' ($r.Code -eq 1 -and $r.Out -match 'Reading revision 4 was refused') $r
 
 # ---- the key, across every run ---------------------------------------------------
 Yes ('no run printed the key, in ' + $script:outs.Count + ' runs') (@($script:outs | Where-Object { $_.Contains($KEY) }).Count -eq 0)

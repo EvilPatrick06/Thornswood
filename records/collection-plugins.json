@@ -2,7 +2,7 @@
   "version": 1,
   "builtBy": "scripts/mods/New-CollectionPluginRecord.ps1",
   "collection": "7essxf",
-  "revision": 6,
+  "revision": 5,
   "plugins": [
     { "name": "_ResourcePack.esl", "size": 78418, "sha256": "d231915a4bbfe6e89536dfb0a46c5adc8e4d2d23ce95d248dc24943776eb76fb" },
     { "name": "3BBB.esp", "size": 20257, "sha256": "ce4f554616458a10b4809f705828f9d3e3e2d1457abe73ee32fe5f8f044a8549" },
@@ -12,6 +12,7 @@
     { "name": "AnotherOakwood.esp", "size": 844208, "sha256": "e29668024dc76c1dfb8e3724448522ae1b8853815cc221c5f0024e433d2b2264" },
     { "name": "Apocalypse - Magic of Skyrim.esp", "size": 1446114, "sha256": "b0a9632372f2117f7d96583e1522b42758f414129d3572f848b8f7ac65681384" },
     { "name": "Arena - Markarth Side.esp", "size": 886405, "sha256": "07a234e56d7c3e05b8ab976e5bc8e5f92642b9b8566be6f5e946fcec5d0ac395" },
+    { "name": "atlas map markers.esp", "size": 305094, "sha256": "e93c675baa5ed7d0825afc697209616d769d480d324d24e6e2d362ee8c6d4361" },
     { "name": "AwBaldandShavedHair.esp", "size": 2701, "sha256": "8a9ca8843e8fe3f3dbe58c2ac5e6a04b222b21f94b50867aacce9016ecf0645a" },
     { "name": "AZ_IADistribution.esp", "size": 43802, "sha256": "240082085b0d2db8369c28c8e2f94601946f6a493d45530b31774d450af0296c" },
     { "name": "BeardMaskFix.esp", "size": 3853, "sha256": "a3566fdf94acc82695809e80cfc06289bf0a3bfe9c87b64e594d9fb998e902db" },

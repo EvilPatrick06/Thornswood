@@ -71,6 +71,17 @@ namespace Thornswood
                     "c6d96ffb786dbce4bcbb63fdf4164cd9a7d190c94ac5e4d77b1ab09eaa38f35b" },
         };
 
+        // Another server's file our packs carried until 29 Sep (#1178): a weapon
+        // mesh in a folder named with that server's prefix, its own name the
+        // folder's followed by the leaf here. The release record cannot list
+        // it as gone without naming that server, which no file here does
+        // (#400), so it is matched by that shape and the bytes it shipped as:
+        // the folder the prefix folders sit in, the leaf, the size, the SHA-256.
+        static readonly string[][] OtherServer = {
+            new[] { "Data\\meshes\\weapons", "_haybale.nif", "44541",
+                    "88c2739744b8fc951f103eedea30ccfa9a83cc525dfc5d349c56054c7798c6c3" },
+        };
+
         /// <summary>
         /// Removes any shipped copy found, in the folder the game runs from and,
         /// when that is Thornswood's own folder, in the Steam copy it is made
@@ -116,8 +127,10 @@ namespace Thornswood
                        " that an earlier installer carried by mistake. It was not yours and nothing of yours was touched.";
 
             string synced = CleanSynced();
-            if (synced == null) return said;
-            return said == null ? synced : said + " " + synced;
+            if (synced != null) said = said == null ? synced : said + " " + synced;
+            string other = CleanOtherServer();
+            if (other != null) said = said == null ? other : said + " " + other;
+            return said;
         }
 
         /// <summary>
@@ -166,6 +179,53 @@ namespace Thornswood
             return "Removed " + gone.Count + (gone.Count == 1 ? " file" : " files") + " from Thornswood's own folder that a dev release of 28 or 29 September " +
                    "handed out by mistake: mod menu settings, window layouts and notes from the machine that ships, each still exactly as it was handed out (" +
                    string.Join(", ", gone.ToArray()) + "). A copy changed since is yours and was kept.";
+        }
+
+        /// <summary>
+        /// Takes another server's files our old packs shipped (OtherServer)
+        /// out of Thornswood's own folder while each is still exactly the bytes
+        /// we shipped (#1178). Only a file named for the prefix folder it sits
+        /// in, so nothing of the collection's is looked at twice. Never the
+        /// Steam copy: somebody who plays that server has the same file there,
+        /// and there it is theirs. The log line names no path, so it does not
+        /// name that server either.
+        /// </summary>
+        static string CleanOtherServer()
+        {
+            bool own;
+            try { own = OwnGame.Active; }
+            catch (Exception ex) { Swallow.Note("Leaks.CleanOtherServer, OwnGame.Active", ex); return null; }
+            if (!own) return null;
+
+            int n = 0;
+            foreach (string[] s in OtherServer)
+            {
+                string dir = Path.Combine(OwnGame.Folder, s[0]);
+                string[] subs;
+                try
+                {
+                    if (!Directory.Exists(dir)) continue;
+                    subs = Directory.GetDirectories(dir);
+                }
+                catch (Exception ex) { Swallow.Note("Leaks.CleanOtherServer, " + s[0], ex); continue; }
+                foreach (string sub in subs)
+                {
+                    string p = Path.Combine(sub, Path.GetFileName(sub) + s[1]);
+                    try
+                    {
+                        if (!File.Exists(p)) continue;
+                        if (new FileInfo(p).Length != long.Parse(s[2])) continue;
+                        if (!string.Equals(Sha256(p), s[3], StringComparison.OrdinalIgnoreCase)) continue;
+                        // This folder's name for it only, as CleanSynced does.
+                        OwnGame.DropName(p);
+                        n++;
+                    }
+                    catch (Exception ex) { Swallow.Note("Leaks.CleanOtherServer, deleting", ex); }
+                }
+            }
+            if (n == 0) return null;
+            return "Removed " + n + (n == 1 ? " file" : " files") + " from Thornswood's own folder that another server made and an update before 29 September " +
+                   "carried by mistake, each still exactly as it was handed out. A copy changed since is yours and was kept.";
         }
 
         static string Sha256(string path)

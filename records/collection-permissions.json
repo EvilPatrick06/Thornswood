@@ -2,7 +2,7 @@
   "version": 1,
   "builtBy": "scripts/release/collection-permissions.js update",
   "collection": "7essxf",
-  "revision": 6,
+  "revision": 5,
   "mods": [
     {
       "modId": 198,
@@ -1080,6 +1080,36 @@
           "Author notes": "This author has not provided any additional notes regarding file permissions"
         },
         "version": "1.5"
+      }
+    },
+    {
+      "modId": 24104,
+      "name": "Atlas Map Markers SE - Updated with MCM",
+      "author": "Kronixx and kryptopyr",
+      "files": [
+        {
+          "fileId": 609074,
+          "name": "Atlas Map Markers",
+          "version": "3.0.4"
+        }
+      ],
+      "plugins": [
+        "atlas map markers.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/24104?tab=description",
+      "reading": {
+        "read": "2026-10-26",
+        "by": "Wyrd audit (Legal), #3649",
+        "collections": "not allowed",
+        "terms": {
+          "Author's instructions": [
+            "You are not allowed to package this mod as part of a mod collection.",
+            "You are not allowed to upload or distribute this file on any other website or platform.",
+            "You are allowed to create compatibility patches for this mod as long as the patch requires that the user download the main file from this page in order to work.",
+            "For questions or to seek additional permissions, contact the author at the address on that page."
+          ]
+        },
+        "version": "3.0.4"
       }
     },
     {

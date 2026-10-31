@@ -17,12 +17,14 @@
   -FromCloudflare (Patrick's A of 22 Oct, after the Desk refused to read the
   secret through the Cloudflare connector, because a live secret would then
   sit in its transcript). Patrick made a Cloudflare API token that can only
-  read Turnstile widgets and pasted it once into the repository's Actions
-  secrets as CLOUDFLARE_TURNSTILE_TOKEN. This:
+  read Turnstile widgets and pastes it into the Actions secrets of the
+  private ops repository, EvilPatrick06/Thornswood-Ops, where the VPS
+  runners are registered (#4013), as CLOUDFLARE_TURNSTILE_TOKEN. This:
     1. has the box make its seal key if it has none, and print the public
        half (scripts\vps\Seal.ps1);
-    2. starts .github/workflows/turnstile-keys.yml on main with that public
-       key. The workflow runs this script with -SealOnGitHub, which seals the
+    2. starts the ops repository's turnstile-keys.yml on its main with that
+       public key. The workflow checks out this repository's main and runs
+       this script with -SealOnGitHub, which seals the
        token to the key and leaves only the sealed form, as an annotation;
     3. hands the sealed form to the box, which opens it with its key, asks
        Cloudflare for the widget's secret with the token, and writes the keys.
@@ -53,7 +55,8 @@ param(
   [string]$Vps  = '',
   [string]$User = '',
   [string]$DocsRoot = 'C:/Thornswood-Docs',
-  [string]$GitHubRepo = 'EvilPatrick06/Thornswood'
+  # Where turnstile-keys.yml and the VPS runners are (#4013).
+  [string]$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'
 )
 
 $ErrorActionPreference = 'Stop'

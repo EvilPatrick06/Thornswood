@@ -64,7 +64,7 @@ const pages = fs.readdirSync(path.join(REPO_DIR, 'site', 'data', 'site')).filter
   .map(function (f) { return 'site/data/site/' + f; })
   .concat(fs.readdirSync(path.join(REPO_DIR, 'site', 'public')).filter(function (f) { return /\.html$/.test(f); })
     .map(function (f) { return 'site/public/' + f; }))
-  .concat(['launcher/app/Help.cs', 'bot/content.py']);
+  .concat(['bot/content.py']);
 const said = [];
 for (const rel of pages) {
   const t = flat(read(rel));

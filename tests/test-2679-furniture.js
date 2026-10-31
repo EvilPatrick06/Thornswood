@@ -329,7 +329,7 @@ const B1 = 'b1:Skyrim.esm';
 
 // --------------------------------------------------- the plugin and the page
 {
-  yes('the panel is one of the overlays', /'thornswood-furniture\.js'\];/.test(front));
+  yes('the panel is one of the overlays', /const OVERLAYS = \[[^\]]*'thornswood-furniture\.js'/.test(front));
   yes('the keys reach furniturePress and arrangePress before the mold key\'s other uses',
       /furniturePress\(e\.code\)\) \{ return; \}\s*\n\s*if \(e\.code === LOCK_KEY && arrangePress\(\)\) \{ return; \}\s*\n\s*if \(e\.code === MOLD_KEY && moldPress\(\)\)/.test(front));
   yes('the inventory line is Arrange furniture on the lock key', front.indexOf("lockRow(LOCK_NAME, 'Arrange furniture'") >= 0);

@@ -17,15 +17,18 @@
   THE KEY. Patrick's personal API key, from https://www.nexusmods.com/settings/api-keys.
   It is read from exactly one of these, by these exact names:
 
-      THORNSWOOD_NEXUS_API_KEY                   the environment variable, in a
-                                                 cloud session (the cloud
-                                                 environment's variables)
+      THORNSWOOD_NEXUS_API_KEY                   the environment variable, in the
+                                                 one step of nexus-run.yml that
+                                                 runs a script, from the secret
+                                                 NEXUS_API_KEY of the "desk"
+                                                 environment (#2841)
       %LOCALAPPDATA%\Thornswood\Nexus\api-key.txt
                                                  the file, on One, written by
                                                  Set-NexusKey.ps1 at a prompt
 
   The variable is used when it is set; otherwise the file. Neither is in the
-  repository. The key is sent only in the apikey header, and only to
+  repository. A cloud session holds neither since #2841: it runs these
+  scripts through scripts\release\Nexus-Run.ps1, which starts nexus-run.yml. The key is sent only in the apikey header, and only to
   https://api.nexusmods.com: never on a command line, never printed, never
   written to a log, and never to the upload addresses Nexus hands back, which
   are signed already and get no key. Requests to api.nexusmods.com do not
@@ -149,7 +152,7 @@ function Read-NexusKey {
   if (-not $k) {
     $where = Get-NexusKeyFile
     if (-not $where) { $where = '%LOCALAPPDATA%\Thornswood\Nexus\api-key.txt (on One)' }
-    throw ('There is no Nexus API key on this machine, so nothing was sent to Nexus. In a cloud session it is the environment variable THORNSWOOD_NEXUS_API_KEY; on One it is ' + $where + ', which .\scripts\release\Set-NexusKey.ps1 writes at a prompt.')
+    throw ('There is no Nexus API key on this machine, so nothing was sent to Nexus. A cloud session holds none: run the script through pwsh scripts/release/Nexus-Run.ps1 -Line ''<script> <parameters>''. On One the key is ' + $where + ', which .\scripts\release\Set-NexusKey.ps1 writes at a prompt.')
   }
   if ($k -match '\s') { throw ('The Nexus API key read from ' + $script:NexusKeyFrom + ' has a space or a line break inside it, so it is not one key. Nothing was sent to Nexus.') }
   $script:NexusKey = $k

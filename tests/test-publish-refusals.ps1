@@ -48,7 +48,6 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $Here = Split-Path -Parent $Here
 if (-not $PublishPath) { $PublishPath = Join-Path $Here 'scripts\release\Publish-Update.ps1' }
 $ToolsDir = Split-Path -Parent $PublishPath
-. (Join-Path $Here 'tests\fixtures\generated-bodies.ps1')
 . (Join-Path $Here 'tests\fixtures\ui-front.ps1')
 
 $script:pass = 0
@@ -83,10 +82,6 @@ function New-Install([string]$name, [string[]]$record, [int64]$bytes) {
     [IO.File]::WriteAllText((Join-Path $root 'rel\published.json'), '{"Data\\gone.esp":"10:1"}')
     if ($null -ne $record) {
         [IO.File]::WriteAllLines((Join-Path $root 'Profile\OwnGame\files.txt'), $record)
-        # The covered bodies a publish needs since d2519bb, built as a build
-        # leaves them, so each case is refused for what it is about. Their
-        # record holds files.txt's hash, so they come after it.
-        New-GeneratedBodies $root (Split-Path -Parent $tools)
     }
     # One file of ours, the size the case asks for. Under Data\Platform\UI, since
     # outside it only what Ship-Rules names is ours (#1178), and under UI only
@@ -152,7 +147,7 @@ try {
                    # Dot-sourced for the signed manifest (#2163); -NoUpload signs nothing.
                    'scripts\release\Release-Manifest.ps1', 'scripts\release\Sign-ReleaseCatalog.ps1', 'scripts\release\Sign-OnGitHub.ps1', 'scripts\release\ShippedBytes.ps1', 'scripts\release\Assert-PublishSigned.ps1',
                    'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt',
-                   'scripts\release\Where.ps1', 'records\client-build.json', 'records\client-licences.json', 'records\client-licences', 'records\ui-gone.json',
+                   'scripts\release\Where.ps1', 'records\client-build.json', 'records\client-licences.json', 'records\client-licences', 'records\ui-gone.json', 'records\shipped-not-ours.json',
                    'scripts\mods\Generated.ps1', 'records\generated.json',
                    # LoadOrder.ps1 compiles the Vortex state reader from the
                    # launcher's source since #1416, and the publish reads the

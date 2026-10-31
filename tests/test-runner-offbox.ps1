@@ -15,10 +15,9 @@
   Issue #2161: -NetworkOnly writes the outbound rules alone (no read deny,
   lock, account or service step), may name a VPS-label runner, and full
   -OffBox still refuses that label.
-  Issue #3312: the runner records\sign-runners.json lists is registered with
-  its label and, under -NetworkOnly, reaches the Microsoft service tags the
-  record names, read with Read-RunnerServiceTags and held to each host with
-  Get-RunnerReachMisses; the dry run writes stand-in tags and asks no one.
+  Issue #4033: no runner signs since release.yml signs on GitHub's runner
+  alone (#4013), so runner 3 is registered with the VPS label alone and its
+  -NetworkOnly rules are the same as any other runner's.
 #>
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -70,17 +69,16 @@ try {
     $r = Dry @('-OffBox')
     Yes "-OffBox dry run ends 0 (got $($r.Code))" ($r.Code -eq 0)
     Yes '  it ran nothing: every step says DRY RUN' ($r.Said -match 'DRY RUN, nothing ran' -and $r.Said -match 'on this machine')
-    # The build label only when records\build-runners.json names this
-    # machine's runner (One's, 26 Oct 2026), so the answer depends on where
-    # the test runs.
-    $buildRec = Get-Content -LiteralPath (Join-Path $repo 'records\build-runners.json') -Raw | ConvertFrom-Json
-    $named = $buildRec.PSObject.Properties['offBox'] -and (@($buildRec.offBox) -contains ('thornswood-pr-' + $comp))
+    # The pull request build label only when records\pr-build-runners.json
+    # names this machine's runner (One's, 26 Oct 2026), so the answer depends
+    # on where the test runs. Never the build label: off the box it is not
+    # carried (#4010).
     $prRec = Get-Content -LiteralPath (Join-Path $repo 'records\pr-build-runners.json') -Raw | ConvertFrom-Json
     $prNamed = $prRec.PSObject.Properties['offBox'] -and (@($prRec.offBox) -contains ('thornswood-pr-' + $comp))
-    $wantLabels = 'thornswood-pr' + $(if ($named) { ',thornswood-build' } else { '' }) + $(if ($prNamed) { ',thornswood-pr-build' } else { '' })
+    $wantLabels = 'thornswood-pr' + $(if ($prNamed) { ',thornswood-pr-build' } else { '' })
     Yes "  registers thornswood-pr-$comp with the label(s) $wantLabels" ($r.Text -match ("--name 'thornswood-pr-" + [regex]::Escape($comp) + "' --labels '" + [regex]::Escape($wantLabels) + "'"))
     Yes '  never the VPS label' ($r.Text -notmatch "--labels 'thornswood-vps" -and $r.Text -notmatch "--labels '[^']*thornswood-vps")
-    Yes '  nor the build label unless the record names it (#2994)' ($named -or $r.Text -notmatch 'thornswood-build')
+    Yes '  nor the build label, which is the box''s alone (#2994, #4010)' ($r.Text -notmatch '\bthornswood-build\b')
     Yes '  in C:\Thornswood-RunnerPR, as the account thornswood-pr' ($r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-RunnerPR'") -and $r.Text -match [regex]::Escape("`$acct = 'thornswood-pr'"))
     Yes '  its own folder is still locked before config.cmd writes into it' ($r.Text -match '(?m)^Lock-RunnerRoot \$root \$acct')
     Yes '  the install shuts it out of every C:\Thornswood* folder, hyphen or not, Dumps included (#2488)' ($r.Text -match [regex]::Escape("Close-RunnerAccount `$acct `$root 'C:\' 'Thornswood*' @() @()"))
@@ -89,6 +87,7 @@ try {
     Yes '  Defender keeps scanning its folder' ($r.Text -match '(?m)^if \(\$false\) \{\s*$')
     Yes '  the stand-in registration token is in none of the scripts (it goes on standard input)' ($r.Text -notmatch 'DRY-RUN-TOKEN-NOT-REAL')
     Yes '  the install script is marked as taking a secret on standard input' ($r.Text -match 'with a secret on standard input')
+    Yes '  dry-run profile recovery names an approved restart of THIS PC, never a VPS script (#4048)' ($r.Text -match 'approved local PC restart' -and $r.Text -notmatch 'Set-TimeWait.ps1 -Restart')
     Yes '  GitHub was never asked (the gh on PATH was not called)' (-not (Test-Path -LiteralPath $ghCalled))
 
     $r = Dry @('-OffBox', '-DefenderSkip', '-AlsoDeny', 'D:\Somewhere Else')
@@ -105,10 +104,11 @@ try {
     $r = Dry @()
     Yes '  and a VPS runner does not' ($r.Code -eq 0 -and $r.Text -match "(?m)^Set-RunnerTemp \`$root '[^']+' \`$false\s*$")
 
-    # Build runners on One (Patrick, 26 Oct 2026): a name the build record's
-    # offBox lists takes the build label too, and never the VPS label.
+    # Build runners on One (Patrick, 26 Oct 2026): a name the pull request
+    # record's offBox lists takes its label too, and never the build or the
+    # VPS label (#4010).
     $r = Dry @('-OffBox', '-RunnerName', 'thornswood-pr-one')
-    Yes 'an off-box runner records\build-runners.json and records\pr-build-runners.json name takes both labels (#4010)' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-pr-one' --labels 'thornswood-pr,thornswood-build,thornswood-pr-build'(?!,)")
+    Yes 'an off-box runner records\pr-build-runners.json names takes its label, not the build label (#4010)' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-pr-one' --labels 'thornswood-pr,thornswood-pr-build'(?!,)")
     $r = Dry @('-OffBox', '-RunnerName', 'thornswood-pr-elsewhere')
     Yes '  and one it does not name keeps the pull request label alone' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-pr-elsewhere' --labels 'thornswood-pr'(?!,)")
 
@@ -123,11 +123,22 @@ try {
     # The VPS, unchanged: what an install on the box would send.
     $r = Dry @()
     Yes "without -OffBox the dry run still ends 0 (got $($r.Code))" ($r.Code -eq 0)
+    # A reinstall never takes off a runner mid-job or by halves (#3889, 30 Oct).
+    Yes '  a reinstall stops before anything is touched when the runner is running a job' ($r.Text -match [regex]::Escape("throw ('this runner is running a job") -and $r.Text -match '(?m)^Assert-RunnerIdle \$root\s*$')
+    Yes '  then stops it whole: no process left under its folder and the service gone, or it says which' ($r.Text -match '(?m)^Stop-RunnerHere \$root ' -and $r.Text -match [regex]::Escape("throw ('still running from '") -and $r.Text -match [regex]::Escape("Stop-Service -Name `$svc -Force -EA Stop"))
+    Yes '  it clears the broker''s .runner_migrated and .credentials_migrated as well, and stops when any of the old configuration is left' ($r.Text -match [regex]::Escape("@('.runner', '.runner_migrated', '.credentials', '.credentials_migrated', '.credentials_rsaparams')") -and $r.Text -match [regex]::Escape("throw ('the old configuration is still there: '"))
+    Yes '  and no stop is passed over silently' ($r.Text -notmatch 'Stop-Service[^\r\n]*-EA SilentlyContinue')
+    Yes '  both come before the account''s password changes, so a refusal leaves the old service able to log on' ($r.Text.IndexOf("Assert-RunnerIdle `$root") -ge 0 -and $r.Text.IndexOf("Assert-RunnerIdle `$root") -lt $r.Text.IndexOf('Set-LocalUser -Name') -and $r.Text.IndexOf("Stop-RunnerHere `$root") -lt $r.Text.IndexOf('Set-LocalUser -Name'))
+    Yes '  the install names its service before anything reads it, so the read back is that one service and not every service on the box' ($r.Text -match "(?m)^\`$svc = 'actions\.runner\.[^']+thornswood-vps'\s*$" -and $r.Text.IndexOf("`$svc = 'actions.runner.") -lt $r.Text.IndexOf("`$s = Get-Service -Name `$svc"))
+    Yes '  and a process list that cannot be read stops them, never reads as empty' ($r.Text -match [regex]::Escape('@(Get-CimInstance Win32_Process -EA Stop | Where-Object'))
+    $rm = Dry @('-Number', '3', '-Remove')
+    Yes '  -Remove refuses a runner running a job before GitHub is told, and stops it the same way' ($rm.Text -match "(?m)^Assert-RunnerIdle 'C:\\Thornswood-Runner3'" -and $rm.Text -match "(?m)^Stop-RunnerHere 'C:\\Thornswood-Runner3' " -and $rm.Text -notmatch 'Stop-Service[^\r\n]*-EA SilentlyContinue' -and $rm.Text.IndexOf('Assert-RunnerIdle ''C:\Thornswood-Runner3''') -lt $rm.Text.IndexOf('config.cmd remove'))
+    Yes '  remote VPS recovery retains VPS restart guidance (#4048)' ($r.Text -match 'Restart the VPS \(scripts\\vps\\Set-TimeWait.ps1 -Restart\)')
     Yes '  the VPS runner keeps its label, name and folder, runner 1 takes builds (#2994) and checks signed drafts (#3956), but no pull request builds (#4010)' ($r.Text -match "--name 'thornswood-vps' --labels 'thornswood-vps,thornswood-build,thornswood-check'(?!,)" -and $r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-Runner'"))
     $r2 = Dry @('-Number', '2')
     Yes '  runner 2 takes builds, pull request builds and checks (#4010)' ($r2.Code -eq 0 -and $r2.Text -match "--name 'thornswood-vps-2' --labels 'thornswood-vps,thornswood-build,thornswood-pr-build,thornswood-check'(?!,)")
     $r = Dry @('-Number', '4')
-    Yes "  runner 4, the light one, takes no builds and checks signed drafts (#3956, exit $($r.Code))" ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-vps-4' --labels 'thornswood-vps,thornswood-check'(?!,)")
+    Yes "  runner 4, the light one, takes no builds and takes the check label's jobs (#3956, #4914, exit $($r.Code))" ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-vps-4' --labels 'thornswood-vps,thornswood-check'(?!,)")
     # #2161, 21 Oct: the record's no-reach folders outside C:\Thornswood-* are denied on the box too.
     $vpsAlso = "@('C:\ProgramData\ssh', 'C:\Users\Administrator')"
     Yes '  and its C:\Thornswood-* filter and Defender skip' ($r.Text -match [regex]::Escape("Close-RunnerAccount `$acct `$root 'C:\' 'Thornswood-*' $vpsAlso") -and $r.Text -match '(?m)^if \(\$true\) \{\s*$')
@@ -137,9 +148,10 @@ try {
     Yes "  and in -Lock, for every runner on the box (exit $($r.Code))" ($r.Code -eq 0 -and $r.Text -match [regex]::Escape("`$alsoDeny = $vpsAlso"))
     $r = Dry @('-Number', '5')
     Yes '  runner 5, which records\build-runners.json does not list, gets the VPS label alone and takes no builds (#2994)' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-vps-5' --labels 'thornswood-vps' --work")
-    # #3312: the runner records\sign-runners.json lists keeps its label through a reinstall.
+    # #4033: runner 3 signed until #4013; now it is a light runner like any other.
     $r = Dry @('-Number', '3')
-    Yes '  runner 3, which records\sign-runners.json lists, is registered with thornswood-sign and takes no builds (#3312)' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-vps-3' --labels 'thornswood-vps,thornswood-sign' --work")
+    Yes '  runner 3 gets the VPS label alone, no signing label and no build label (#4033)' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-vps-3' --labels 'thornswood-vps' --work")
+    Yes '  and Install-Runner.ps1 reads no signing record' ([IO.File]::ReadAllText($script) -notmatch 'sign-runners')
     Yes '  GitHub still never asked' (-not (Test-Path -LiteralPath $ghCalled))
 
     # ---- Close-RunnerAccount on scratch folders, the off-box filter ---------
@@ -199,7 +211,8 @@ try {
     Yes "-OffBox -Lock fetches the lists again and puts the guards back (exit $($r.Code))" ($r.Code -eq 0 -and $r.Text -match [regex]::Escape('Set-RunnerFirewall $grdAcct $grdGroup $grdBlocks') -and $r.Text -match [regex]::Escape('Close-RunnerReads'))
     $r = Dry @('-OffBox', '-Remove')
     Yes '-OffBox -Remove takes the firewall rules and the read denies off' ($r.Text -match [regex]::Escape('Remove-RunnerFirewall $grdGroup') -and $r.Text -match [regex]::Escape('Open-RunnerReads $grdAcct (Get-RunnerReadDenies $grdAcct -Own $grdOwn)'))
-    # ON THE RUNNER DRIVE (#3861): New-RunnerDrive.ps1's Dev Drive, R: here.
+    # ON THE RUNNER DRIVE (#3861): explicit R: is fixture metadata, not a
+    # lookup of One's attached labelled drive (#4048). Defaults above are C:.
     $r = Dry @('-OffBox', '-Number', '3', '-Root', 'R:\Thornswood-RunnerPR3')
     $t = $r.Text
     Yes "-OffBox on the runner drive installs there (exit $($r.Code))" ($r.Code -eq 0 -and $t -match [regex]::Escape("`$root = 'R:\Thornswood-RunnerPR3'"))
@@ -254,30 +267,12 @@ try {
     $r = Dry @('-NetworkOnly', '-Lock')
     Yes "-NetworkOnly with -Lock is refused (exit $($r.Code))" ($r.Code -eq 1 -and -not $r.Text)
 
-    # ---- the signing runner's reach (#3312) ---------------------------------
-    $signRec = Get-Content -LiteralPath (Join-Path $Repo 'records\sign-runners.json') -Raw | ConvertFrom-Json
-    $hole4 = { param($t) $t -match [regex]::Escape("-198.51.99.255'") -and $t -match [regex]::Escape("'198.51.101.0-") }
-    $hole6 = { param($t) $t -match [regex]::Escape("-2001:db7:ffff:ffff:ffff:ffff:ffff:ffff'") -and $t -match [regex]::Escape("'2001:db9::-") }
-    $r = Dry @('-NetworkOnly', '-Number', '3')
-    Yes "-NetworkOnly -Number 3, the signing runner, ends 0 (exit $($r.Code))" ($r.Code -eq 0 -and $r.Text -match [regex]::Escape("`$grdAcct = 'thornswood-runner3'"))
-    Yes '  and lets its Microsoft tags through (stand-in 198.51.100.0/24 and 2001:db8::/32)' ((& $hole4 $r.Text) -and (& $hole6 $r.Text))
-    Yes '  naming every host records\sign-runners.json lists, with its tag' (@($signRec.reach.hosts | Where-Object { $r.Said -notmatch ([regex]::Escape($_.host + ': ' + $_.tag)) }).Count -eq 0)
-    Yes '  and still no lock step' ($r.Text -notmatch $noLock)
-    $r = Dry @('-NetworkOnly', '-Number', '4')
-    Yes '-NetworkOnly for a runner that does not sign gets no Microsoft hole' ($r.Code -eq 0 -and -not (& $hole4 $r.Text) -and $r.Said -notmatch 'api\.nuget\.org')
-    $r = Dry @('-OffBox', '-NetworkOnly', '-Number', '3')
-    Yes '  nor does an off-box runner, whatever its number' ($r.Code -eq 0 -and -not (& $hole4 $r.Text))
-
-    # Each host is the one the file that uses it names, so the record and the sign steps cannot drift apart.
-    $hosts = @($signRec.reach.hosts | ForEach-Object { [string]$_.host })
-    Yes 'records\sign-runners.json names each host once, each with a tag' ($hosts.Count -ge 5 -and @($hosts | Select-Object -Unique).Count -eq $hosts.Count -and -not @($signRec.reach.hosts | Where-Object { -not $_.tag -or -not $_.for }).Count)
-    $meta = Get-Content -LiteralPath (Join-Path $Repo 'records\signing\metadata.json') -Raw | ConvertFrom-Json
-    Yes '  the signing service is metadata.json''s Endpoint' ($hosts -contains ([Uri]$meta.Endpoint).Host)
-    $tmpl = Get-Content -LiteralPath (Join-Path $Repo 'records\signing\signing.template.json') -Raw | ConvertFrom-Json
-    Yes '  the timestamp is signing.template.json''s timestampUrl' ($hosts -contains ([Uri]$tmpl.timestampUrl).Host)
-    $pin = [regex]::Match([IO.File]::ReadAllText((Join-Path $Repo 'scripts\release\Setup-ShipMachine.ps1')), "Url\s*=\s*'(https://[^']+\.nupkg)'").Groups[1].Value
-    Yes '  the signing client comes from the host Setup-ShipMachine.ps1 pins' ($pin -and $hosts -contains ([Uri]$pin).Host)
-    Yes '  and Azure sign-in is there' ($hosts -contains 'login.microsoftonline.com')
+    # ---- runner 3's rules are any runner's (#4033) --------------------------
+    $three = Dry @('-NetworkOnly', '-Number', '3')
+    $four = Dry @('-NetworkOnly', '-Number', '4')
+    $ranges = { param($t) [regex]::Match($t, '\$grdBlocks = (@\([^\r\n]*\))').Groups[1].Value }
+    Yes "-NetworkOnly -Number 3 ends 0 (exit $($three.Code))" ($three.Code -eq 0 -and $three.Text -match [regex]::Escape("`$grdAcct = 'thornswood-runner3'"))
+    Yes '  and blocks exactly what runner 4''s rules block: no Microsoft hole is left for signing' ((& $ranges $three.Text) -and (& $ranges $three.Text) -eq (& $ranges $four.Text) -and $three.Said -notmatch 'Service Tags|api\.nuget\.org')
     # ---- the range arithmetic ----------------------------------------------
     $rl = [regex]::Match($src, "(?s)\`$rangeLib = @'\r?\n(.*?)\r?\n'@").Groups[1].Value
     Yes 'the range library is where it was' ($rl -match 'function Get-RunnerBlockRanges')
@@ -289,28 +284,23 @@ try {
     $b = @(Get-RunnerBlockRanges @('10.0.0.1/8'))
     Yes 'host bits in a CIDR are ignored' ($b[0] -eq '0.0.0.0-9.255.255.255')
     Yes 'nothing to allow blocks everything' ((@(Get-RunnerBlockRanges @()) -join ',') -eq '0.0.0.0-255.255.255.255,::-ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff')
-    # Microsoft's Service Tags file, the shape it has (#3312).
-    $st = '{"changeNumber":1,"cloud":"Public","values":[{"name":"AzureActiveDirectory","properties":{"addressPrefixes":["20.190.128.0/18","2603:1006:2000::/48"]}},{"name":"AzureFrontDoor.Frontend","properties":{"addressPrefixes":["150.171.110.0/24"]}},{"name":"Empty","properties":{"addressPrefixes":[]}}]}'
-    $tags = Read-RunnerServiceTags ([string][char]0xFEFF + $st) @('AzureActiveDirectory', 'AzureFrontDoor.Frontend', 'AzureActiveDirectory')
-    Yes 'Read-RunnerServiceTags: each tag''s ranges, a byte order mark and a repeated name taken in its stride' ($tags.Count -eq 2 -and ($tags['AzureActiveDirectory'] -join ',') -eq '20.190.128.0/18,2603:1006:2000::/48' -and ($tags['AzureFrontDoor.Frontend'] -join ',') -eq '150.171.110.0/24')
-    $why = ''; try { $null = Read-RunnerServiceTags $st @('AzureCloud.westus2') } catch { $why = $_.Exception.Message }
-    Yes '  a tag the file does not have stops it' ($why -match 'has 0 tags named AzureCloud\.westus2')
-    $why = ''; try { $null = Read-RunnerServiceTags $st @('Empty') } catch { $why = $_.Exception.Message }
-    Yes '  so does a tag with no range' ($why -match 'gives Empty no address range')
-    $why = ''; try { $null = Read-RunnerServiceTags ($st -replace '"Public"', '"AzureGovernment"') @('AzureActiveDirectory') } catch { $why = $_.Exception.Message }
-    Yes '  and a file that is not the Public cloud''s' ($why -match 'not Public')
-    $miss = @(Get-RunnerReachMisses @('20.190.155.66', '150.171.110.194', '48.192.88.101', '2603:1006:2000::1', '2603:1006:2001::1') @('20.190.128.0/18', '150.171.110.0/24', '2603:1006:2000::/48'))
-    Yes 'Get-RunnerReachMisses: an address outside every range is named, IPv4 or IPv6, and one inside is not' (($miss -join ',') -eq '48.192.88.101,2603:1006:2001::1')
+    Yes 'the Service Tags reader went with the signing runner' ($rl -notmatch 'Read-RunnerServiceTags|Get-RunnerReachMisses')
 
     # ---- the guards themselves, on stand-ins and scratch folders -----------
-    $gl = [regex]::Match($src, "(?s)\`$guardLib = @'\r?\n(.*?)\r?\n'@").Groups[1].Value
+    $gl = [regex]::Match($src, "(?s)\`$guardLib = \(Get-ThornswoodFirewallScript\) \+ @'\r?\n(.*?)\r?\n'@").Groups[1].Value
     Yes 'the guard library is where it was' ($gl -match 'function Set-RunnerFirewall')
     $script:fw = New-Object Collections.ArrayList
     $script:gone = New-Object Collections.ArrayList
     # Stand-ins: functions win over the cmdlets, so no real rule is read or made.
-    function New-NetFirewallRule { param($DisplayName, $Group, $Direction, $Action, $Profile, $LocalUser, $RemoteAddress, $Description, $ErrorAction) [void]$script:fw.Add(@{ Name = $DisplayName; Group = $Group; Direction = $Direction; Action = $Action; LocalUser = $LocalUser; Remote = @($RemoteAddress) }) }
-    function Get-NetFirewallRule { param($Group, $ErrorAction) @($script:fw | Where-Object { $_.Group -eq $Group } | ForEach-Object { New-Object PSObject -Property @{ Name = $_.Name; Enabled = 'True' } }) }
-    function Remove-NetFirewallRule { param($Name) [void]$script:gone.Add($Name); $keep = @($script:fw | Where-Object { $_.Name -ne $Name }); $script:fw.Clear(); foreach ($k in $keep) { [void]$script:fw.Add($k) } }
+    # Every store each one is asked for, and each refresh, are kept (#3896).
+    $script:stores = New-Object Collections.ArrayList
+    $script:syncs = 0
+    function New-NetFirewallRule { param($PolicyStore, $DisplayName, $Group, $Direction, $Action, $Profile, $LocalUser, $RemoteAddress, $Description, $ErrorAction) [void]$script:stores.Add($PolicyStore); [void]$script:fw.Add(@{ Name = $DisplayName; Group = $Group; Direction = $Direction; Action = $Action; LocalUser = $LocalUser; Remote = @($RemoteAddress) }) }
+    function Get-NetFirewallRule { param($PolicyStore, $Group, $ErrorAction) [void]$script:stores.Add($PolicyStore); @($script:fw | Where-Object { $_.Group -eq $Group } | ForEach-Object { New-Object PSObject -Property @{ Name = $_.Name; Enabled = 'True' } }) }
+    function Remove-NetFirewallRule { param($PolicyStore, $Name) [void]$script:stores.Add($PolicyStore); [void]$script:gone.Add($Name); $keep = @($script:fw | Where-Object { $_.Name -ne $Name }); $script:fw.Clear(); foreach ($k in $keep) { [void]$script:fw.Add($k) } }
+    function Sync-ThornswoodFirewall { $script:syncs++ }
+    # On the box the head sets the box's policy store, the only one its firewall takes rules from.
+    $grdStore = 'localhost'
     . ([scriptblock]::Create($gl))
     $many = @(1..1203 | ForEach-Object { '10.0.' + [int][Math]::Floor($_ / 256) + '.' + ($_ % 256) })
     $said = Set-RunnerFirewall '*S-1-5-7' 'TS test group' $many
@@ -323,6 +313,8 @@ try {
     Yes '  an empty list changes nothing and says so' ($threw -and $script:fw.Count -eq 1)
     $null = Remove-RunnerFirewall 'TS test group'
     Yes 'Remove-RunnerFirewall takes the group off' ($script:fw.Count -eq 0 -and (Get-RunnerFirewall 'TS test group') -match 'NO RULES')
+    Yes '  every rule read, made and taken away in the store the head names, and the policy refreshed after each change (#3896)' (
+        @($script:stores | Where-Object { $_ -ne 'localhost' }).Count -eq 0 -and $script:stores.Count -gt 0 -and $script:syncs -eq 3)
 
     $u = Join-Path $work 'Users'; $pd = Join-Path $work 'ProgramData'; $dv = Join-Path $work 'D-root'
     foreach ($n in 'alice', 'Public', 'Default', 'thornswood-pr', 'thornswood-pr.ONE') { New-Item -ItemType Directory -Path (Join-Path $u $n) | Out-Null }

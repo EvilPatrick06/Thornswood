@@ -37,6 +37,22 @@ that makes two items from one craft is still one piece of work.
 
 Each rank hands one skill-tree point. See [Skill tree](skill-tree.md).
 
+A rank in a half you make things in also says what it just opened,
+counted the way the recipe book on K counts it: how many recipes sit at
+that rank, their kinds, and how many of them Skyrim lists at the bench
+(Patrick, 26 October 2026, #3149). The rest each carry a condition of
+their own, a perk or a spell or something to hold first:
+
+> You are now an Advanced Platewright. 1 skill point to spend, on K.
+> Advanced Platewright work opens 57 more recipes to you: armoured
+> boots, gauntlets, helmets, body armour, shields and other armour and
+> clothing. Skyrim lists 2 of them at the bench. The other 55 each
+> carry a condition of their own, a perk or a spell or something you
+> have to be holding.
+
+The count leaves out what your race may not make, as the book does. A
+half with nothing at the rank reached gets the rank line alone.
+
 The same ladder is used by every class. A miner and a tailor are not
 on different clocks.
 
@@ -146,6 +162,15 @@ asks the same question the craft does, recipe by recipe, so a rank, a
 race's own gear and a roll all count. The menu then lists only what you
 may make.
 
+It sorts that list by kind first, with material groups inside (#3133).
+Weapons, armour, and arrows and bolts each have a header of their own,
+beside clothing, jewellery and food, and under each header the pieces sit
+in groups by material: Iron, Steel, Elven, Dragon and the rest, so the iron
+helmets and the iron swords are no longer one list. A piece whose record
+names no material is under its header and in no group. The groups are
+`game/ours/Data/SKSE/Plugins/CraftingCategories/Thornswood-Content.json`,
+and their names `game/ours/Data/Interface/Translations/Thornswood-Content_ENGLISH.txt`.
+
 Who each bench opens for. A half is one you can work at the rank named:
 your own half, or your sister half or a taught half at novice. No
 bench opens for everybody: the few things at a bench that nobody owns
@@ -171,6 +196,10 @@ are made by whoever the bench opens for.
 | Aetherium forge | Shut for everybody. Nobody works it |
 | Smelter | Platewright, from novice |
 
+A cooking spit is a cookpot: the same recipes, so it opens for the
+Hearthcook and nobody else. Boiling water there is not cooking, and
+anybody may boil water at a spit or a pot.
+
 A forge or a skyforge burns one charcoal, cheapest grade in the pack
 first. No charcoal, nothing is made. A war axe, a battleaxe, a
 warhammer, and a mace also take 1 Tool Handle. Swords, greatswords,
@@ -178,6 +207,15 @@ daggers, bows, and staves do not. The handle is novice
 [Charburner](professions/woodworker/charburner.md) work, so listing it
 does not move the rank. The plugin rows still omit it. The server
 already removes one when the craft goes through.
+
+A bench in a building you hold also draws from the chests in that
+building (#3159, Patrick, 22 Oct). While you are at it, the crafting
+menu lists what the chests hold beside what you carry, and a craft
+takes from your pack first and from the chests, nearest the bench
+first, for the rest. The charcoal and the handle come from the chests
+too when your pack has none. A guest, a partner with the master key
+and a bench outdoors get the pack alone. [Property](property.md) says
+which chests are yours.
 
 ## The book on K
 
@@ -188,12 +226,72 @@ lists linked from each sub-profession.
 
 A mage sees the spell book there instead.
 
+## The guides on K
+
+Press K, Profession guides. Every profession has a page, one tab
+each, and it opens on your own (Patrick, 22 Oct, A on #3165). It is
+there while you create a character too, before Home, so a profession
+can be read before it is picked. A page says three things:
+
+- What it makes: each half, the benches it works at and the rank each
+  opens at, its families with how many rows sit at each rank, and the
+  first things a new novice can make. A warrior's page lists the
+  maneuvers instead, and a mage's the spells of each school.
+- Where the materials come from: the inputs its recipes ask for most,
+  the class each one rests on and at what rank, the bench that makes
+  it out of what, and where it is found (the mines with the most veins
+  of the ore, or the kinds of animal that give the part).
+- How to rank up: what counts as a piece of work for it, the ladder,
+  the rest a piece costs, the sister half and the party bonus.
+
+The facts are read out of `game\data\recipes.json`,
+`game\data\mine-buildings.json`, `game\data\hunts.json` and the
+gamemode's bench table, maneuvers and tuning by
+`scripts\dev\Build-ProfessionGuides.js`, which writes them into
+`game\ui\thornswood-skills.js`. Run it after any of those change;
+`tests\test-3165-profession-guides.js` fails while the page is behind.
+
+## Everything has a maker
+
+Everything in the world has a recipe or a class that gathers it, except
+named uniques and quest items (Patrick, 22 October 2026), and the
+Ancient Nord burial set, which is found in a dungeon and nowhere else
+(Patrick, 26 October 2026, #3524). That covers
+what a chest or a body pays, the clothes and tool a new character is
+handed, and whatever a recipe asks for. [Who makes what the world hands
+out](lists/who-makes-it.md) lists each item and its maker, and the few
+that have none yet, each with the issue that gives it one. The build
+fails when something new is handed out that nobody makes.
+
 ## Names that are not a profession
 
 Bard, merchant, priest, scholar and thief are not picked on K. They
 grant no recipe, no verb and no rank. Bardic rest is on
 [People beside you](people.md). The merchant NPCs belong to the
 [Merchant's Guild](merchants-guild.md).
+
+## Staff
+
+Staff have a crafting card on the Office page of K. They pick somebody
+in the world and see every class, half and school that person holds, its
+rank, and the work counted toward the next. Raise moves one rank, the
+way the work would: the same ceilings hold, so a taught trade stays at
+novice and a sister half past novice still needs its Master, and the
+rank gives its skill point, and a spell point for a mage's school or an
+Enchanter's staff spells. The count toward the next rank starts again at
+0.
+
+The card also asks the server about a recipe by what it makes: whether
+that person may make it, and if not, the reason the bench would give.
+When they may make it and the bench still leaves it out, the card says
+whether their game was handed an older list than the server gives now,
+which a button hands it again, or whether the game's own recipe asks for
+a perk, an item or a spell first.
+
+And staff give back an item somebody lost, with a count and a reason.
+Nothing records what was lost, so the reason is the record. Nobody does
+any of it to themselves, and every change is in the staff log with the
+name of the staff member who made it.
 
 ## Where this is
 
@@ -214,12 +312,13 @@ Master taking you on or a roll changes the list straight away. A recipe
 nobody owns is listed for everybody.
 
 A weapon or an armour piece comes out crude, fine or masterwork, and
-the tier is on its name, in the server.
+the tier is on its name, in the server. The line at a rank up naming
+what it opened is in the server too.
 
 Not in the world yet: the tenth less or more for a crude or masterwork
-piece, which the engine's damage formula has to read off the name (the
-fork change for it waits on the next engine pin), the parts of a
-warrior's maneuvers the game
+piece, which the engine's damage formula reads off the name (the fork
+has it since 26 October, and it waits on the next engine pin), the
+parts of a warrior's maneuvers the game
 has to do itself (see [Warrior](professions/warrior.md)), the repair
 kits on [Durability](durability.md), the check of which effect a
 brew or an enchantment carries (the engine does not pass it yet),

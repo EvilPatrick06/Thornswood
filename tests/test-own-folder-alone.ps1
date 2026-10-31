@@ -91,7 +91,8 @@ $refs = @('System.dll', 'System.Core.dll', 'System.Runtime.Serialization.dll', '
     ForEach-Object { Join-Path $LauncherRefDir $_ }
 foreach ($r in $refs) { Yes "$([IO.Path]::GetFileName($r)) is there to compile against" (Test-Path -LiteralPath $r) }
 
-$real = @('OwnGame.cs', 'OwnGameShare.cs', 'OwnGameKinds.cs', 'Downgrade.cs', 'Steam.cs', 'Paths.cs', 'Config.cs', 'Secrets.cs', 'LoadOrder.cs', 'Swallow.cs', 'Progress.cs') |
+# OwnGameKinds and Verify name LastPlugin (#2791), which reads the game's archives through FromGameArchive.cs.
+$real = @('OwnGame.cs', 'OwnGameShare.cs', 'OwnGameKinds.cs', 'Downgrade.cs', 'Steam.cs', 'Paths.cs', 'Config.cs', 'Secrets.cs', 'LoadOrder.cs', 'Swallow.cs', 'Progress.cs', 'LastPlugin.cs', 'FromGameArchive.cs') |
     ForEach-Object { Join-Path $AppPath $_ }
 foreach ($f in $real) {
     Yes "launcher\app\$([IO.Path]::GetFileName($f)) is there" (Test-Path -LiteralPath $f)
@@ -533,7 +534,8 @@ namespace Thornswood
         }
 
         // records\ui-gone.json is compiled in. OwnGame.Foreign reads that
-        // copy, not a test override. 37 Daedric names and hashes, 42 unused.
+        // copy, not a test override. 37 Daedric names and hashes, 42 unused,
+        // and the four Futura PT and DIN Pro faces (#1317).
         static void UiGoneCompiledIn()
         {
             Yes("a Daedric jpg from the compiled-in gone record is not ours",
@@ -541,19 +543,24 @@ namespace Thornswood
             var flags = BindingFlags.NonPublic | BindingFlags.Static;
             var leaves = typeof(OwnGame).GetField("uiGoneLeaves", flags).GetValue(null) as HashSet<string>;
             var hashes = typeof(OwnGame).GetField("uiGoneHashes", flags).GetValue(null) as HashSet<string>;
-            int daedric = 0, unused = 0;
+            var commercial = new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
+                "6f802bf60c545304b09e.ttf", "00e4a2200c3e5ae71d67.ttf", "268a0df3f0e2c23d1ea6.ttf", "fdf086661e1600f95a34.ttf" };
+            int daedric = 0, unused = 0, faces = 0;
             if (leaves != null)
             {
                 foreach (string n in leaves)
                 {
                     string x = (n ?? "").ToLowerInvariant();
-                    if (x.EndsWith(".svg") || x == "bg.png") unused++;
+                    if (commercial.Contains(x)) faces++;
+                    else if (x.EndsWith(".svg") || x == "bg.png") unused++;
                     else daedric++;
                 }
             }
             Yes("the compiled-in gone record has 37 Daedric names", daedric == 37);
             Yes("  and 37 Daedric hashes", hashes != null && hashes.Count == 37);
             Yes("  and 42 unused names", unused == 42);
+            Yes("  and the four Futura PT and DIN Pro faces (#1317)", faces == 4);
+            Yes("  so a refresh keeps them out", OwnGame.Foreign("Data\\Platform\\UI\\268a0df3f0e2c23d1ea6.ttf"));
         }
 
         // One plugin the published collection does not ship must not read as

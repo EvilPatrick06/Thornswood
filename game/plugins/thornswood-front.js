@@ -35,8 +35,9 @@
   // ours: this file does nothing at all. Unreadable: carry on, as before.
   //
   // Ours is the address in Thornswood.ini's ServerAddress line when there is
-  // one, so a server move is an ini edit, and the fixed address below when
-  // there is not.
+  // one, and the game's own name below when there is not: the launcher writes
+  // that name into server-ip, never the box's address (#3690), so a server
+  // move is a DNS record and nothing here.
   //
   // This is the one copy (issue #485). The other plugins in game/plugins hold
   // no check of their own: this file publishes it below as
@@ -45,7 +46,7 @@
   // tests/test-whose-game-gate.js holds that together.
   if (!thornswoodGame()) { return; }
   function thornswoodGame() {
-    const ours = ['192.135.112.23'];
+    const ours = ['play.thornswood.net'];
     let ip = '';
     try {
       const fs = require('fs');
@@ -87,13 +88,17 @@
   T.whoseGame = thornswoodGame;
   if (T.front) return;      // already loaded, do not load the page twice
   T.front = true;
+  // Each other plugin that reads Thornswood.ini puts a reader here, and the
+  // Settings panel's changes are handed to every one (applySettings, #3126).
+  T.settingsListeners = T.settingsListeners || [];
 
   const UI_PATH = 'Data/Platform/UI/index.html';
   const OVERLAYS = ['thornswood-chat.js', 'thornswood-emotes.js', 'thornswood-voice.js',
                     'thornswood-skills.js', 'thornswood-party.js',
                     'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js',
                     'thornswood-repair.js', 'thornswood-treat.js', 'thornswood-maneuvers.js', 'thornswood-ride.js',
-                    'thornswood-help.js', 'thornswood-afk.js', 'thornswood-box.js', 'thornswood-ship.js', 'thornswood-furniture.js'];
+                    'thornswood-help.js', 'thornswood-settings.js', 'thornswood-afk.js', 'thornswood-box.js', 'thornswood-ship.js',
+                    'thornswood-preserve.js', 'thornswood-furniture.js', 'thornswood-stall.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -347,33 +352,38 @@
     return m ? (Number(m[1]) || fallback) : fallback;
   }
 
-  const ini = readText(INI);
-  const CHAT_KEY = iniNumber(ini, 'ChatKey', 28);       // Enter
+  let ini = readText(INI);
+  let CHAT_KEY = iniNumber(ini, 'ChatKey', 28);       // Enter
   // Opens the chat with a slash already in it, ready for a command. /, which
   // is the game's Quick Stats; see STATS_MENU below for why that stays shut.
-  const COMMAND_KEY = iniNumber(ini, 'CommandKey', 53);  // /
+  let COMMAND_KEY = iniNumber(ini, 'CommandKey', 53);  // /
   /*
     Profession, Class and Skill Tree. K, which was the minimap's settings
     panel until 20 September; that moved to F10 in Keys.cs and this took the
     letter, because a panel somebody opens once is worth less than the menu
     the whole progression system lives in.
   */
-  const SKILLS_KEY = iniNumber(ini, 'SkillsKey', 37);   // K
+  let SKILLS_KEY = iniNumber(ini, 'SkillsKey', 37);   // K
   const VOICE_PORT = iniNumber(ini, 'VoicePort', 7778);
   /*
     How long the chat stays up after its last line, and whether the needs bars
-    are drawn, from the launcher's Settings (ChatFade and NeedsBars in
-    Display.cs). Both go to the page in window.THORNSWOOD, which is where the
-    chat and the bars live. Not iniNumber, because 0 is a real answer here:
-    it is the chat staying up for good, and iniNumber turns 0 into its
-    fallback. Anything that is not one of the launcher's choices is ten.
+    are drawn, from the Settings panel in the game (ChatFade and NeedsBars in
+    Thornswood.ini, #3126). Both go to the page in window.THORNSWOOD, which is
+    where the chat and the bars live, at load and again whenever the panel
+    changes one (chatSettingsToPage). Not iniNumber, because 0 is a real
+    answer here: it is the chat staying up for good, and iniNumber turns 0
+    into its fallback. Anything that is not one of the panel's choices is ten.
   */
-  const CHAT_FADE = (function () {
-    const m = ini.match(/^\s*ChatFade\s*=\s*(\d+)\s*$/im);
+  function chatFadeOf(text) {
+    const m = text.match(/^\s*ChatFade\s*=\s*(\d+)\s*$/im);
     const v = m ? Number(m[1]) : 10;
-    return [0, 5, 10, 15, 20].indexOf(v) >= 0 ? v : 10;
-  })();
-  const NEEDS_BARS = !/^\s*NeedsBars\s*=\s*0\s*$/im.test(ini);
+    return CHAT_FADE_CHOICES.indexOf(v) >= 0 ? v : 10;
+  }
+  function needsBarsOf(text) { return !/^\s*NeedsBars\s*=\s*0\s*$/im.test(text); }
+  // In the order the Settings panel offers them; 0 is never.
+  const CHAT_FADE_CHOICES = [5, 10, 15, 20, 0];
+  let CHAT_FADE = chatFadeOf(ini);
+  let NEEDS_BARS = needsBarsOf(ini);
   /*
     Where voice lives: https://thornswood.net/voice, or /voice-dev on the dev
     build. Written by the launcher at every Play, the same way VoicePort is,
@@ -393,10 +403,10 @@
     Skyrim and are only armed while somebody is under the crosshair, so even a
     mod that wanted one of them would keep it the rest of the time.
   */
-  const PARTY_KEY   = iniNumber(ini, 'PartyKey', 25);      // P
-  const JOURNAL_KEY = iniNumber(ini, 'JournalKey', 36);    // J
-  const FRIEND_KEY  = iniNumber(ini, 'FriendKey', 21);     // Y, not G: G is the emote wheel (#529)
-  const TRADE_KEY   = iniNumber(ini, 'TradeWithKey', 35);  // H
+  let PARTY_KEY   = iniNumber(ini, 'PartyKey', 25);      // P
+  let JOURNAL_KEY = iniNumber(ini, 'JournalKey', 36);    // J
+  let FRIEND_KEY  = iniNumber(ini, 'FriendKey', 21);     // Y, not G: G is the emote wheel (#529)
+  let TRADE_KEY   = iniNumber(ini, 'TradeWithKey', 35);  // H
   /*
     MuteThemKey, NOT MuteKey. MuteKey is already in this same file and is the
     microphone's, once a row on the Controls page with nothing reading it
@@ -406,7 +416,7 @@
     L rather than G, B or N: WheelKey is G, VoiceModeKey is B and StopKey is
     N, all of them in this file already.
   */
-  const MUTE_KEY    = iniNumber(ini, 'MuteThemKey', 38);   // L
+  let MUTE_KEY    = iniNumber(ini, 'MuteThemKey', 38);   // L
   /*
     The key mold, pressed into the lock of the door under the crosshair.
     Patrick, 24 September: "actually can we make it a different key that is
@@ -419,8 +429,8 @@
     test-mold-key.js. Like G, H and L it only means anything while its
     prompt is up.
   */
-  const MOLD_KEY    = iniNumber(ini, 'MoldKey', 22);       // U
-  const LOCK_KEY    = iniNumber(ini, 'LockKey', 45);       // X
+  let MOLD_KEY    = iniNumber(ini, 'MoldKey', 22);       // U
+  let LOCK_KEY    = iniNumber(ini, 'LockKey', 45);       // X
   /*
     The holder's sleep key on the look prompt (#1603). Patrick: the holder
     names who may sleep there "with buttons and GUI, not commands". THE MOLD'S
@@ -428,9 +438,9 @@
     test-thornswood-keys.js holds no two of ours on one default. The two never
     meet: the mold is armed only while a door is under the crosshair, and this
     only while a person is, inside a building you hold. Rebinding MoldKey moves
-    both, and its Controls row says so.
+    both, and its row on Settings says so.
   */
-  const SLEEP_KEY   = MOLD_KEY;
+  let SLEEP_KEY   = MOLD_KEY;
   /*
     A Master's "Take on as apprentice" on the look prompt (#1634). K, THE
     SKILLS KEY, and not a new one: every letter is already Skyrim's or ours,
@@ -440,7 +450,7 @@
     list puts the row there; the rest of the time K is K. See
     apprenticePress.
   */
-  const APPRENTICE_KEY = SKILLS_KEY;
+  let APPRENTICE_KEY = SKILLS_KEY;
   /*
     "Dye their hair" on the look prompt (#2675). K again, for the same
     reason: it opens the K panel, on its Hair dye page with the person under
@@ -449,16 +459,16 @@
     key when both apply; Dye hair under Near you on P is there either way.
     See hairDyePress.
   */
-  const HAIR_DYE_KEY = SKILLS_KEY;
+  let HAIR_DYE_KEY = SKILLS_KEY;
   /*
     "Tend their wounds" on the look prompt (#1383). THE LOCK KEY, X, and not
     a new one: every letter is already Skyrim's or ours. The two never meet:
     the lock key answers only with a door, a crop or a forge under the
     crosshair (lockKeyNow), and this only with a person the server's near
     list says has a wound to tend. Rebinding LockKey moves both, and its
-    Controls row says so. See treatPress.
+    row on Settings says so. See treatPress.
   */
-  const TREAT_KEY = LOCK_KEY;
+  let TREAT_KEY = LOCK_KEY;
   /*
     "Tend your wounds" in the inventory (#1383). THE TRADE KEY, H: in the
     inventory the social keys refuse to act, Skyrim's controlmap.txt binds
@@ -466,31 +476,41 @@
     U, the key the repair kit uses there, can be up at the same time as this.
     See treatSelfPress.
   */
-  const TREAT_SELF_KEY = TRADE_KEY;
+  let TREAT_SELF_KEY = TRADE_KEY;
+  /*
+    "Salt or smoke your food" in the inventory (#3163). THE FRIEND KEY, Y,
+    and not a new one: every letter is already Skyrim's or ours. In the
+    inventory the social keys refuse to act and Skyrim binds nothing to Y,
+    and U, H and X, the other three keys with a line there, are other keys,
+    so all four lines can be up at once. Rebinding FriendKey moves both. See
+    preservePress.
+  */
+  let PRESERVE_KEY = FRIEND_KEY;
   /*
     A warrior's maneuvers (#1386): opens the maneuver panel. 9, scan code 10:
     1 to 8 are the game's own favourites hotkeys (and the emote slots while
     the wheel is open), and every letter is already one of ours or the game's.
   */
-  const MANEUVER_KEY = iniNumber(ini, 'ManeuverKey', 10);  // 9
+  let MANEUVER_KEY = iniNumber(ini, 'ManeuverKey', 10);  // 9
   /*
     The help panel (#1633): what /help said, as keys and panels, opened
     without the chat. Patrick's answer on #1633: its own key, on the
-    Controls page, and Help on the K, P and J panels. F7, scan code 65:
+    launcher's Controls page then and on Settings in the game since #3126,
+    and Help on the K, P and J panels. F7, scan code 65:
     every letter is already Skyrim's or ours, F1 to F4 are SkyUI's
     favourite groups (F1 and F2 the client's as well), F5 and F9 save and
     load, F6 is the client's, F8 the mark and F10 closing Skyrim at
     creation; tests/test-1633-help-panel.js checks it the way
     test-mold-key.js checks U.
   */
-  const HELP_KEY = iniNumber(ini, 'HelpKey', 65);          // F7
+  let HELP_KEY = iniNumber(ini, 'HelpKey', 65);          // F7
   /*
     Three keys the help panel names that are read by the voice and emote
     plugins and not used here: the help says the key as this machine has it.
   */
-  const TALK_KEY = iniNumber(ini, 'PushToTalk', 47);       // V
-  const VOICE_MODE_KEY = iniNumber(ini, 'VoiceModeKey', 48); // B
-  const WHEEL_KEY = iniNumber(ini, 'WheelKey', 34);        // G
+  let TALK_KEY = iniNumber(ini, 'PushToTalk', 47);       // V
+  let VOICE_MODE_KEY = iniNumber(ini, 'VoiceModeKey', 48); // B
+  let WHEEL_KEY = iniNumber(ini, 'WheelKey', 34);        // G
   /* What the prompt calls them. Read off the scan code so a rebind in the ini
      changes the letter on the screen as well as the key that works. */
   function keyName(code) {
@@ -503,23 +523,83 @@
       // The help panel names the chat keys and its own (#1633).
       28: 'Enter', 53: '/',
       59: 'F1', 60: 'F2', 61: 'F3', 62: 'F4', 63: 'F5', 64: 'F6', 65: 'F7',
-      66: 'F8', 67: 'F9', 68: 'F10', 87: 'F11', 88: 'F12'
+      66: 'F8', 67: 'F9', 68: 'F10', 87: 'F11', 88: 'F12',
+      // The rest the Settings panel offers (#3126), so a key moved there is
+      // named on the prompts as it is on the panel, and Escape, the wheel's
+      // close key unless it is moved.
+      1: 'Escape', 12: '-', 13: '=', 14: 'Backspace', 15: 'Tab', 26: '[', 27: ']', 39: ';', 40: '\'',
+      41: '`', 43: '\\', 51: ',', 52: '.', 54: 'Right Shift', 58: 'Caps Lock', 69: 'Num Lock',
+      70: 'Scroll Lock', 157: 'Right Ctrl', 184: 'Right Alt', 197: 'Pause', 199: 'Home',
+      201: 'Page up', 207: 'End', 209: 'Page down', 210: 'Insert', 211: 'Delete',
+      259: 'Mouse 4', 260: 'Mouse 5'
     };
     return letters[code] || ('#' + code);
   }
-  const PARTY_NAME = keyName(PARTY_KEY);
-  const FRIEND_NAME = keyName(FRIEND_KEY);
-  const TRADE_NAME = keyName(TRADE_KEY);
-  const MUTE_NAME = keyName(MUTE_KEY);
-  const MOLD_NAME = keyName(MOLD_KEY);
-  const SLEEP_NAME = keyName(SLEEP_KEY);
-  const APPRENTICE_NAME = keyName(APPRENTICE_KEY);
-  const HAIR_DYE_NAME = keyName(HAIR_DYE_KEY);
-  const LOCK_NAME = keyName(LOCK_KEY);
-  const MANEUVER_NAME = keyName(MANEUVER_KEY);
-  const HELP_NAME = keyName(HELP_KEY);
-  const TREAT_NAME = keyName(TREAT_KEY);
-  const TREAT_SELF_NAME = keyName(TREAT_SELF_KEY);
+  let PARTY_NAME = keyName(PARTY_KEY);
+  let FRIEND_NAME = keyName(FRIEND_KEY);
+  let TRADE_NAME = keyName(TRADE_KEY);
+  let MUTE_NAME = keyName(MUTE_KEY);
+  let MOLD_NAME = keyName(MOLD_KEY);
+  let SLEEP_NAME = keyName(SLEEP_KEY);
+  let APPRENTICE_NAME = keyName(APPRENTICE_KEY);
+  let HAIR_DYE_NAME = keyName(HAIR_DYE_KEY);
+  let LOCK_NAME = keyName(LOCK_KEY);
+  let MANEUVER_NAME = keyName(MANEUVER_KEY);
+  let HELP_NAME = keyName(HELP_KEY);
+  let TREAT_NAME = keyName(TREAT_KEY);
+  let TREAT_SELF_NAME = keyName(TREAT_SELF_KEY);
+  let PRESERVE_NAME = keyName(PRESERVE_KEY);
+
+  /*
+    A KEY CHANGED IN THE GAME (#3126). The Settings panel writes
+    Thornswood.ini (setSetting, below) and this reads it again, so every key
+    above and every name the prompts show is the file's from the next press.
+    Each line is its declaration's again, with the default the Settings
+    panel's list (SETTINGS_KEYS, below) gives it, and
+    tests/test-3126-settings.js holds the two together.
+  */
+  function readKeys(text) {
+    ini = text;
+    CHAT_KEY = iniNumber(ini, 'ChatKey', SETTINGS_KEYS.ChatKey);
+    COMMAND_KEY = iniNumber(ini, 'CommandKey', SETTINGS_KEYS.CommandKey);
+    SKILLS_KEY = iniNumber(ini, 'SkillsKey', SETTINGS_KEYS.SkillsKey);
+    CHAT_FADE = chatFadeOf(ini);
+    NEEDS_BARS = needsBarsOf(ini);
+    PARTY_KEY = iniNumber(ini, 'PartyKey', SETTINGS_KEYS.PartyKey);
+    JOURNAL_KEY = iniNumber(ini, 'JournalKey', SETTINGS_KEYS.JournalKey);
+    FRIEND_KEY = iniNumber(ini, 'FriendKey', SETTINGS_KEYS.FriendKey);
+    TRADE_KEY = iniNumber(ini, 'TradeWithKey', SETTINGS_KEYS.TradeWithKey);
+    MUTE_KEY = iniNumber(ini, 'MuteThemKey', SETTINGS_KEYS.MuteThemKey);
+    MOLD_KEY = iniNumber(ini, 'MoldKey', SETTINGS_KEYS.MoldKey);
+    LOCK_KEY = iniNumber(ini, 'LockKey', SETTINGS_KEYS.LockKey);
+    SLEEP_KEY = MOLD_KEY;
+    APPRENTICE_KEY = SKILLS_KEY;
+    HAIR_DYE_KEY = SKILLS_KEY;
+    TREAT_KEY = LOCK_KEY;
+    TREAT_SELF_KEY = TRADE_KEY;
+    PRESERVE_KEY = FRIEND_KEY;
+    MANEUVER_KEY = iniNumber(ini, 'ManeuverKey', SETTINGS_KEYS.ManeuverKey);
+    HELP_KEY = iniNumber(ini, 'HelpKey', SETTINGS_KEYS.HelpKey);
+    TALK_KEY = iniNumber(ini, 'PushToTalk', SETTINGS_KEYS.PushToTalk);
+    VOICE_MODE_KEY = iniNumber(ini, 'VoiceModeKey', SETTINGS_KEYS.VoiceModeKey);
+    WHEEL_KEY = iniNumber(ini, 'WheelKey', SETTINGS_KEYS.WheelKey);
+    PARTY_NAME = keyName(PARTY_KEY);
+    FRIEND_NAME = keyName(FRIEND_KEY);
+    TRADE_NAME = keyName(TRADE_KEY);
+    MUTE_NAME = keyName(MUTE_KEY);
+    MOLD_NAME = keyName(MOLD_KEY);
+    SLEEP_NAME = keyName(SLEEP_KEY);
+    APPRENTICE_NAME = keyName(APPRENTICE_KEY);
+    HAIR_DYE_NAME = keyName(HAIR_DYE_KEY);
+    LOCK_NAME = keyName(LOCK_KEY);
+    MANEUVER_NAME = keyName(MANEUVER_KEY);
+    HELP_NAME = keyName(HELP_KEY);
+    TREAT_NAME = keyName(TREAT_KEY);
+    TREAT_SELF_NAME = keyName(TREAT_SELF_KEY);
+    PRESERVE_NAME = keyName(PRESERVE_KEY);
+    CLOSE_GAME_KEY = iniNumber(ini, 'CloseGameKey', SETTINGS_KEYS.CloseGameKey);
+    CLOSE_GAME_NAME = keyName(CLOSE_GAME_KEY);
+  }
   /*
     HANDING OVER A LETTER (#1595). Patrick, 4 Oct: /deliver becomes a key on
     the look prompt, shown while you carry a letter for the person under the
@@ -611,6 +691,33 @@
   // settings hold the last one played and the real answer comes from the main
   // menu (the block below), so this is reassigned when the choice is made.
   let PROFILE = Number((client.gameData || {}).profileId) || 0;
+  // For the other plugins, which read the settings file and so had the
+  // character played last rather than the one picked (#3128): voice asks
+  // this, and follows a pick made again at the choice in the game.
+  T.profile = function () { return PROFILE; };
+
+  /*
+    Whose a join pass is: its p, or 0 (#3128). jp1.<payload>.<mac>, the
+    payload base64url JSON the site signs (readPass in gamemode.js reads the
+    same). Only read here, never trusted: the server checks the signature.
+    A pass is put in storage and sent only for the character this game is
+    now, so a character picked again at the choice in the game is never
+    offered the one before it's pass while the launcher fetches its own.
+  */
+  function passProfile(raw) {
+    const parts = String(raw || '').split('.');
+    if (parts.length !== 3 || parts[0] !== 'jp1') { return 0; }
+    const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    let bits = 0, acc = 0, text = '';
+    for (let i = 0; i < parts[1].length; i++) {
+      const v = A.indexOf(parts[1].charAt(i));
+      if (v < 0) { return 0; }
+      acc = ((acc << 6) | v) & 0xffffff;
+      bits += 6;
+      if (bits >= 8) { bits -= 8; text += String.fromCharCode((acc >> bits) & 255); }
+    }
+    try { return Number(JSON.parse(text).p) || 0; } catch (e) { return 0; }
+  }
 
   // ------------------------------------------------- the main menu choice --
   /*
@@ -904,6 +1011,15 @@
       what is missing: an index.html from before this change gets the list
       and the script injected; a browser on some other address (none known)
       gets a loadUrl as a last resort and the wait that comes with it.
+
+      Shown from the start (#3129). The page was drawn and hidden for those
+      fifteen seconds, with the game's own menu picture the only thing on
+      screen, because SkyrimPlatform makes its browser hidden and nothing
+      showed it before this tick. The fork's SkyrimPlatform now shows and
+      focuses it as it is made ([Browser] ShowAtStart, on unless the ini
+      says false), and skymp5-client no longer hides it as it loads when the
+      choice is made here. The setVisible and setFocused below are what
+      shows it when ShowAtStart is off.
     */
     if (menuPhase === 0) {
       // 100 ms, was 600 (Djinn, 25 September: the still before the loop was up too long).
@@ -1038,9 +1154,19 @@
     // starts in the place in line this game holds for the character it was.
     // Ended by the server (#1157): the slots, with the server's sentence over
     // them, and no place in line.
+    // Change character on K (#3128): the slots and nothing over them, with
+    // the character they just left lit and named, since a character made in
+    // this game has no name in the list the launcher wrote at its pick.
     if (menuAgain) {
       list.intro = false; list.music = '';
-      if (menuAgain.ended) { list.ended = String(menuAgain.ended); } else { list.away = menuAgain; }
+      if (menuAgain.ended) { list.ended = String(menuAgain.ended); }
+      else if (menuAgain.switched) {
+        list.last = menuAgain.id;
+        list.characters.forEach(function (c) {
+          if (c && Number(c.profileId) === menuAgain.id && !c.name && menuAgain.name) { c.name = menuAgain.name; }
+        });
+      }
+      else { list.away = menuAgain; }
     }
     if (has !== 'list' || menuAgain) { T.js('window.THORNSWOOD_SELECT=' + JSON.stringify(list) + ';'); }
     inject('thornswood-select.js');
@@ -1098,7 +1224,35 @@
       lineId = 0;
     }
     log('menu: chosen profile', id);
-    if (menuAgain) { relogAs(id); }
+    if (menuAgain) { pickedAgain(id); relogAs(id); }
+  }
+
+  /*
+    PICKED AGAIN AT THE CHOICE IN THE GAME, maybe as somebody else (#3128).
+
+    The page, the chat's connection and the join pass in storage all outlive
+    the world: they were the character this game was before it came back to
+    the choice (the idle check, the server ending the session, or Change
+    character on K). A pick at the menu at the start of a game is before any
+    of them exist; a pick here is not, so each is moved to the new one here.
+
+    - The chat (and voice, which rides on its socket) joins again as the
+      new character: rejoinAs closes the connection and opens it as id,
+      asking the launcher for that character's own token, and does nothing
+      for the same character.
+    - The join pass in storage, which skymp5-client answers the game
+      server's login challenge with, goes when it is another character's.
+      The client then waits for one, and the joinpass block puts this
+      character's there once the launcher has fetched it (passProfile).
+  */
+  function pickedAgain(id) {
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.rejoinAs(' + id + ',"");}catch(e){}');
+    let jp = null;
+    try { jp = sp.storage.thornswoodJoinPass; } catch (e) { jp = null; }
+    if (jp && typeof jp === 'object' && passProfile(jp.pass) !== id) {
+      try { sp.storage.thornswoodJoinPass = null; } catch (e) { }
+      log('menu: the join pass in storage was another character\'s, so the login waits for profile', id + '\'s own');
+    }
   }
 
   /*
@@ -1316,7 +1470,8 @@
 
     // Idempotent, so a page the silence watch reloaded gets all of it back.
     T.js('try{if(!window.thornswoodNet){window.THORNSWOOD=' + JSON.stringify({
-      host: HOST, port: VOICE_PORT, profileId: lineId, name: '', token: tok, base: VOICE_URL
+      host: HOST, port: VOICE_PORT, profileId: lineId, name: '', token: tok, base: VOICE_URL,
+      chatFade: CHAT_FADE, needsBars: NEEDS_BARS
     }) + ';}}catch(e){}');
     inject('thornswood-chat.js');
     // rejoinAs only takes the token while the connection is already this
@@ -1327,7 +1482,7 @@
     // The pass when it is new and every minute, as the world does (#937), so
     // a staff role can be seated ahead of the line and a required pass is on hand.
     const pass = readText(LINE_PASS_FILE).trim();
-    const passOk = /^jp1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(pass);
+    const passOk = /^jp1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(pass) && passProfile(pass) === lineId;
     if (passOk && (early || pass !== linePassSent || now - linePassAt >= LINE_PASS_EVERY_MS)) {
       linePassSent = pass;
       linePassAt = now;
@@ -1659,6 +1814,128 @@
       tellServer('/afk active');
     }
     if (now - afkLastInput >= AFK_MS) { afkAsk(now); }
+  }));
+
+  /*
+    ------------------------------------------------- change character (#3128)
+
+    Patrick's ask: switch to another character from inside the game, without
+    closing Skyrim and going back through the launcher, and the same screen
+    picks a slot, makes a new character and deletes one. His answer on the
+    report page, 22 Oct: any time out of combat, after a 10 s wait in place.
+
+    THE WAY OUT IS THE ONE THE IDLE CHECK TAKES. Change character on the K
+    panel says 'skills:switch'. The character has to be out of combat, and
+    then stand where it is for SWITCH_WAIT_MS, a line a second saying how long
+    is left. Moving more than SWITCH_MOVE_UNITS, getting into combat, losing
+    health, dying or leaving the world stops it and says why; the button
+    again stops it too. At the end the connection to the game server closes
+    (destroyClient, so skymp5-client does not connect again as the same
+    character), the game goes to the main menu, and the character choice
+    comes up with the slots, the one just left lit (backToChoice). A slot
+    plays that character, an empty one makes a new one and the delete icon
+    forgets one, the way the choice at the start of a game does; a pick
+    connects again (relogAs) as whoever was picked (pickedAgain).
+
+    The game server sees a connection close, as when somebody quits, so the
+    character left is put away the same way. Out of combat is this game's
+    check: closing Skyrim leaves at any moment, so a check on the server
+    would hold nobody who wanted out, and the wait is there so a switch is
+    not a way out of a fight.
+
+    In update only: quitToMainMenu and the reads of the character are
+    Papyrus, and the K panel's message arrives on tick.
+  */
+  const SWITCH_WAIT_MS = 10000;
+  const SWITCH_MOVE_UNITS = 32;
+  let switchAsked = false;   // the button was pressed, for the next update
+  let switchAt = 0;          // when the wait began, 0 while there is none
+  let switchFrom = null;     // { x, y, z, hp } when it began
+  let switchSaid = 0;        // the whole seconds left that were last said
+
+  /* What would stop a switch now, in words, or '' when nothing would. */
+  function switchHeld(pc) {
+    if (!pc) { return 'there is no character'; }
+    try { if (pc.isDead()) { return 'your character is dead'; } } catch (e) { }
+    try { if (pc.isInCombat()) { return 'you are in combat'; } } catch (e) { }
+    return '';
+  }
+
+  function switchWhere(pc) {
+    try {
+      return { x: pc.getPositionX(), y: pc.getPositionY(), z: pc.getPositionZ(),
+               hp: pc.getActorValue('Health') };
+    } catch (e) { return null; }
+  }
+
+  function switchStop(why) {
+    switchAt = 0;
+    switchFrom = null;
+    switchSaid = 0;
+    note('Change of character stopped: ' + why + '.');
+  }
+
+  function switchStart(now) {
+    if (!chooseAtMenu || !(PROFILE > 0)) {
+      note('This game does not choose its character in the game. Close Skyrim and press Play to pick another.');
+      return;
+    }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    const held = switchHeld(pc);
+    if (held) { note('You cannot change character now: ' + held + '.'); return; }
+    switchFrom = switchWhere(pc);
+    if (!switchFrom) { note('You cannot change character now: your character could not be found.'); return; }
+    switchAt = now;
+    switchSaid = 0;
+    log('change character: profile', PROFILE, 'asked; waiting', SWITCH_WAIT_MS / 1000 + 's in place');
+  }
+
+  function switchLeave() {
+    const me = PROFILE;
+    const name = myName();
+    switchAt = 0;
+    switchFrom = null;
+    log('change character: ' + SWITCH_WAIT_MS / 1000 + 's in place and out of combat, so out of the world ' +
+        'to the character choice as profile', me, '(' + (name || 'no name') + ')');
+    afkGone = true;
+    afkClose();
+    try { globalThis.__thornswoodInWorld = false; } catch (e) { }
+    try { sp.mpClientPlugin.destroyClient(); } catch (e) { log('change character: could not close the connection to the game server:', e); }
+    try { sp.Game.quitToMainMenu(); } catch (e) { log('change character: could not go to the main menu:', e); }
+    backToChoice({ id: me, name: name, switched: true });
+  }
+
+  sp.on('update', guard('change character', () => {
+    const now = Date.now();
+    if (switchAsked) {
+      switchAsked = false;
+      if (switchAt) { switchStop('as you asked'); return; }
+      switchStart(now);
+      return;
+    }
+    if (!switchAt) { return; }
+    let here = false;
+    try { here = !!globalThis.__thornswoodInWorld; } catch (e) { here = false; }
+    if (!here || afkGone) { switchStop('you left the world'); return; }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    const held = switchHeld(pc);
+    if (held) { switchStop(held); return; }
+    const at = switchWhere(pc);
+    if (!at) { switchStop('your character could not be found'); return; }
+    const dx = at.x - switchFrom.x, dy = at.y - switchFrom.y, dz = at.z - switchFrom.z;
+    if (dx * dx + dy * dy + dz * dz > SWITCH_MOVE_UNITS * SWITCH_MOVE_UNITS) { switchStop('you moved'); return; }
+    // Against the most it has been since the wait began, so health coming
+    // back first does not hide a hit after it.
+    if (at.hp < switchFrom.hp) { switchStop('you were hurt'); return; }
+    switchFrom.hp = at.hp;
+    const left = Math.ceil((SWITCH_WAIT_MS - (now - switchAt)) / 1000);
+    if (left <= 0) { switchLeave(); return; }
+    if (left !== switchSaid) {
+      switchSaid = left;
+      note('Changing character in ' + left + (left === SWITCH_WAIT_MS / 1000 ? '. Stay where you are.' : '.'));
+    }
   }));
 
   /* The choice is on screen and this block is holding it up: asking the page
@@ -2176,10 +2453,10 @@
   */
   const CAP_CLOSES = {
     skills: 'thornswoodSkills', party: 'thornswoodParty', journal: 'thornswoodJournal',
-    board: 'thornswoodBoard', repair: 'thornswoodRepair', treat: 'thornswoodTreat',
+    board: 'thornswoodBoard', repair: 'thornswoodRepair', treat: 'thornswoodTreat', preserve: 'thornswoodPreserve',
     trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
     afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers', ride: 'thornswoodRide',
-    help: 'thornswoodHelp', box: 'thornswoodBox', ship: 'thornswoodShip'
+    help: 'thornswoodHelp', settings: 'thornswoodSettings', box: 'thornswoodBox', ship: 'thornswoodShip', stall: 'thornswoodStall'
   };
 
   T.claimFocus = function (who, on) {
@@ -3532,10 +3809,8 @@
     whole cost, and it ends with the menu.
   */
   let closingGame = false;   // set by closeGame, read by the race menu above
-  const CLOSE_GAME_KEY = iniNumber(ini, 'CloseGameKey', 68);   // F10
-  const CLOSE_GAME_NAME = ({ 59: 'F1', 60: 'F2', 61: 'F3', 62: 'F4', 63: 'F5', 64: 'F6',
-                             65: 'F7', 66: 'F8', 67: 'F9', 68: 'F10', 87: 'F11', 88: 'F12' })[CLOSE_GAME_KEY] ||
-                          keyName(CLOSE_GAME_KEY);
+  let CLOSE_GAME_KEY = iniNumber(ini, 'CloseGameKey', 68);   // F10
+  let CLOSE_GAME_NAME = keyName(CLOSE_GAME_KEY);
   const CLOSE_ARM_MS = 5000;
   const CLOSE_LINE_EVERY = 200;
   const CLOSE_LINE_COLOUR = [0.91, 0.82, 0.61, 0.95];   // the K panel's gold
@@ -5723,8 +5998,77 @@
     ['JKs Skyrim.esp', 0x2493e], ['JKs Skyrim.esp', 0x2493d], ['JKs Skyrim.esp', 0x2c91],
     ['JKs Skyrim.esp', 0x3274], ["JK's Whiterun's Outskirts.esp", 0x1503ff],
     ["JK's Whiterun's Outskirts.esp", 0x18d5d7], ["JK's Whiterun's Outskirts.esp", 0x141081],
-    ["JK's Whiterun's Outskirts.esp", 0x141088]
+    ["JK's Whiterun's Outskirts.esp", 0x141088],
+    // The HearthFires garden planters, plots since #3141.
+    ['HearthFires.esm', 0x1045e], ['HearthFires.esm', 0x1045f], ['HearthFires.esm', 0x10460],
+    ['HearthFires.esm', 0x110b9], ['HearthFires.esm', 0x110ba], ['HearthFires.esm', 0x110cd]
   ];
+  /*
+    A MARKET STALL (#3160). Stalls are fixed market stalls (Patrick, 22 Oct
+    2026), and a stall's counter is a static, which the crosshair never
+    names. So the line goes up by where somebody stands: within a stall's
+    reach of the point in front of its counter, in its world or cell, with
+    nothing else of the lock key's under the crosshair, the line says Market
+    stall, and the lock key sends /stall open and the stall's id. The server
+    checks again that they stand there, and its panel does the rest
+    (game/ui/thornswood-stall.js).
+  */
+  // MARKET STALL SPOTS BEGIN
+  // Built by scripts\dev\Build-MarketStallsGamemode.js out of game\data\market-stalls.json. Do not hand edit.
+  const STALL_SPOTS = [
+    ["falkreath-e0b1", 0x3c, "Skyrim.esm", -54113, -34305, -3633, 335],
+    ["falkreath-e0b2", 0x3c, "Skyrim.esm", -54413, -34602, -3620, 335],
+    ["markarth-473a0", 0x16d71, "Skyrim.esm", -174050, 5729, -3363, 183],
+    ["markarth-473a1", 0x16d71, "Skyrim.esm", -174136, 6065, -3328, 183],
+    ["markarth-7de", 0x3c, "Skyrim.esm", -168656, 6632, -4331, 183],
+    ["morthal-bc995", 0x3c, "Skyrim.esm", -85314, 57199, -11567, 254],
+    ["morthal-bc996", 0x3c, "Skyrim.esm", -85377, 57518, -11568, 254],
+    ["riften-1b1f7a", 0x16bb4, "Skyrim.esm", 176485, -98728, 11211, 260],
+    ["riften-1b1f7c", 0x16bb4, "Skyrim.esm", 176213, -99094, 11207, 202],
+    ["riften-1dd1", 0x16bb4, "Skyrim.esm", 172370, -96376, 11128, 202],
+    ["riften-1dd2", 0x16bb4, "Skyrim.esm", 172370, -96231, 11128, 202],
+    ["riften-cc524", 0x16bb4, "Skyrim.esm", 173755, -96726, 11104, 252],
+    ["riften-cc52d", 0x16bb4, "Skyrim.esm", 173079, -97352, 11104, 309],
+    ["riften-cc52e", 0x16bb4, "Skyrim.esm", 173779, -97306, 11104, 257],
+    ["solitude-1aa3b", 0x3c, "Skyrim.esm", -59552, 100648, -13958, 224],
+    ["solitude-2a11", 0x37edf, "Skyrim.esm", -61093, 105827, -8410, 224],
+    ["solitude-2a1b", 0x37edf, "Skyrim.esm", -61315, 105933, -8418, 209],
+    ["solitude-2a49", 0x37edf, "Skyrim.esm", -60786, 105792, -8410, 224],
+    ["solitude-357d", 0x37edf, "Skyrim.esm", -59225, 107632, -8021, 224],
+    ["solitude-46f5", 0x37edf, "Skyrim.esm", -60730, 104169, -8307, 224],
+    ["solitude-4725", 0x37edf, "Skyrim.esm", -61764, 104094, -8307, 224],
+    ["solitude-50c6a", 0x37edf, "Skyrim.esm", -61161, 104924, -8335, 224],
+    ["solitude-5133", 0x3c, "Skyrim.esm", -58740, 101161, -13959, 224],
+    ["solitude-64b8c", 0x37edf, "Skyrim.esm", -61200, 104536, -8334, 224],
+    ["solitude-64b8d", 0x37edf, "Skyrim.esm", -61605, 104462, -8333, 224],
+    ["whiterun-1908f", 0x1a26f, "Skyrim.esm", 21453, -7327, -3587, 254],
+    ["whiterun-5b2e4", 0x1a26f, "Skyrim.esm", 25242, -7425, -3393, 254],
+    ["whiterun-5bee6", 0x1a26f, "Skyrim.esm", 25156, -7089, -3400, 314],
+    ["whiterun-6b0b6", 0x1a26f, "Skyrim.esm", 24382, -7187, -3399, 335],
+    ["whiterun-b7f00", 0x3c, "Skyrim.esm", 12937, -10803, -4726, 238],
+    ["whiterun-fe7f", 0x1a26f, "Skyrim.esm", 24312, -6755, -3422, 270],
+    ["windhelm-383a6", 0x1691d, "Skyrim.esm", 130794, 36455, -12272, 236],
+    ["windhelm-38403", 0x1691d, "Skyrim.esm", 130808, 35750, -12276, 236],
+    ["windhelm-38404", 0x1691d, "Skyrim.esm", 130560, 36224, -12272, 236],
+    ["windhelm-80c33", 0x3c, "Skyrim.esm", 135265, 30774, -12565, 202],
+    ["windhelm-8b01e", 0x1691d, "Skyrim.esm", 134225, 39412, -12049, 236],
+    ["windhelm-8b0a", 0x1691d, "Skyrim.esm", 129842, 36459, -12272, 236],
+    ["windhelm-8b0fb", 0x3c, "Skyrim.esm", 135301, 30408, -12581, 177],
+    ["windhelm-8b6c", 0x1691d, "Skyrim.esm", 130415, 35648, -12272, 236],
+    ["windhelm-a48fc", 0x1691d, "Skyrim.esm", 137951, 38182, -12643, 208],
+    ["windhelm-b4bb", 0x1691d, "Skyrim.esm", 137721, 38748, -12660, 219],
+    ["windhelm-f3c74", 0x1691d, "Skyrim.esm", 131041, 35666, -12272, 219],
+    ["windhelm-f3c75", 0x1691d, "Skyrim.esm", 130560, 36016, -12272, 219],
+    ["winterhold-76d1", 0x3c, "Skyrim.esm", 114289, 104184, -9405, 202],
+    ["winterhold-76d3", 0x3c, "Skyrim.esm", 114562, 104038, -9392, 183],
+    ["winterhold-76e1", 0x3c, "Skyrim.esm", 114011, 103748, -9225, 202],
+    ["winterhold-76e2", 0x3c, "Skyrim.esm", 113403, 100147, -8954, 183],
+    ["winterhold-76e4", 0x3c, "Skyrim.esm", 113628, 100266, -9020, 202],
+    ["winterhold-76e5", 0x3c, "Skyrim.esm", 112678, 100814, -8953, 202],
+    ["winterhold-76e6", 0x3c, "Skyrim.esm", 112650, 100647, -8944, 202]
+  ];
+  // MARKET STALL SPOTS END
+  let stallWorlds = null;  // null not resolved yet, else { stall id: runtime world or cell id }
   const PLOT_ASK_MS = 10000;     // asked again this often while one crop is looked at
   const PLOT_LINE_MS = 30000;    // an answer older than this is not drawn
   let lockAt = 0;
@@ -5820,9 +6164,61 @@
 
   const LOCK_WORDS = { claim: 'Claim ', lock: 'Lock ', unlock: 'Unlock ' };
 
+  /** The lock key's line at a stall: what stallAt finds, with no menu over it. */
+  function stallNow() {
+    const s = stallAt();
+    if (!s || busyMenuOpenNow()) { return null; }
+    return { hex: s, verb: 'stall open', words: 'Market stall' };
+  }
+
+  /** The id of the stall somebody is standing at, by STALL_SPOTS, or ''. */
+  function stallAt() {
+    if (!STALL_SPOTS.length) { return ''; }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    if (!pc) { return ''; }
+    if (!stallWorlds) {
+      const got = {};
+      let found = 0;
+      for (let i = 0; i < STALL_SPOTS.length; i++) {
+        try {
+          const f = sp.Game.getFormFromFile(STALL_SPOTS[i][1], STALL_SPOTS[i][2]);
+          const id = f ? (f.getFormID() >>> 0) : 0;
+          if (id) { got[STALL_SPOTS[i][0]] = id; found++; }
+        } catch (e) { }
+      }
+      if (!found) { return ''; }
+      stallWorlds = got;
+      say('market stalls for the lock key: ' + found + ' of ' + STALL_SPOTS.length + ' found');
+    }
+    let where = 0, x = 0, y = 0, z = 0;
+    try {
+      const w = pc.getWorldSpace();
+      const c = pc.getParentCell();
+      where = w ? (w.getFormID() >>> 0) : (c ? (c.getFormID() >>> 0) : 0);
+      x = pc.getPositionX(); y = pc.getPositionY(); z = pc.getPositionZ();
+    } catch (e) { return ''; }
+    if (!where) { return ''; }
+    // Two stalls side by side reach over each other: the nearer one is the one at hand.
+    let best = '', bestD = Infinity;
+    for (let i = 0; i < STALL_SPOTS.length; i++) {
+      const s = STALL_SPOTS[i];
+      if (stallWorlds[s[0]] !== where) { continue; }
+      const dx = x - s[3], dy = y - s[4], dz = z - s[5];
+      const d = dx * dx + dy * dy + dz * dz;
+      if (d <= s[6] * s[6] && d < bestD) { best = s[0]; bestD = d; }
+    }
+    return best;
+  }
+
   /** What the lock key would do right now: { hex, verb, words }, or null. */
   function lockKeyNow() {
     if (anyClaim()) { return null; }
+    return lockKeyRef() || stallNow();
+  }
+
+  /** What the lock key would do at what is under the crosshair: a door, a crop or a forge. */
+  function lockKeyRef() {
     let ref = null;
     try { ref = sp.Game.getCurrentCrosshairRef(); } catch (e) { ref = null; }
     if (!ref) { return null; }
@@ -6179,6 +6575,84 @@
     catch (err) { say('treat: closeMenu threw on the inventory: ' + err); }
     tellServer('/treat');
     say('pressed ' + TREAT_SELF_NAME + ' in the inventory with a wound to tend, asked the server for the treatment panel');
+    return true;
+  }
+
+  /*
+    ------------------------------------- salting and smoking food, from the inventory
+
+    #3163. Food spoils (docs/systems/spoilage.md), and a cook keeps raw meat
+    and fish by salting or smoking it. There is no item to use for that, so
+    it is the repair kit's pattern: while the inventory is open and the
+    server says you may preserve something you carry, one line at the bottom
+    names a key, and that key shuts the inventory and asks the server for
+    the preserving panel (game/ui/thornswood-preserve.js), whose buttons
+    send the rest. /preserve is that ask; nobody is told to type it.
+
+    Whether there is anything to preserve is the server's: you have to be a
+    cook and carry raw food that spoils, and its spoilage block writes that
+    on the thornswoodPreserveLine property, whose owner's script sets
+    globalThis.thornswoodPreserveLine. Above the furniture line, so all four
+    can be up.
+  */
+  let preserveShown = false;
+  const PRESERVE_CSS = REPAIR_CSS.replace('bottom:12%', 'bottom:27%');
+
+  function preserveCan() {
+    try { return !!globalThis.thornswoodPreserveLine; } catch (e) { return false; }
+  }
+
+  /** The line up or down. Only remembered once the page has taken it. */
+  function drawPreserveLine(on) {
+    if (on === preserveShown) { return; }
+    if (!on) {
+      if (T.js('try{var d=document.getElementById("ts-preserve-line");if(d){d.style.display="none";}}catch(e){}')) {
+        preserveShown = false;
+      }
+      return;
+    }
+    const html =
+      '<span style="display:inline-block;min-width:26px;text-align:center;margin-right:12px;' +
+      'padding:1px 7px;border:1px solid rgba(233,209,155,.55);border-bottom-width:2px;' +
+      'border-radius:3px;background:rgba(0,0,0,.35);color:#e9d19b">' + PRESERVE_NAME + '</span>' +
+      'Salt or smoke your food';
+    if (T.js('(function(){try{' +
+             'var d=document.getElementById("ts-preserve-line");' +
+             'if(!d){d=document.createElement("div");d.id="ts-preserve-line";' +
+             'd.style.cssText=' + JSON.stringify(PRESERVE_CSS) + ';' +
+             'document.body.appendChild(d);}' +
+             'd.innerHTML=' + JSON.stringify(html) + ';' +
+             'd.style.display="";' +
+             '}catch(e){}})();')) {
+      preserveShown = true;
+    }
+  }
+
+  sp.on('menuOpen', guard('preserve line up', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    drawPreserveLine(!!T.ready && preserveCan());
+  }));
+  sp.on('menuClose', guard('preserve line down', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    drawPreserveLine(false);
+  }));
+
+  /*
+    The key, in the inventory. Asked again at the press: the inventory open,
+    nothing typing, something to preserve. Answers whether it was used, so
+    the key falls through when it was not.
+  */
+  function preservePress() {
+    if (!T.ready || claims.chat) { return false; }
+    let open = false;
+    try { open = !!sp.Ui.isMenuOpen(INVENTORY_MENU); } catch (e) { open = false; }
+    if (!open) { return false; }
+    if (!preserveCan()) { drawPreserveLine(false); return false; }
+    drawPreserveLine(false);
+    try { sp.TESModPlatform.closeMenu(INVENTORY_MENU); }
+    catch (err) { say('preserve: closeMenu threw on the inventory: ' + err); }
+    tellServer('/preserve');
+    say('pressed ' + PRESERVE_NAME + ' in the inventory with food to preserve, asked the server for the preserving panel');
     return true;
   }
 
@@ -6669,8 +7143,10 @@
     the same three colours your own microphone takes while you speak
     (docs/systems/voice.md): whisper pale blue, ordinary white, yell amber.
     Never the party's green, which is the name's alone. It is a round dot
-    out of DIN-Pro-bold, a font the fork ships with Skyrim Platform, because
-    the asterisk in the client's own Tavern was eleven pixels high.
+    out of Barlow-SemiBold, Thornswood's own sprite font from the OFL face
+    (game\ours, scripts\mods\Build-SpriteFont.py), because the asterisk in
+    the client's own Tavern was eleven pixels high. Until #1317 it was
+    DIN-Pro-bold, a picture of a commercial face nobody may hand on.
   */
   const HEAD_MS = 6000;
   const HEAD_COLOUR = [0.95, 0.91, 0.82, 0.95];
@@ -6679,9 +7155,9 @@
     local: [1, 1, 1, 0.95],
     yell: [0.93, 0.68, 0.22, 0.95]
   };
-  const MARK_TEXT = '\u2022';            // a bullet, in DIN-Pro-bold.spritefont
-  const MARK_FONT = 'DIN-Pro-bold';      // client-deps\common\Data\Platform\Fonts in the fork
-  const MARK_SIZE = 1.6;                 // ten pixels of dot at 1.0, so sixteen
+  const MARK_TEXT = '\u2022';            // a bullet, in Barlow-SemiBold.spritefont
+  const MARK_FONT = 'Barlow-SemiBold';   // game\ours\Data\Platform\Fonts (#1317)
+  const MARK_SIZE = 1.8;                 // nine pixels of dot at 1.0, so sixteen
   const MARK_BEAT_MS = 1150;             // twPulse's 1.15s
   const MARK_LOW = 0.58;                 // twPulse's low point
   const overheadHeads = {};
@@ -7717,7 +8193,7 @@
 
     And the game's journal cannot be switched off as a whole, because the
     Journal Menu is also what Escape opens, at its System page, which is where
-    people save, change settings and quit. The journal flag on
+    people change settings and quit (#3127 took saving off it). The journal flag on
     DisablePlayerControls is documented as leaving only the System page of
     the book, which takes the quest log mods still write to away from Escape
     as well, and the controls watchdog above turns every control back on
@@ -7957,9 +8433,9 @@
     A classic SkyUI menu keeps its choices in the save, and there is no save
     here, so Apocalypse, AHZmoreHUD, atlas map markers, Skyrim Unbound and
     chfshVariousActions started from their defaults every session (Atlas
-    left the collection with revision 6, #3649, and its menu with it). What a
-    menu writes into a GLOB record can be read from here and put back, and
-    those are the 78 below, out of scripts\mods\Audit-ModMenus.js -v: plugin,
+    leaves the collection with revision 6, #3649, and its menu is no longer
+    kept). What a menu writes into a GLOB record can be read from here and put
+    back, and those are the 78 below, out of scripts\mods\Audit-ModMenus.js -v: plugin,
     editor id, and the id inside the plugin, which does not move when the load
     order does. The gamemode keeps the same table (test-mod-settings.js checks
     the two agree) and refuses any name that is not in it.
@@ -8511,6 +8987,18 @@
     }
   }));
 
+  // A market stall's panel closes when you walk away from the stall (#3160).
+  let stallWatchAt = 0;
+  sp.on('update', guard('stall distance', () => {
+    if (!T.hasFocus('stall')) { return; }
+    const now = Date.now();
+    if (now - stallWatchAt < 250) { return; }
+    stallWatchAt = now;
+    if (!stallAt()) {
+      T.js('try{window.thornswoodStall&&window.thornswoodStall.close();}catch(e){}');
+    }
+  }));
+
   sp.on('buttonEvent', guard('keys', (e) => {
     keysSeen++;
     // Before the isDown guard, not after it.
@@ -8590,6 +9078,8 @@
     if (e.code === TREAT_KEY && treatPress()) { return; }
     // The trade key in the inventory, with a wound to tend (#1383). See TREAT_SELF_KEY.
     if (e.code === TREAT_SELF_KEY && treatSelfPress()) { return; }
+    // The friend key in the inventory, for a cook with raw food (#3163). See PRESERVE_KEY.
+    if (e.code === PRESERVE_KEY && preservePress()) { return; }
     /*
       The five social keys work in the open world, and P and J can always
       close their own panel. Djinn on dev, 24 September: "The party menu
@@ -9498,6 +9988,11 @@
       if (what.indexOf('select:alive') !== 0) { log('choice page:', what.slice(7)); }
       return;
     }
+    // The loading screen (#3130) says when it went up and down by the page's
+    // own clock, and how far the loop played. Sent during a load, so they
+    // reach this log after it: the times in them are the record, not this
+    // log's.
+    if (what.indexOf('load:') === 0) { log('loading screen:', what.slice(5)); return; }
 
     /*
       The skills panel says when it opens and closes rather than being
@@ -9531,6 +10026,10 @@
     if (what === 'ship:opened') { T.claimFocus('ship', true); return; }
     if (what === 'ship:closed') { T.claimFocus('ship', false); return; }
     if (what === 'ship:ready') { log('the trade ships panel is in'); return; }
+    // A market stall's panel (#3160): the lock key at a stall.
+    if (what === 'stall:opened') { T.claimFocus('stall', true); return; }
+    if (what === 'stall:closed') { T.claimFocus('stall', false); return; }
+    if (what === 'stall:ready') { log('the market stall panel is in'); return; }
     if (what.indexOf('board:near ') === 0) {
       const bits = what.slice('board:near '.length).trim().split(/\s+/);
       if (bits[0] === 'none' || bits.length < 3) { boardNear = null; return; }
@@ -9552,11 +10051,24 @@
     if (what === 'help:opened') { T.claimFocus('help', true); return; }
     if (what === 'help:closed') { T.claimFocus('help', false); return; }
     if (what === 'help:ready') { log('the help panel is in'); helpToPage(); return; }
+    // The Settings panel (#3126): opened from Settings on the help, K, P and
+    // J panels; every change it asks for is checked and written here.
+    if (what === 'settings:opened') { T.claimFocus('settings', true); settingsToPage(''); return; }
+    if (what === 'settings:closed') { T.claimFocus('settings', false); return; }
+    if (what === 'settings:ready') { log('the settings panel is in'); settingsToPage(''); return; }
+    if (what.indexOf('settings:set ') === 0) {
+      const bits = what.slice('settings:set '.length).trim().split(/\s+/);
+      setSetting(bits[0], bits[1]);
+      return;
+    }
     if (what === 'trade:opened') { T.claimFocus('trade', true); return; }
     if (what === 'trade:closed') { T.claimFocus('trade', false); return; }
     if (what === 'repair:opened') { T.claimFocus('repair', true); return; }
     if (what === 'repair:closed') { T.claimFocus('repair', false); return; }
     if (what === 'repair:ready') { log('the repair panel is in'); return; }
+    if (what === 'preserve:opened') { T.claimFocus('preserve', true); return; }
+    if (what === 'preserve:closed') { T.claimFocus('preserve', false); return; }
+    if (what === 'preserve:ready') { log('the preserving panel is in'); return; }
     if (what === 'furniture:opened') { T.claimFocus('furniture', true); return; }
     if (what === 'furniture:closed') { T.claimFocus('furniture', false); return; }
     if (what === 'furniture:ready') { log('the furniture panel is in'); return; }
@@ -9585,6 +10097,11 @@
         T.js('try{window.thornswoodParty&&window.thornswoodParty.setKey&&window.thornswoodParty.setKey(' +
              JSON.stringify(PARTY_NAME) + ');}catch(e){}');
       }
+      // And the J panel on J, wherever the Settings panel has put it (#3126).
+      if (what === 'journal:ready') {
+        T.js('try{window.thornswoodJournal&&window.thornswoodJournal.setKey&&window.thornswoodJournal.setKey(' +
+             JSON.stringify(keyName(JOURNAL_KEY)) + ');}catch(e){}');
+      }
       tellServer(what === 'trade:ready' ? '/trade refresh' : '/party refresh');
       log('the ' + what.split(':')[0] + ' panel is in');
       return;
@@ -9607,6 +10124,8 @@
     if (what.indexOf('skills:quit ') === 0) { log('skills:', what.slice(7)); return; }
 
     if (what === 'skills:opened') { T.claimFocus('skills', true); return; }
+    // Change character (#3128); the wait itself runs in update.
+    if (what === 'skills:switch') { switchAsked = true; return; }
     if (what === 'skills:closed') { T.claimFocus('skills', false); return; }
     if (what === 'skills:ready' || what === 'skills:refresh') {
       if (what === 'skills:ready') {
@@ -9732,6 +10251,182 @@
 
     log(what);
   }));
+
+  // ------------------------------------------------- the map's calendar --
+  /*
+    THE MAP'S CALENDAR: THE DATE, THE SEASON AND THE SERVER CLOCK (#3156).
+
+    Patrick, 22 Oct 2026, on his page: C, on the map menu. A strip at the top
+    of the screen while MapMenu is up, gone the moment it closes:
+
+      26th of Frostfall, 4E 252
+      Autumn, winter in 3 days
+      Server clock 9:46 AM MDT, yours 4:46 PM
+
+    THE DATE is the game's own calendar, the globals the game's map line
+    reads (GameDay 0x37, GameMonth 0x36, GameYear 0x35), which the engine's
+    TimeService writes from today's date in UTC. It is read here rather than
+    worked out again, so this line and the game's never disagree. There is
+    no day of the week: the game counts that from GameDaysPassed, which
+    TimeService never writes (#841), so it is not the same for two people.
+
+    THE SEASON AND THE SERVER CLOCK are the server's, handed over by the
+    calendar property (gamemode.js, THE DATE, THE SEASON AND THE SERVER CLOCK
+    ON THE MAP) through globalThis.thornswoodCalendar, as the drunk screen's
+    is. The server clock is the box's zone put on this machine's own clock,
+    the clock the sky already runs on. Yours shows only when your zone is not
+    the server's. Before the server has said anything, the date shows alone.
+
+    Read once a second while the map is up, and written to the page only when
+    a line changed, which is once a minute.
+  */
+  const MAP_MENU = 'MapMenu';
+  const MAP_CAL_ID = 'ts-map-calendar';
+  const MAP_CAL_EVERY_MS = 1000;
+  // GameMonth counts from 0, Morning Star.
+  const MONTHS = ['Morning Star', 'Sun\'s Dawn', 'First Seed', 'Rain\'s Hand', 'Second Seed', 'Midyear',
+                  'Sun\'s Height', 'Last Seed', 'Hearthfire', 'Frostfall', 'Sun\'s Dusk', 'Evening Star'];
+  const GAME_DAY = 0x37;
+  const GAME_MONTH = 0x36;
+  const GAME_YEAR = 0x35;
+  let mapCalendar = null;   // what the server last handed over
+  let mapUp = false;
+  let mapCalAt = 0;
+  let mapCalShown = '';
+  let mapCalUnread = false; // the calendar could not be read, said once a map
+
+  globalThis.thornswoodCalendar = function (v) { mapCalendar = v; mapCalShown = ''; };
+
+  function ordinal(n) {
+    const t = n % 100;
+    if (t >= 11 && t <= 13) { return n + 'th'; }
+    if (n % 10 === 1) { return n + 'st'; }
+    if (n % 10 === 2) { return n + 'nd'; }
+    if (n % 10 === 3) { return n + 'rd'; }
+    return n + 'th';
+  }
+
+  function clock12(h, m) {
+    const hh = h % 12 === 0 ? 12 : h % 12;
+    return hh + ':' + (m < 10 ? '0' : '') + m + (h < 12 ? ' AM' : ' PM');
+  }
+
+  function gameGlobal(id) {
+    const gv = sp.GlobalVariable.from(sp.Game.getFormEx(id));
+    return gv ? Math.floor(gv.getValue()) : NaN;
+  }
+
+  function mapDateLine() {
+    let day = NaN, month = NaN, year = NaN;
+    try {
+      day = gameGlobal(GAME_DAY);
+      month = gameGlobal(GAME_MONTH);
+      year = gameGlobal(GAME_YEAR);
+    } catch (e) {
+      if (!mapCalUnread) { mapCalUnread = true; log('map calendar: the game\'s calendar could not be read: ' + e); }
+      return '';
+    }
+    if (!(day >= 1 && day <= 31) || !(month >= 0 && month <= 11) || !(year >= 1)) {
+      if (!mapCalUnread) {
+        mapCalUnread = true;
+        log('map calendar: the game\'s calendar reads day ' + day + ', month ' + month + ', year ' + year + ', so no date');
+      }
+      return '';
+    }
+    return ordinal(day) + ' of ' + MONTHS[month] + ', 4E ' + year;
+  }
+
+  function untilWords(ms) {
+    const H = 3600000;
+    if (ms >= 36 * H) { return 'in ' + Math.round(ms / (24 * H)) + ' days'; }
+    if (ms >= 90 * 60000) { return 'in ' + Math.round(ms / H) + ' hours'; }
+    return 'within the hour';
+  }
+
+  function capital(w) { return w.charAt(0).toUpperCase() + w.slice(1); }
+
+  function mapSeasonLine(cal, now) {
+    if (!cal || !cal.season) { return ''; }
+    const line = capital(cal.season);
+    if (!cal.next || !(cal.turns > now)) { return line; }
+    return line + ', ' + cal.next + ' ' + untilWords(cal.turns - now);
+  }
+
+  function mapClockLine(cal, now) {
+    if (!cal || typeof cal.off !== 'number' || !isFinite(cal.off)) { return ''; }
+    const s = new Date(now + cal.off * 60000);
+    let line = 'Server clock ' + clock12(s.getUTCHours(), s.getUTCMinutes()) + (cal.tz ? ' ' + cal.tz : '');
+    const here = new Date(now);
+    if (-here.getTimezoneOffset() !== cal.off) {
+      line += ', yours ' + clock12(here.getHours(), here.getMinutes());
+    }
+    return line;
+  }
+
+  function mapCalendarLines(now) {
+    return [mapDateLine(), mapSeasonLine(mapCalendar, now), mapClockLine(mapCalendar, now)]
+      .filter(function (l) { return !!l; });
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /*
+    The strip, in the needs HUD's own pixels (--ts, gamemode.js hudScript):
+    the screen's height over 720 or its width over 1280, whichever is smaller,
+    so it sits in the same place at every screen size. Centred at the top,
+    where the map has nothing of its own.
+  */
+  const MAP_CAL_CSS = '--ts:min(0.078125vw,0.1388889vh);' +
+    'position:fixed;left:50vw;top:calc(50vh - 350 * var(--ts));transform:translateX(-50%);' +
+    'z-index:2147483500;pointer-events:none;text-align:center;white-space:nowrap;' +
+    'font-family:Georgia,serif;font-size:calc(11 * var(--ts));line-height:1.35;color:#efe4cc;' +
+    'background:rgba(12,10,8,.62);border:calc(1 * var(--ts)) solid rgba(0,0,0,.65);' +
+    'border-radius:calc(4 * var(--ts));padding:calc(4 * var(--ts)) calc(10 * var(--ts));' +
+    'text-shadow:0 1px 3px rgba(0,0,0,.95)';
+
+  function drawMapCalendar(now) {
+    const lines = mapCalendarLines(now);
+    const text = lines.join('\n');
+    if (text === mapCalShown) { return; }
+    mapCalShown = text;
+    if (!lines.length) { hideMapCalendar(); return; }
+    const html = lines.map(function (l) { return '<div>' + escapeHtml(l) + '</div>'; }).join('');
+    T.js('(function(){try{' +
+         'var d=document.getElementById(' + JSON.stringify(MAP_CAL_ID) + ');' +
+         'if(!d){d=document.createElement("div");d.id=' + JSON.stringify(MAP_CAL_ID) + ';' +
+         'd.style.cssText=' + JSON.stringify(MAP_CAL_CSS) + ';document.body.appendChild(d);}' +
+         'd.innerHTML=' + JSON.stringify(html) + ';' +
+         '}catch(e){}})();');
+  }
+
+  function hideMapCalendar() {
+    T.js('(function(){try{var d=document.getElementById(' + JSON.stringify(MAP_CAL_ID) + ');' +
+         'if(d&&d.parentNode){d.parentNode.removeChild(d);}}catch(e){}})();');
+  }
+
+  sp.on('menuOpen', guard('map calendar open', (e) => {
+    if (!e || e.name !== MAP_MENU) { return; }
+    mapUp = true;
+    mapCalAt = 0;
+    mapCalShown = '';
+    mapCalUnread = false;
+  }));
+  sp.on('menuClose', guard('map calendar close', (e) => {
+    if (!e || e.name !== MAP_MENU) { return; }
+    mapUp = false;
+    mapCalShown = '';
+    hideMapCalendar();
+  }));
+  sp.on('update', guard('map calendar', () => {
+    if (!mapUp) { return; }
+    const now = Date.now();
+    if (now - mapCalAt < MAP_CAL_EVERY_MS) { return; }
+    mapCalAt = now;
+    drawMapCalendar(now);
+  }));
+  // ------------------------------------------------ end the map's calendar --
 
   // ------------------------------------------------------ the drunk screen --
   /*
@@ -10363,8 +11058,8 @@
     Thornswood.ini, F7 by default) opens game/ui/thornswood-help.js, and so
     does Help on the K, P and J panels, which the page does on its own. The
     page holds the topics; this hands it the name of every key it mentions,
-    as this machine has them bound, so a rebind on the Controls page is what
-    the help says. E is the game's Activate, wherever that is bound.
+    as this machine has them bound, so a rebind on Settings is what the help
+    says, at once (helpToPage runs again on every change). E is the game's Activate, wherever that is bound.
 
     The panel holds the keyboard while it is up, under the 'help' claim, and
     says when it opens and closes like every other panel; the cap closes it
@@ -10400,6 +11095,297 @@
     if (busyNow) { say('help key seen, but ' + busyNow + ' is open'); return; }
     helpToPage();
     T.js('try{window.thornswoodHelp&&window.thornswoodHelp.open();}catch(e){}');
+  }
+
+  // -------------------------------------------------------- the settings --
+  /*
+    #3126. Patrick: every setting in the launcher that is really an in-game
+    setting is in the game's own settings, every key binding included; and on
+    #3146, the launcher keeps Play, news, update, diagnostics, account and
+    the display settings that need a restart. The Settings panel
+    (game/ui/thornswood-settings.js) is opened from Settings on the help
+    panel and on the K, P and J panels. The page never touches a file: it
+    sends 'settings:set <Name> <value>', and this checks the value, writes
+    Thornswood.ini in place, reads it back, and applies it at once:
+
+      - a key: readKeys above, the menu key blocks moved to the new key, the
+        names the help, P, J, K and maneuver panels show, and every other
+        plugin that reads Thornswood.ini, through T.settingsListeners;
+      - the field of view: fovChanged;
+      - how long the chat stays up and whether the needs bars are drawn:
+        window.THORNSWOOD, which the chat page reads (chatSettingsToPage).
+
+    The panel's state always comes back from the file, with a line saying
+    what was done or why not, so what it shows is what is set.
+  */
+
+  /* Every Thornswood key the panel offers, by its name in Thornswood.ini.
+     The same list as KEYS in thornswood-settings.js (the harness checks). */
+  const SETTINGS_KEYS = {
+    ChatKey: 28, CommandKey: 53, HelpKey: 65, SkillsKey: 37, PartyKey: 25, JournalKey: 36,
+    ManeuverKey: 10, FriendKey: 21, TradeWithKey: 35, MuteThemKey: 38, MoldKey: 22, LockKey: 45,
+    WheelKey: 34, PageKey: 15, CloseKey: 1, StopKey: 49,
+    PushToTalk: 47, VoiceModeKey: 48, VoiceLockKey: 24, CloseGameKey: 68
+  };
+  const SETTINGS_LABELS = {
+    ChatKey: 'Talk in chat', CommandKey: 'Type a command', HelpKey: 'Help',
+    SkillsKey: 'the character panel', PartyKey: 'Friends and party', JournalKey: 'Journals',
+    ManeuverKey: 'a warrior\'s maneuvers', FriendKey: 'Add or remove a friend',
+    TradeWithKey: 'Offer a trade', MuteThemKey: 'Mute somebody', MoldKey: 'Press a key mold into a lock',
+    LockKey: 'Claim, lock or unlock a door', WheelKey: 'the emote wheel', PageKey: 'Search the wheel',
+    CloseKey: 'Close the wheel', StopKey: 'Stand up', PushToTalk: 'Hold to talk',
+    VoiceModeKey: 'Whisper, talk or yell', VoiceLockKey: 'Keep talking',
+    CloseGameKey: 'Close Skyrim while making a character'
+  };
+
+  /*
+    The keys the panel can catch: the ones the launcher's Controls page
+    offered (letters, numbers, function keys and a handful of others), and
+    Enter, so the chat key can go back to it, by scan code. Escape is not
+    one; it gives up listening. A key's own default is always allowed.
+  */
+  const SETTINGS_OFFERED = (function () {
+    const out = {};
+    const add = function (c) { out[c] = true; };
+    for (let c = 2; c <= 13; c++) { add(c); }          // 1 to 0, - and =
+    for (let c = 14; c <= 28; c++) { add(c); }         // Backspace, Tab, Q to P, [ ], Enter
+    for (let c = 30; c <= 41; c++) { add(c); }         // A to L, ; ' `
+    for (let c = 43; c <= 54; c++) { add(c); }         // \ Z to M , . / Right Shift
+    for (let c = 58; c <= 70; c++) { add(c); }         // Caps Lock, F1 to F10, Num and Scroll Lock
+    [87, 88, 157, 184, 197, 199, 201, 207, 209, 210, 211, 259, 260].forEach(add);
+    return out;
+  })();
+
+  /* The game client's own, compiled in: names over heads, its overlay, its focus. */
+  const CLIENT_KEYS = { 59: 'F1 shows and hides the names over heads', 60: 'F2 hides the game client\'s overlay',
+                        64: 'F6 is the game client\'s' };
+
+  /*
+    Skyrim's own controls that a Thornswood key on top would take away:
+    moving, acting and the menus that are not ours to shadow. Journal, Quick
+    Stats, Quick Magic and Tween Menu are not here: J, / and P take the first
+    three on purpose, and Tab is the wheel's search only while it is open.
+  */
+  const GAME_CONTROLS = ['Forward', 'Back', 'Strafe Left', 'Strafe Right', 'Activate', 'Jump',
+    'Sprint', 'Sneak', 'Run', 'Toggle Always Run', 'Auto-Move', 'Ready Weapon', 'Shout',
+    'Toggle POV', 'Wait', 'Favorites', 'Quick Inventory', 'Quick Map', 'Left Attack/Block',
+    'Right Attack/Block'];
+
+  function gameControlOn(code) {
+    for (let n = 0; n < GAME_CONTROLS.length; n++) {
+      for (let device = 0; device <= 1; device++) {
+        let got = -1;
+        try { got = Number(sp.Input.getMappedKey(GAME_CONTROLS[n], device)); } catch (e) { got = -1; }
+        if (got === code) { return GAME_CONTROLS[n]; }
+      }
+    }
+    return '';
+  }
+
+  /*
+    THE OTHER MODS' KEYS, read from where each keeps them, for the panel to
+    show. MCM Helper keeps what a person chose in Data/MCM/Settings/<mod>.ini
+    over the mod's own Data/MCM/Config/<mod>/settings.ini; the defaults are
+    the mods' own. A mod whose files are not here is left off.
+  */
+  const MOD_KEYS = [
+    ['search', 'SkyUI_SE', 'iSearchKey', 57], ['switchtab', 'SkyUI_SE', 'iSwitchTabKey', 56],
+    ['equipmode', 'SkyUI_SE', 'iEquipModeKey', 42], ['favadd', 'SkyUI_SE', 'iFavoriteGroupAddKey', 33],
+    ['favuse', 'SkyUI_SE', 'iFavoriteGroupUseKey', 19], ['favicon', 'SkyUI_SE', 'iFavoriteSetIconKey', 56],
+    ['favstate', 'SkyUI_SE', 'iFavoriteEquipStateKey', 20], ['favfocus', 'SkyUI_SE', 'iFavoriteToggleFocusKey', 57],
+    ['favhot1', 'SkyUI_SE', 'iFavoriteGroupUseHotkey1', 59], ['favhot2', 'SkyUI_SE', 'iFavoriteGroupUseHotkey2', 60],
+    ['favhot3', 'SkyUI_SE', 'iFavoriteGroupUseHotkey3', 61], ['favhot4', 'SkyUI_SE', 'iFavoriteGroupUseHotkey4', 62],
+    ['lock', 'TrueDirectionalMovement', 'uTargetLockKey', 258],
+    ['lockleft', 'TrueDirectionalMovement', 'uSwitchTargetLeftKey', -1],
+    ['lockright', 'TrueDirectionalMovement', 'uSwitchTargetRightKey', -1],
+    ['lockbehind', 'TrueDirectionalMovement', 'uTargetLockBehindTargetKey', -1],
+    ['cyclehold', 'BetterThirdPersonSelection', 'iObjectCycleModifierKey', 42],
+    ['cycleup', 'BetterThirdPersonSelection', 'iCycleUpKey', 264],
+    ['cycledown', 'BetterThirdPersonSelection', 'iCycleDownKey', 265]
+  ];
+
+  function iniValue(text, key) {
+    const lines = String(text || '').split(/\r?\n/);
+    const rx = new RegExp('^\\s*' + key + '\\s*=\\s*(.*?)\\s*$', 'i');
+    for (let n = 0; n < lines.length; n++) {
+      const t = lines[n].trim();
+      if (t[0] === ';' || t[0] === '#') { continue; }
+      const m = rx.exec(lines[n]);
+      if (m) { return m[1]; }
+    }
+    return null;
+  }
+
+  function modKeys() {
+    const out = {};
+    const files = {};
+    for (let n = 0; n < MOD_KEYS.length; n++) {
+      const row = MOD_KEYS[n];
+      const mod = row[1];
+      if (!files[mod]) {
+        files[mod] = {
+          user: readText('Data/MCM/Settings/' + mod + '.ini'),
+          own: readText('Data/MCM/Config/' + mod + '/settings.ini')
+        };
+      }
+      const f = files[mod];
+      if (!f.own && !f.user) { continue; }
+      let raw = iniValue(f.user, row[2]);
+      if (raw === null) { raw = iniValue(f.own, row[2]); }
+      const v = raw === null ? NaN : Math.round(Number(raw));
+      out[row[0]] = isFinite(v) ? v : row[3];
+    }
+    // SKSE Menu Framework names its key ("F4") rather than numbering it.
+    const menu = readText('Data/SKSE/Plugins/SKSEMenuFramework.ini');
+    if (menu) { out.menu = String(iniValue(menu, 'ToggleKey') || 'F4'); }
+    return out;
+  }
+
+  function settingsState(said) {
+    const keys = {};
+    for (const k in SETTINGS_KEYS) { keys[k] = iniNumber(ini, k, SETTINGS_KEYS[k]); }
+    return {
+      fov: { value: wantedFov || FOV_DEFAULT, min: FOV_MIN, max: FOV_MAX, def: FOV_DEFAULT },
+      chatFade: CHAT_FADE, chatChoices: CHAT_FADE_CHOICES, needsBars: NEEDS_BARS,
+      keys: keys, mods: modKeys(), said: said || ''
+    };
+  }
+
+  function settingsToPage(said) {
+    T.js('try{window.thornswoodSettings&&window.thornswoodSettings.setState(' +
+         JSON.stringify(settingsState(said)) + ');}catch(e){}');
+  }
+
+  /* How long the chat stays up and whether the needs bars are drawn, to the
+     chat page, which reads them off window.THORNSWOOD. */
+  function chatSettingsToPage() {
+    T.js('try{var c=window.THORNSWOOD=window.THORNSWOOD||{};c.chatFade=' + CHAT_FADE +
+         ';c.needsBars=' + NEEDS_BARS + ';window.thornswoodChat&&window.thornswoodChat.settings&&' +
+         'window.thornswoodChat.settings();}catch(e){}');
+  }
+
+  /*
+    Thornswood.ini with one line changed, the way the launcher's writers did
+    it: the line rewritten where it is with its own spacing, comments and
+    every other line left alone, a second copy dropped, and a key the file
+    does not have yet added at the end. null takes the line out, which is how
+    a setting goes back to its default.
+  */
+  function iniWith(text, key, value) {
+    const nl = text.indexOf('\r\n') >= 0 ? '\r\n' : '\n';
+    const lines = text.length ? text.split(/\r?\n/) : [];
+    const rx = new RegExp('^(\\s*)(' + key + ')(\\s*=\\s*)', 'i');
+    const out = [];
+    let done = false;
+    for (let n = 0; n < lines.length; n++) {
+      const t = lines[n].trim();
+      const m = (t[0] === ';' || t[0] === '#') ? null : rx.exec(lines[n]);
+      if (!m) { out.push(lines[n]); continue; }
+      if (done || value === null) { continue; }
+      out.push(m[1] + m[2] + m[3] + value);
+      done = true;
+    }
+    if (!done && value !== null) {
+      let end = out.length;
+      while (end > 0 && out[end - 1].trim() === '') { end--; }
+      out.splice(end, 0, key + ' = ' + value);
+    }
+    let joined = out.join(nl);
+    if (joined && joined.slice(-nl.length) !== nl) { joined += nl; }
+    return joined;
+  }
+
+  /* Why a key cannot go where it was asked, or '' when it can. */
+  function keyRefusal(name, code) {
+    const keyN = keyName(code);
+    if (!SETTINGS_OFFERED[code] && code !== SETTINGS_KEYS[name]) { return 'That key cannot be used here. Try a function key, a letter, a number, or something like Insert.'; }
+    if (CLIENT_KEYS[code]) { return CLIENT_KEYS[code] + ', so it cannot be ' + SETTINGS_LABELS[name].toLowerCase() + ' as well.'; }
+    for (const other in SETTINGS_KEYS) {
+      if (other === name) { continue; }
+      if (iniNumber(ini, other, SETTINGS_KEYS[other]) === code) {
+        return keyN + ' is already ' + SETTINGS_LABELS[other].toLowerCase() + '. Move that one first.';
+      }
+    }
+    const control = gameControlOn(code);
+    if (control) { return keyN + ' is Skyrim\'s ' + control + '. Move it under Settings, Controls in the pause menu first.'; }
+    return '';
+  }
+
+  /* The page asked for one change. Checked, written, read back, applied. */
+  function setSetting(name, raw) {
+    let value;
+    let said;
+    if (name === 'Fov') {
+      const v = Math.round(Number(raw));
+      if (!(v >= FOV_MIN && v <= FOV_MAX)) { settingsToPage('The field of view goes from ' + FOV_MIN + ' to ' + FOV_MAX + '.'); return; }
+      value = v === FOV_DEFAULT ? null : String(v);
+      said = v === FOV_DEFAULT ? 'Field of view back to Skyrim\'s own, ' + FOV_DEFAULT + '.' : 'Field of view set to ' + v + '.';
+    } else if (name === 'ChatFade') {
+      const v = Number(raw);
+      if (CHAT_FADE_CHOICES.indexOf(v) < 0) { settingsToPage('That is not one of the choices.'); return; }
+      value = v === 10 ? null : String(v);
+      said = v === 0 ? 'The chat stays on screen all the time.' : 'The chat hides ' + v + ' seconds after its last line.';
+    } else if (name === 'NeedsBars') {
+      const shown = String(raw) !== '0';
+      value = shown ? null : '0';
+      said = shown ? 'The needs bars are shown.' : 'The needs bars are hidden. The Body page on ' + keyName(SKILLS_KEY) + ' shows them.';
+    } else if (Object.prototype.hasOwnProperty.call(SETTINGS_KEYS, name)) {
+      const code = Math.round(Number(raw));
+      if (code === iniNumber(ini, name, SETTINGS_KEYS[name])) { settingsToPage('It is ' + keyName(code) + ' already.'); return; }
+      const why = keyRefusal(name, code);
+      if (why) { settingsToPage(why); return; }
+      value = String(code);
+      said = SETTINGS_LABELS[name].charAt(0).toUpperCase() + SETTINGS_LABELS[name].slice(1) + ' is now ' + keyName(code) + '.';
+    } else {
+      log('settings: the page asked for', name, 'which is not a setting');
+      return;
+    }
+
+    const before = readText(INI);
+    const after = iniWith(before, name, value);
+    try { require('fs').writeFileSync(INI, after); }
+    catch (e) {
+      log('settings: could not write', INI, e);
+      settingsToPage('Could not save that. Thornswood.ini could not be written.');
+      return;
+    }
+    applySettings(readText(INI));
+    log('settings:', name, value === null ? '(default)' : value);
+    settingsToPage(said);
+  }
+
+  /*
+    Thornswood.ini changed: every key, the field of view and the chat, and
+    every panel and plugin that names or reads one, from the file as it is now.
+  */
+  function applySettings(text) {
+    const journalWas = JOURNAL_KEY;
+    const commandWas = COMMAND_KEY;
+    readKeys(text);
+    // The game's menu opener ignores our key while it is blocked, so the old
+    // key is let go and the new one held on the next frame.
+    if (journalWas !== JOURNAL_KEY && journalKeyKept) {
+      try { sp.setMenuOpenKeyBlocked('Journal', journalWas, false, KEYBOARD_MENUS); } catch (e) { }
+      journalKeyKept = null;
+    }
+    if (commandWas !== COMMAND_KEY && commandKeyKept) {
+      try { sp.setMenuOpenKeyBlocked('Quick Stats', commandWas, false, KEYBOARD_MENUS); } catch (e) { }
+      commandKeyKept = null;
+    }
+    fovChanged(text);
+    chatSettingsToPage();
+    helpToPage();
+    maneuversToPage();
+    T.js('try{window.thornswoodParty&&window.thornswoodParty.setKey&&window.thornswoodParty.setKey(' +
+         JSON.stringify(PARTY_NAME) + ');' +
+         'window.thornswoodJournal&&window.thornswoodJournal.setKey&&window.thornswoodJournal.setKey(' +
+         JSON.stringify(keyName(JOURNAL_KEY)) + ');' +
+         'window.thornswoodSkills&&window.thornswoodSkills.setKey&&window.thornswoodSkills.setKey(' +
+         JSON.stringify(keyName(SKILLS_KEY)) + ');}catch(e){}');
+    const others = T.settingsListeners || [];
+    for (let n = 0; n < others.length; n++) {
+      try { others[n](text); } catch (e) { log('settings: a plugin threw reading the new settings:', e); }
+    }
   }
 
   /*
@@ -10601,6 +11587,8 @@
     passReadAt = now;
     const raw = readText(PASS_FILE).trim();
     if (!/^jp1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(raw)) { return; }
+    // The one before's, until the launcher has this character's (#3128).
+    if (passProfile(raw) !== PROFILE) { return; }
     const keyLine = readText(PASS_KEY_FILE).trim().split(' ');
     if (keyLine.length === 2 && keyLine[0] === raw.split('.')[2] && /^[A-Za-z0-9_-]{16,128}$/.test(keyLine[1])) {
       sp.storage.thornswoodJoinPass = { pass: raw, key: keyLine[1] };
@@ -10614,7 +11602,7 @@
   }));
 
   /*
-    Field of view, from the launcher.
+    Field of view, from the Settings panel in the game.
 
     Skyrim's own fDefaultWorldFOV is not enough here. The game rewrites it at
     various points, mods fight over it, and a value in an ini only lands when
@@ -10622,42 +11610,41 @@
     the camera changes is the only version that holds, which is why the working
     RP servers carry a service to do exactly this.
 
-    Read from Thornswood.ini, the same file the voice keys come from, so the
-    launcher writes one place and everything reads it. Absent or nonsense
-    leaves the game alone entirely rather than forcing a default on anybody.
+    Read from Thornswood.ini, the same file the keys come from, which the
+    Settings panel in the game writes (#3126) and reads again through
+    fovChanged. Absent or nonsense leaves the game alone entirely rather than
+    forcing a default on anybody.
   */
   const FOV_INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const FOV_MIN = 60;
   const FOV_MAX = 140;
   // Skyrim's own. A setting equal to this is the same as no setting, and the
-  // launcher does not write it at all, but checking here as well means a file
+  // panel does not write it at all, but checking here as well means a file
   // edited by hand costs nothing either.
   const FOV_DEFAULT = 65;
 
-  let wantedFov = 0;
-  try {
-    const fsf = require('fs');
-    const text = fsf.readFileSync(FOV_INI, 'utf8');
-    const m = text.match(/^\s*Fov\s*=\s*(\d+(?:\.\d+)?)\s*$/m);
-    if (m) {
-      const v = Number(m[1]);
-      if (v === FOV_DEFAULT) {
-        log('fov is set to Skyrim\'s own ' + FOV_DEFAULT + ', leaving the camera alone');
-      } else if (v >= FOV_MIN && v <= FOV_MAX) {
-        wantedFov = v;
-      } else {
-        log('fov ' + v + ' is outside ' + FOV_MIN + ' to ' + FOV_MAX + ', ignoring it');
-      }
+  /* The field of view a Thornswood.ini asks for, or 0 for Skyrim's own. */
+  function fovOf(text) {
+    const m = String(text || '').match(/^\s*Fov\s*=\s*(\d+(?:\.\d+)?)\s*$/m);
+    if (!m) { return 0; }
+    const v = Number(m[1]);
+    if (v === FOV_DEFAULT) {
+      log('fov is set to Skyrim\'s own ' + FOV_DEFAULT + ', leaving the camera alone');
+      return 0;
     }
-  } catch (e) { }
+    if (v >= FOV_MIN && v <= FOV_MAX) { return v; }
+    log('fov ' + v + ' is outside ' + FOV_MIN + ' to ' + FOV_MAX + ', ignoring it');
+    return 0;
+  }
 
-  function applyFov() {
-    if (!wantedFov) { return; }
+  let wantedFov = fovOf(readText(FOV_INI));
+
+  function setFov(v) {
     try {
       if (typeof sp.Game.setCameraFOV === 'function') {
-        sp.Game.setCameraFOV(wantedFov, wantedFov);
+        sp.Game.setCameraFOV(v, v);
       } else if (typeof sp.setCameraFOV === 'function') {
-        sp.setCameraFOV(wantedFov, wantedFov);
+        sp.setCameraFOV(v, v);
       } else {
         log('this build has no setCameraFOV, leaving the field of view alone');
         wantedFov = 0;
@@ -10665,21 +11652,37 @@
     } catch (e) { }
   }
 
-  if (wantedFov) {
-    let fovAt = 0;
-    sp.on('update', guard('fov', () => {
-      // Cheap, and it has to be repeated: loading, a menu, mounting a horse
-      // and anything that swaps the camera all put it back to the game's own
-      // number. Once a second is under the noise floor and is not noticeable
-      // when something else has just reset it.
-      const now = Date.now();
-      if (now - fovAt < 1000) { return; }
-      fovAt = now;
-      applyFov();
-    }));
-    try { sp.on('cameraStateChanged', guard('fovcam', () => { applyFov(); })); } catch (e) { }
-    say('field of view set to ' + wantedFov);
+  function applyFov() {
+    if (!wantedFov) { return; }
+    setFov(wantedFov);
   }
+
+  /*
+    The panel changed it. Applied now, and a field of view put back to
+    Skyrim's own is set to that once, because the camera keeps whatever it
+    was last given until the game next resets it.
+  */
+  function fovChanged(text) {
+    const was = wantedFov;
+    wantedFov = fovOf(text);
+    if (wantedFov) { applyFov(); say('field of view set to ' + wantedFov); }
+    else if (was) { setFov(FOV_DEFAULT); say('field of view back to Skyrim\'s own ' + FOV_DEFAULT); }
+  }
+
+  let fovAt = 0;
+  sp.on('update', guard('fov', () => {
+    if (!wantedFov) { return; }
+    // Cheap, and it has to be repeated: loading, a menu, mounting a horse
+    // and anything that swaps the camera all put it back to the game's own
+    // number. Once a second is under the noise floor and is not noticeable
+    // when something else has just reset it.
+    const now = Date.now();
+    if (now - fovAt < 1000) { return; }
+    fovAt = now;
+    applyFov();
+  }));
+  try { sp.on('cameraStateChanged', guard('fovcam', () => { applyFov(); })); } catch (e) { }
+  if (wantedFov) { say('field of view set to ' + wantedFov); }
 
   /*
     HOW FAR PEOPLE AND NPCS ARE DRAWN, the same for everybody (#963).

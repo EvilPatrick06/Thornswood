@@ -13,8 +13,8 @@
   "writeOnly": ["C:\\Thornswood-Dumps"],
   "tempMaxHours": 24,
   "mainOnlyEnvironments": {
-    "about": "Environments whose deployment branch policy lets only main use them (Settings, Environments). A job in one of these runs only main's code, so scripts/vps/Check-RunnerIsolation.ps1 counts it as held to main on a runner that signs (records/sign-runners.json, #3550), and -Collect reads each one's policy from GitHub and says so when it lets in any other ref.",
-    "names": ["board", "notices"]
+    "about": "Environments whose deployment branch policy lets only main use them (Settings, Environments). A job in one of these runs only main's code (#3550), and scripts/vps/Check-RunnerIsolation.ps1 -Collect reads each one's policy from GitHub and says so when it lets in any other ref. Until #4033 the check also counted such a job as held to main on the signing runner; no runner of the box signs since #4013.",
+    "names": ["board", "desk", "notices"]
   },
   "intentional": []
 }

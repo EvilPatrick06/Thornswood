@@ -122,6 +122,14 @@ An **alchemy lab** works for an Alchemist, either a **Blightbrewer** or a
 Somebody who has not chosen a profession yet can use neither, and is told to
 press K and choose one.
 
+An ingredient goes in a brew only once your character has eaten one. A brew
+with an ingredient you have never eaten is refused, and the ingredients stay in
+your pack. Once you have brewed a mix, your character remembers it at any
+alchemy lab, with every effect it showed you, and the alchemy menu shows them
+again every time you come into the world.
+The Alchemy journal page of the K panel lists every mix you have brewed and
+every ingredient you have eaten, with the effects you know of each.
+
 ### Tempering and repair
 
 There is no tempering. The sharpening wheel and the armour table do not open
@@ -129,9 +137,10 @@ for anybody, because nothing is made at either.
 
 A piece is mended with a kit instead: a **Weapon Kit**, an **Armor Kit** or a
 **Sewing Kit**. With one in your pack, the inventory names the key that opens
-the repair panel. The half that makes a kit mends with it to 120%, past new: an
-Edgewright with a Weapon Kit, a Platewright with an Armor Kit, a Haberdasher
-with a Sewing Kit. Anybody else, the sister half included, mends to 100%.
+the repair panel. The half that makes a kit can mend with it to 120%, past new:
+an Edgewright with a Weapon Kit and a Platewright with an Armor Kit once they
+are Master, and a Haberdasher with a Sewing Kit at any rank. Anybody else, a
+smith below Master and the sister half included, mends to 100%.
 
 Gear wears with use. Each hit takes 1% off the armour and clothing of the
 person hit and off the weapon that landed it, and a piece at 0% can break. Its
@@ -390,7 +399,7 @@ rank is worth the years rather than just a word over your head.
 | **Mage** | **Archmage.** A third school of magic, and the standing to apprentice non-mages |
 | **Alchemist** | **Master Chemist.** Every batch yields two instead of one |
 | **Cook** | **Grand Chef.** Every batch yields two instead of one |
-| **Smith** | **Mastercraft.** The 120% repair with your own half's kit. Every smith of that half already has it, so Master adds nothing on top of it |
+| **Smith** | **Mastercraft.** Your own half's kit mends a piece to 120%, past new. Below Master it mends to 100% |
 | **Enchanter** | **Twin Souls.** Two enchantments on one item |
 | **Tailor** | **Master Weaver.** Each garment you make carries hidden armour, which gives back a tenth of every hit, or keeps the weather off; you pick which on K. It still weighs what clothing weighs |
 | **Woodworker** | **Master Carver.** Fires and kilns you work give the most warmth there is |
