@@ -229,8 +229,8 @@ so the half that makes the kit can get its makings on day one:
                                   tanning rack. Tailor, Haberdasher.
 
 The owner and the half are not readable off a MISC at a forge or a tanning
-rack, so all three are named in $RECIPE_OWNER in
-scripts/dev/Build-RecipeTable.ps1, the same as the key mold. The rank is the
+rack, so all three are named in records/recipe-owners.json (RECIPE_OWNER
+in scripts/dev/Build-RecipeTable.ps1), the same as the key mold. The rank is the
 dearest input, which is novice for all three.
 
 The Sewing Kit was offered as linen wrap and leather strips. Linen wrap is
@@ -270,6 +270,9 @@ the dearest of them:
                                   at the alchemy lab. Alchemist, Physicker.
                                   Advanced: the flower is a gatherer's at
                                   advanced, and the chitin cures disease.
+    ThornswoodRecipePotion...     the ten potions the dungeon pile used to pay,
+                                  at the alchemy lab. Alchemist, Physicker
+                                  (#3470, THE PHYSICKER'S POTIONS below).
 
 THE LOOM IS A MOD'S BENCH, AND THIS PLUGIN CAN STILL NAME IT. The loom's
 keyword is MCE_CraftingLoom, which MoreCraftableEquipment.esp injects into
@@ -285,8 +288,8 @@ of each hold capital (WHERE THE STATIONS STAND, above), and carries ThornswoodCr
 until now. Skyrim's own alchemy lab cannot show a recipe at all: it brews from
 the effects ingredients share. So the physicker's two are made at this one.
 
-The owner and the half are named in $RECIPE_OWNER in
-scripts/dev/Build-RecipeTable.ps1, because none of the four can be read off a
+The owner and the half are named in records/recipe-owners.json (RECIPE_OWNER
+in scripts/dev/Build-RecipeTable.ps1), because none of the four can be read off a
 MISC at these benches. All four MISC records wear Skyrim's charcoal stick,
 like the kits, so no new mesh has to ship.
 
@@ -346,9 +349,12 @@ four Dragonborn bows/arrows, and our own three poles plus the fish trap) have th
 BNAM pointed at that keyword. The charcoal kiln is not used until #2337 is fixed.
 
 (i) The other 53 rows live in plugins that load after this one (or that would force
-a master renumber if added here). scripts/mods/Build-WoodworkerTrailOverrides.py
-and woodworker-trail-recipes.json prepare a small trailing plugin for the next
-collection revision. Until that ships, the server refusal stays the gate for those.
+a master renumber if added here). Their live ones are moved to the woodworking bench
+by Thornswood-Last.esp, which loads after them all: Build-RecipeTable.ps1 names the
+rows of a trade at a bench it does not work at, and Build-LastPlugin.py copies each
+with its BNAM pointed at the trade's own bench (#3120). That replaced the small
+trailing plugin (Thornswood-WoodworkerTrail.esp) this paragraph used to promise,
+which never shipped.
 
 Placements of the furniture in the world are Claude's: at least one beside a forge
 in every major hold and some minor towns. This script only adds the base records.
@@ -448,13 +454,18 @@ CONTENTS = (
     (r'(MISC ThornswoodMisc(Pole\w+|FishTrap)|FLOR ThornswoodFish\w+|COBJ ThornswoodRecipe(Pole\w+|FishTrap))$',
      'own', 'fishing'),
     (r'(MISC ThornswoodMisc|COBJ ThornswoodRecipe)(Weapon|Armor|Sewing)Kit$', 'own', 'repair kits'),
-    (r'(MISC ThornswoodMisc|COBJ ThornswoodRecipe)(Bandage|Splint|Poultice|Remedy)$', 'own', 'treatments'),
+    # The treatments and the Physicker's potion recipes (#3470) are one word,
+    # because the description has 512 bytes and a row of its own ran over.
+    (r'(MISC ThornswoodMisc|COBJ ThornswoodRecipe)(Bandage|Splint|Poultice|Remedy)$|COBJ ThornswoodRecipePotion\w+$',
+     'own', 'medicine'),
     (r'(MISC ThornswoodFurniture|COBJ ThornswoodRecipeFurniture)\w+$', 'own', 'furniture'),
-    (r'(ALCH ThornswoodFoodTea|COBJ ThornswoodRecipeTea)\w+$|MGEF ThornswoodTeaSteepEffect$', 'own', 'teas'),
-    (r'ALCH Thornswood(FoodBurntMeal|FoodFine\w+)$|MGEF Thornswood(Burnt|Fine)Effect$', 'own',
-     'burnt and fine meals'),
+    # The teas, the burnt, fine and spoiled food (#3163) and the festival
+    # feasts and brews (#3152) share one row, which keeps the description
+    # under its 512.
+    (r'(ALCH ThornswoodFood|COBJ ThornswoodRecipe)(Tea|Feast|Brew)\w+$|ALCH Thornswood(FoodBurntMeal|FoodFine\w+|FoodSpoiled)$'
+     r'|MGEF Thornswood(TeaSteep|Burnt|Fine|Feast|Brew|Spoiled)Effect$', 'own', 'food and drink'),
     (r'(MISC ThornswoodQuest\w+|ACTI ThornswoodQuestLedgerSource)$', 'own', 'quest items'),
-    (r'IMAD ThornswoodDrunkImod$', 'own', 'the drunk screen'),
+    (r'IMAD Thornswood(Drunk|High|Hangover|Withdrawal)Imod$', 'own', 'the screen looks'),
     (r'BOOK ThornswoodPassage\w+$', 'own', 'starting town passages'),
     (r'BOOK ThornswoodWelcome$', 'own', 'the welcome letter'),
     (r'COBJ (DLC[12])?Recipe(Weapon\w+Bow|Arrow\w+|TechBolt\w+)$', 'bethesda',
@@ -592,6 +603,35 @@ RECIPE_SPLINT = 0x50154C5
 RECIPE_POULTICE = 0x50154C6
 RECIPE_REMEDY = 0x50154C7
 
+# THE PHYSICKER'S POTIONS (#3470). Patrick, 26 Oct 2026, A+B on the report
+# page: the dungeon pile pays ingredients instead of Skyrim's ten potion
+# records, and the Physicker gets a recipe for each record at this plugin's
+# alchemy lab. A on 27 Oct for how the strengths differ: the weakest takes two
+# ingredients that share the potion's effect and each step up takes one more,
+# and the rank climbs with it (Build-RecipeTable.ps1's RECIPE_RANK). Every
+# ingredient carries the effect by game/data/ingredients.json, which reads it
+# off the INGR records, and has a maker by scripts/dev/Check-Makers.js, at a
+# gathering rank no higher than the recipe's;
+# tests/test-3470-potion-recipes.js holds both. After a gap from the master
+# key, in numbers no version of this plugin used.
+POTION_RECIPES = (
+    # (recipe, editor id, the potion it makes, its inputs)
+    (0x50154F0, 'ThornswoodRecipePotionMinorHealing', 0x0003EADD, ('IMP_STOOL', 'EYE_OF_SABRE_CAT')),
+    (0x50154F1, 'ThornswoodRecipePotionHealing', 0x0003EADE,
+     ('BLUE_MOUNTAIN_FLOWER', 'WHEAT', 'SWAMP_FUNGAL_POD')),
+    (0x50154F2, 'ThornswoodRecipePotionPlentifulHealing', 0x0003EADF,
+     ('BLUE_MOUNTAIN_FLOWER', 'WHEAT', 'SWAMP_FUNGAL_POD', 'BLISTERWORT')),
+    (0x50154F3, 'ThornswoodRecipePotionVigorousHealing', 0x0003EAE3,
+     ('BLUE_MOUNTAIN_FLOWER', 'WHEAT', 'SWAMP_FUNGAL_POD', 'BLISTERWORT', 'EYE_OF_SABRE_CAT')),
+    (0x50154F4, 'ThornswoodRecipePotionMinorMagicka', 0x0003EAE0, ('WHITE_CAP', 'CREEP_CLUSTER')),
+    (0x50154F5, 'ThornswoodRecipePotionMagicka', 0x0003EAE1, ('RED_MOUNTAIN_FLOWER', 'GIANT_LICHEN', 'WHITE_CAP')),
+    (0x50154F6, 'ThornswoodRecipePotionMinorStamina', 0x0003EAE5, ('MUDCRAB_CHITIN', 'SABRE_CAT_TOOTH')),
+    (0x50154F7, 'ThornswoodRecipePotionStamina', 0x00039BE8,
+     ('PURPLE_MOUNTAIN_FLOWER', 'MUDCRAB_CHITIN', 'EYE_OF_SABRE_CAT')),
+    (0x50154F8, 'ThornswoodRecipePotionResistFire', 0x00039B4A, ('SNOWBERRIES', 'FIRE_SALTS')),
+    (0x50154F9, 'ThornswoodRecipePotionResistShock', 0x00039BE1, ('SNOWBERRIES', 'GLOWING_MUSHROOM')),
+)
+
 # THE NOTICE BOARD AND THE HOLD'S DROP BOX (#2298).
 #
 # ThornswoodMessageBoard, the activator every board in the world is, named a
@@ -677,6 +717,22 @@ TANNING_KEYWORD = 0x007866A  # CraftingTanningRack
 GARLIC = 0x00034D22          # a gatherer's at novice (game/data/harvests.json)
 MUDCRAB_CHITIN = 0x0006BC00  # a hunter's off a mudcrab, novice (HUNTS_BY_BASE)
 BLUE_MOUNTAIN_FLOWER = 0x00077E1C  # a gatherer's at advanced (game/data/harvests.json)
+# The Physicker's potion ingredients (#3470), each with who gathers it and at
+# what rank (game/data/harvests.json, hunts.json, ores.json).
+IMP_STOOL = 0x0004DA23               # Gatherer, novice
+WHITE_CAP = 0x0004DA22               # Gatherer, novice
+CREEP_CLUSTER = 0x000B2183           # Gatherer, novice
+EYE_OF_SABRE_CAT = 0x0006BC07        # Hunter, novice
+SABRE_CAT_TOOTH = 0x0006BC04         # Hunter, novice
+WHEAT = 0x0004B0BA                   # Farmer and Gatherer, advanced
+SWAMP_FUNGAL_POD = 0x0007E8B7        # Gatherer, advanced
+RED_MOUNTAIN_FLOWER = 0x00077E1D     # Gatherer, advanced
+PURPLE_MOUNTAIN_FLOWER = 0x00077E1E  # Gatherer, advanced
+GIANT_LICHEN = 0x0007E8C1            # Gatherer, advanced
+SNOWBERRIES = 0x0001B3BD             # Gatherer, advanced
+GLOWING_MUSHROOM = 0x0007EE01        # Gatherer, advanced
+BLISTERWORT = 0x0004DA25             # Gatherer, expert
+FIRE_SALTS = 0x0003AD5E              # Miner, expert, at the quarry
 # MCE_CraftingLoom: MoreCraftableEquipment.esp's keyword, injected as Update.esm's
 # 0x6CE000. Update.esm is this plugin's master 01. See THE LOOM at the top.
 LOOM_KEYWORD = 0x016CE000
@@ -848,6 +904,59 @@ TEAS = (
 )
 TEA_HERBS = 2
 
+# SEASONAL FOOD AND DRINK (#3152). Patrick, 22 October 2026, A: a seasonal
+# dish can be made any time with its ingredients, and the ingredients are what
+# is seasonal. The server picks Lavender, Jazbay Grapes, Snowberries and
+# Juniper Berries only in their two seasons each (game\data\food-groups.json
+# inSeason), so each season has its own pair, and each season's festival dish
+# and brew want that pair. Off season they are made from what was put by.
+#
+# A festival dish is a feast (docs/systems/food.md, the feast row): the server
+# knows it by group feast in food-groups.json, with the help each one gives
+# (feasts), and every cook of one comes out burnt, plain or fine as any dish
+# does, so each has a fine record in the quality block, made by the quality
+# pass below from the same look. A brew is ale (group ale), so it goes down
+# the way any ale does. All are a Hearthcook's: none carries Gourmet.esp's
+# dessert keyword, which this plugin does not master. The festivals are the
+# calendar's own: First Planting, the Mid Year Celebration, Harvest's End and
+# Saturalia.
+#
+# Each carries one effect of this plugin's own, the tea's kind (a script
+# effect with no script), which says on the item what the server does. A
+# feast wears a vanilla dish's mesh, bounds and weight, the ones this plugin's
+# fine dish of it reads from the masters, so nothing new ships; a brew wears
+# the tea's cup. Form ids 0x501A000 on, a range no version of this plugin used.
+FEAST_EFFECT = 0x501A000
+FEAST_EFFECT_WORDS = ('A festival feast. It fills more than a meal, and its help is twice as strong '
+                      'for half as long.')
+BREW_EFFECT = 0x501A001
+BREW_EFFECT_WORDS = 'A festival brew. It goes down the way any ale does.'
+OVEN_KEYWORD = 0x030117F7                       # BYOHCraftingOven, HearthFires.esm
+FLOUR = 0x03003538                              # Sack of Flour, HearthFires.esm
+BUTTER = 0x0300353C                             # Butter, HearthFires.esm
+CHICKEN_EGG = 0x00023D77                        # Chicken's Egg, a farmer's
+VENISON = 0x000669A2                            # Venison, a hunter's
+SALT_PILE = 0x00034CDF                          # Salt Pile, a miner's
+JAZBAY_GRAPES = 0x0006AC4A                      # a gatherer's at novice
+WHEAT = 0x0004B0BA                              # a farmer's at advanced
+FEAST_VALUE = 5
+FEAST_EAT = 0x000CAF94                          # ITMFoodEat, the eating sound Skyrim's dishes carry
+FEASTS = (
+    # item       recipe     editor id                            name                    bench
+    #   inputs; the mesh, its bounds and the weight, each a vanilla dish's
+    (0x501A010, 0x501A020, 'ThornswoodFoodFeastFirstPlanting', 'First Planting Loaf', OVEN_KEYWORD,
+     ((FLOUR, 1), (CHICKEN_EGG, 1), (LAVENDER, 1), (JUNIPER_BERRIES, 1)),
+     '_BYOH\\Clutter\\Food\\BraidedBread01.nif', (0, 0, 0, 0, 0, 0), 0.2),          # Braided Bread
+    (0x501A011, 0x501A021, 'ThornswoodFoodFeastMidyear', 'Midyear Jazbay Tart', OVEN_KEYWORD,
+     ((FLOUR, 1), (BUTTER, 1), (JAZBAY_GRAPES, 2), (LAVENDER, 1)),
+     '_BYOH\\Clutter\\Food\\Tart01.nif', (-20, -20, 0, 20, 20, 7), 0.2),             # Jazbay Crostata
+    (0x501A012, 0x501A022, 'ThornswoodFoodFeastHarvestsEnd', "Harvest's End Roast", COOKPOT_KEYWORD,
+     ((VENISON, 1), (SALT_PILE, 1), (JAZBAY_GRAPES, 1), (SNOWBERRIES, 1)),
+     'Clutter\\Ingredients\\VenisonCooked.nif', (0, 0, 0, 0, 0, 0), 2.0),              # Venison Chop
+    (0x501A013, 0x501A023, 'ThornswoodFoodFeastSaturalia', 'Saturalia Spice Cake', OVEN_KEYWORD,
+     ((FLOUR, 1), (BUTTER, 1), (SNOWBERRIES, 1), (JUNIPER_BERRIES, 1)),
+     'Clutter\\Food\\NuttyBread01.nif', (-5, -17, -4, 4, 14, 5), 0.1),               # Honey Nut Treat
+)
 # COOKING QUALITY (#2906). Patrick, 20 October 2026, B: a cook comes out
 # burnt, plain or fine, the odds by the cook's rank, and every dish needs a
 # fine record as well as the burnt one, because an item cannot carry per-copy
@@ -878,6 +987,28 @@ FINE_EFFECT_WORDS = 'A fine dish. The help a meal of it gives lasts 30 minutes, 
 BURNT_MEAL_EDID = 'ThornswoodFoodBurntMeal'
 BURNT_MEAL_NAME = 'Burnt Meal'
 BURNT_MEAL_LOOK = '721e8:Skyrim.esm'            # Cooked Beef
+
+# SPOILED FOOD (#3163). Patrick, 26 October 2026, C on his report page: food
+# that runs out of days stays in the pack, named for what it was and
+# "(spoiled)"; eating it fills nothing and starts food sickness, and no recipe
+# takes it. The client names what it eats by record alone, so the engine
+# cannot tell "Venison (spoiled)" from "Venison (3 days left)" when both are
+# the Venison record: a spoiled piece has to be a record of its own for the
+# server to know it was the spoiled one that went down. One record holds them
+# all, each entry named for its food by the spoilage block in the gamemode;
+# it is written from these numbers and wears the burnt meal's look, the
+# Cooked Beef mesh, so nothing here reads the masters. It is worth nothing,
+# carries no vendor keyword, and its one effect is a script effect with no
+# script, as the burnt meal's is, saying what the server does.
+SPOILED_FOOD = 0x5019100
+SPOILED_EFFECT = 0x5019003
+SPOILED_FOOD_EDID = 'ThornswoodFoodSpoiled'
+SPOILED_FOOD_NAME = 'Spoiled Food'
+SPOILED_EFFECT_WORDS = 'Spoiled. It fills nothing, and it turns the stomach.'
+SPOILED_MODEL = 'Clutter\\Ingredients\\BeefMeatCooked.nif'
+SPOILED_BOUNDS = (-5, -9, -2, 5, 9, 2)
+SPOILED_WEIGHT = 0.5
+SPOILED_EAT_SOUND = 0x000CAF94                  # the burnt meal's, Skyrim's eating sound
 # The subrecords of a dish's look this copies, and in each the offsets that
 # hold a form id. ENIT is worth, flags, addiction, addiction chance and the
 # eating sound; the addiction is not copied, a dish has none.
@@ -928,6 +1059,41 @@ DRUNK_LOOK = {
     b'NAM4': 0.25,     # motion blur strength
 }
 
+# THE SCREEN LOOKS FOR HIGH, A HANGOVER AND WITHDRAWAL (#3153). Patrick, 22
+# October 2026, on his report page: drunk, high, hangover and withdrawal each
+# have visual effects ("I also want visual affects"). Each is laid out as the
+# drunk screen is and drawn the same way, one at a time, by the front plugin
+# (globalThis.thornswoodLook, lookNow in gamemode.js). A look names only what
+# it changes; every other keyed list is neutral. TNAM is a tint as red, green,
+# blue and how much; IAD is the HDR and cinematic lists by their index
+# (xEdit's IMAD: 0x03 bloom scale, 0x11 saturation, 0x12 brightness, 0x13
+# contrast), each a multiply, its add left at nothing.
+#   high        colour and light turned up, a little bloom and a warm rose
+#               wash, a soft edge: skooma's lift.
+#   hangover    light too bright and glaring, colour drained, a little blur:
+#               the morning after.
+#   withdrawal  grey and hard, a cold wash, the edges closing in: the want.
+HIGH_IMOD = 0x5018021
+HIGH_LOOK = {
+    b'VNAM': 0.002,    # double vision strength
+    b'RNAM': 0.05,     # radial blur strength
+    b'UNAM': 0.4,      # radial blur start: the edges only
+    b'TNAM': (1.0, 0.72, 0.88, 0.10),
+    'iad': {0x03: 1.6, 0x11: 1.5, 0x12: 1.08, 0x13: 1.08},
+}
+HANGOVER_IMOD = 0x5018022
+HANGOVER_LOOK = {
+    b'BNAM': 0.12,     # blur radius
+    'iad': {0x03: 1.8, 0x11: 0.75, 0x12: 1.15},
+}
+WITHDRAWAL_IMOD = 0x5018023
+WITHDRAWAL_LOOK = {
+    b'RNAM': 0.08,     # radial blur strength
+    b'UNAM': 0.45,     # radial blur start: the edges only
+    b'TNAM': (0.7, 0.8, 1.0, 0.08),
+    'iad': {0x11: 0.45, 0x12: 0.92, 0x13: 1.15},
+}
+
 # ---------------------------------------------------------------------------
 # THE SALVAGED RECORDS, REMADE AS THORNSWOOD'S OWN (#2553)
 #
@@ -969,6 +1135,20 @@ IS_BLACKSMITH_WORKBENCH = 0x000D932E  # isBlacksmithWorkbench, the carpenter ben
 ACTOR_TYPE_NPC = 0x00013794           # ActorTypeNPC, who may use a bench
 HONEYCOMB = 0x000B08C5                # BeeHoneyComb
 HONEYCOMB_SOUND = 0x0010FD51          # ITMIngredientBeehiveHuskUp, the comb's own sound
+
+# The festival brews (#3152, SEASONAL FOOD AND DRINK above), here because the
+# first and the last want the comb.
+BREWS = (
+    # item       recipe     editor id                          name                      inputs
+    (0x501A040, 0x501A050, 'ThornswoodFoodBrewFirstPlanting', 'First Planting Mead',
+     ((HONEYCOMB, 1), (LAVENDER, 1), (JUNIPER_BERRIES, 1))),
+    (0x501A041, 0x501A051, 'ThornswoodFoodBrewMidyear', 'Midyear Jazbay Wine',
+     ((JAZBAY_GRAPES, 2), (LAVENDER, 1))),
+    (0x501A042, 0x501A052, 'ThornswoodFoodBrewHarvestsEnd', "Harvest's End Ale",
+     ((WHEAT, 1), (JAZBAY_GRAPES, 1), (SNOWBERRIES, 1))),
+    (0x501A043, 0x501A053, 'ThornswoodFoodBrewSaturalia', 'Saturalia Mulled Mead',
+     ((HONEYCOMB, 1), (SNOWBERRIES, 1), (JUNIPER_BERRIES, 1))),
+)
 
 # A bench's furniture marker numbers, as Skyrim's own benches carry them: one
 # marker, entered from the front (MNAM, FNPR), and its WBDT, the kind of bench
@@ -1089,10 +1269,10 @@ def bench(fid, edid, box, name, model, kws, flags=0, skill=0xFF):
         (b'MNAM', BENCH_MARKERS), (b'WBDT', bytes([1, skill])), (b'FNPR', BENCH_ENTRY)])
 
 
-def drunk_imad():
-    """The drunk screen (#1382): an IMAD laid out the way dunSleepingTreeCampISMD
-    is, every keyed list two keys long, its values DRUNK_LOOK and the rest
-    neutral."""
+def look_imad(fid, edid, look):
+    """A screen look (#1382 drunk, #3153 the rest): an IMAD laid out the way
+    dunSleepingTreeCampISMD is, every keyed list two keys long, its values the
+    look's and the rest neutral."""
     dnam = bytearray(244)
     struct.pack_into('<If', dnam, 0, 0, 1.0)           # not animatable; a duration of 1
     for at in list(range(8, 200, 4)) + [212, 216, 220, 228, 232, 236, 240]:
@@ -1102,24 +1282,26 @@ def drunk_imad():
     def keyed(value):
         return struct.pack('<4f', 0.0, value, 1.0, value)
 
-    def colour():
-        # Time, red, green, blue, and how much: nothing, at both keys.
-        return struct.pack('<10f', 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0)
+    def colour(rgba=(1.0, 1.0, 1.0, 0.0)):
+        # Time, red, green, blue, and how much, the same at both keys.
+        return struct.pack('<5f', 0.0, *rgba) + struct.pack('<5f', 1.0, *rgba)
 
-    pairs = [(b'EDID', zstr('ThornswoodDrunkImod')), (b'DNAM', bytes(dnam)),
-             (b'BNAM', keyed(DRUNK_LOOK[b'BNAM'])), (b'VNAM', keyed(DRUNK_LOOK[b'VNAM'])),
-             (b'TNAM', colour()), (b'NAM3', colour())]
+    pairs = [(b'EDID', zstr(edid)), (b'DNAM', bytes(dnam)),
+             (b'BNAM', keyed(look.get(b'BNAM', 0.0))), (b'VNAM', keyed(look.get(b'VNAM', 0.0))),
+             (b'TNAM', colour(look.get(b'TNAM', (1.0, 1.0, 1.0, 0.0)))), (b'NAM3', colour())]
     for tag in (b'RNAM', b'SNAM', b'UNAM', b'NAM1', b'NAM2', b'WNAM', b'XNAM', b'YNAM', b'NAM4'):
-        pairs.append((tag, keyed(DRUNK_LOOK[tag])))
-    # The HDR and cinematic lists: each one a multiply (times one) and an add (nothing).
+        pairs.append((tag, keyed(look.get(tag, 0.0))))
+    # The HDR and cinematic lists: each one a multiply (times one unless the
+    # look says) and an add (nothing).
+    iad = look.get('iad', {})
     for i in range(21):
-        pairs.append((bytes([i]) + b'IAD', keyed(1.0)))
+        pairs.append((bytes([i]) + b'IAD', keyed(iad.get(i, 1.0))))
         pairs.append((bytes([0x40 + i]) + b'IAD', keyed(0.0)))
-    return own_record(b'IMAD', DRUNK_IMOD, pairs)
+    return own_record(b'IMAD', fid, pairs)
 
 
 def needs_records():
-    """Tea, its recipes and its effect, and the drunk screen (#1382)."""
+    """Tea, its recipes and its effect (#1382), and the screen looks (#1382, #3153)."""
     data = bytearray(TEA_EFFECT_DATA)
     struct.pack_into('<I', data, 0, TEA_EFFECT_FLAGS)
     out = [own_record(b'MGEF', TEA_EFFECT, [
@@ -1137,8 +1319,12 @@ def needs_records():
     for item, recipe, edid, name, herb in TEAS:
         out.append(cobj(recipe, edid.replace('ThornswoodFood', 'ThornswoodRecipe'),
                         [(herb, TEA_HERBS)], item, COOKPOT_KEYWORD))
-    out.append(drunk_imad())
+    out.append(look_imad(DRUNK_IMOD, 'ThornswoodDrunkImod', DRUNK_LOOK))
+    out.append(look_imad(HIGH_IMOD, 'ThornswoodHighImod', HIGH_LOOK))
+    out.append(look_imad(HANGOVER_IMOD, 'ThornswoodHangoverImod', HANGOVER_LOOK))
+    out.append(look_imad(WITHDRAWAL_IMOD, 'ThornswoodWithdrawalImod', WITHDRAWAL_LOOK))
     out += quality_effects()
+    out += spoiled_records()
     # The verb on the crosshair says what activating it does.
     out.append(own_record(b'ACTI', WELL_BUCKET, [
         (b'EDID', zstr('ThornswoodActivatorWellBucket')), (b'OBND', bounds(WELL_BUCKET_BOUNDS)),
@@ -1162,6 +1348,23 @@ def quality_effects():
             (FINE_EFFECT, 'ThornswoodFineEffect', 'Fine', FINE_EFFECT_WORDS))]
 
 
+def spoiled_records():
+    """Spoiled food and its effect (#3163). See SPOILED_FOOD."""
+    data = bytearray(TEA_EFFECT_DATA)
+    struct.pack_into('<I', data, 0, TEA_EFFECT_FLAGS)
+    return [
+        own_record(b'MGEF', SPOILED_EFFECT, [
+            (b'EDID', zstr('ThornswoodSpoiledEffect')), (b'FULL', zstr('Spoiled')),
+            (b'DATA', bytes(data)), (b'SNDD', b''), (b'DNAM', zstr(SPOILED_EFFECT_WORDS))]),
+        own_record(b'ALCH', SPOILED_FOOD, [
+            (b'EDID', zstr(SPOILED_FOOD_EDID)), (b'OBND', bounds(SPOILED_BOUNDS)),
+            (b'FULL', zstr(SPOILED_FOOD_NAME)), (b'MODL', zstr(SPOILED_MODEL)),
+            (b'DATA', struct.pack('<f', SPOILED_WEIGHT)),
+            # Worth nothing, no auto calc and a food item, no addiction, the eating sound.
+            (b'ENIT', struct.pack('<iIIfI', 0, 0x3, 0, 0.0, SPOILED_EAT_SOUND)),
+            (b'EFID', struct.pack('<I', SPOILED_EFFECT)), (b'EFIT', struct.pack('<fII', 0.0, 0, 0))])]
+
+
 def quality_wanted(plugin_masters, plugin_name):
     """[(form id, editor id, name, the dish whose look it wears, effect)] for
     the burnt meal and every fine dish in food-groups.json's quality block."""
@@ -1171,6 +1374,10 @@ def quality_wanted(plugin_masters, plugin_name):
     names = {}
     for row in recipes.values():
         names.setdefault(row.get('out'), row.get('name'))
+    # The festival feasts are this plugin's own (#3152), named here before the
+    # recipe table is built from the plugin that holds them.
+    for item, recipe, edid, name, bench_kw, inputs, model, box, weight in FEASTS:
+        names.setdefault('%x:%s' % (item & 0xFFFFFF, plugin_name), name)
     out = [(local_fid(quality['burnt'], plugin_masters, plugin_name), BURNT_MEAL_EDID, BURNT_MEAL_NAME,
             BURNT_MEAL_LOOK, BURNT_EFFECT)]
     for plain, fine in sorted(quality.get('fine', {}).items(), key=lambda kv: kv[1]):
@@ -1178,8 +1385,10 @@ def quality_wanted(plugin_masters, plugin_name):
         if not name:
             raise SystemExit('STOP. %s has a fine record and no recipe makes it (game\\data\\recipes.json). '
                              'Nothing was written.' % plain)
+        # An apostrophe is dropped, not a break: Harvest's End is HarvestsEnd.
         edid = 'ThornswoodFoodFine' + ''.join(w[:1].upper() + w[1:] for w in
-                                               ''.join(c if c.isalnum() else ' ' for c in name).split())
+                                               ''.join(c if c.isalnum() else ' '
+                                                       for c in name.replace("'", '')).split())
         out.append((local_fid(fine, plugin_masters, plugin_name), edid, 'Fine ' + name, plain, FINE_EFFECT))
     return out
 
@@ -1241,6 +1450,43 @@ def quality_record(fid, edid, name, look, effect):
              field(b'ZNAM') + field(b'DATA') + field(b'ENIT') +
              [(b'EFID', struct.pack('<I', effect)), (b'EFIT', struct.pack('<fII', 0.0, 0, 0))])
     return own_record(b'ALCH', fid, pairs)
+
+
+def feast_look(model, box, weight):
+    """A festival feast's look (#3152), as [(tag, bytes)] the way dish_look
+    answers one, so its fine record wears the same."""
+    return [(b'OBND', bounds(box)), (b'MODL', zstr(model)), (b'DATA', struct.pack('<f', weight)),
+            # Worth, no auto calc and a food item, no addiction, the eating sound.
+            (b'ENIT', struct.pack('<iIIfI', FEAST_VALUE, 0x3, 0, 0.0, FEAST_EAT))]
+
+
+def seasonal_records():
+    """The festival feasts and brews, their recipes and their two effects
+    (#3152)."""
+    data = bytearray(TEA_EFFECT_DATA)
+    struct.pack_into('<I', data, 0, TEA_EFFECT_FLAGS)
+    out = [own_record(b'MGEF', fid, [
+        (b'EDID', zstr(edid)), (b'FULL', zstr(name)),
+        (b'DATA', bytes(data)), (b'SNDD', b''), (b'DNAM', zstr(words))])
+        for fid, edid, name, words in (
+            (FEAST_EFFECT, 'ThornswoodFeastEffect', 'Feast', FEAST_EFFECT_WORDS),
+            (BREW_EFFECT, 'ThornswoodBrewEffect', 'Festival Brew', BREW_EFFECT_WORDS))]
+    for item, recipe, edid, name, bench_kw, inputs, model, box, weight in FEASTS:
+        out.append(quality_record(item, edid, name, feast_look(model, box, weight), FEAST_EFFECT))
+    for item, recipe, edid, name, inputs in BREWS:
+        out.append(own_record(b'ALCH', item, [
+            (b'EDID', zstr(edid)), (b'OBND', bounds(TEA_BOUNDS)), (b'FULL', zstr(name))] +
+            keywords((VENDOR_ITEM_FOOD,)) + [
+            (b'MODL', zstr(TEA_MODEL)), (b'YNAM', struct.pack('<I', TEA_PICK_UP)),
+            (b'DATA', struct.pack('<f', TEA_WEIGHT)),
+            (b'ENIT', struct.pack('<iIIfI', TEA_VALUE, 0x3, 0, 0.0, TEA_DRINK)),
+            (b'EFID', struct.pack('<I', BREW_EFFECT)), (b'EFIT', struct.pack('<fII', 0.0, 0, 0))]))
+    for item, recipe, edid, name, bench_kw, inputs, model, box, weight in FEASTS:
+        out.append(cobj(recipe, edid.replace('ThornswoodFood', 'ThornswoodRecipe'), list(inputs), item, bench_kw))
+    for item, recipe, edid, name, inputs in BREWS:
+        out.append(cobj(recipe, edid.replace('ThornswoodFood', 'ThornswoodRecipe'), list(inputs), item,
+                        COOKPOT_KEYWORD))
+    return out
 
 
 def thornswood_records(passage, clam, passages):
@@ -1356,9 +1602,13 @@ def thornswood_records(passage, clam, passages):
              POULTICE, ALCHEMY_KEYWORD),
         cobj(RECIPE_REMEDY, 'ThornswoodRecipeRemedy', [(MUDCRAB_CHITIN, 1), (BLUE_MOUNTAIN_FLOWER, 1)],
              REMEDY, ALCHEMY_KEYWORD),
+    ] + [
+        cobj(fid, edid, [(globals()[name], 1) for name in inputs], potion, ALCHEMY_KEYWORD)
+        for fid, edid, potion, inputs in POTION_RECIPES
+    ] + [
         misc(MASTER_KEY, 'ThornswoodMiscMasterKey', 'Master Key', KEY_MODEL, KEY_BOUNDS, 0, 0.0),
     ]
-    # Tea, its recipes and the drunk screen (#1382).
+    # Tea, its recipes and the screen looks (#1382, #3153).
     out += needs_records()
     # Placeable furniture (#2679), one MISC and one woodworking recipe a row.
     out += furniture_records()
@@ -2201,6 +2451,7 @@ def main():
             return 1
         passages[name] = book
     own = thornswood_records(passage, clam, passages)
+    own += seasonal_records()
     if len({r.fid for r in own}) != len(own):
         raise ValueError('Two authored records share a form ID')
     unmade = sorted(remade - set(r.fid for r in own))
@@ -2317,7 +2568,10 @@ def main():
             print('STOP. %s is already in this plugin as 0x%07X and this writes it as 0x%07X. '
                   'Nothing was written.' % (edid, other.fid, fid))
             return 1
-        look = dish_look(args.masters, dish, plugin_masters, problems)
+        # A festival feast's fine record wears the feast's own look (#3152),
+        # which is this plugin's and needs no master.
+        feast = next((row for row in FEASTS if '%x:%s' % (row[0] & 0xFFFFFF, args.plugin) == dish), None)
+        look = feast_look(*feast[6:]) if feast else dish_look(args.masters, dish, plugin_masters, problems)
         if look is not None:
             quality_new.append(quality_record(fid, edid, name, look, effect))
     if problems:

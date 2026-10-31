@@ -103,6 +103,8 @@ const MADE = [
     words: '| Physicker\'s Remedy | 1 Mudcrab Chitin, 1 Blue Mountain Flower | Alchemy lab | Alchemist, Physicker, advanced |' }
 ];
 const recipeTable = read('scripts', 'dev', 'Build-RecipeTable.ps1');
+// RECIPE_OWNER's entries, which Build-RecipeTable.ps1 reads from records/recipe-owners.json.
+const named = JSON.parse(read('records', 'recipe-owners.json')).owner;
 const adder = read('scripts', 'mods', 'Add-ContentRecords.py');
 MADE.forEach(function (m) {
   const misc = plugin.recs[m.item];
@@ -116,8 +118,8 @@ MADE.forEach(function (m) {
       sub(cobj, 'BNAM')[0].data.readUInt32LE(0) === m.bench &&
       sub(cobj, 'COCT')[0].data.readUInt32LE(0) === m.inputs.length &&
       JSON.stringify(ins) === JSON.stringify(m.inputs) && injury.indexOf(m.words) !== -1);
-  yes('and $RECIPE_OWNER names it to ' + m.owner.join('/') + ', so the rebuilt table gates it',
-      new RegExp("'" + m.edid + "'\\s*=\\s*@\\{ Owner = '" + m.owner[0] + "'; Half = '" + m.owner[1] + "'").test(recipeTable));
+  yes('and records/recipe-owners.json names it to ' + m.owner.join('/') + ', so the rebuilt table gates it',
+      !!named[m.edid] && named[m.edid].Owner === m.owner[0] && named[m.edid].Half === m.owner[1]);
   // Written by the tool from its own numbers (#2553): a writer call with the
   // record's constant and its editor id.
   yes('and Add-ContentRecords.py is what adds both records',
@@ -709,7 +711,7 @@ yes('the panel is loaded and the two minute cap can close it, and it claims the 
     /'treat:opened'\) \{ T\.claimFocus\('treat', true\)/.test(front) &&
     /'treat:closed'\) \{ T\.claimFocus\('treat', false\)/.test(front));
 yes('Tend their wounds is the lock key, X, and Tend your wounds the trade key, H, and neither is a new key',
-    /const TREAT_KEY = LOCK_KEY;/.test(front) && /const TREAT_SELF_KEY = TRADE_KEY;/.test(front) &&
+    /(?:const|let) TREAT_KEY = LOCK_KEY;/.test(front) && /(?:const|let) TREAT_SELF_KEY = TRADE_KEY;/.test(front) &&
     !/iniNumber\(ini, 'Treat/.test(front));
 yes('the look prompt draws the row only for somebody the near list marks t, and the key sends /treat with their id',
     /\(row\.t \? keyRow\(TREAT_NAME, 'Tend their wounds', false\) : ''\)/.test(front) &&
@@ -742,11 +744,13 @@ yes('the server tells the look prompt t for somebody with a wound to tend',
       lits.every(function (l) { return l === "'/treat'"; }));
 }
 {
-  const keysCs = read('launcher', 'app', 'Keys.cs');
+  // The rows on Settings in the game (#3126), where the launcher's Controls
+  // page rows were.
+  const settingsPage = read('game', 'ui', 'thornswood-settings.js');
   const ini = read('launcher', 'Thornswood.ini');
-  yes('the Controls page and the shipped ini say what X and H do for wounds',
-      /While you are looking at somebody with a wound to tend, it opens the panel that tends it\.",\s*ThornIni, "LockKey", 45/.test(keysCs) &&
-      /In your inventory, while you have a wound to tend, the same key opens the panel that tends it\.",\s*ThornIni, "TradeWithKey", 35/.test(keysCs) &&
+  yes('Settings in the game and the shipped ini say what X and H do for wounds',
+      /\{ ini: 'LockKey', def: 45,[^}]*Looking at somebody with a wound to tend, opens the panel that tends it\.' \}/.test(settingsPage) &&
+      /\{ ini: 'TradeWithKey', def: 35,[^}]*In your inventory, while you have a wound to tend, the same key opens the panel that tends it\.' \}/.test(settingsPage) &&
       /wound to tend[\s\S]{0,120}\nTradeWithKey = 35/.test(ini) && /wound to tend[\s\S]{0,140}\nLockKey = 45/.test(ini));
 }
 yes('the injury page no longer lists the treatments or the blows as not in',

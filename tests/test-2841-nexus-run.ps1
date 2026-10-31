@@ -23,7 +23,7 @@
        New-NexusRevision's download each run, print nothing of the script's
        output into the log, and seal it to the session's key; no key stops
        it before anything runs.
-    5. nexus-run.yml: main-only environment, the key in one step's
+    5. nexus-run.yml: on GitHub's Windows runner (#4013), main-only environment, the key in one step's
        environment, no input pasted into a script, actions pinned by SHA,
        the output sealed and kept a day.
     6. Set-NexusKey -ToEnvironment holds the environment to main alone and
@@ -110,6 +110,10 @@ Yes 'a Send-NexusFile line gives its parameters, the pack apart' (
     $c.Own['PackRoot'] -eq 'game/content' -and $c.Own['Pack'] -eq 'Thornswood-Content.esp' -and $c.Own['PackName'] -eq 'Thornswood-Content-1.3.zip')
 $c = Params 'New-NexusRevision -Mod 192001,192762 -FileId 830001,830002 -DropPatch 192001:Thornswood-Content.esp'
 Yes 'a list is split on its commas' (@($c.Params['Mod']).Count -eq 2 -and @($c.Params['FileId'])[1] -eq '830002' -and @($c.Params['DropPatch'])[0] -eq '192001:Thornswood-Content.esp' -and -not $c.Params.Contains('Archive'))
+$c = Params 'New-NexusRevision -Remove 24104 -Rule docs/COLLECTION-REVISION-6-RULE.json -WhatIf'
+Yes 'a revision can take a mod out and give a plugin a rule (#3649)' (@($c.Params['Remove'])[0] -eq '24104' -and $c.Params['Rule'] -eq 'docs/COLLECTION-REVISION-6-RULE.json')
+$c = Params 'New-NexusRevision -Discard 6'
+Yes 'and a waiting draft can be thrown away' ($c.Params['Discard'] -eq '6')
 $c = Params 'Set-NexusDescription -Mod 192001,192762 -AddLine "THIS MOD IS NOT MADE, GUARANTEED OR SUPPORTED BY ZENIMAX OR ITS AFFILIATES." -WhatIf'
 Yes 'a text value with spaces arrives whole' ($c.Params['AddLine'] -eq 'THIS MOD IS NOT MADE, GUARANTEED OR SUPPORTED BY ZENIMAX OR ITS AFFILIATES.' -and @($c.Params['Mod']).Count -eq 2)
 $c = Params 'Set-NexusKey'
@@ -127,6 +131,8 @@ foreach ($bad in @(
         @('a pack name that is not a zip', 'Send-NexusFile -Mod 192001 -Version 1.3 -PackRoot game/content -Pack a.esp -PackName a.7z'),
         @('-Mod with no -FileId', 'New-NexusRevision -Mod 192001'),
         @('-Add outside records', 'New-NexusRevision -Add game/x.json'),
+        @('-Rule outside docs', 'New-NexusRevision -Rule records/x.json'),
+        @('-Rule that climbs out', 'New-NexusRevision -Rule docs/../x.json'),
         @('a dollar sign', 'Set-NexusDescription -Mod 192001 -AddLine "$env:THORNSWOOD_NEXUS_API_KEY"'),
         @('a parameter given twice', 'Set-NexusDescription -Mod 192001 -Mod 192762 -AddLine x'),
         @('a value that starts with a hyphen', 'Set-NexusDescription -Mod 192001 -AddLine -WhatIf'))) {
@@ -241,7 +247,7 @@ else {
 # ---- 5. nexus-run.yml -------------------------------------------------------------
 $wf = (Text '.github/workflows/nexus-run.yml') -replace "`r`n", "`n"
 Yes 'nexus-run.yml is started by hand and by nothing else' ($wf -match '(?m)^  workflow_dispatch:\s*$' -and @([regex]::Matches(([regex]::Match($wf, '(?ms)^on:\n(.*?)^\S').Groups[1].Value), '(?m)^  [a-z_]+:')).Count -eq 1)
-Yes '  on a box runner, in the environment desk, reading the repository only' ($wf.Contains('runs-on: [self-hosted, Windows, thornswood-vps]') -and $wf -match '(?m)^    environment: desk$' -and $wf -match '(?m)^permissions:\n  contents: read$')
+Yes '  on GitHub''s Windows runner, never the box (#4013), in the environment desk, from main only, reading the repository only' ($wf -match '(?m)^    runs-on: windows-latest$' -and $wf -notmatch 'self-hosted|thornswood-' -and $wf -match "(?m)^    if: github\.ref == 'refs/heads/main'$" -and $wf -match '(?m)^    environment: desk$' -and $wf -match '(?m)^permissions:\n  contents: read$')
 Yes '  the key in one step''s environment, and nowhere else' (@([regex]::Matches($wf, 'secrets\.')).Count -eq 1 -and $wf.Contains('THORNSWOOD_NEXUS_API_KEY: ${{ secrets.NEXUS_API_KEY }}'))
 $runBlocks = @([regex]::Matches($wf, '(?ms)^\s+run: \|\s*\n(.*?)(?=^\s+- |\z)') | ForEach-Object { $_.Groups[1].Value })
 Yes '  no input is pasted into a script; they reach it through the environment' (-not @($runBlocks | Where-Object { $_ -match '\$\{\{' }).Count)

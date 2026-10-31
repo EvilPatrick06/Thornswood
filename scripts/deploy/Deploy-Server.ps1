@@ -221,6 +221,8 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # -GamemodeOnly and -FromStore read no build here, so they never ask for one (#459).
 $DistGiven = [bool]$Dist
 $noBuild = [bool]($GamemodeOnly -or $FromStore)
+# Whether Thornswood-Last.esp is made on the box into the stage (#2791).
+$makeLast = $false
 if (-not $Dist -and -not $noBuild) { $Dist = & (Join-Path $Here '..\release\Where.ps1') ServerDist }
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
@@ -236,6 +238,7 @@ if (-not $PSBoundParameters.ContainsKey('Wait')) {
 . (Join-Path $Here 'ServerBuild.ps1')
 . (Join-Path $Here 'DeployedBuild.ps1')
 . (Join-Path $Here 'ServerContent.ps1')   # which content plugin the box holds, by size and sha256 (#2308)
+. (Join-Path $Here 'LastPluginOnBox.ps1')   # Thornswood-Last.esp, made on the box from the recipe (#2791)
 . (Join-Path $Here '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 function Remote($script) {
@@ -596,7 +599,7 @@ if (-not $noBuild -and -not (Test-Path -LiteralPath $Dist)) {
 # uncommitted changes (#1121).
 . (Join-Path $Here 'Artifact.ps1')
 $artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here '..\..') -Paths 'game/gamemode.js' `
-  -AlsoSends 'game/content/Thornswood-Content.esp', 'game/content/Thornswood-Last.esp', 'records/server-build.json'
+  -AlsoSends 'game/content/Thornswood-Content.esp', 'game/data/last-plugin.recipe', 'game/data/last-plugin.json', 'records/server-build.json'
 '{0,-22} {1}' -f 'artifact', (Format-ThornswoodArtifact $artifact) | Write-Host
 $src = Join-Path $artifact.Folder 'game\gamemode.js'
 # -GamemodeOnly and -FromStore have no build to copy it into, and send the artifact's own.
@@ -873,15 +876,27 @@ if (Test-Path -LiteralPath $rp) {
   # The plugin that loads last (#2468) is only loaded as the live server's
   # last plugin, and this run changes no setting, so a live order that does
   # not end with it is a refusal: the full deploy (Deploy-Gamemode.ps1, then
-  # this without -GamemodeOnly) puts it there.
-  if (Test-Path -LiteralPath (Join-Path $Here '..\..\game\content\Thornswood-Last.esp')) {
+  # this without -GamemodeOnly) puts it there. It is made on the box from the
+  # recipe, never sent (#2791), when the box does not hold the bytes
+  # game\data\last-plugin.json names.
+  $lastWant = Get-ThornswoodLastPluginWant (Join-Path $Here '..\..')
+  if ($lastWant) {
     $liveOrder = @($boxContent.Order)
     if (-not $boxContent.OrderRead -or $liveOrder.Count -eq 0 -or $liveOrder[-1] -ine 'Thornswood-Last.esp') {
       throw ('the live load order does not end with Thornswood-Last.esp, and -GamemodeOnly changes no setting. ' +
              'Run .\scripts\deploy\Deploy-Gamemode.ps1, then .\scripts\deploy\Deploy-Server.ps1 without -GamemodeOnly. Nothing was sent and the server was not touched.')
     }
   }
+  if ($lastWant) {
+    $boxLast = Get-ThornswoodServerPlugin $boxContent $ThornswoodLastPlugin
+    if (-not (Test-ThornswoodContentSame $boxLast $lastWant.Bytes $lastWant.Sha)) {
+      $makeLast = $true
+      $changed += ('{0}  {1:N0} -> {2:N0} bytes, sha256 {3} -> {4}, made on the box from the recipe' -f $ThornswoodLastPlugin, $boxLast.Bytes, $lastWant.Bytes,
+                   $(if ($boxLast.Sha) { $boxLast.Sha.Substring(0, 12) } else { 'none' }), $lastWant.Sha.Substring(0, 12))
+    }
+  }
   foreach ($ownName in $ThornswoodRepoPlugins) {
+    if ($ownName -ieq $ThornswoodLastPlugin) { continue }
     $own = Get-ThornswoodRepoPluginPath (Join-Path $Here '..\..') $ownName
     if (-not (Test-Path -LiteralPath $own)) { continue }
     $mine = Get-ThornswoodLocalContent $own
@@ -895,7 +910,7 @@ if (Test-Path -LiteralPath $rp) {
     }
   }
   Write-Host ''
-  if ($sendPlugins.Count) {
+  if ($sendPlugins.Count -or $makeLast) {
     Write-Host '  our plugins will go up before the restart:' -ForegroundColor Yellow
     foreach ($c in $changed) { Write-Host ('    changed: ' + $c) -ForegroundColor Yellow }
   } else {
@@ -981,7 +996,18 @@ if (Test-Path -LiteralPath $rp) {
 
   $sendPlugins = @()
   $changed = @()
+  $lastWant = Get-ThornswoodLastPluginWant (Join-Path $Here '..\..')
   foreach ($n in $pluginNames) {
+    # Made on the box from the recipe, never sent (#2791).
+    if ($lastWant -and $n -ieq $ThornswoodLastPlugin) {
+      $boxLast = Get-ThornswoodServerPlugin $boxContent $n
+      if (-not (Test-ThornswoodContentSame $boxLast $lastWant.Bytes $lastWant.Sha)) {
+        $makeLast = $true
+        $changed += ('{0}  {1:N0} -> {2:N0} bytes, sha256 {3} -> {4}, made on the box from the recipe' -f $n, $boxLast.Bytes, $lastWant.Bytes,
+                     $(if ($boxLast.Sha) { $boxLast.Sha.Substring(0, 12) } else { 'none' }), $lastWant.Sha.Substring(0, 12))
+      }
+      continue
+    }
     $local = Join-Path $Data $n
     # Ours (RepoPlugins.ps1) comes from the repo, never -Data (#2486).
     $isOurs = $false
@@ -1026,9 +1052,10 @@ if (Test-Path -LiteralPath $rp) {
   Assert-ThornswoodCollectionPlugins -RecordPath (Join-Path $Here '..\..\records\collection-plugins.json') -Files $sendPlugins -Exempt $ThornswoodRepoPlugins -What 'this deploy'
   Write-Host ''
   Write-Host ('  load order: {0} plugins, paths rewritten to {1}' -f $pluginNames.Count, $remotePlugins) -ForegroundColor DarkGray
-  if ($sendPlugins.Count) {
+  if ($sendPlugins.Count -or $makeLast) {
     Write-Host ('  {0} plugin(s) will go up before the restart:' -f $sendPlugins.Count) -ForegroundColor Yellow
     foreach ($p in $sendPlugins) { Write-Host ('    ' + (Split-Path $p -Leaf)) -ForegroundColor Yellow }
+    if ($makeLast) { Write-Host ('  and {0} will be made on the box from the recipe' -f $ThornswoodLastPlugin) -ForegroundColor Yellow }
     foreach ($c in $changed) { Write-Host ('    changed: ' + $c) -ForegroundColor Yellow }
   } else {
     Write-Host '  every plugin the load order names is on the VPS at the same size, and ours at the same bytes' -ForegroundColor DarkGray
@@ -1113,6 +1140,15 @@ foreach ($rel in $send.Keys) {
   Invoke-ThornswoodNative { & scp @ssh $send[$rel] "$User@${Vps}:$stageFar/$rel" }
   if ($LASTEXITCODE -ne 0) { throw "scp failed for $rel. The server has not been touched." }
   Write-Host "  $rel"
+}
+# Thornswood-Last.esp, made into the stage from the plugins just sent and
+# then the live server's own (#2791); the stage check holds it to the
+# manifest's sha256 like a file that was sent.
+if ($makeLast) {
+  $lastMade = Invoke-ThornswoodLastPluginMake -Target "$User@$Vps" -SshArgs $ssh -RepoDir (Join-Path $Here '..\..') `
+    -Reads @("$rootWin\$stageName\plugins", "$rootWin\plugins") -Into "$rootWin\$stageName\plugins" -Want $lastWant
+  Write-Host ('  plugins/{0}, made on the box: {1:N0} bytes, sha256 {2}' -f $ThornswoodLastPlugin, $lastMade.Bytes, $lastMade.Sha.Substring(0, 12))
+  $hashes['plugins/' + $ThornswoodLastPlugin] = $lastMade.Sha
 }
 # -FromStore (#459): the box takes the record's build out of its store into the
 # stage, held to the record there (ServerBuild.ps1).
@@ -1238,6 +1274,6 @@ if ($outside.Answered) {
   Write-Host ("  FAIL. The box says the server is up, and {0}:{1} was {2} from here, though {3} on the box answers from here." -f $Vps, $resPort, $outside.Said, $witness) -ForegroundColor Red
   Write-Host '  The new files stay in place: this is the box''s inbound rule for the port, or' -ForegroundColor Red
   Write-Host '  something between, and putting the old files back would not change it:' -ForegroundColor Red
-  Write-Host ("  .\scripts\vps\Remote.ps1 `"Get-NetFirewallPortFilter -Protocol TCP | Where-Object LocalPort -eq {0} | Get-NetFirewallRule | Format-Table DisplayName,Enabled,Action,Profile`"" -f $resPort) -ForegroundColor DarkGray
+  Write-Host ("  .\scripts\vps\Remote.ps1 `"Get-NetFirewallPortFilter -PolicyStore ActiveStore -Protocol TCP | Where-Object LocalPort -eq {0} | Get-NetFirewallRule | Format-Table DisplayName,Enabled,Action,Profile`"" -f $resPort) -ForegroundColor DarkGray
   exit 1
 }

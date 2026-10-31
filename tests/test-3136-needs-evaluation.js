@@ -21,8 +21,8 @@
 //      minutes of wet. It settles first now, then moves them through the one
 //      function place() moves them through (moveTo).
 //   H  Lying down drunk and coming back inside 24 minutes was a hangover.
-//      drink.md: "If you drank three or more and log out without a bed".
-//      A bed or a bedroll counts whether or not it gave a night.
+//      Since #3153 nothing about logging out starts one: being drunk wearing
+//      off does, when the 45 minutes pass, and a night in a bed sleeps it off.
 //
 // Drives the real needs block out of game/gamemode.js over a fake mp and a
 // fake clock, and the real onEatItem handler out of the injury block.
@@ -234,30 +234,34 @@ if (block !== null && smoke) {
     r.settle(ME);
     return r;
   }
+  // Since #3153 a hangover is what being drunk leaves when the 45 minutes
+  // pass, in the world or while away; a night in a bed sleeps it off.
   {
     const r = drunkThenAway('bed', 10);
-    yes('H1 three ales, lying in your own bed, back in 10 minutes: no hangover', r.read(ME).hangover === false);
+    yes('H1 three ales, lying in your own bed, back in 10 minutes: no hangover', r.hungOver(ME) === false);
     yes('H1 and still drunk, the ales still counting', r.read(ME).drunk === true && r.read(ME).ale === 3);
     r.clock.now += 40 * MIN;
     r.settle(ME);
-    yes('H1 sober once the 45 minutes pass, and no hangover after it', r.read(ME).drunk === false && r.read(ME).hangover === false);
+    yes('H1 sober once the 45 minutes pass, and hung over from then (#3153)',
+        r.read(ME).drunk === false && r.hungOver(ME) === true);
   }
   {
     const r = drunkThenAway('rough', 10);
-    yes('H2 a bedroll on the road counts as a bed: no hangover, still drunk', r.read(ME).hangover === false && r.read(ME).drunk === true);
+    yes('H2 a bedroll on the road counts as a bed: no hangover, still drunk', r.hungOver(ME) === false && r.read(ME).drunk === true);
   }
   {
     const r = drunkThenAway('common', 30);
     yes('H3 an inn bed and a night: slept it off, sober and no hangover',
-        r.read(ME).hangover === false && r.read(ME).drunk === false && r.read(ME).ale === 0);
+        r.hungOver(ME) === false && r.read(ME).drunk === false && r.read(ME).ale === 0);
   }
   {
     const r = drunkThenAway('sit', 10);
-    yes('H4 a seat is not a bed: hung over', r.read(ME).hangover === true && r.read(ME).drunk === false);
+    yes('H4 a seat gives no night: back in 10 minutes, still drunk and not yet hung over',
+        r.hungOver(ME) === false && r.read(ME).drunk === true);
   }
   {
     const r = drunkThenAway('', 60);
-    yes('H5 on your feet: hung over, as drink.md says', r.read(ME).hangover === true);
+    yes('H5 on your feet, back after the 45 minutes: hung over, as drink.md says', r.hungOver(ME) === true);
   }
   {
     const page = read('docs', 'systems', 'drink.md');

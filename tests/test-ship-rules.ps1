@@ -265,7 +265,7 @@ Yes 'OwnGame.cs has no second hand-copied Daedric list' (
 Yes 'Build-Launcher.ps1 embeds that record' (
     ([IO.File]::ReadAllText((Join-Path $Here 'scripts\release\Build-Launcher.ps1'))).Contains('ui-gone.json'))
 
-Yes 'the real shipped build.js is committed as a test fixture' (Test-Path -LiteralPath $uiFixtureJs)
+Yes 'the real shipped build.js''s asset modules are committed as a test fixture' (Test-Path -LiteralPath $uiFixtureJs)
 $uiExpected = Get-UiFrontFixtureExpectedNames
 $uiRealParsed = $null
 $uiRealThrew = $false
@@ -277,8 +277,14 @@ Yes '  and the parsed names are exactly the emitted hashed set from that file' (
 $uiFonts = @(Get-UiFrontFixtureFontNames)
 $uiFontA = [string]$uiFonts[0]
 $uiFontB = [string]$uiFonts[1]
-Yes '  and that set names the Futura PT Cond Book font the fixture emits' ($uiExpected.Contains($uiFontA))
-Yes '  and names the Futura PT Cond Medium font' ($uiExpected.Contains($uiFontB))
+Yes '  and that set names the Bankir-Retro font the fixture emits' ($uiExpected.Contains($uiFontA))
+Yes '  and names the icomoon font' ($uiExpected.Contains($uiFontB))
+# The four Futura PT and DIN Pro faces that older build.js names are on
+# records\ui-gone.json (#1317): named by build.js or not, they never ship.
+foreach ($face in '6f802bf60c545304b09e.ttf', '00e4a2200c3e5ae71d67.ttf', '268a0df3f0e2c23d1ea6.ttf', 'fdf086661e1600f95a34.ttf') {
+    Yes "  it names the commercial face $face too" ($uiExpected.Contains($face))
+    Yes "  which is not ours all the same (#1317)" (Test-ShipOtherServer ('Data\Platform\UI\' + $face))
+}
 
 $uiWork = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-ui-front-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $uiDir = Join-Path $uiWork 'Data\Platform\UI'
@@ -653,7 +659,6 @@ $ship = @(
     (Row 'Data\textures\lostark\b.dds' 500),
     (Row 'Data\meshes\armor\commonclothes\travel.nif' 4000),
     (Row 'Data\meshes\leftover.nif' 700),
-    (Row 'Data\meshes\animationdatasinglefile.txt' 700),
     (Row 'Data\meshes\interface\logo\logo.nif' 10562),
     (Row 'Data\meshes\interface\logo\logo01ae.nif' 10562),
     (Row 'Data\textures\interface\objects\Mainmenuwallpaper.dds' 8388736),

@@ -157,6 +157,22 @@
     ],
     "privacy": [
       {
+        "sha256": "281afc2684d11ca5e077d953a984cc729fe72f33953122f7557b23eed95e4ac9",
+        "changed": "2026-10-30"
+      },
+      {
+        "sha256": "0e0dd9169683b1b166364f5922051f8a980a5335abbb31f1db5f964147f3a171",
+        "changed": "2026-10-30"
+      },
+      {
+        "sha256": "52aa684b3d583871bfa2eba17d0c5a2058d4e15c8751ab95cbbc14e7c7bb0e2a",
+        "changed": "2026-10-30"
+      },
+      {
+        "sha256": "a52dd3a3cfcb3eef7c016773bdcd46f3b710607c3e77b4d3e22d687ed9f75674",
+        "changed": "2026-10-30"
+      },
+      {
         "sha256": "eeb739575294ff5f7c81fcb639adf2b9d2284e71a8196b58ac49337f78804e58",
         "changed": "2026-10-22"
       },
@@ -403,6 +419,22 @@
       {
         "sha256": "386c6e355d4c2ec1147105ea598151d27042620651cb362d7f143b467bac0b97",
         "changed": "2026-10-26"
+      },
+      {
+        "sha256": "88ced374db13fe6071c50a37c337c488688958b50d3687b63a69c8ab08982975",
+        "changed": "2026-10-26"
+      },
+      {
+        "sha256": "a348c49278947cc98c270190b07c1b17c98ac25b90c21cfc0b430fbbca789933",
+        "changed": "2026-10-26"
+      },
+      {
+        "sha256": "a3913a1da7d17d9fe58b50c79bd146d4125780cac2c317adc8437b3b73fdc9b4",
+        "changed": "2026-10-27"
+      },
+      {
+        "sha256": "18c0d3f9af857e67979225cf7ec9640b399f6e7f050c61b77b126c548a740ff7",
+        "changed": "2026-10-27"
       }
     ],
     "rules": [

@@ -7,28 +7,36 @@
       pwsh scripts/vps/Box-Run.ps1 -Line 'Deploy-DevGamemode -Restart'
       pwsh scripts/vps/Box-Run.ps1 -Line 'Deploy-Docs -Site'
       pwsh scripts/vps/Box-Run.ps1 -Line 'Get-Logs -Dev -Lines 2000'
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Rebuild-ContentTables -Server dev'
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Deploy-Server -GamemodeOnly -Build <main's full commit>'
       pwsh scripts/vps/Box-Run.ps1 -Line 'ping'
       pwsh scripts/vps/Box-Run.ps1 -Run 1234567890     read an earlier run again
 
   scripts\vps\gate\verbs.json is the whole list of verbs and the switches
   each takes; a line outside it is refused here before anything starts, and
   again on the box. What runs is always that script of main as main is on
-  GitHub when the box reads it, never this checkout.
+  GitHub when the box reads it, never this checkout. A live verb
+  (Deploy-Server, Publish-Server-Main) names the commit of main Patrick gave
+  his word for with -Build, and the box refuses it once main is anywhere
+  else.
 
-  HOW. It starts .github\workflows\box-run.yml on main with the line. That
-  run takes a box runner and the desk's deploy key out of the "desk"
-  environment, which only main may use (Grant-BoxAccess.ps1 -Deploy puts it
-  there), and asks the gate over the box's own sshd on 127.0.0.1 with
+  HOW. It starts box-run.yml on main of the private ops repository,
+  EvilPatrick06/Thornswood-Ops, where the VPS runners are registered since
+  this repository went public (#4013), with the line. That run checks out
+  this repository's main, takes a box runner and the desk's deploy key out
+  of the ops repository's "desk" environment, which only main may use
+  (Grant-BoxAccess.ps1 -Deploy puts it there), and asks the gate over the box's own sshd on 127.0.0.1 with
   this script's -OnTheBox half. The key logs in as thornswood-deploy and can
   only hand the gate a line (scripts\vps\gate\Gate.ps1).
 
   WHAT COMES BACK, AND TO WHOM. A deploy prints paths and a Get-Logs run
-  brings back the servers' logs, and once the repository is public a run's
-  log and files are readable by anyone. So the run's log carries only the
+  brings back the servers' logs, and a run's log and files are readable by
+  everyone who can read the repository it runs in. So the run's log carries only the
   verb, main's commit and the exit code. Everything the verb printed and
   every file it wrote is sealed on the runner to a key made here for this
-  run alone (RSA-OAEP over an AES-GCM key) and uploaded as the run's
-  artifact. Only the private half, kept in this machine's scratch folder
+  run alone (RSA-OAEP over an AES-GCM key) and written into the run's log
+  as TWSEAL-LOG lines (scripts\ops\Sealed.ps1 says why the log and not an
+  artifact). Only the private half, kept in this machine's scratch folder
   (box-run\<run>.key, readable by this account only), opens it, and this
   prints the output and puts the files in box-run\<run>\.
 
@@ -39,7 +47,8 @@ param(
     [string]$Line = '',
     [long]$Run = 0,
     [switch]$OnTheBox,
-    [string]$GitHubRepo = 'EvilPatrick06/Thornswood'
+    # Where box-run.yml and the VPS runners are (#4013).
+    [string]$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -74,7 +83,7 @@ if ($OnTheBox) {
     $req = Test-ThornswoodGateRequest -Line $Line -Verbs (Read-ThornswoodGateVerbs (Join-Path $Here 'gate\verbs.json'))
     if (-not $req.Ok) { Die $req.Why }
     $keyB64 = [string]$env:THORNSWOOD_DESK_KEY_B64
-    if (-not $keyB64) { Die 'THORNSWOOD_DESK_KEY_B64 is not set. In box-run.yml it is the DESK_KEY_B64 secret of the "desk" environment, which .\scripts\vps\Grant-BoxAccess.ps1 -Name desk -Deploy -MakeKey -ToEnvironment desk puts there from One. Nothing was run.' }
+    if (-not $keyB64) { Die 'THORNSWOOD_DESK_KEY_B64 is not set. In box-run.yml it is the DESK_KEY_B64 secret of the ops repository''s "desk" environment, which .\scripts\vps\Grant-BoxAccess.ps1 -Name desk -Deploy -MakeKey -ToEnvironment desk puts there from One. Nothing was run.' }
     $recipient = ([string]$env:BOX_RECIPIENT).Trim()
     $sshExe = Get-SignedSsh
     if (-not $sshExe) { Die 'there is no Microsoft-signed ssh.exe in Program Files\OpenSSH or System32\OpenSSH on this runner. Nothing was run.' }
@@ -176,7 +185,7 @@ if ($a.State -eq 'waiting' -or $a.State -eq 'unread') { Die ("run $Run has no an
 $keyPath = Join-Path $scratch "$Run.key"
 $dir = Join-Path $scratch "$Run"
 if (Test-Path -LiteralPath $keyPath) {
-    $o = Open-ThornswoodSealedRun -Repo $GitHubRepo -Run $Run -Artifact 'box-run-sealed' -File 'box-run.sealed' -KeyPath $keyPath -Into $dir
+    $o = Open-ThornswoodSealedRun -Repo $GitHubRepo -Run $Run -Artifact 'box-run-sealed' -File 'box-run.sealed' -KeyPath $keyPath -Into $dir -FromLog
     if ($o.Ok) {
         $txt = Join-Path $dir 'output.txt'
         if (Test-Path -LiteralPath $txt) { Get-Content -LiteralPath $txt | ForEach-Object { Write-Host $_ } }

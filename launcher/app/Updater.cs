@@ -10,7 +10,7 @@ namespace Thornswood
 {
     static partial class Updater
     {
-        public const string Version = "1.2.9";
+        public const string Version = "1.2.13";
 
         /// <summary>
         /// The collection revision the last feed named, or 0 when it named
@@ -94,6 +94,9 @@ namespace Thornswood
             // empty array for 204), so a caller that has to tell them apart
             // reads this (#2636). 0 until an answer arrives.
             public int Status;
+            // The connection group the request goes in, or null for the
+            // shared one. Only the feed watch sets it (WatchGroup).
+            public string Group;
             protected override WebResponse GetWebResponse(WebRequest request)
             {
                 var r = base.GetWebResponse(request);
@@ -110,6 +113,7 @@ namespace Thornswood
                 {
                     if (Since != DateTime.MinValue) h.IfModifiedSince = Since;
                     if (Gzip) h.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
+                    if (Group != null) h.ConnectionGroupName = Group;
                 }
                 return r;
             }
@@ -305,6 +309,24 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// The connection group the feed watch holds its socket in, apart from
+        /// every other request to thornswood.net.
+        ///
+        /// The .NET Framework lets a program keep two connections to a host
+        /// at a time (ServicePointManager.DefaultConnectionLimit), and a
+        /// request waits for a free one inside its own timeout. Each
+        /// connection group counts its two apart. In the shared group the
+        /// watch held one of the two all the time from #2440 on, so the
+        /// Play page's gallery, its pictures, the voice token and the news
+        /// took turns on the one left: a picture of several megabytes held
+        /// the rest back, and a request whose timeout ran out while it
+        /// waited failed, which left the gallery blank. In a group of its
+        /// own the watch leaves both to them, as before it existed.
+        /// tests\test-2440-watch-connection.ps1 holds this.
+        /// </summary>
+        public const string WatchGroup = "feed-watch";
+
+        /// <summary>
         /// The long-poll request itself, apart from CheckUrl so a test can
         /// point it at a server of its own (tests\test-2636-feed-watch-quiet.ps1),
         /// the way Conditional is apart from FromSite.
@@ -325,6 +347,7 @@ namespace Thornswood
             using (var q = (Quick)Client(cfg, false, tip))
             {
                 q.Ms = ms;
+                q.Group = WatchGroup;
                 q.Gzip = true;
                 if (tag.Length > 0) q.Headers["If-None-Match"] = tag;
                 try { q.DownloadData(tip); }

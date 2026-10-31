@@ -20,7 +20,8 @@
     3. the script itself, lifted out of the workflow and run in a child
        PowerShell with a stand-in Invoke-RestMethod that writes down each call
        instead of making it: every claimed label (any spelling GitHub allows,
-       "claimed: Claude", "claimed:GitHub") is one DELETE on that issue with
+       "claimed: Claude", "claimed:GitHub", each Hermes Bot's "claimed:
+       Bramble" and the rest, #4715) is one DELETE on that issue with
        the name escaped into the address, every other label is left alone, no
        claimed label is no call at all, a label already off (404) is said and
        passed over, and any other answer fails the run.
@@ -69,7 +70,7 @@ $runsOn = [regex]::Match($text, '(?m)^\s*runs-on:\s*(.+)$').Groups[1].Value.Trim
 $build = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\build.yml'))
 # Any job of build.yml: its first job asks GitHub's hosted runner since #3551.
 $buildRunsOn = @([regex]::Matches($build, '(?m)^\s*runs-on:\s*(.+)$') | ForEach-Object { $_.Groups[1].Value.Trim() } | Where-Object { $_.StartsWith('[self-hosted, Windows, thornswood-vps') })
-Yes ("it runs on the VPS runners the build check uses ({0})" -f $runsOn) ($runsOn -eq '[self-hosted, Windows, thornswood-vps]' -and $buildRunsOn.Count -gt 0)
+Yes ("it runs on the VPS runners the build check uses while the repository is private, and on GitHub's once public, since anyone can close their own issue then (#3685) ({0})" -f $runsOn) ($runsOn -eq "`${{ github.event.repository.private && fromJSON('[`"self-hosted`", `"Windows`", `"thornswood-vps`"]') || 'windows-latest' }}" -and $buildRunsOn.Count -gt 0)
 Yes '  on any of them, not only the build runners, so a few seconds of work never waits behind a build (#2994)' ($runsOn -notmatch 'thornswood-build')
 Yes '  with a timeout' ($text -match '(?m)^\s+timeout-minutes:\s*\d+\s*$')
 Yes '  and only when the closed issue carries a claimed label, so a close with none takes no runner' (
@@ -162,6 +163,15 @@ try {
 
     $r = Invoke-Drop @('claimed: Codex')
     Yes ("one claimed label, the only label: one DELETE (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Calls.Count -eq 1 -and $r.Calls[0] -like ('DELETE ' + $base + 'claimed%3A%20Codex *'))
+
+    # The six Hermes Bots claim with labels of their own (#4715), made after
+    # this test, so it holds them by name: a change to the prefix match that
+    # left them on a closed issue fails here.
+    $bots = @('Bramble', 'Rift', 'Sprocket', 'Echo', 'Magpie', 'Wisp')
+    $r = Invoke-Drop (@($bots | ForEach-Object { "claimed: $_" }) + 'area: Launcher')
+    Yes ("each Bot's claimed label is one DELETE, and the area label stays (exit {0})" -f $r.Code) (
+        $r.Code -eq 0 -and $r.Calls.Count -eq 6 -and
+        @($bots | Where-Object { $b = $_; @($r.Calls | Where-Object { $_ -like ('DELETE ' + $base + 'claimed%3A%20' + $b + ' *') }).Count -eq 1 }).Count -eq 6)
 
     $r = Invoke-Drop @('area: Release', 'wave: 2')
     Yes ("no claimed label: no call at all (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Calls.Count -eq 0)

@@ -115,6 +115,14 @@ zero for 10 minutes, then costs 30 rest and 10 hunger. Neither replaces
 a bed. A second dose inside the window does not stack. It refreshes the
 clock and adds the crash again.
 
+While a dose holds, you are high, and the screen shows it: colour and
+light turned up, a warm wash and a soft edge. Withdrawal comes after
+three doses in a day, the last 24 real hours: when the window of the
+third or a later one ends, stamina and magicka recover 10% slower for
+30 minutes, on top of the crash, and the screen goes grey and cold at
+the edges until it passes. Logged out before the window ends, it
+starts the next time you are in the world (Patrick, 22 Oct 2026).
+
 ## Where this is
 
 The 8 hour clock, the per-swing costs, the craft gate at 15, the eight
@@ -148,7 +156,7 @@ each place above and one for somebody on their feet (#2246), and the
 Body page's line is worked out from the same row. An
 inn or a temple is read off the room's own records: its location carries
 the game's inn or temple mark, and a house the game sells as a home never counts as one.
-Skooma is in the server (#1382): all six drugs (Skooma, Redwater Skooma, Double-Distilled Skooma, Balmora Blue, Eversnow and Sleeping Tree Sap) hold the rest drain at zero for 10 real minutes, resting still gains, and when the window ends each dose taken inside it costs 30 rest and 10 hunger. Tea is in the server too (#1382): Lavender Tea, Juniper Tea and Snowberry Tea are Thornswood's own items (Patrick, 12 Oct 2026), each brewed at a cooking pot from two of its herb. A cup is a drink, 20 thirst, and holds the rest drain at half for 20 real minutes; when the window ends each cup taken inside it costs 15 rest. While skooma and tea both run, the drain is held at zero.
+Skooma is in the server (#1382): all six drugs (Skooma, Redwater Skooma, Double-Distilled Skooma, Balmora Blue, Eversnow and Sleeping Tree Sap) hold the rest drain at zero for 10 real minutes, resting still gains, and when the window ends each dose taken inside it costs 30 rest and 10 hunger. While that window is open you are high, and a star icon sits just above the left end of the needs bars until it closes (Patrick, 22 Oct 2026, #3143). Tea is in the server too (#1382): Lavender Tea, Juniper Tea and Snowberry Tea are Thornswood's own items (Patrick, 12 Oct 2026), each brewed at a cooking pot from two of its herb. A cup is a drink, 20 thirst, and holds the rest drain at half for 20 real minutes; when the window ends each cup taken inside it costs 15 rest. While skooma and tea both run, the drain is held at zero.
 Sleeping on open ground, an hour on a seat with no roof over you and
 no fire in reach, starts a chill. See [Disease](disease.md).
 The craft gate is asked at every bench's own menu, brews, enchanting

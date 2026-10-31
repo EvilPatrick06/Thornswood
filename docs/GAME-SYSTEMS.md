@@ -61,11 +61,11 @@ name them.
 
 The needs bars as text stay a command too. Decided by Patrick on
 11 Oct (#2267): `/needs` (and `/need`) says the four bars as one line of
-text, for somebody who hid the bars in the launcher's Settings and wants
-a quick look at them. It is another view of what the bars and the Body
-page on K already show, so it is an exception, like the ones above. The
-help in the game, the launcher's Help and the Settings line under the
-bars name it.
+text, for somebody who hid the bars on Settings in the game (#3126) and
+wants a quick look at them. It is another view of what the bars and the
+Body page on K already show, so it is an exception, like the ones above.
+The help in the game, the launcher's Help and the line under the needs
+bars on Settings in the game name it.
 
 Reporting a problem to the developers is the one help line with a
 button. Decided by Patrick on 21 Oct (#3155): testers get both a
@@ -125,7 +125,9 @@ by a fire 35, that bed by a fire 45, a bed you are allowed in 50, and
 your own bed 80. Crafting stops under 15.
 
 [Food](systems/food.md). Raw, burnt, cooked, and a feast. Eating takes
-time. A full stomach refuses another meal's help.
+time. A full stomach refuses another meal's help. Four herbs are picked
+only in their seasons, and each season has a festival dish and brew
+made from its pair.
 
 [Drink and ale](systems/drink.md). Clean water, fouled water, and ale that
 gets worse with each one inside 45 minutes.
@@ -139,7 +141,9 @@ is not built.
 
 [Temperature and weather](systems/temperature.md). One meter, 0 to 100,
 comfort at 50. Place, wind, sky, night, height, fire, water and clothing.
-A season changes the odds of the sky. Winter is not all snow.
+A season changes the odds of the sky. Winter is not all snow. Winter
+cools a quarter faster under the sky, and a harvest gives a quarter
+more in summer and a quarter less in winter.
 
 [Injury](systems/injury.md). Cuts, breaks, burns, bites, and going down
 before a death. Lasting harm is part of this, not a separate switch.
@@ -160,8 +164,13 @@ past novice, and the two outside trades. A master decides, and either
 of you can end it.
 
 [Durability](systems/durability.md). Weapon Kit, Armor Kit, Sewing
-Kit. The right half repairs to 120%. Anyone else repairs to 100%.
+Kit. The right half repairs to 120%, at Master for the two smith
+kits. Anyone else repairs to 100%.
 Worn gear loses 1% a hit. At 0%, a worn piece can break.
+
+[Spoilage](systems/spoilage.md). Raw food keeps a real week, a dish
+two, salted or smoked food never. A pack spoils only while its owner
+is online. A cook salts or smokes raw meat and fish on a panel.
 
 [Cut items](systems/cut-items.md). What leaves the open book, and the
 references kept so a row can come back. The recipe file is not
@@ -249,6 +258,11 @@ not a recipe and not a mint.
 [Property](systems/property.md). A claim at the door, a deed, locks, keys,
 rent, and what a home is for.
 
+[Market stalls](systems/stalls.md). The stalls already in the towns'
+markets, claimed like a building for nothing. The keeper lays out goods
+at their own price, in gold or in goods, and a stall sells only while
+its keeper is standing at it.
+
 [Gold](systems/gold.md). 40 gold once for a person. A guild trader
 starts with 250, once. A scene quest creates the gold written on it,
 on that quest's cooldown. A company sale can take some coin out of
@@ -309,6 +323,9 @@ the East Empire Company.
 
 [Carriages and ferries](systems/carriages.md). How you travel with fast
 travel off. A fade, not a ride that has to stay in sync.
+
+[Trade carts](systems/carts.md). Goods between holds on carts people drive,
+lost only to a raid.
 
 ## Where a number comes from
 

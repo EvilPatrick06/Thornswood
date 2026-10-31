@@ -23,7 +23,7 @@
     Gate.ps1            hands the line it was asked to the broker over the
                         pipe \\.\pipe\thornswood-gate and prints the answer.
     GateBroker.ps1      the task "Thornswood Gate", SYSTEM from boot: holds
-                        the line to verbs.json (GateRules.ps1), pulls the tip
+                        the line to main's verbs.json (GateRules.ps1), pulls the tip
                         of main with a read-only GitHub deploy key, and runs
                         that verb's script from main, which reaches the box as
                         Administrator over loopback with the gate's own key
@@ -40,6 +40,9 @@
                                keys\    the GitHub deploy key, the gate's box
                                         key and their known_hosts
                                log\, runs\  the broker's record
+                               tools\gh-<version>\  the GitHub CLI the Ship
+                                        verbs sign through, pinned by its
+                                        SHA-256 (Ship-OnBox.ps1)
     the account and its profile, made with Windows' CreateProfile so sshd
     finds its .ssh folder; authorized_keys left as it is, or empty
     administrators_authorized_keys   the gate's line, thornswood-gate,
@@ -52,7 +55,7 @@
   titled "thornswood-gate (box, read only)", replacing an older one of that
   title.
 
-  WHAT IT SENDS. The gate's four files out of HEAD (git show), never the
+  WHAT IT SENDS. The gate's three files out of HEAD (git show), never the
   working tree, so it stops when they have uncommitted changes. Nothing
   secret leaves this machine: the two keys are made on the box and only
   their public halves come back.
@@ -87,7 +90,14 @@ $TaskName = 'Thornswood Gate'
 $DeployUser = 'thornswood-deploy'
 $KeyTitle = 'thornswood-gate (box, read only)'
 $Remote = "ssh://git@ssh.github.com:443/$GitHubRepo.git"
-$Files = @('scripts/vps/gate/Gate.ps1', 'scripts/vps/gate/GateBroker.ps1', 'scripts/vps/gate/GateRules.ps1', 'scripts/vps/gate/verbs.json')
+# Not verbs.json: the broker reads main's own at each run (Patrick's A, 30 Oct
+# 2026), so a merged verb needs no install.
+$Files = @('scripts/vps/gate/Gate.ps1', 'scripts/vps/gate/GateBroker.ps1', 'scripts/vps/gate/GateRules.ps1')
+# The GitHub CLI the Ship verbs sign through (Ship-OnBox.ps1), pinned: bump
+# both together from https://github.com/cli/cli/releases, the windows_amd64
+# line of that release's checksums file.
+$GhVersion = '2.89.0'
+$GhSha = 'F3326F6406C98C99701B257D77E2B040EEDF83D0176C2C2E9809AA339CEB467E'
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $Here)
 
 function Clean($lines) {
@@ -210,7 +220,24 @@ foreach (`$f in @(
 `$acl = Get-Acl -LiteralPath `$gate
 `$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier(`$sid)), 'ReadAndExecute', 'Allow')))
 Set-Acl -LiteralPath `$gate -AclObject `$acl
-'CHANGED Gate.ps1, GateBroker.ps1, GateRules.ps1 and verbs.json from $Commit; ' + `$user + ' may read Gate.ps1 alone'
+'CHANGED Gate.ps1, GateBroker.ps1 and GateRules.ps1 from $Commit; ' + `$user + ' may read Gate.ps1 alone'
+# The verbs are main's own now, read at each run; an installed copy would only mislead.
+if (Test-Path -LiteralPath (Join-Path `$root 'verbs.json')) { Remove-Item -LiteralPath (Join-Path `$root 'verbs.json') -Force; 'CHANGED the installed verbs.json removed: the broker reads main''s' }
+
+# ---- the GitHub CLI the Ship verbs sign through, pinned and checked
+`$ghDir = Join-Path `$root ('tools\gh-$GhVersion')
+`$gh = Join-Path `$ghDir 'bin\gh.exe'
+if (-not (Test-Path -LiteralPath `$gh)) {
+  [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+  `$zip = Join-Path `$root 'tools\gh.zip'
+  New-Item -ItemType Directory -Path (Split-Path -Parent `$zip) -Force | Out-Null
+  Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/cli/cli/releases/download/v$GhVersion/gh_$($GhVersion)_windows_amd64.zip' -OutFile `$zip
+  `$got = (Get-FileHash -LiteralPath `$zip -Algorithm SHA256).Hash
+  if (`$got -ne '$GhSha') { Remove-Item -LiteralPath `$zip -Force -EA SilentlyContinue; 'STOP the GitHub CLI $GhVersion does not match the SHA-256 its release published (got ' + `$got + '), so it was not installed.'; exit 1 }
+  Expand-Archive -LiteralPath `$zip -DestinationPath `$ghDir -Force
+  Remove-Item -LiteralPath `$zip -Force
+  'CHANGED the GitHub CLI $GhVersion, checksum matched, in ' + `$ghDir
+} else { 'ALREADY the GitHub CLI $GhVersion in ' + `$ghDir }
 
 # ---- the keys, made here and never sent anywhere
 function New-GateKey([string]`$path, [string]`$comment) {
@@ -218,6 +245,10 @@ function New-GateKey([string]`$path, [string]`$comment) {
   # Windows PowerShell 5.1 drops an empty argument, so the empty passphrase
   # goes as '""', which reaches ssh-keygen as an empty one; '' is tried too,
   # and each key is proved to open with no passphrase the same way.
+  # What ssh-keygen writes to stderr must not stop this under 'Stop' in
+  # Windows PowerShell 5.1 before the second way is tried; its exit code and
+  # the files it leaves are what count.
+  `$ErrorActionPreference = 'Continue'
   foreach (`$empty in '""', '') {
     Remove-Item -LiteralPath `$path, (`$path + '.pub') -Force -EA SilentlyContinue
     & `$keygen -q -t ed25519 -N `$empty -C `$comment -f `$path 2>&1 | Out-Null
@@ -247,12 +278,21 @@ foreach (`$k in `$ghKey, `$boxKey) { Set-SystemAdminsOnly `$k }
 'CHANGED GitHub''s ' + `$ghHosts.Count + ' host key(s) pinned for ssh.github.com:443'
 
 # ---- the box's own host keys, held to vps.json's pins
+# Each fingerprint is worked out here, as vps-openssh.ps1's Get-KeyPrint does,
+# not by ssh-keygen's -l: the box's OpenSSH no longer reads its old DSA key, and
+# what ssh-keygen says about that stops this script under 'Stop' in Windows
+# PowerShell 5.1, 2>`$null or not (29 Oct, the second install).
 `$pins = @($pinned)
 `$lines = @()
+`$sha = [Security.Cryptography.SHA256]::Create()
 foreach (`$pub in @(Get-ChildItem -LiteralPath (Join-Path `$env:ProgramData 'ssh') -Filter 'ssh_host_*_key.pub')) {
-  `$fp = [regex]::Match(((& `$keygen -l -E sha256 -f `$pub.FullName 2>`$null) -join ' '), 'SHA256:[A-Za-z0-9+/]+').Value
-  if (`$pins -contains `$fp) { `$t = ([IO.File]::ReadAllText(`$pub.FullName).Trim() -split '\s+'); `$lines += ('$Address ' + `$t[0] + ' ' + `$t[1]) }
+  `$t = @(([IO.File]::ReadAllText(`$pub.FullName).Trim()) -split '\s+')
+  if (`$t.Count -lt 2) { continue }
+  try { `$blob = [Convert]::FromBase64String(`$t[1]) } catch { continue }
+  `$fp = 'SHA256:' + [Convert]::ToBase64String(`$sha.ComputeHash(`$blob)).TrimEnd('=')
+  if (`$pins -contains `$fp) { `$lines += ('$Address ' + `$t[0] + ' ' + `$t[1]) }
 }
+`$sha.Dispose()
 if (-not `$lines.Count) { 'STOP none of the box''s host keys is one vps.json pins, so the gate would not know the box. Nothing more was changed.'; exit 1 }
 [IO.File]::WriteAllLines((Join-Path `$root 'keys\box_known_hosts'), [string[]]`$lines, `$utf8)
 'CHANGED ' + `$lines.Count + ' pinned host key(s) of the box for the gate'
@@ -292,7 +332,7 @@ foreach (`$k in 'github_known_hosts', 'box_known_hosts') { Set-SystemAdminsOnly 
 'CHANGED SYSTEM''s ssh sends $Address to 127.0.0.1 with the gate''s key'
 
 # ---- what the broker reads
-[IO.File]::WriteAllText((Join-Path `$root 'gate.json'), ((@{ commit = '$Commit'; git = `$git; pwsh = `$pwsh; ssh = `$ssh; remote = '$Remote'; deploySid = `$sid } | ConvertTo-Json)), `$utf8)
+[IO.File]::WriteAllText((Join-Path `$root 'gate.json'), ((@{ commit = '$Commit'; git = `$git; pwsh = `$pwsh; ssh = `$ssh; gh = `$gh; remote = '$Remote'; deploySid = `$sid } | ConvertTo-Json)), `$utf8)
 
 # ---- the task, SYSTEM from boot, started again on this commit
 `$t = Get-ScheduledTask -TaskName `$task -EA SilentlyContinue

@@ -184,6 +184,9 @@ CRIME_HOLD = {
 }
 
 NO_HOLD = 'no hold'
+# Built from what this and Build-NpcPopulation.py read: it switches off every
+# placed actor the catalogue cuts (#2468), so its actors are never read here.
+LAST_PLUGIN = 'Thornswood-Last.esp'
 WANTED = (b'FACT', b'NPC_', b'LVLN', b'RACE', b'KYWD', b'LCTN', b'CELL', b'WRLD')
 
 
@@ -510,6 +513,20 @@ def build(data, plugins_txt, say):
             pl.strings = bsa.load_strings(data, name)
             if pl.strings:
                 tables += 1
+        if name == LAST_PLUGIN:
+            # This is the cast as it stands before anything is deleted, and
+            # Thornswood-Last.esp is the deleting: read as an input it would
+            # list every cut actor as off at the start. Its places are read,
+            # as Build-NpcPopulation.py reads them (#2551): its locations over
+            # the ones before it, and of its cells only the location.
+            places = dict((k, {}) for k in t)
+            places[b'LCTN'] = t[b'LCTN']
+            read(pl, places)
+            failed += pl.failed
+            for d, row in places[b'CELL'].items():
+                if row.get('location') and d in t[b'CELL']:
+                    t[b'CELL'][d]['location'] = row['location']
+            continue
         read(pl, t)
         failed += pl.failed
 

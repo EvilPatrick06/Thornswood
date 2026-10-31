@@ -18,9 +18,8 @@
   down every call:
     1. an issue in Done whose merge is in the release gets one comment holding
        exactly the test task, then is closed as completed, in that order;
-    2. one whose merge came after the release, or names a commit the checkout
-       does not hold, stays open, and so does one whose last done-on-merge
-       comment names the later merge;
+    2. one whose merge came after the release stays open, and so does one
+       whose last done-on-merge comment names the later merge;
     3. one with a person's newer "Test task:" for main is closed with no
        second comment; a newer Server: Dev one keeps nothing open and the
        Main block is still written; a Dev block is written unless a newer
@@ -40,7 +39,11 @@
        block, or with no comment when it says "No test task: nobody would
        notice this fix."; kept open when the merge is not in the release; the
        newer of it and a done-on-merge comment stands; and a line with
-       neither a block nor the no-task line is a stop.
+       neither a block nor the no-task line is a stop;
+   10. a merge this checkout does not hold stays open only when GitHub says
+       it is on main; one that is not (an id from before main's history was
+       rewritten, #3684), or that GitHub does not know, is a stop naming it,
+       and the issues beside it are still closed.
 
   It never reaches GitHub. Files under its own temp folder only.
 #>
@@ -150,7 +153,7 @@ try {
     function Card([int]$n, [string]$status = 'Done', [string]$state = 'OPEN', [string]$repo = $Slug) {
         return [ordered]@{ repo = $repo; number = $n; kind = 'Issue'; title = "issue $n"; state = $state; status = $status; order = $null; archived = $false }
     }
-    $items = @((Card 1), (Card 2), (Card 3), (Card 4 'In Progress'), (Card 5 'Done' 'CLOSED'), (Card 6), (Card 7), (Card 8), (Card 9), (Card 10), (Card 11 'Done' 'OPEN' 'EvilPatrick06/other'), (Card 12), (Card 13), (Card 15), (Card 16), (Card 17), (Card 18), (Card 20), (Card 21))
+    $items = @((Card 1), (Card 2), (Card 3), (Card 4 'In Progress'), (Card 5 'Done' 'CLOSED'), (Card 6), (Card 7), (Card 8), (Card 10), (Card 11 'Done' 'OPEN' 'EvilPatrick06/other'), (Card 12), (Card 13), (Card 15), (Card 16), (Card 17), (Card 18), (Card 20), (Card 21))
     $items += [ordered]@{ repo = $Slug; number = 14; kind = 'PullRequest'; title = 'a pull request'; state = 'OPEN'; status = 'Done'; order = $null; archived = $false }
     $script:boardFile = Join-Path $work 'board.json'
     [IO.File]::WriteAllText($script:boardFile, ([ordered]@{ read_at = '2026-10-22T13:41:52Z'; items = $items } | ConvertTo-Json -Depth 6))
@@ -181,7 +184,6 @@ try {
         (Page 6)  = @((Robot $mergeA), (Person "Test task: A better title`nServer: Main`n1. Look again."))
         (Page 7)  = @((Robot $mergeA), (Person "Test task: Measure the forge`nServer: Dev`n1. Read the log."))
         (Page 8)  = @((Robot $mergeA 3300 'EvilPatrick06'))
-        (Page 9)  = @((Robot 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef'))
         (Page 10) = @((Robot $mergeA 3304 'github-actions[bot]' $devBlock), (Person "Test task: The anvil works`nServer: Main`n1. Use the anvil."))
         (Page 15) = @((Robot $mergeA 3304 'github-actions[bot]' $devBlock), (Person ($devBlock + "`n2. And the timing.")))
         (Page 11) = @((Robot $mergeA))
@@ -206,7 +208,7 @@ try {
     Yes '  then closed as completed, after the comment' (
         $p1.Count -eq 1 -and $p1[0] -match '"state":"closed"' -and $p1[0] -match '"state_reason":"completed"' -and [array]::IndexOf($w, $c1[0]) -lt [array]::IndexOf($w, $p1[0]))
     Yes '#2, merge after the release: stays open, said' (@($w | Where-Object { $_ -match '/issues/2[ /]' }).Count -eq 0 -and $r.Out -match "#2: stays open, pull request #3301's merge")
-    Yes '#9, a merge this checkout does not hold: stays open' (@($w | Where-Object { $_ -match '/issues/9[ /]' }).Count -eq 0 -and $r.Out -match '#9: stays open')
+    Yes '  a merge after the release in this checkout asks GitHub nothing more' (@($r.Calls | Where-Object { $_ -match '/compare/' }).Count -eq 0)
     Yes '#12, its last done-on-merge comment names the later merge: stays open' (@($w | Where-Object { $_ -match '/issues/12[ /]' }).Count -eq 0 -and $r.Out -match "#12: stays open, pull request #3302's merge")
     Yes '#6, a person''s newer test task for main: closed with no second comment' (
         @($w | Where-Object { $_ -like "POST repos/$Slug/issues/6/comments *" }).Count -eq 0 -and @($w | Where-Object { $_ -like "PATCH repos/$Slug/issues/6 *" -and $_ -match '"state":"closed"' }).Count -eq 1)
@@ -263,6 +265,27 @@ try {
     Yes ("#19, a Fixed by line with no test task and no no-task line: a stop (exit {0})" -f $r.Code) (
         $r.Code -eq 1 -and @($r.Writes | Where-Object { $_ -match '/issues/19[ /]' }).Count -eq 0 -and $r.Out -match '#19: the Fixed by line naming pull request #3327 holds no Test task' -and $r.Out -match 'Stopped, the lines above say why \(1\): #19')
     Yes '  and #1 beside it is still closed' (@($r.Writes | Where-Object { $_ -like "PATCH repos/$Slug/issues/1 *" }).Count -eq 1)
+    $script:boardFile = $keepBoard
+
+    # ---- 10: a merge this checkout does not hold -------------------------------
+    $script:boardFile = Join-Path $work 'board-9.json'
+    [IO.File]::WriteAllText($script:boardFile, ([ordered]@{ read_at = '2026-10-22T13:41:52Z'; items = @((Card 9), (Card 1)) } | ConvertTo-Json -Depth 6))
+    $gone = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+    $cmp = "GET repos/$Slug/compare/$($gone.Substring(0, 12))...main?per_page=1"
+    $nine = @{ (Page 9) = @((Robot $gone 3328)); (Page 1) = $answers[(Page 1)] }
+    $r = Run @() ($nine + @{ $cmp = @{ status = 'ahead' } })
+    Yes ("#9, a merge GitHub has on main that this checkout does not hold: stays open (exit {0})" -f $r.Code) (
+        $r.Code -eq 0 -and @($r.Writes | Where-Object { $_ -match '/issues/9[ /]' }).Count -eq 0 -and $r.Out -match "#9: stays open, pull request #3328's merge" -and
+        @($r.Calls | Where-Object { $_ -like "$cmp *" }).Count -eq 1)
+    $r = Run @() ($nine + @{ $cmp = @{ status = 'diverged' } })
+    Yes ("#9, a merge that is not on main, as after a history rewrite: a stop (exit {0})" -f $r.Code) (
+        $r.Code -eq 1 -and @($r.Writes | Where-Object { $_ -match '/issues/9[ /]' }).Count -eq 0 -and
+        $r.Out -match "#9: the done-on-merge comment for pull request #3328 names merge deadbeefdead, which is not on main \(GitHub says main and it have diverged\)" -and
+        $r.Out -match 'Stopped, the lines above say why \(1\): #9')
+    Yes '  and #1 beside it is still closed' (@($r.Writes | Where-Object { $_ -like "PATCH repos/$Slug/issues/1 *" }).Count -eq 1)
+    $r = Run @() $nine @($cmp)
+    Yes ("#9, a merge GitHub does not know: a stop that says what GitHub answered (exit {0})" -f $r.Code) (
+        $r.Code -eq 1 -and @($r.Writes | Where-Object { $_ -match '/issues/9[ /]' }).Count -eq 0 -and $r.Out -match '#9: .*which is not on main \(GitHub answered GET .*403')
     $script:boardFile = $keepBoard
 
     # ---- 8: what stops before anything is read -------------------------------

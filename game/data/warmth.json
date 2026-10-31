@@ -1,16 +1,16 @@
 {
   "builtBy": "scripts\\dev\\Build-WarmthTable.js",
-  "builtAt": "2026-10-26T22:43:22.170Z",
-  "source": "the ARMO records of 103 plugins in load order, and the KYWD records their keywords point at",
+  "builtAt": "2026-10-31T07:19:00.992Z",
+  "source": "the ARMO records of 106 plugins in load order, and the KYWD records their keywords point at",
   "readFrom": "BOD2 for what it covers, KWDA for the material, DATA for the weight",
   "note": "what a material is WORTH is balance and lives in NEEDS.wear in gamemode.js",
-  "count": 4061,
+  "count": 4168,
   "byMaterial": {
-    "cloth": 1683,
-    "heavy": 1153,
-    "light": 681,
-    "leather": 306,
-    "fur": 238
+    "cloth": 1715,
+    "heavy": 1209,
+    "light": 688,
+    "leather": 311,
+    "fur": 245
   },
   "items": {
     "16fff:Skyrim.esm": {
@@ -17892,6 +17892,648 @@
       "c": "body",
       "w": 0,
       "e": "DLC2ExpSpiderPoisonSkin"
+    },
+    "1:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 28,
+      "e": "ArmorScholarofStendarr"
+    },
+    "2:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "body",
+      "w": 6,
+      "e": "ArmorAdventurer"
+    },
+    "3:cheddars_mashups.esl": {
+      "m": "leather",
+      "c": "body",
+      "w": 9,
+      "e": "ArmorVampireBattlemaster"
+    },
+    "4:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 45,
+      "e": "ArmorBladesRemnant"
+    },
+    "5:cheddars_mashups.esl": {
+      "m": "leather",
+      "c": "body",
+      "w": 6,
+      "e": "ForswornModestCuirass"
+    },
+    "6:cheddars_mashups.esl": {
+      "m": "light",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorImperialCleric"
+    },
+    "7:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "body",
+      "w": 6,
+      "e": "ArmorDawnguardScholar"
+    },
+    "8:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 38,
+      "e": "ArmorNoble"
+    },
+    "9:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "body",
+      "w": 6,
+      "e": "ArmorDawnguardExecutioner"
+    },
+    "22:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "body",
+      "w": 7,
+      "e": "DBStalkerArmor"
+    },
+    "23:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "feet",
+      "w": 9,
+      "e": "ArmorVampireBattlemasterBoots"
+    },
+    "2d:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "hands",
+      "w": 6,
+      "e": "ArmorScholarGauntlets"
+    },
+    "31:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "hands",
+      "w": 2,
+      "e": "ArmorWerwolfBaneGloves"
+    },
+    "32:cheddars_mashups.esl": {
+      "m": "leather",
+      "c": "body",
+      "w": 6,
+      "e": "ArmorWerewolfBane"
+    },
+    "3a:cheddars_mashups.esl": {
+      "m": "leather",
+      "c": "body",
+      "w": 6,
+      "e": "ArmorVampireStalker"
+    },
+    "3d:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "hair,circlet",
+      "w": 1,
+      "e": "CultistMaskSkull"
+    },
+    "43:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "body",
+      "w": 6,
+      "e": "ArmorDawnguardAlikr"
+    },
+    "4a:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "feet",
+      "w": 4,
+      "e": "ArmorFallenCompanionBoots"
+    },
+    "4b:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "hands",
+      "w": 4,
+      "e": "ArmorFallenCompanionGauntlets"
+    },
+    "52:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "body",
+      "w": 12,
+      "e": "ArmorRedguardWarrior"
+    },
+    "56:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 45,
+      "e": "ArmorBladesPriest"
+    },
+    "49:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 20,
+      "e": "ArmorFallenCompanion"
+    },
+    "59:cheddars_mashups.esl": {
+      "m": "fur",
+      "c": "feet",
+      "w": 4,
+      "e": "ArmorSonofSkyrimboots"
+    },
+    "5a:cheddars_mashups.esl": {
+      "m": "fur",
+      "c": "hands",
+      "w": 6,
+      "e": "ArmorSonofSkyrimgauntlets"
+    },
+    "5b:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "hair,circlet",
+      "w": 8,
+      "e": "ArmorSonofSkyrimhelmet"
+    },
+    "5c:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorSteelVigilantA"
+    },
+    "5d:cheddars_mashups.esl": {
+      "m": "fur",
+      "c": "body",
+      "w": 16,
+      "e": "ArmorSonofSkyrim"
+    },
+    "5e:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "hair,circlet",
+      "w": 8,
+      "e": "ArmorSteeledVigilantHood"
+    },
+    "5f:cheddars_mashups.esl": {
+      "m": "fur",
+      "c": "body",
+      "w": 30,
+      "e": "ArmorBonemoldCuirassForsworn"
+    },
+    "60:cheddars_mashups.esl": {
+      "m": "light",
+      "c": "head,hair,circlet,ears",
+      "w": 1,
+      "e": "ArmorSalvagedChitinHood"
+    },
+    "61:cheddars_mashups.esl": {
+      "m": "light",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorImperialPriestCuirass"
+    },
+    "81:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "body",
+      "w": 38,
+      "e": "ArmorDawnguardPriestRobe"
+    },
+    "89:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 40,
+      "e": "ArmorWamsuBoneCuirass"
+    },
+    "85:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "hands",
+      "w": 5,
+      "e": "ArmorIronFurGauntlets"
+    },
+    "8c:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 38,
+      "e": "ArmoredJarl"
+    },
+    "8d:cheddars_mashups.esl": {
+      "m": "fur",
+      "c": "body",
+      "w": 12,
+      "e": "ArmorScaledIronCuirass"
+    },
+    "8e:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorRobedSteel"
+    },
+    "8f:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 30,
+      "e": "ArmorNobleAlt"
+    },
+    "90:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorRobedSteelB"
+    },
+    "91:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorRobedSteelY"
+    },
+    "92:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorRobedSteelD"
+    },
+    "93:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorRobedSteelC"
+    },
+    "94:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorRobedSteelP"
+    },
+    "95:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorRobedSteelR"
+    },
+    "96:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "head",
+      "w": 10,
+      "e": "ArmorDawnguardHelmetHooded"
+    },
+    "97:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "head",
+      "w": 10,
+      "e": "ArmorDawnguardHelmetHoodedW"
+    },
+    "98:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "head",
+      "w": 10,
+      "e": "ArmorDawnguardHelmetHoodedB"
+    },
+    "99:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "head",
+      "w": 10,
+      "e": "ArmorDawnguardHelmetHoodedG"
+    },
+    "9a:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "hands",
+      "w": 4,
+      "e": "ArmorDraugrGloves"
+    },
+    "9b:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "body",
+      "w": 34,
+      "e": "ArmorAlikrKnight"
+    },
+    "9c:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorRobedSteelG"
+    },
+    "9d:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorRobedIronB"
+    },
+    "9e:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorRobedIronY"
+    },
+    "9f:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorRobedIronD"
+    },
+    "a0:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorRobedIronG"
+    },
+    "a1:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorRobedIronR"
+    },
+    "a2:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorRobedIronC"
+    },
+    "a3:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorRobedSteelO"
+    },
+    "a4:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorRobedIronO"
+    },
+    "a5:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorRobedIron"
+    },
+    "a6:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorRobedIronP"
+    },
+    "a7:cheddars_mashups.esl": {
+      "m": "light",
+      "c": "body",
+      "w": 7,
+      "e": "ArmorAncientFalmerRobes"
+    },
+    "a8:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorOrcishHuntCuirass"
+    },
+    "a9:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorOrcishExecCuirass"
+    },
+    "aa:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "feet",
+      "w": 7,
+      "e": "ArmorOrcishExecBoots"
+    },
+    "ab:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "hands",
+      "w": 7,
+      "e": "ArmorOrcishExecGauntlets"
+    },
+    "ac:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "hair,circlet",
+      "w": 8,
+      "e": "ArmorOrcishExecHelmet"
+    },
+    "ad:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorThalmorPlate"
+    },
+    "ae:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "hair,circlet",
+      "w": 5,
+      "e": "ArmorSteelHoodedHelmet"
+    },
+    "af:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 37,
+      "e": "ArmorNordicRobes"
+    },
+    "121:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "head,hair",
+      "w": 2,
+      "e": "ArmorGuardHelmetRangerWhiterun"
+    },
+    "122:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "head,hair",
+      "w": 2,
+      "e": "ArmorGuardHelmetRangerFalkreath"
+    },
+    "123:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "head,hair",
+      "w": 2,
+      "e": "ArmorGuardHelmetRangerPale"
+    },
+    "124:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "head,hair",
+      "w": 2,
+      "e": "ArmorGuardHelmetRangerMorthal"
+    },
+    "125:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "head,hair",
+      "w": 2,
+      "e": "ArmorGuardHelmetRangerWinterhold"
+    },
+    "126:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "head,hair",
+      "w": 2,
+      "e": "ArmorGuardHelmetRangerSolitude"
+    },
+    "127:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "head,hair",
+      "w": 2,
+      "e": "ArmorGuardHelmetRangerMarkarth"
+    },
+    "128:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "head,hair",
+      "w": 2,
+      "e": "ArmorGuardHelmetRangerRift"
+    },
+    "120:cheddars_mashups.esl": {
+      "m": "fur",
+      "c": "head,hair",
+      "w": 2,
+      "e": "ArmorStormcloakRangerHelm"
+    },
+    "129:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "hair,circlet",
+      "w": 5,
+      "e": "ArmorSteelHoodedHelmetRed"
+    },
+    "12a:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "hair,circlet",
+      "w": 5,
+      "e": "ArmorSteelHoodedHelmetBlack"
+    },
+    "144:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "hands",
+      "w": 4,
+      "e": "ArmorSteelFurGauntlets"
+    },
+    "145:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "hands",
+      "w": 6,
+      "e": "ArmorVampirePlateGloves"
+    },
+    "146:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "hands",
+      "w": 4,
+      "e": "ArmorSteelFurGloves"
+    },
+    "148:cheddars_mashups.esl": {
+      "m": "fur",
+      "c": "hands",
+      "w": 1,
+      "e": "ArmorGlovedHideGauntlets"
+    },
+    "14b:cheddars_mashups.esl": {
+      "m": "light",
+      "c": "body",
+      "w": 35,
+      "e": "ArmorImperialBattlelordCuirass"
+    },
+    "14d:cheddars_mashups.esl": {
+      "m": "light",
+      "c": "head,hair,circlet,ears",
+      "w": 5,
+      "e": "ArmorImperialBattlelordHood"
+    },
+    "15b:cheddars_mashups.esl": {
+      "m": "leather",
+      "c": "body",
+      "w": 9,
+      "e": "ArmorVampireBattlelord"
+    },
+    "161:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "head,hair,circlet,ears",
+      "w": 10,
+      "e": "ArmorDawnguardPriestHood"
+    },
+    "143:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "hands",
+      "w": 4,
+      "e": "ArmorFalmerReinforcedGauntlets"
+    },
+    "176:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 38,
+      "e": "ArmorRobedPlateCuirassB"
+    },
+    "177:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 38,
+      "e": "ArmorRobedPlateCuirassC"
+    },
+    "178:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 38,
+      "e": "ArmorRobedPlateCuirassG"
+    },
+    "179:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 38,
+      "e": "ArmorRobedPlateCuirassD"
+    },
+    "17a:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 38,
+      "e": "ArmorRobedPlateCuirassO"
+    },
+    "17b:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 38,
+      "e": "ArmorRobedPlateCuirassR"
+    },
+    "17c:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 38,
+      "e": "ArmorRobedPlateCuirassP"
+    },
+    "17d:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 38,
+      "e": "ArmorRobedPlateCuirassY"
+    },
+    "190:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 28,
+      "e": "ArmorNordHeroCuirass"
+    },
+    "191:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "hair,circlet",
+      "w": 4,
+      "e": "ArmorNordHeroHelmet"
+    },
+    "196:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "body",
+      "w": 6,
+      "e": "ArmorDawnguardCasual"
+    },
+    "199:cheddars_mashups.esl": {
+      "m": "light",
+      "c": "body",
+      "w": 4,
+      "e": "ArmorTelvanniRobes"
+    },
+    "16d:cheddars_mashups.esl": {
+      "m": "heavy",
+      "c": "body",
+      "w": 38,
+      "e": "ArmorRobedPlateCuirass"
+    },
+    "19f:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "head,hair,circlet,ears",
+      "w": 10,
+      "e": "ArmorDawnguardHunterHelmet"
+    },
+    "1a4:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "head,hair,circlet,ears",
+      "w": 10,
+      "e": "ArmorDawnguardHornedHelmet"
+    },
+    "19e:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "body",
+      "w": 6,
+      "e": "ArmorDawnguardHunterCuriass"
+    },
+    "1a8:cheddars_mashups.esl": {
+      "m": "cloth",
+      "c": "body",
+      "w": 6,
+      "e": "ArmorFallenDawnguard"
     },
     "23966:JKs Skyrim.esp": {
       "m": "cloth",

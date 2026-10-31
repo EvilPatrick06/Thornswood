@@ -1024,6 +1024,7 @@ setInterval(() => {
 const QUEUE_CEILING = 1024 * 1024;
 let droppedPositions = 0;   // ticks not sent to a backed socket, for /health
 let skippedRosters = 0;     // rosters replaced by a newer one unsent, for /health
+let rostersAhead = 0;       // held rosters written ahead of a message sent to their socket, for /health
 let closedBacklogged = 0;   // sockets closed at the ceiling, for /health
 
 /*
@@ -1132,7 +1133,9 @@ class Sock {
     if (this.closed) return;
     // A roster held back while this socket was backed goes out first, so
     // every message still arrives after the roster that was current when it
-    // was sent, as it did before rosters were held back.
+    // was sent, as it did before rosters were held back. Counted, so a
+    // harness can tell this from a drain having sent it already.
+    if (this.latest) rostersAhead++;
     this.flushLatest();
     if (this.closed) return;
     try { this.write(frame(JSON.stringify(obj))); } catch (e) { this.close(); }
@@ -2588,7 +2591,8 @@ const server = http.createServer((req, res) => {
                             // Last: /health's fields only ever go on the end (voice/test-turn-key.js).
                             captions: { on: CAPTIONS, sent: captionCounts.sent, dropped: captionCounts.dropped,
                                         tailMs: CAPTION_TAIL_MS, burst: CAPTION_BURST, refillMs: CAPTION_REFILL_MS,
-                                        reach: CAPTION_REACH || 'voice', textMute: CAPTION_TEXT_MUTE } }));
+                                        reach: CAPTION_REACH || 'voice', textMute: CAPTION_TEXT_MUTE },
+                            rostersAhead: rostersAhead }));
     return;
   }
 

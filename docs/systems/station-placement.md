@@ -193,5 +193,4 @@ To move one: `python scripts/dev/Build-WoodworkingBenches.py --search <town>` li
 
 ### Still to do
 
-1. Ship `Thornswood-WoodworkerTrail.esp` in the next collection revision (see `scripts/mods/woodworker-trail-recipes.json` and `Build-WoodworkerTrailOverrides.py`).
-2. Pin the trail plugin last among Thornswood plugins in the collection load order.
+Nothing for the woodworking recipes. The Woodwright's recipes that sat at the forge in plugins loading after Thornswood-Content.esp are moved to the woodworking bench by Thornswood-Last.esp (#3120); the trailing plugin once planned for them never shipped and is gone.

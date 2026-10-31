@@ -58,6 +58,10 @@ function build(src) {
     fallback builds it on the box. A pull request from a fork never reaches
     the box: the fallback's condition names this repository as the head. The
     hosted job's failure stays standing as its own red check.
+    ONLY WHILE PRIVATE (#3685, Patrick's A of 26 Oct 2026). Once the
+    repository is public the fallback never runs, GitHub's runners are free,
+    and no VPS runner is registered to it: a fork's pull request runs its own
+    copy of this file, so that condition alone could not keep it off the box.
   */
   /*
     NO "tested" JOB ON A PULL REQUEST (#3182). build.yml's first job asks
@@ -70,8 +74,8 @@ function build(src) {
   if (!tested) { fail('build.yml no longer has its "tested" job before the fallback'); }
   body = body.replace(tested[0], '\n');
   body = swap(body, '    needs: [tested, tested-vps, launcher]\n', '    needs: launcher\n', 'the fallback\'s needs');
-  body = swap(body, "    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && needs.launcher.result", "    if: ${{ !cancelled() && needs.launcher.result", 'the fallback\'s tested condition');
-  body = swap(body, "    needs: [tested, tested-vps]\n    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && vars.BUILD_RUNNER", "    if: ${{ vars.BUILD_RUNNER", 'the hosted job\'s tested condition');
+  body = swap(body, "    if: ${{ !cancelled() && github.event.repository.private && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && needs.launcher.result", "    if: ${{ !cancelled() && github.event.repository.private && needs.launcher.result", 'the fallback\'s tested condition');
+  body = swap(body, "    needs: [tested, tested-vps]\n    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && (!github.event.repository.private || (vars.BUILD_RUNNER", "    if: ${{ (!github.event.repository.private || (vars.BUILD_RUNNER", 'the hosted job\'s tested condition');
   if (/needs\.tested|needs: \[?tested|^  tested:/m.test(code(body))) { fail('the pull request build still names the tested job'); }
   /*
     A PULL REQUEST'S FALLBACK MAY ALSO LAND ON ONE (#3860, Patrick, 26 Oct
@@ -89,11 +93,53 @@ function build(src) {
   const vps = body.indexOf('\n  launcher-vps:\n');
   const dflt = body.indexOf('\n  # The default:');
   if (jobs < 0 || vps < 0 || dflt < vps) { fail('build.yml no longer has the launcher-vps fallback job before the default job'); }
-  const IF = "    if: ${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}\n";
-  const SAME = "    if: ${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' && github.event.pull_request.head.repo.full_name == github.repository }}\n";
+  const IF = "    if: ${{ !cancelled() && github.event.repository.private && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}\n";
+  const SAME = "    if: ${{ !cancelled() && github.event.repository.private && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' && github.event.pull_request.head.repo.full_name == github.repository }}\n";
   const job = body.slice(vps, dflt);
   if (job.indexOf(IF) < 0) { fail('the fallback job no longer has its condition'); }
   body = body.slice(0, vps) + job.replace(IF, SAME) + body.slice(dflt);
+  /*
+    THE ONE CHECK MAIN'S PROTECTION REQUIRES (#3683, Patrick's A on
+    q-3683-required-check, 27 Oct 2026). GitHub counts a skipped required
+    check as passed. In box mode (BUILD_RUNNER=vps) "Launcher builds" is
+    skipped and the fallback builds; for a fork's pull request the fallback
+    is skipped too. So neither build's name can be the required one: a red
+    box build, or no build at all, would still pass. "Build check result"
+    needs both, and passes only when one of them succeeded.
+
+    It runs on GitHub's ubuntu-latest, never the box: it is a pull request's
+    job, and a fork's pull request brings its own copy of this file. It
+    runs only once the repository is public, as codeql.yml does: hosted
+    minutes are free there, and while the repository is private they are
+    the account's (gone until about 1 November 2026, measured 26 Oct), so a
+    run then would fail to start and stand red on every pull request. While
+    it is skipped it counts as passed, so main's ruleset stays disabled in
+    records/github-repo-settings.json until the flip.
+  */
+  if (/\n  result:\n/.test(body)) { fail('build.yml already has a job named result'); }
+  body = body.replace(/\n*$/, '\n') + [
+    '',
+    '  # The one check main\'s ruleset requires (#3683): passes only when one of',
+    '  # the two builds above succeeded. Written by Build-PrWorkflow.js, which',
+    '  # says why it is on GitHub\'s runner and only once the repository is public.',
+    '  result:',
+    '    name: Build check result',
+    '    needs: [launcher-vps, launcher]',
+    '    if: ${{ !cancelled() && github.event.repository.private == false }}',
+    '    runs-on: ubuntu-latest',
+    '    timeout-minutes: 5',
+    '    steps:',
+    '      - name: One of the two builds passed',
+    '        env:',
+    '          HOSTED: ${{ needs.launcher.result }}',
+    '          VPS: ${{ needs.launcher-vps.result }}',
+    '        run: |',
+    '          echo "Launcher builds: $HOSTED; Launcher builds (VPS fallback): $VPS"',
+    '          if [ "$HOSTED" = success ] || [ "$VPS" = success ]; then exit 0; fi',
+    '          echo "::error::neither build passed, so this pull request may not merge"',
+    '          exit 1',
+    '',
+  ].join('\n');
   if (code(body).split('runs-on: [self-hosted').length - 1 !== 1) { fail('the VPS label is in more than the fallback job'); }
   if (code(body).indexOf('always()') >= 0) { fail('a job uses always(), which a newer run cannot cancel'); }
   if (code(body).split('head.repo.full_name == github.repository').length - 1 !== 1) { fail('the fallback lost its same-repository condition'); }

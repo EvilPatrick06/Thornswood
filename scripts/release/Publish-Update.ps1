@@ -156,6 +156,8 @@ if ($Dev -and -not $PSBoundParameters.ContainsKey('Root') -and -not (Test-Path (
 . (Join-Path $Here 'Dev-News.ps1')
 # Which content plugin the channel's server holds (#2308, ServerContent.ps1).
 . (Join-Path $Here '..\deploy\ServerContent.ps1')
+# Which Thornswood-Last.esp this commit's recipe makes (#2791).
+. (Join-Path $Here '..\deploy\LastPluginRecipe.ps1')
 # Where the notes are kept, in the feed or as a file of their own (#1050).
 . (Join-Path $Here 'Feed-News.ps1')
 # The signed release manifest (#2163, phase B): what it lists, and signing it.
@@ -479,15 +481,12 @@ elseif ($null -ne $ownCollection) {
 # 3 October. Revision 2 supplies the baseline; our packs supply subsequent
 # fishing and crafting records. Updater unshares each destination before
 # extraction, preserving Vortex staging and the independently updated channel.
-$shipGeneratedFiles = Get-ShipGeneratedFiles $ProfileDir
-# From the feed the bodies are the bytes the last release carried, each held
-# to its sha256 there by New-FeedRoot; only a collection Ship builds them.
-if ($FromFeed) { Say '  the generated bodies are the last release''s, by their sha256' 'DarkGray' }
-else { Assert-ShipGeneratedBodies $GameDir $ProfileDir }
+# The behavior files and bodies are built on each computer by the launcher
+# since #3715 and never ship (Ship-Rules Test-ShipGenerated), so nothing here
+# reads the generated record any more.
 function Test-FromCollection([string]$rel) {
     if ($null -eq $vortexFiles) { return $false }
     if (Test-ThornswoodRepoPlugin $rel) { return $false }
-    if ($shipGeneratedFiles -contains $rel) { return $false }
     return $vortexFiles.Contains($rel)
 }
 # Place plugins the load order names that Vortex does not deploy under that
@@ -552,9 +551,22 @@ if ($FromFeed) {
     try { $revDoc = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($VersionFile)) $VersionFile } catch { Die $_.Exception.Message }
     if ($revDoc.PSObject.Properties['collectionRevision']) { [void][int]::TryParse([string]$revDoc.collectionRevision, [ref]$ShipCollectionRevision) }
     if ($ShipCollectionRevision -le 0) { Die "The $Channel feed names no collection revision, so which held files ship is not known. A collection Ship on One names it. Nothing was built." }
+    # The last release's plugin list goes forward, so this release is on the
+    # last release's revision, and the feed may only say the recorded one
+    # (#3597): when the collection has moved, the release that carries it is a
+    # Ship from One.
+    $revWhy = Get-ShipCollectionRevisionProblem -RepoDir $RepoDir -Built $ShipCollectionRevision -Source "the $Channel feed's last release" -Remedy 'A release from the feed carries that release''s plugin list, so it cannot move the revision: Ship from One, with Vortex on the recorded revision. Nothing was built.'
+    if ($revWhy) { Die $revWhy }
 } else {
     $ShipCollectionRevision = Get-ShipCollectionRevision $Root
+    # This machine's Vortex is what the plugin list, its order and the bodies
+    # are read from, so it has to be on the revision the feed will name (#3597).
+    $revWhy = Get-ShipCollectionRevisionProblem -RepoDir $RepoDir -Built $ShipCollectionRevision -Slug (Get-CollectionSlug (Get-ShipCollectionUrl $Root)) -Source "this machine's Vortex" -Remedy 'Update the collection in Vortex''s Thornswood profile to the recorded revision, let it deploy, close Vortex, then Ship again. Nothing was built.'
+    if ($revWhy) { Die $revWhy }
 }
+# And the record has to be the newest revision published on Nexus (#4068).
+$newestWhy = Get-ShipNewestRevisionProblem -RepoDir $RepoDir
+if ($newestWhy) { Die $newestWhy }
 Say ("  collection revision {0}: loose files held for the collection until then still ship" -f $ShipCollectionRevision) 'DarkGray'
 function Test-Machine([string]$rel) { return ((Test-ShipMachine $rel) -or (Test-ShipNotOurs $rel)) }
 
@@ -1134,8 +1146,11 @@ if (-not $changed.Count -and -not $realRemoved -and -not $profileChanged.Count -
 # than through the server's manifest. A dry run (-NoUpload -NoPush) asks the
 # same and stops the same, so it says what the real Ship would do.
 # Every plugin of ours (RepoPlugins.ps1), not the content plugin alone: since
-# #2486 Thornswood-Last.esp ships from the repo too, under the same rule.
-$contentChanged = @($changed | Where-Object { Test-ThornswoodRepoPlugin $_ })
+# #2486 Thornswood-Last.esp reaches clients from the repo too, under the same
+# rule, and since #2791 as its recipe, from which the launcher makes the
+# plugin game\data\last-plugin.json names. So a release whose recipe changed
+# asks the server for that plugin, which the deploy made on the box.
+$contentChanged = @($changed | Where-Object { (Test-ThornswoodRepoPlugin $_) -or $_ -ieq 'Data\Thornswood-Last.recipe' })
 if ($contentChanged.Count) {
     Head 'Our plugins on the server'
     $contentBox = $null
@@ -1144,6 +1159,11 @@ if ($contentChanged.Count) {
     foreach ($contentRel in $contentChanged) {
         $contentName = Split-Path -Leaf $contentRel
         $contentEntry = [string]$now[$contentRel]
+        if ($contentRel -ieq 'Data\Thornswood-Last.recipe') {
+            $contentName = $ThornswoodLastPlugin
+            $lastShipWant = Get-ThornswoodLastPluginWant $RepoDir
+            $contentEntry = if ($lastShipWant) { '{0}:{1}' -f $lastShipWant.Bytes, $lastShipWant.Sha } else { '' }
+        }
         $pluginBox = Get-ThornswoodServerPlugin $contentBox $contentName
         $contentProblem = Get-ThornswoodContentShipProblem $Channel $contentEntry $pluginBox $contentName
         if ($contentProblem) {
@@ -1630,11 +1650,32 @@ foreach ($k in @($prev.Keys)) {
     if ($now.ContainsKey($k)) { continue }
     if (-not (Test-ShipNotOurs $k)) { continue }
     # Bethesda's, one machine's and backups never become hash-gone: a delete
-    # must not reach Steam copies of those (#1152, #1239, #1261).
-    if ((Test-ShipBethesda $k) -or (Test-ShipOneMachine $k) -or (Test-ShipBackup $k)) { continue }
+    # must not reach Steam copies of those (#1152, #1239, #1261). Nor what the
+    # launcher builds on each computer (#3715): an install whose build made
+    # the very bytes a release once carried would lose them at every update
+    # and build them again at the next Play.
+    # Nor Thornswood-Last.esp, which the launcher makes from the recipe on
+    # each computer before every Play (#2791, Test-ShipMadeFromRecipe).
+    if ((Test-ShipBethesda $k) -or (Test-ShipOneMachine $k) -or (Test-ShipBackup $k) -or (Test-ShipGenerated $k) -or (Test-ShipMadeFromRecipe $k)) { continue }
     $m = [regex]::Match([string]$prev[$k], '^\d+:([0-9a-fA-F]{64})$')
     if ($m.Success) { $gone[$k] = $m.Groups[1].Value.ToLowerInvariant() }
 }
+# ==== thornswood shipped not ours ====
+# tests\test-shipped-not-ours.ps1 runs this block on its own.
+#
+# And the ones no record named any more when #1261 came (#1178): the scrub of
+# 29 September had already taken them out of the records, so the loop above
+# never saw them, and every install the old packs reached kept them.
+# Ship-Rules' Get-ShipShippedNotOurs reads them, with the bytes we shipped, from
+# records\shipped-not-ours.json, and stops the release on a path that is not
+# another author's. A path this release ships is its own file again and is not
+# gone; one Ship-Rules deletes everywhere stays 'always'.
+$shippedNotOurs = Get-ShipShippedNotOurs
+foreach ($k in @($shippedNotOurs.Keys)) {
+    if ($now.ContainsKey($k) -or [string]$gone[$k] -eq 'always') { continue }
+    $gone[$k] = $shippedNotOurs[$k]
+}
+# ==== end thornswood shipped not ours ====
 foreach ($k in @($gone.Keys)) {
     if ($now.ContainsKey($k)) { $gone.Remove($k); continue }
     if ($gone[$k] -eq 'always') { continue }
@@ -2091,12 +2132,11 @@ if (Test-Path $cfgPath) {
 
         # Which collection revision this release agrees with.
         #
-        # Read off THIS machine's Vortex install, because this machine's
-        # deployment is what the server's load order and the reference plugin
-        # list were both derived from. It is not a claim about what is newest
-        # on Nexus; it is a statement of what this release matches, and the
-        # launcher compares its own installed revision against it and says
-        # behind or ahead.
+        # The recorded one (records\collection-plugins.json, #3597), which the
+        # check at the top of this run held this release's source to: One's
+        # Vortex for a Ship from One, the last release for one from the feed.
+        # The launcher compares its own installed revision against it and says
+        # behind or ahead, and holds Play for either.
         #
         # There was no number at all before 22 September. The launcher guessed
         # from whether po3_StartOnSave.dll existed, a file Add-Characters.ps1
@@ -2105,20 +2145,12 @@ if (Test-Path $cfgPath) {
         # and skipped that script read as behind, and this machine sat on
         # revision 2 while Nexus was on 4 and nothing said a word.
         #
-        # Silence when it cannot be read, never a guess: a wrong number here
-        # tells everybody to reinstall a collection that is already right.
-        # From the feed there is no Vortex here, and the revision is the one
-        # the last release named, which only a collection Ship moves (#2754).
-        $slug = Get-CollectionSlug ([string]$cfg.CollectionUrl)
-        $rev = if ($FromFeed) { 0 } else { Get-CollectionRevision $slug }
-        if ($FromFeed) {
-            Say "  collection revision $ShipCollectionRevision, as the last release named it" 'DarkGray'
-        } elseif ($rev -gt 0) {
-            Set-Prop $doc 'collectionRevision' $rev
-            Say "  collection revision $rev (what this release was built against)" 'Green'
-        } else {
-            Say '  could not read the collection revision from Vortex, so the feed keeps what it had' 'Yellow'
-        }
+        # From then until #3597 the number written here was the one this
+        # machine's Vortex had installed, or from the feed the last release's.
+        # One stayed on revision 2 while 3, 4 and 5 were published without
+        # Vortex, so both feeds said 2 and a launcher on 2 was let in.
+        Set-Prop $doc 'collectionRevision' $ShipCollectionRevision
+        Say "  collection revision $ShipCollectionRevision (records\collection-plugins.json, what this release was built against)" 'Green'
 
         # The server password does NOT ride along, and it used to.
         #

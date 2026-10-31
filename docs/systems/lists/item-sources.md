@@ -1,23 +1,23 @@
 # Where every item comes from
 
-Generated from `game/data/item-sources.json` by `scripts/dev/Write-SystemLists.js`. 1058 items: everything somebody can come to hold, and every input a live recipe asks for. Each is marked with every way it comes into the world. `scripts/dev/Build-ItemSources.js` builds the table; run it, then this script, after a recipe, work, quest or dungeon table changes. Balance is what a thing takes to make or get plus its stats, never gold.
+Generated from `game/data/item-sources.json` by `scripts/dev/Write-SystemLists.js`. 1153 items: everything somebody can come to hold, and every input a live recipe asks for. Each is marked with every way it comes into the world. `scripts/dev/Build-ItemSources.js` builds the table; run it, then this script, after a recipe, work, quest or dungeon table changes. Balance is what a thing takes to make or get plus its stats, never gold.
 
 | Kind | What it means | Items | Only this |
 | --- | --- | --- | --- |
-| crafted | made at a bench by a profession, by anybody where no profession owns the recipe, or made by the server in place of a recipe's output (fine and burnt dishes, hair dye) | 719 | 662 |
-| race | a recipe only the named race may make | 38 | 25 |
+| crafted | made at a bench by a profession, by anybody where no profession owns the recipe, or made by the server in place of a recipe's output (fine and burnt dishes, hair dye) | 816 | 758 |
+| race | a recipe only the named race may make | 42 | 29 |
 | company | a Free Skyrim Trading Company ware (cut-items.json rieklingKept) | 13 | 0 |
-| faction | a recipe only the embassy roll or the remnant roll may make | 24 | 24 |
-| quest | drawn only while a merchant's scarce work is open, a rare seam its quest opens, or a retrieval token | 21 | 11 |
-| gathered | a class's work: picked, grown, fished, hunted, mined or pressed | 138 | 113 |
-| found | created by a dungeon chest or a body | 180 | 112 |
+| faction | a recipe only the embassy roll or the remnant roll may make | 29 | 29 |
+| quest | drawn only while a merchant's scarce work is open, a rare seam its quest opens, or a retrieval token | 21 | 10 |
+| gathered | a class's work: picked, grown, fished, hunted, mined or pressed | 138 | 106 |
+| found | created by a dungeon chest or a body | 177 | 100 |
 | start | handed to a new character: first clothes, a class's tool, a farmer's first seeds | 11 | 0 |
 
 Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearthfire building row, a deed, key or key mold (named claim papers), and gold.
 
 ## Nothing hands these out
 
-17 items a live recipe asks for, or a hair dye or a bottle of water needs, that no recipe, class, quest, dungeon or starting kit hands out. Every recipe that asks for one of them cannot be made.
+18 items a live recipe asks for, or a hair dye or a bottle of water needs, that no recipe, class, quest, dungeon or starting kit hands out. Every recipe that asks for one of them cannot be made.
 
 | Item | Asked for by | Id |
 | --- | --- | --- |
@@ -25,7 +25,7 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 | Drum | Drum | `daba9:Skyrim.esm` |
 | Dwarven Oil | Dwemer Fire Paste | `f11c0:Skyrim.esm` |
 | Eidar Cheese Wheel | Eidar Cheese Fondue | `64b34:Skyrim.esm` |
-| Empty Wine Bottle | a hair dye or a bottle of water | `f2012:Skyrim.esm` |
+| Empty Wine Bottle | a bottle of water | `f2012:Skyrim.esm` |
 | Flute | Flute | `daba7:Skyrim.esm` |
 | Honey | Honey Nut Treat | `10394d:Skyrim.esm` |
 | Linen Wrap | Apotheus Scarf, Bandana, Bandana, Tied, College of Winterhold Cloak, Dark Brotherhood Cloak, Dawngaurd Cloak and 40 more | `34cd6:Skyrim.esm` |
@@ -37,29 +37,29 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 | Unenchanted Conjuration Staff | Staff of Soul Trapping | `7e647:Skyrim.esm` |
 | Unenchanted Destruction Staff | Staff of Firebolts, Staff of Flames, Staff of Frostbite, Staff of Ice Spikes, Staff of Ice Storms, Staff of Icy Spear and 4 more | `be11f:Skyrim.esm` |
 | Unenchanted Restoration Staff | Grand Staff of Turning, Staff of Turning | `51b0c:Skyrim.esm` |
+| Werewolf Pelt | Werewolf's Bane | `fe6a9:Skyrim.esm` |
 | White Wine | Eidar Cheese Fondue, Goat Cheese Fondue, Mammoth Cheese Fondue | `3133c:Skyrim.esm` |
 
 ## Only from a quest
 
-11 items. Drawn only while a merchant's scarce work is open, a rare seam its quest opens, or a retrieval token.
+10 items. Drawn only while a merchant's scarce work is open, a rare seam its quest opens, or a retrieval token.
 
 | Item | Sources | Id |
 | --- | --- | --- |
-| Crimson Nirnroot | quest crimson (game/data/merchant-scarce-harvest.json) | `b701a:Skyrim.esm` |
+| Crimson Nirnroot | quest gatherer crimson novice (game/data/merchant-scarce-harvest.json) | `b701a:Skyrim.esm` |
 | Guild Ledger | quest ledger (game/data/merchant-retrievals.json) | `17001:Thornswood-Content.esp` |
 | Guild Locket | quest locket (game/data/merchant-retrievals.json) | `17003:Thornswood-Content.esp` |
 | Guild Satchel | quest satchel (game/data/merchant-retrievals.json) | `17000:Thornswood-Content.esp` |
 | Guild Seal | quest seal (game/data/merchant-retrievals.json) | `17006:Thornswood-Content.esp` |
 | Guild Signet | quest signet (game/data/merchant-retrievals.json) | `17002:Thornswood-Content.esp` |
 | Heart Stone | quest miner heartstone master (ores.json, the rare seams of game/gamemode.js custom quests) | `17749:Dragonborn.esm` |
-| Petty Soul Gem | quest geode (game/data/merchant-scarce-geodes.json) | `2e4e2:Skyrim.esm` |
 | Sealed Guild Case | quest case (game/data/merchant-retrievals.json) | `17004:Thornswood-Content.esp` |
 | Sealed Guild Dispatch | quest dispatch (game/data/merchant-retrievals.json) | `17005:Thornswood-Content.esp` |
 | Stalhrim | quest miner stalhrim master (ores.json, the rare seams of game/gamemode.js custom quests) | `2b06b:Dragonborn.esm` |
 
 ## Only found
 
-112 items. Created only by a dungeon chest or a body.
+100 items. Created only by a dungeon chest or a body.
 
 | Item | Sources | Id |
 | --- | --- | --- |
@@ -87,18 +87,6 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 | Lesser Soul Gem | found tier 2 (dungeon goods) | `2e4e4:Skyrim.esm` |
 | Lockpick | found tier 1 (dungeon goods) | `a:Skyrim.esm` |
 | Long Bow | found tier 1 (dungeon goods) | `3b562:Skyrim.esm` |
-| Orichalcum Ingot | found tier 4 (dungeon goods) | `43e27:Skyrim.esm` |
-| Petty Soul Gem | found tier 1 (dungeon goods) | `1fe9b:Skyrim.esm` |
-| Potion of Healing | found tier 2 (dungeon goods) | `3eade:Skyrim.esm` |
-| Potion of Magicka | found tier 2 (dungeon goods) | `3eae1:Skyrim.esm` |
-| Potion of Minor Healing | found tier 1 (dungeon goods) | `3eadd:Skyrim.esm` |
-| Potion of Minor Magicka | found tier 1 (dungeon goods) | `3eae0:Skyrim.esm` |
-| Potion of Minor Stamina | found tier 1 (dungeon goods) | `3eae5:Skyrim.esm` |
-| Potion of Plentiful Healing | found tier 3 (dungeon goods) | `3eadf:Skyrim.esm` |
-| Potion of Resist Fire | found tier 2 (dungeon goods) | `39b4a:Skyrim.esm` |
-| Potion of Resist Shock | found tier 2 (dungeon goods) | `39be1:Skyrim.esm` |
-| Potion of Stamina | found tier 2 (dungeon goods) | `39be8:Skyrim.esm` |
-| Potion of Vigorous Healing | found tier 4 (dungeon goods) | `3eae3:Skyrim.esm` |
 | Spell Tome: Bane of the Undead | found (dungeon tomes master) | `dd647:Skyrim.esm` |
 | Spell Tome: Blizzard | found (dungeon tomes master) | `a270d:Skyrim.esm` |
 | Spell Tome: Bound Battleaxe | found (dungeon tomes adept) | `a26ed:Skyrim.esm` |
@@ -178,13 +166,16 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 
 ## Faction work
 
-24 items. Only the embassy roll or the remnant roll may make these.
+29 items. Only the embassy roll or the remnant roll may make these.
 
 | Item | Sources | Id |
 | --- | --- | --- |
 | Hooded Thalmor Robes | faction Tailor/Liverywright remnant novice | `820:MoreCraftableEquipment.esp` |
+| Imperial Armor | faction Smith/Platewright embassy advanced | `14b:cheddars_mashups.esl` |
+| Imperial Battlelord Hood | faction Smith/Platewright embassy advanced | `14d:cheddars_mashups.esl` |
 | Imperial Boots | faction Smith/Platewright embassy advanced | `136d6:Skyrim.esm` |
 | Imperial Bracers | faction Smith/Platewright embassy advanced | `136d4:Skyrim.esm` |
+| Imperial Cleric Armor | faction Smith/Platewright embassy advanced | `6:cheddars_mashups.esl` |
 | Imperial Heavy Shield | faction Smith/Platewright embassy advanced | `135ba:Skyrim.esm` |
 | Imperial Helmet | faction Smith/Platewright embassy advanced | `13edc:Skyrim.esm` |
 | Imperial Knight Cape | faction Tailor/Liverywright embassy expert | `6aa04:Hothtrooper44_ArmorCompilation.esp` |
@@ -193,6 +184,7 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 | Imperial Light Bracers | faction Smith/Platewright embassy advanced | `13eda:Skyrim.esm` |
 | Imperial Light Helmet | faction Smith/Platewright embassy advanced | `13edb:Skyrim.esm` |
 | Imperial Light Shield | faction Smith/Platewright embassy advanced | `13ab2:Skyrim.esm` |
+| Imperial Priest Armor | faction Smith/Platewright embassy advanced | `61:cheddars_mashups.esl` |
 | Imperial Soldier's Armor | faction Smith/Platewright embassy advanced | `136d5:Skyrim.esm` |
 | Justiciar Arrow | faction Woodworker/Woodwright remnant advanced | `4d72:Immersive Weapons.esp` |
 | Justiciar Changdao | faction Smith/Edgewright remnant expert | `1dc3:Immersive Weapons.esp` |
@@ -205,15 +197,19 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 | Thalmor Boots | faction Tailor/Haberdasher remnant novice | `65bac:Skyrim.esm` |
 | Thalmor Gloves | faction Tailor/Haberdasher remnant novice | `65bb3:Skyrim.esm` |
 | Thalmor Hood | faction Tailor/Haberdasher remnant novice | `821:MoreCraftableEquipment.esp` |
+| Thalmor Plate | faction Tailor/Haberdasher remnant master | `ad:cheddars_mashups.esl` |
 | Thalmor Robes | faction Tailor/Liverywright remnant novice | `81f:MoreCraftableEquipment.esp` |
 
 ## Race work
 
-38 items. Only the named race may make these. An item also made by another source shows it.
+42 items. Only the named race may make these. An item also made by another source shows it.
 
 | Item | Sources | Id |
 | --- | --- | --- |
 | Alik'r Hood | race Tailor/Haberdasher redguard novice | `7bc1a:Skyrim.esm` |
+| Alik'r Knight | race Smith/Platewright redguard advanced | `9b:cheddars_mashups.esl` |
+| Alik'r Warrior Garb | race Tailor/Haberdasher redguard novice | `52:cheddars_mashups.esl` |
+| Armored Telvanni Robes | race Smith/Platewright darkelf advanced | `199:cheddars_mashups.esl` |
 | Bosmer Boots | race Smith/Platewright woodelf expert | `238e0:Hothtrooper44_ArmorCompilation.esp` |
 | Bosmer Bracers | race Smith/Platewright woodelf expert | `238eb:Hothtrooper44_ArmorCompilation.esp` |
 | Bosmer Cuirass | race Smith/Platewright woodelf expert | `238e2:Hothtrooper44_ArmorCompilation.esp` |
@@ -225,6 +221,7 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 | Dark Alik'r Hood | race Tailor/Haberdasher redguard novice | `e0dd2:Skyrim.esm` |
 | Dark Hammerfell Garb | race Tailor/Haberdasher redguard novice | `e0dd0:Skyrim.esm` |
 | Dark Redguard Boots | race Tailor/Haberdasher redguard novice | `e0dd4:Skyrim.esm` |
+| Dawnguard Alik'r Armor | race Smith/Platewright redguard advanced | `43:cheddars_mashups.esl` |
 | Dunmer Hooded Outfit | race Tailor/Haberdasher darkelf novice | `82c:MoreCraftableEquipment.esp` |
 | Dunmer Hooded Outfit | race Tailor/Haberdasher darkelf novice | `82d:MoreCraftableEquipment.esp` |
 | Dunmer Hooded Outfit | race Tailor/Haberdasher darkelf novice | `831:MoreCraftableEquipment.esp` |

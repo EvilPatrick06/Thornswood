@@ -100,8 +100,8 @@ WHAT HOLDS A SPOT CLEAR, the same measure as the woodworking benches:
 WHAT IT READS. The collection's plugins in game\\data\\last-plugin.json's load
 order, from --data, and from the repository's Thornswood-Content.esp only the
 four station records: their bounds are the stations' outlines. It does not
-read Thornswood-Last.esp or Thornswood-WoodworkerTrail.esp, and it checks
-that neither places anything. It reads the benches' spots out of
+read Thornswood-Last.esp, and it checks that it places nothing new: only the town gates it unlocks and
+the floor items it switches off, where they stand. It reads the benches' spots out of
 game\\data\\woodworking-benches.json and the boards' out of game\\gamemode.js.
 
 WHAT IT WRITES. game\\data\\station-sites.json: every site's anchor, the spot,
@@ -149,7 +149,7 @@ last = _module('build_last_plugin', os.path.join(ROOT, 'scripts', 'mods', 'Build
 
 CONTENT = 'Thornswood-Content.esp'
 OWN = 'thornswood-content.esp'
-OURS_AFTER = ['Thornswood-Last.esp', 'Thornswood-WoodworkerTrail.esp']
+OURS_AFTER = ['Thornswood-Last.esp']
 MASTERS = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm']
 DELETED, DISABLED = 0x20, 0x800
 
@@ -831,26 +831,40 @@ def main():
               % (len(other), args.data, record.get('revision'), ', '.join(other[:6])))
         return 2
     # Thornswood's two plugins after the content plugin place nothing new, so
-    # they are not read: measured here, not assumed. The one exception is
-    # Thornswood-Last.esp's overrides of the town gates Bethesda ships locked
-    # (#2484): each is a master's own reference, left where it stands without
-    # its lock or script, and last-plugin.json names every one. A gate is not
-    # a station and stands where it always stood, so no spot changes.
+    # they are not read: measured here, not assumed. Thornswood-Last.esp's
+    # placed references are of two kinds, and neither is a station or moves:
+    # the town gates Bethesda ships locked (#2484), each a master's own
+    # reference left where it stands without its lock or script, which
+    # last-plugin.json names; and since #3077 the floor items it switches off,
+    # each a master's or a mod's own reference left where it stands, initially
+    # disabled, as many as last-plugin.json's floorItems.off. A switched-off
+    # item still counts here as something in the way, as it did before, so no
+    # spot changes. Anything else it placed would stop this.
     gates = set(lo_doc.get('gatesUnlocked') or [])
+    floor_off = int((lo_doc.get('floorItems') or {}).get('off') or 0)
     for n in OURS_AFTER:
-        pl = wb.Plugin(os.path.join(ROOT, 'game', 'content', n), n)
+        # Made in the Data folder from its recipe since #2791 (own_plugins.py).
+        pl = wb.Plugin(own_plugins.plugin_path(args.data, n), n)
         placed = []
-        pl.walk(lambda tag, p, size, flags, fid, w, c: placed.append(fid) if tag == b'REFR' else None,
+        pl.walk(lambda tag, p, size, flags, fid, w, c: placed.append((fid, flags)) if tag == b'REFR' else None,
                 tops={b'WRLD', b'CELL'})
-        named = []
-        for fid in placed:
+        named, off = [], 0
+        for fid, flags in placed:
             i = fid >> 24
             desc = '%x:%s' % (fid & 0xFFFFFF, pl.masters[i]) if i < len(pl.masters) else None
-            if not (n == 'Thornswood-Last.esp' and desc in gates):
-                named.append(desc or '%08X (its own)' % fid)
+            if n == 'Thornswood-Last.esp' and desc in gates:
+                continue
+            if n == 'Thornswood-Last.esp' and desc and flags & DISABLED and not flags & DELETED:
+                off += 1
+                continue
+            named.append(desc or '%08X (its own)' % fid)
         if named:
-            print('STOP. %s places %d reference(s) that are not the town gates it unlocks (%s); '
-                  'this table would have to read it.' % (n, len(named), ', '.join(named[:6])))
+            print('STOP. %s places %d reference(s) that are neither the town gates it unlocks nor floor items it '
+                  'switches off (%s); this table would have to read it.' % (n, len(named), ', '.join(named[:6])))
+            return 1
+        if n == 'Thornswood-Last.esp' and off != floor_off:
+            print('STOP. %s switches off %d floor item(s) and last-plugin.json says %d; rebuild it first.'
+                  % (n, off, floor_off))
             return 1
     print('The load order: %d plugins, game\\data\\last-plugin.json\'s; %s read from game\\content for its '
           'station records only' % (len(plugins), CONTENT))

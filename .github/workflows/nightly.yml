@@ -45,11 +45,12 @@ jobs:
     name: Nightly checks
     # Main only (#3550): runner 3 signs release launchers and takes any job
     # that asks for thornswood-vps alone, so this job and "board" never run a
-    # branch's code. A dispatch on a branch runs the harness shares alone, on
-    # the build runners, and tells the board nothing: a branch's night is not
-    # main's, and the first night that passes closes the board's issue.
+    # branch's code. A dispatch on a branch runs the harness shares and the
+    # bot harnesses alone, on the build runners and GitHub's, and tells the board
+    # nothing: a branch's night is not main's, and the first night that passes
+    # closes the board's issue.
     if: github.ref == 'refs/heads/main'
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -217,64 +218,6 @@ jobs:
           if ($bad) { exit 1 }
           Write-Host 'every bot file parses'
 
-      - name: Run the bot harnesses
-        if: ${{ !cancelled() }}
-        shell: pwsh
-        run: |
-          # The two Python ones import bot.py for real, so they need the
-          # library the bot runs on. They were written to be run by hand and,
-          # like every harness above before this file existed, had never run
-          # anywhere: nothing was checking the bot's startup on a pull request.
-          #
-          # An install that fails must fail the step (#1344). A soft pass here
-          # made a green nightly that never ran the bot harnesses. A harness
-          # that fails is red, and so is a missing venv or a pip that could
-          # not install what the bot runs on.
-          #
-          # From requirements.txt, the file Install-Bot.ps1 installs on the
-          # VPS, so the versions tested here are the versions the bot runs.
-          #
-          # Into a venv of this run's own, never the machine's Python: the
-          # runner is on the VPS, and the live bot runs on that Python.
-          $venv = Join-Path $env:RUNNER_TEMP 'bot-venv'
-          python -m venv $venv
-          $py = Join-Path $venv 'Scripts\python.exe'
-          if (-not (Test-Path $py)) {
-            Write-Host '::error::could not make a venv for the bot harnesses, so they did not run'
-            exit 1
-          }
-          & $py -m pip install --quiet --disable-pip-version-check --require-hashes --only-binary :all: -r bot\requirements.txt
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host '::error::could not install discord.py from the hash-pinned bot\requirements.txt (a hash that does not match stops it, #2190), so the bot harnesses did not run'
-            exit 1
-          }
-          #
-          # Each on a clock, as in the step above: 300 seconds, then it and
-          # everything it started are killed and it is named, and the rest
-          # still run. Their output comes straight through as it is written.
-          #
-          # In UTF-8, as the bot itself runs (BotService.cs, Install-Bot.ps1)
-          # and as tests\bot-python.js runs it: the output goes to a pipe
-          # here, and Windows Python writes a pipe in the ANSI code page, so a
-          # harness that printed a channel name with an emoji in it died on
-          # the print (test-post-rules, test-wipe-channels, 23 Oct).
-          $env:PYTHONIOENCODING = 'utf-8'
-          $env:DISCORD_TOKEN = 'not-a-real-token'
-          $PER_HARNESS = 300
-          $bad = 0
-          foreach ($t in (Get-ChildItem bot -Filter 'test-*.py' -File | Sort-Object Name)) {
-            Write-Host ("--- {0}" -f $t.Name)
-            $p = Start-Process -FilePath $py -ArgumentList ('"' + $t.FullName + '"') -NoNewWindow -PassThru
-            $null = $p.Handle
-            if (-not $p.WaitForExit($PER_HARNESS * 1000)) {
-              & taskkill.exe /T /F /PID $p.Id 2>&1 | Out-Null
-              $bad++; Write-Host ("::error file={0}::harness timed out after {1}s and was killed" -f $t.FullName, $PER_HARNESS)
-            }
-            elseif ($p.ExitCode -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed (exit {1})" -f $t.FullName, $p.ExitCode) }
-          }
-          if ($bad) { exit 1 }
-          Write-Host 'every bot harness passed'
-
       - name: Count the silent catches in the launcher, the scripts, the site, voice and the bot
         if: ${{ !cancelled() }}
         shell: pwsh
@@ -385,7 +328,7 @@ jobs:
     # Each share is a build check's worth of harnesses, so it takes one of
     # the box's build slots (thornswood-build, records/build-runners.json,
     # #2994); the short jobs around it run on any VPS runner.
-    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps", "thornswood-build"]') || 'windows-latest' }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -442,6 +385,76 @@ jobs:
           # before the job could be cancelled.
           .\scripts\dev\Nightly-Harnesses.ps1 -Shard ${{ matrix.shard }} -Of 2 -BudgetSeconds 2400
 
+  bot:
+    # The bot harnesses install discord.py from pypi. While the repository
+    # was private they ran on a box runner that reached the package feeds
+    # (#4914): the signing runner, runner 3, reached GitHub and the signing
+    # service only, and on 30 Oct pip got WinError 10013 there for every
+    # connection (run 41030383899). Since the flip (#4013) no box runner is
+    # registered here, the box signs nothing, and GitHub's runner reaches
+    # pypi, so they run there and records/check-runners.json is gone (#4033).
+    name: Bot harnesses
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Run the bot harnesses
+        shell: pwsh
+        run: |
+          # The two Python ones import bot.py for real, so they need the
+          # library the bot runs on. They were written to be run by hand and,
+          # like every harness above before this file existed, had never run
+          # anywhere: nothing was checking the bot's startup on a pull request.
+          #
+          # An install that fails must fail the step (#1344). A soft pass here
+          # made a green nightly that never ran the bot harnesses. A harness
+          # that fails is red, and so is a missing venv or a pip that could
+          # not install what the bot runs on.
+          #
+          # From requirements.txt, the file Install-Bot.ps1 installs on the
+          # VPS, so the versions tested here are the versions the bot runs.
+          #
+          # Into a venv of this run's own, never the machine's Python.
+          $venv = Join-Path $env:RUNNER_TEMP 'bot-venv'
+          python -m venv $venv
+          $py = Join-Path $venv 'Scripts\python.exe'
+          if (-not (Test-Path $py)) {
+            Write-Host '::error::could not make a venv for the bot harnesses, so they did not run'
+            exit 1
+          }
+          & $py -m pip install --quiet --disable-pip-version-check --require-hashes --only-binary :all: -r bot\requirements.txt
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error::could not install discord.py from the hash-pinned bot\requirements.txt (a hash that does not match stops it, #2190), so the bot harnesses did not run'
+            exit 1
+          }
+          #
+          # Each on a clock, as in the step above: 300 seconds, then it and
+          # everything it started are killed and it is named, and the rest
+          # still run. Their output comes straight through as it is written.
+          #
+          # In UTF-8, as the bot itself runs (BotService.cs, Install-Bot.ps1)
+          # and as tests\bot-python.js runs it: the output goes to a pipe
+          # here, and Windows Python writes a pipe in the ANSI code page, so a
+          # harness that printed a channel name with an emoji in it died on
+          # the print (test-post-rules, test-wipe-channels, 23 Oct).
+          $env:PYTHONIOENCODING = 'utf-8'
+          $env:DISCORD_TOKEN = 'not-a-real-token'
+          $PER_HARNESS = 300
+          $bad = 0
+          foreach ($t in (Get-ChildItem bot -Filter 'test-*.py' -File | Sort-Object Name)) {
+            Write-Host ("--- {0}" -f $t.Name)
+            $p = Start-Process -FilePath $py -ArgumentList ('"' + $t.FullName + '"') -NoNewWindow -PassThru
+            $null = $p.Handle
+            if (-not $p.WaitForExit($PER_HARNESS * 1000)) {
+              & taskkill.exe /T /F /PID $p.Id 2>&1 | Out-Null
+              $bad++; Write-Host ("::error file={0}::harness timed out after {1}s and was killed" -f $t.FullName, $PER_HARNESS)
+            }
+            elseif ($p.ExitCode -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed (exit {1})" -f $t.FullName, $p.ExitCode) }
+          }
+          if ($bad) { exit 1 }
+          Write-Host 'every bot harness passed'
+
   board:
     # Told last, once every job above has ended, passed or failed (#2357).
     # !cancelled() rather than always(): a run somebody cancels is not a
@@ -453,10 +466,10 @@ jobs:
     # harness share stops starting harnesses inside its own budget and
     # prints the list itself.
     name: Put the night on the board
-    needs: [nightly, harnesses]
+    needs: [nightly, harnesses, bot]
     # Main only, as "nightly" above says (#3550).
     if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -476,7 +489,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Put a failure on the board
-        if: ${{ needs.nightly.result != 'success' || needs.harnesses.result != 'success' }}
+        if: ${{ needs.nightly.result != 'success' || needs.harnesses.result != 'success' || needs.bot.result != 'success' }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -486,11 +499,11 @@ jobs:
           # One "Nightly checks failed" issue, never two: added to when one is
           # open (every page read, the oldest kept, any duplicate closed
           # pointing to it), opened when none is. Issues #905 and #1120.
-          Write-Host ('checks: ${{ needs.nightly.result }}, harnesses: ${{ needs.harnesses.result }}')
+          Write-Host ('checks: ${{ needs.nightly.result }}, harnesses: ${{ needs.harnesses.result }}, bot: ${{ needs.bot.result }}')
           .\scripts\dev\Nightly-Issue.ps1 -Result failure
 
       - name: Close the failure when every check passed
-        if: ${{ needs.nightly.result == 'success' && needs.harnesses.result == 'success' }}
+        if: ${{ needs.nightly.result == 'success' && needs.harnesses.result == 'success' && needs.bot.result == 'success' }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

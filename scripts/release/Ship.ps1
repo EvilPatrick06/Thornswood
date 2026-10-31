@@ -236,15 +236,6 @@
   for a security fix or for something that leaves the game untestable, and he
   says which.
 
-.PARAMETER AllowUncoveredBodies
-  Lets a main release go out while a body in the game folder is nude (issue
-  #405). A main release reads the collection revision this machine has
-  installed and tells every launcher to match it, so it refuses while
-  scripts\mods\Check-CoveredBodies.ps1 finds a nude body here; a dev release
-  only warns. Give it for a security fix that cannot wait for the covered
-  bodies' collection revision, and only on Patrick's word. A body mesh the
-  check cannot read refuses on both channels, with or without it (#1956).
-
 .PARAMETER AllowStaleCheckout
     Go ahead from a checkout that is not exactly origin/main and clean, with a loud warning (#2118). Without it the script refuses a stale or dirty checkout before it sends anything.
 
@@ -332,14 +323,13 @@ param(
     # from changed since the one on the feed (issue #921).
     ,[switch]$RebuildLauncher
     # A main release with a nude body in the game folder (issue #405).
-    ,[switch]$AllowUncoveredBodies
     # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
     ,[switch]$AllowStaleCheckout
     # Build the release with no game folder of the collection's (#2754,
     # Patrick's A, 20 Oct): New-FeedRoot.ps1 stages the files the last release
     # carried, by their sha256 on the site, and this checkout builds over them.
-    # The collection's checks (the Vortex profile, the generated files, the
-    # covered bodies) belong to a Ship from One, run when the collection
+    # The collection's checks (the Vortex profile, whether the animation and
+    # body files can be built from it) belong to a Ship from One, run when the collection
     # changes; the plugin list is the last release's, held to the server's
     # order on the box. Runs off Windows. Keeps the feed's launcher.
     ,[switch]$FromFeed
@@ -389,7 +379,11 @@ function Get-SourceRepo([string]$repoDir) {
     } else {
         Write-Host '  git is not on the path, so the launcher''s draft is looked for on EvilPatrick06/Thornswood' -ForegroundColor Yellow
     }
-    if ($remote -and $remote -match 'github\.com[:/](.+?)(?:\.git)?\s*$') { return $Matches[1] }
+    # A URL's port is not part of owner/name: the deploy gate's checkout reads
+    # ssh://git@ssh.github.com:443/<owner>/<name>.git (Install-Gate.ps1), and
+    # on 31 Oct its main Ship asked gh for 443/EvilPatrick06/Thornswood, a
+    # repository on a host named 443 ("error connecting to 443").
+    if ($remote -and $remote -match 'github\.com(?::\d+(?=/))?[:/](.+?)(?:\.git)?\s*$') { return $Matches[1] }
     return 'EvilPatrick06/Thornswood'
 }
 
@@ -498,6 +492,77 @@ function Save-ReleaseAssets([string]$repo, $release, [string[]]$names, [string]$
     return ''
 }
 
+# FROM THE RUN THAT BUILT THEM, THEN THE DRAFT (#2841). GitHub lists a draft
+# release only to an account that can push. A Ship on One reads with Patrick's
+# own gh and sees the drafts; a Ship from the deploy gate reads with the box
+# admin App's token, Actions write and Contents read (ship-access.js, his pick
+# of 30 Oct), and the releases list it gets has no drafts in it. On 31 Oct the
+# gate's Ship-Main had release.yml build, sign and check v1.2.12 (run
+# 41196215137, all three files on the draft) and then stopped on "There is no
+# verified launcher for v1.2.12". release.yml keeps the same three files as its
+# run's artifact "release-files", which Actions read reaches, so they are taken
+# from the newest green run of main's release.yml titled for the tag, and from
+# the draft only when no such run still holds them all (a run before this, or
+# one past its 30 days). The checks that follow are the same either way.
+#
+# Downloads $names for $tag into $into. Returns @{ LookWhy; None; Why }:
+# LookWhy when GitHub could not be asked at all, None when neither a run nor a
+# draft holds them, Why when they were there and did not come down whole.
+function Save-ReleaseFiles([string]$repo, [string]$tag, [string[]]$names, [string]$into) {
+    New-Item -ItemType Directory -Force -Path $into | Out-Null
+    function Read-GhJson([string]$path) {
+        $ms = New-Object IO.MemoryStream
+        try {
+            $why = Invoke-GhToStream @('api', '-H', 'Accept: application/vnd.github+json', $path) $ms
+            $text = [Text.Encoding]::UTF8.GetString($ms.ToArray())
+        } finally { $ms.Dispose() }
+        if ($why) { return @{ Doc = $null; Why = $why } }
+        try { return @{ Doc = ($text | ConvertFrom-Json); Why = '' } }
+        catch { return @{ Doc = $null; Why = ('the answer did not read as JSON: ' + $_.Exception.Message) } }
+    }
+    $runs = Read-GhJson "repos/$repo/actions/workflows/release.yml/runs?branch=main&event=workflow_dispatch&status=success&per_page=50"
+    if ($runs.Why) { return @{ LookWhy = "gh could not list the release.yml runs of $repo ($($runs.Why))"; None = $false; Why = '' } }
+    $run = $null
+    foreach ($r in @($runs.Doc.workflow_runs | ForEach-Object { $_ })) {
+        if ($r -and [string]$r.display_title -ceq ('Release launcher ' + $tag) -and [string]$r.head_branch -ceq 'main' -and
+            ($null -eq $run -or [long]$r.id -gt [long]$run.id)) { $run = $r }
+    }
+    if ($null -ne $run) {
+        $arts = Read-GhJson "repos/$repo/actions/runs/$($run.id)/artifacts"
+        if ($arts.Why) { return @{ LookWhy = "gh could not list the files of release.yml run $($run.id) ($($arts.Why))"; None = $false; Why = '' } }
+        $art = $null
+        foreach ($a in @($arts.Doc.artifacts | ForEach-Object { $_ })) {
+            if ($a -and [string]$a.name -ceq 'release-files' -and -not $a.expired -and ($null -eq $art -or [long]$a.id -gt [long]$art.id)) { $art = $a }
+        }
+        if ($null -ne $art) {
+            $zip = Join-Path $into 'release-files.zip'
+            $dir = Join-Path $into 'release-files'
+            foreach ($p in $zip, $dir) { if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Recurse -Force } }
+            $fs = [IO.File]::Create($zip)
+            try { $why = Invoke-GhToStream @('api', "repos/$repo/actions/artifacts/$($art.id)/zip") $fs }
+            finally { $fs.Dispose() }
+            try {
+                if ($why) { return @{ LookWhy = ''; None = $false; Why = "could not download the files of release.yml run $($run.id) ($why)" } }
+                try { $null = Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force -ErrorAction Stop }
+                catch { return @{ LookWhy = ''; None = $false; Why = "the files of release.yml run $($run.id) did not open as a zip ($($_.Exception.Message))" } }
+                if (@($names | Where-Object { -not (Test-Path -LiteralPath (Join-Path $dir $_) -PathType Leaf) }).Count -eq 0) {
+                    foreach ($n in $names) { Copy-Item -LiteralPath (Join-Path $dir $n) -Destination (Join-Path $into $n) -Force }
+                    Write-Host ("  from release.yml run {0}, {1}" -f $run.id, [string]$run.html_url) -ForegroundColor DarkGray
+                    return @{ LookWhy = ''; None = $false; Why = '' }
+                }
+            } finally {
+                foreach ($p in $zip, $dir) { if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Recurse -Force -ErrorAction SilentlyContinue } }
+            }
+        }
+    }
+    $look = Find-ReleaseByTag $repo $tag
+    if ($look.Why) { return @{ LookWhy = $look.Why; None = $false; Why = '' } }
+    if (-not $look.Release) { return @{ LookWhy = ''; None = $true; Why = '' } }
+    $got = Save-ReleaseAssets $repo $look.Release $names $into
+    if ($got -match '^the release has no ') { return @{ LookWhy = ''; None = $true; Why = '' } }
+    return @{ LookWhy = ''; None = $false; Why = $got }
+}
+
 # Downloads Thornswood.exe and SHA256SUMS for tag v<version> into $into and
 # checks the exe against its line in SHA256SUMS. Returns '' when the verified
 # exe is sitting in $into, or a sentence saying why not, for the caller to Die
@@ -517,15 +582,13 @@ function Get-ReleaseLauncher([string]$repo, [string]$version, [string]$into) {
                "draft release, then run this same Ship again:`r`n" +
                "    git tag $tag`r`n" +
                "    git push origin $tag")
-    $look = Find-ReleaseByTag $repo $tag
-    if ($look.Why) {
-        return ("The launcher CI built for $tag could not be looked for: $($look.Why). This is GitHub or gh, not the release; " +
+    $look = Save-ReleaseFiles $repo $tag @('Thornswood.exe', 'SHA256SUMS') $into
+    if ($look.LookWhy) {
+        return ("The launcher CI built for $tag could not be looked for: $($look.LookWhy). This is GitHub or gh, not the release; " +
                 "check gh auth status and run this same Ship again. Nothing was published.")
     }
-    if (-not $look.Release) { return $notYet }
-    $got = Save-ReleaseAssets $repo $look.Release @('Thornswood.exe', 'SHA256SUMS') $into
-    if ($got -match '^the release has no ') { return $notYet }
-    if ($got) { return ("The launcher CI built for $tag is on $repo, but $got. Run this same Ship again. Nothing was published.") }
+    if ($look.None) { return $notYet }
+    if ($look.Why) { return ("The launcher CI built for $tag is on $repo, but $($look.Why). Run this same Ship again. Nothing was published.") }
     $exe = Join-Path $into 'Thornswood.exe'
     $sums = Join-Path $into 'SHA256SUMS'
     # SHA256SUMS is "<hash>  Thornswood.exe", the sha256sum shape, so the line
@@ -569,15 +632,13 @@ function Get-ReleaseStub([string]$repo, [string]$version, [string]$into) {
     }
     $none = ("The release for $tag on $repo has no setup program (setup-stub.exe), so -Package would build an installer " +
              "with nothing to run it. Nothing was published. " + $again)
-    $look = Find-ReleaseByTag $repo $tag
-    if ($look.Why) {
-        return ("The setup program CI built for $tag could not be looked for: $($look.Why). This is GitHub or gh, not the release; " +
+    $look = Save-ReleaseFiles $repo $tag @('setup-stub.exe', 'SHA256SUMS') $into
+    if ($look.LookWhy) {
+        return ("The setup program CI built for $tag could not be looked for: $($look.LookWhy). This is GitHub or gh, not the release; " +
                 "check gh auth status and run this same Ship again. Nothing was published.")
     }
-    if (-not $look.Release) { return $none }
-    $got = Save-ReleaseAssets $repo $look.Release @('setup-stub.exe', 'SHA256SUMS') $into
-    if ($got -match '^the release has no ') { return $none }
-    if ($got) { return ("The setup program CI built for $tag is on $repo, but $got. Run this same Ship again. Nothing was published.") }
+    if ($look.None) { return $none }
+    if ($look.Why) { return ("The setup program CI built for $tag is on $repo, but $($look.Why). Run this same Ship again. Nothing was published.") }
     $stub = Join-Path $into 'setup-stub.exe'
     $sums = Join-Path $into 'SHA256SUMS'
     $want = ''
@@ -602,8 +663,8 @@ function Get-ReleaseStub([string]$repo, [string]$version, [string]$into) {
 # its own notes announced. And records\client-build.json is compiled into the
 # exe, so the stale launcher called the new client runtime in that same pack
 # "not the recorded build" and put the old skymp5-client.js back.
-# Returns the changed paths under launcher\ and records\client-build.json
-# between the tag and HEAD, or nothing when the tag is not here to compare
+# Returns the changed paths under launcher\ and the records compiled in
+# (client-build.json, ui-gone.json and, since #3715, generated.json) between the tag and HEAD, or nothing when the tag is not here to compare
 # with (Get-ReleaseLauncher stops that Ship anyway). Markdown is not built.
 function Get-LauncherDrift([string]$repoDir, [string]$tag) {
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
@@ -614,7 +675,7 @@ function Get-LauncherDrift([string]$repoDir, [string]$tag) {
             & git -C $repoDir rev-parse --verify --quiet "refs/tags/$tag" *> $null
             if ($LASTEXITCODE -ne 0) { return @() }
         }
-        $paths = @(& git -C $repoDir diff --name-only "refs/tags/$tag" HEAD -- launcher records/client-build.json records/ui-gone.json ':(exclude,glob)**/*.md' 2>$null |
+        $paths = @(& git -C $repoDir diff --name-only "refs/tags/$tag" HEAD -- launcher records/client-build.json records/ui-gone.json records/generated.json ':(exclude,glob)**/*.md' 2>$null |
                    Where-Object { $_ })
         if ($LASTEXITCODE -ne 0) { return @() }
         return $paths
@@ -680,7 +741,8 @@ function Set-ReleaseLauncherSignature([string]$exe, [string]$signer, [string]$ex
 # WHAT THE LAUNCHER IS COMPILED FROM, as one sha256, issue #921. Every file
 # under launcher\ but the Markdown (the code, ui.xaml, the art, the video, the
 # WebView2 loader, the manifest), records\client-build.json and
-# records\ui-gone.json, which are compiled in, and Build-Launcher.ps1, which
+# records\ui-gone.json and records\generated.json (#3715), which are compiled
+# in, and Build-Launcher.ps1, which
 # writes the version resource and picks what goes in. Read off the working tree, not git, so a dev Ship of uncommitted
 # work counts it. Paths with / and sorted ordinally, so the same tree gives the
 # same answer on any machine; a line ending changed by git's autocrlf gives a
@@ -697,7 +759,7 @@ function Get-LauncherInputHash([string]$repoDir) {
             $lines.Add($rel + "`t" + (Get-ThornswoodShippedSha256 $f.FullName))
         }
     }
-    foreach ($rel in 'records/client-build.json', 'records/ui-gone.json', 'scripts/release/Build-Launcher.ps1') {
+    foreach ($rel in 'records/client-build.json', 'records/ui-gone.json', 'records/generated.json', 'scripts/release/Build-Launcher.ps1') {
         $p = Join-Path $repoDir $rel
         $h = 'missing'
         if (Test-Path -LiteralPath $p) { $h = Get-ThornswoodShippedSha256 $p }
@@ -772,7 +834,18 @@ function Test-LauncherUnchanged($published, [string]$inputs) {
 #   - main's feed cannot be read at all: it cannot tell, so it refuses, before
 #     anything is built.
 # $mainPub and $devPub are what Get-PublishedLauncher returns. Returns
-# MainEquivalent, Why (one line for the screen) and Refuse ('' or the reason).
+# MainEquivalent, MainsOwn, Why (one line for the screen) and Refuse ('' or
+# the reason).
+#
+# MainEquivalent says dev carries main's number. MainsOwn says more: main's
+# feed already offers this very launcher, so dev can take that exe as it is.
+# Only the case "main published $current from these same sources" is both.
+# "Main has not published $current yet" is MainEquivalent alone: the number is
+# main's, the launcher is not built yet. On 31 Oct the gate's Ship-Dev from
+# 556471fc read MainEquivalent as "take main's feed launcher", and dev release
+# 20261031-051138-dev went out naming launcher 1.2.12 (minLauncher 1.2.12)
+# with main's 1.2.11 exe (bb01775f) under it, so every dev launcher was told
+# it was too old and was offered itself.
 function Get-DevLauncherLine([bool]$aligned, [string]$current, [string]$inputs, $mainPub, $devPub) {
     function Cmp([string]$a, [string]$b) {
         $x = @(); $y = @()
@@ -788,7 +861,7 @@ function Get-DevLauncherLine([bool]$aligned, [string]$current, [string]$inputs, 
     function SameSources($pub) {
         return ($null -ne $pub -and $pub.Inputs -and $inputs -and ([string]$pub.Inputs -eq $inputs))
     }
-    $out = [pscustomobject]@{ MainEquivalent = $false; Why = ''; Refuse = '' }
+    $out = [pscustomobject]@{ MainEquivalent = $false; MainsOwn = $false; Why = ''; Refuse = '' }
     if (-not $aligned) {
         $out.Why = 'not a clean checkout of origin/main, so the launcher takes a dev number'
         return $out
@@ -809,6 +882,7 @@ function Get-DevLauncherLine([bool]$aligned, [string]$current, [string]$inputs, 
     if ($c -eq 0) {
         if (SameSources $mainPub) {
             $out.MainEquivalent = $true
+            $out.MainsOwn = $true
             $out.Why = "this is the launcher main published as $current, so dev carries $current too"
         } else {
             $out.Why = ("main published $current from other launcher sources than these, so this launcher takes a dev number " +
@@ -1052,13 +1126,10 @@ if (-not $PSBoundParameters.ContainsKey('Root') -and -not $FromFeed) {
     try { $Root = [string](& (Join-Path $Here 'Where.ps1') $(if ($Dev) { 'ShipRootDev' } else { 'ShipRoot' })) }
     catch { Die ($_.Exception.Message + ' Nothing was built.') }
 }
-# What a Ship from the feed cannot do, said before anything is built: the
-# installer holds the whole game, on One (#2754). A new launcher it can carry
-# since #3312, built and signed on GitHub, so -RebuildLauncher and -Version
-# mean what they mean anywhere else.
-if ($FromFeed) {
-    if ($Package) { Die '-Package builds the installer from the whole game folder, which a Ship from the feed does not have. Ship -Package from One. Nothing was built.' }
-}
+# A Ship from the feed carries a new launcher since #3312, built and signed on
+# GitHub, so -RebuildLauncher and -Version mean what they mean anywhere else,
+# and its installer since #3412, built from the feed and signed on GitHub
+# (installer.yml, Publish-InstallerFromGitHub.ps1), so -Package does too.
 
 # ------------------------------------------------------------ dev channel
 # The dev build has its own feed and baseline on the VPS (feed-dev), and its
@@ -1096,9 +1167,9 @@ if ($Dev) {
 
 # A folder Vortex deploys into is the collection's source, not a release
 # folder (#1692, docs\COLLECTION-REVISION-2.md step 8): Vortex writes its own
-# record, Data\vortex.deployment.json, into it, Build-Generated never builds
-# there, so a Ship from it could only stop at the generated files, and on
-# 4 October one did, after it had built and installed the launcher there.
+# record, Data\vortex.deployment.json, into it, and Build-Generated never
+# builds there, so on 4 October a Ship from one stopped at the generated
+# files, after it had built and installed the launcher there.
 # Refused here, before anything is built, whichever way the folder was named.
 if (Test-Path -LiteralPath (Join-Path $Root 'Game\Data\vortex.deployment.json')) {
     Die ("$Root is a folder Vortex deploys into (Game\Data\vortex.deployment.json is there), so a release is never built from it. Nothing was built. " +
@@ -1177,7 +1248,7 @@ if ($repeats.Count) {
 Write-Host "  $Notes" -ForegroundColor DarkGray
 
 # The words in the files people read, not only the notes. Note-Rules above
-# reads the release notes. Check-Words reads the launcher help and window,
+# reads the release notes. Check-Words reads the launcher window,
 # and every other page a Ship sends out (issue #1081). A dev Ship may be run
 # from any branch, including one whose pull request build never ran or went
 # red, so this runs here, before anything is built, and on a dry run too.
@@ -1328,6 +1399,33 @@ if ($FromFeed) {
     }
 }
 
+# ------------------------------------------------------------ collection revision
+# The feed names records\collection-plugins.json's revision (#3597), and the
+# launcher holds Play for any install that is not on it. So what this release
+# is built from has to be on it too: this machine's Vortex, which the plugin
+# list, its order and the bodies are read from, or from the feed the last
+# release, whose plugin list goes forward. Publish-Update asks again before it
+# writes the number; asking here stops the Ship before the version moves.
+Head 'Collection revision'
+if ($FromFeed) {
+    $revFeed = $null
+    try { $revFeed = Read-SiteFeed $Channel } catch { Die ('The ' + $Channel + ' feed could not be read, so which collection revision its last release carries is not known. Nothing was built or published: ' + $_.Exception.Message) }
+    $revBuilt = 0
+    if ($null -ne $revFeed -and $revFeed.PSObject.Properties['collectionRevision']) { [void][int]::TryParse([string]$revFeed.collectionRevision, [ref]$revBuilt) }
+    $revWhy = Get-ShipCollectionRevisionProblem -RepoDir $RepoDir -Built $revBuilt -Source "the $Channel feed's last release" -Remedy 'A release from the feed carries that release''s plugin list, so it cannot move the revision: Ship from One, with Vortex on the recorded revision. Nothing was built or published.'
+} else {
+    try { $revRead = & { . (Join-Path $Here '..\mods\LoadOrder.ps1'); [pscustomobject]@{ Built = (Get-ShipCollectionRevision $Root); Slug = (Get-CollectionSlug (Get-ShipCollectionUrl $Root)) } } }
+    catch { Die ($_.Exception.Message + ' Nothing was built or published.') }
+    $revBuilt = [int]$revRead.Built
+    $revWhy = Get-ShipCollectionRevisionProblem -RepoDir $RepoDir -Built $revBuilt -Slug $revRead.Slug -Source "this machine's Vortex" -Remedy 'Update the collection in Vortex''s Thornswood profile to the recorded revision, let it deploy, close Vortex, then Ship again. Nothing was built or published.'
+}
+if ($revWhy) { Die $revWhy }
+# And the record has to be the newest revision published on Nexus, so no
+# release is built on an old one (#4068).
+$newestWhy = Get-ShipNewestRevisionProblem -RepoDir $RepoDir
+if ($newestWhy) { Die $newestWhy }
+Say ("  collection revision {0}, the one records\collection-plugins.json names and the newest on Nexus" -f $revBuilt) 'Green'
+
 # ------------------------------------------------------------ version
 $updaterCs = Join-Path $Here '..\..\launcher\app\Updater.cs'
 if (-not (Test-Path $updaterCs)) { Die "Could not find $updaterCs" }
@@ -1371,6 +1469,7 @@ $LauncherInputs = Get-LauncherInputHash $RepoDir
 # launcher can be kept. Worked out from main's feed and the fingerprint, before
 # anything is built, and a case it cannot tell stops here (Get-DevLauncherLine).
 $MainEquivalent = $false
+$MainsOwnLauncher = $false
 $MainLauncher = $null
 $devLine = $null
 if ($Dev -and -not $ModsOnly) {
@@ -1378,6 +1477,7 @@ if ($Dev -and -not $ModsOnly) {
     $devLine = Get-DevLauncherLine $MainSourceAligned $current $LauncherInputs $MainLauncher (Get-PublishedLauncher $ReleaseDir 'dev')
     if ($devLine.Refuse) { Die $devLine.Refuse }
     $MainEquivalent = [bool]$devLine.MainEquivalent
+    $MainsOwnLauncher = [bool]$devLine.MainsOwn
 }
 
 # What the channel's feed offers as its launcher, read here when a Ship asks
@@ -1561,8 +1661,11 @@ elseif ($Dev) {
     # A release from the feed asks release-tag.yml for the tag v<number>, and
     # a tag is never moved (#3312). One that stopped after asking left its
     # number tagged on its own commit, so a later one climbs past it rather
-    # than be refused.
-    if ($FromFeed -and -not $ModsOnly -and -not $MainEquivalent) {
+    # than be refused. Only main's own launcher, taken from main's feed, asks
+    # for no tag; main's number on a launcher not built yet does (MainsOwn,
+    # Get-DevLauncherLine), and a three part number tagged on another commit
+    # stops here rather than at release-tag.yml.
+    if ($FromFeed -and -not $ModsOnly -and -not $MainsOwnLauncher) {
         for ($k = 0; ; $k++) {
             $on = ''
             try { $on = Get-RemoteTagCommit $RepoDir ('v' + $target) }
@@ -1679,42 +1782,44 @@ if ($Package -and -not $Dev -and -not $DryRun) {
     }
     $ciStub = Join-Path $stubDir 'setup-stub.exe'
     Say ("  verified against SHA256SUMS, {0:n0} KB" -f ((Get-Item -LiteralPath $ciStub).Length / 1KB)) 'Green'
+    # From the feed the installer is built on GitHub after the release, by
+    # installer.yml started on main (#3412; on main since 31 Oct, the header
+    # of installer.yml), which main always has.
+    if ($FromFeed) { Say '  the installer is built and signed on GitHub after the release (installer.yml on main)' 'Green' }
 }
 
-# ------------------------------------------------------------ generated files
-# Issue #1247, Patrick 29 Sep: the behavior files (Pandora) and BodySlide's bodies
-# are made in Thornswood's own folder on this machine, by
-# scripts\mods\Build-Generated.ps1, as a step before a Ship; the Steam copy is
-# the person's own. A release carries what is in the folder, so a folder whose
-# files were built for another mod list, from other files, or never, would
-# send everybody animations and bodies that do not match the collection.
-# Get-GeneratedState reads the record Build-Generated wrote against this
-# machine now (scripts\mods\Generated.ps1). Both channels stop: the files ship
-# on both. Before the launcher is built and installed (#1692): on 4 October a
-# dev Ship built and installed it, closing the running launcher, and only
-# then stopped here. And before the covered bodies, which read what it built.
+# ------------------------------------------------------------ animation and body files
+# The behavior files (Pandora) and the covered bodies (BodySlide) are built on
+# each computer by the launcher, before Play, from the collection installed
+# there, and no release carries them (#3715, Ship-Rules Test-ShipGenerated).
+# A release tells every launcher which collection revision to match, by the
+# one installed here, so this asks whether that collection can build them:
+# Pandora and every patch records\generated.json names are deployed, and every
+# slider set is there and keeps to the body rules (#1004, #405). A dry run of
+# the build, which writes nothing and starts no tool. Both channels stop:
+# every launcher would refuse Play on a collection that cannot build them.
+# Before the launcher is built and installed (#1692): on 4 October a dev Ship
+# built and installed it, closing the running launcher, and only then
+# stopped at the generated files.
 $GameDir = Join-Path $Root 'Game'
 if (-not $FromFeed -and -not (Test-Path -LiteralPath (Join-Path $GameDir 'SkyrimSE.exe'))) { $GameDir = '' }
-Head 'Generated files'
+Head 'Animation and body files'
 if ($FromFeed) {
-    # The last release's, each held to its sha256 by New-FeedRoot; a Ship from
-    # One builds and checks them when the collection changes (#2754).
-    Say '  the last release''s, by their sha256; a Ship from One makes them when the collection changes' 'DarkGray'
+    # The collection is the last release's, unchanged; a Ship from One asks
+    # this when the collection changes (#2754).
+    Say '  the collection is the last release''s; a Ship from One asks whether it builds them when the collection changes' 'DarkGray'
 } elseif ($GameDir) {
-    . (Join-Path $Here '..\mods\Generated.ps1')
-    $genState = $null
-    try { $genState = Get-GeneratedState $Root (Join-Path $RepoDir 'records\generated.json') }
-    catch {
-        Unbump 'the generated files could not be checked'
-        Die ($_.Exception.Message + ' Nothing was built or published.')
+    $global:LASTEXITCODE = 0
+    & (Join-Path $Here '..\mods\Build-Generated.ps1') -Root $Root -DryRun -NoPause
+    $genExit = $LASTEXITCODE
+    if ($genExit -ne 0) {
+        Unbump 'the collection cannot build the animation and body files'
+        Die ("The collection installed here cannot build Thornswood's animation and body files (Build-Generated.ps1 -DryRun exit $genExit, the STOP above says why), " +
+             'and every launcher on this release would refuse Play. Put it right in Vortex, bring the folder up to date, and Ship again. Nothing was built or published.')
     }
-    if (-not $genState.Current) {
-        Unbump 'the generated files are out of date'
-        Die (Get-GeneratedStaleSays $genState $Channel)
-    }
-    Say ("  {0} file(s) Build-Generated made for this mod list, as it made them" -f $genState.Record.Files.Count) 'Green'
+    Say '  the collection installed here builds them; every launcher builds them before Play' 'Green'
 } else {
-    Say '  no own game folder here, so there are none to check' 'DarkGray'
+    Say '  no own game folder here, so whether the collection builds them was not asked' 'DarkGray'
 }
 
 # ------------------------------------------------------------ node
@@ -1767,7 +1872,7 @@ if (-not $ModsOnly) {
             Die ($_.Exception.Message + ' Nothing was published.')
         }
         $hold = { param($p, $who) Get-SignedFileRefusal $p $who $RepoDir }
-        if ($MainEquivalent) {
+        if ($MainsOwnLauncher) {
             Head "Main's launcher, from main's feed"
             $why = Get-FeedLauncher $MainLauncher $buildOut $ciSigner $hold
             if ($why) {
@@ -1899,11 +2004,12 @@ if (-not $ModsOnly) {
 # launcherSha256 and its signature, put in place by Install-Launcher.ps1, and
 # left alone when the folder already holds it. Where the launcher a Ship
 # builds is installed, in its place (the two never both run): after the
-# generated files and node checks, so nothing is installed for a release that
+# animation and body files and node checks, so nothing is installed for a release that
 # stops there (#1692), and before anything is published, so a release with no
 # launcher to package stops now and not after it is out (Package-Thornswood
-# runs after, #2243).
-if ($Package -and -not $Dev -and -not $DryRun -and $ModsOnly) {
+# runs after, #2243). From the feed installer.yml takes that launcher off the
+# feed itself (#3412), so nothing is put anywhere here.
+if ($Package -and -not $Dev -and -not $DryRun -and $ModsOnly -and -not $FromFeed) {
     Head 'The launcher the feed offers, for the installer'
     if ($null -eq $pubLauncher) { $pubLauncher = Get-PublishedLauncher $ReleaseDir 'main' }
     try {
@@ -1932,7 +2038,7 @@ if ($Package -and -not $Dev -and -not $DryRun -and $ModsOnly) {
 # So it happens here, before anything is scanned, into the same folder the
 # client patch and the publisher use. SkipServer because this is a build step
 # and has no business talking to the VPS. $GameDir is the game folder the
-# generated files were checked in, above, or '' when there is none.
+# animation and body files were asked of, above, or '' when there is none.
 
 # ------------------------------------------------------------ the front
 # The front Go.ps1 unpacks is built here from the pinned fork commit and held
@@ -2059,43 +2165,6 @@ if ($LASTEXITCODE -eq 2) {
 if ($LASTEXITCODE -ne 0) {
     Unbump 'the client build could not be checked'
     Die 'Sync-Client.ps1 refused, and says why above. The client that matches the record is CI''s build of the pin: .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild ci, then Ship again (engine\README.md, A Ship machine takes CI''s build).'
-}
-
-# ------------------------------------------------------------ covered bodies
-# Issue #405, Patrick 28 Sep: "no nudity in players or NPCs for both males and
-# females". The bodies come from the Nexus collection, and a release tells every
-# launcher which collection revision to match by reading the one installed
-# here, so a main release out of a game folder whose body is nude points
-# everybody at a nude body. Check-CoveredBodies.ps1 reads the shapes in each
-# body mesh: 0 covered, 2 a nude body, 1 unreadable. Main refuses on 2 unless
-# -AllowUncoveredBodies; dev warns, so work can still be tried on the dev build
-# while the covered bodies' revision is on its way. 1 refuses on both channels
-# (#1956, Patrick 5 Oct), as the SkyUI menus step below does since #1913.
-Head 'Covered bodies'
-if ($FromFeed) {
-    # The bodies are the last release's bytes; a Ship from One reads them when
-    # the collection changes, as it builds them (#2754).
-    Say '  the last release''s bodies, by their sha256; a Ship from One reads them when the collection changes' 'DarkGray'
-} elseif ($GameDir) {
-    $global:LASTEXITCODE = 0
-    & (Join-Path $Here '..\mods\Check-CoveredBodies.ps1') -Game $GameDir -Quiet
-    $bodiesExit = $LASTEXITCODE
-    if ($bodiesExit -eq 2 -and -not $Dev -and -not $AllowUncoveredBodies) {
-        Unbump 'a body in the game folder is nude'
-        Die 'A body in the game folder is nude, and a main release would point everybody at this collection revision. Install the collection revision with the covered bodies (issue #405), bring the game folder up to date, and Ship again. -AllowUncoveredBodies ships anyway, on Patrick''s word only.'
-    }
-    if ($bodiesExit -eq 2) { Say '  a body in the game folder is nude (issue #405); shipping anyway' 'Yellow' }
-    elseif ($bodiesExit -ne 0) {
-        # Anything but 0 and 2, 1 for a mesh or a Data folder it could not read
-        # or the check itself failing, refuses on both channels, the way the
-        # SkyUI menus step does (#1956, Patrick 5 Oct). A check that cannot read
-        # is not a pass: the unread mesh may be the nude one.
-        Unbump 'the body meshes could not all be read'
-        Die ("The body meshes in the game folder could not all be read (Check-CoveredBodies.ps1 exit $bodiesExit), so whether a body is nude is not known. " +
-             'The red lines above say what could not be read. Fix or replace it in the game folder, and Ship again. -AllowUncoveredBodies does not let this through.')
-    }
-} else {
-    Say '  no game folder here, so the bodies were not read' 'DarkGray'
 }
 
 # ------------------------------------------------------------ SkyUI's menus
@@ -2573,6 +2642,26 @@ elseif ($Package -and $DryRun) {
     Say '  dry run, so not rebuilt: Package-Thornswood.ps1 puts what it builds on the site' 'Yellow'
     Say ('  .\scripts\release\Package-Thornswood.ps1 -OneFile -NoPublish -OutDir "' + $DistDir + '"   builds it and publishes nothing') 'DarkGray'
 }
+elseif ($Package -and $FromFeed) {
+    # FROM THE FEED, ON GITHUB (#3412). installer.yml builds it from what the
+    # release just published recorded and signs it, a second runner checks it,
+    # and Publish-InstallerFromGitHub.ps1 takes it off the launcher's draft and
+    # publishes it. Not stopping the release when it fails, for the reason the
+    # One path below gives.
+    Head 'Rebuilding the installer on GitHub'
+    $pubArgs = @{ OutDir = $DistDir }
+    if ($AllowStaleCheckout) { $pubArgs['AllowStaleCheckout'] = $true }
+    try { & (Join-Path $Here 'Publish-InstallerFromGitHub.ps1') @pubArgs }
+    catch {
+        $script:InstallerWhy = [string]$_.Exception.Message
+        $script:InstallerFailed = 1
+        Say "  THE INSTALLER DID NOT BUILD. $($script:InstallerWhy)" 'Red'
+        Say '  The release itself is already published and is fine. What is not' 'Red'
+        Say '  rebuilt is Thornswood-Setup.exe, so anybody installing from scratch' 'Red'
+        Say '  sits through this release on first launch.' 'Red'
+        Say '  .\scripts\release\Publish-InstallerFromGitHub.ps1   to put that right' 'Yellow'
+    }
+}
 elseif ($Package) {
     Head 'Rebuilding the installer'
     # THE ONE FILE SHAPE, issue #1213: the payload attached to
@@ -2588,7 +2677,7 @@ elseif ($Package) {
     # to Publish-Update (#2235), or the packager refuses what Ship let past.
     if ($AllowStaleCheckout) { $pkgArgs['AllowStaleCheckout'] = $true }
     # A THROW IS A FAILED BUILD TOO (#2243). On 11 October a stale generated
-    # files check inside the packager (Assert-ShipGeneratedBodies) threw, and
+    # files check inside the packager threw, and
     # the throw went straight out of Ship: the remirror, the dev feed's marks,
     # the news, the Discord post, the restart and the tag never ran, after the
     # pack was already on the feed. Caught here and given the same treatment
@@ -2881,7 +2970,7 @@ if ($script:InstallerFailed) {
     Say ("The installer did NOT rebuild (exit $script:InstallerFailed). The release went out " +
          'without it.') 'Red'
     if ($script:InstallerWhy) { Say ("  It stopped with: " + $script:InstallerWhy) 'Red' }
-    Say '  .\scripts\release\Package-Thornswood.ps1 -OneFile' 'Yellow'
+    Say $(if ($FromFeed) { '  .\scripts\release\Publish-InstallerFromGitHub.ps1' } else { '  .\scripts\release\Package-Thornswood.ps1 -OneFile' }) 'Yellow'
     Write-Host ''
 }
 # The release is out either way, and the people who would have read the post

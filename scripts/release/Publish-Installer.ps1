@@ -113,9 +113,20 @@ try {
 } catch {
   throw $_.Exception.Message
 }
-$signWhy = Get-PublishSignRefusal -Path $exeItem.FullName -ExpectedSigner $expectWho
-if ($signWhy) { throw $signWhy }
-Write-Host ("  publish sign gate: {0} Authenticode Valid, ExpectedSigner {1}" -f $exeItem.Name, $expectWho) -ForegroundColor Green
+# Off Windows (a Ship from the feed in the cloud, #3412) nothing here can read
+# a signature, and the installer is too big to send inside a check script the
+# way Sign-OnGitHub.ps1 sends a launcher. So it goes to the box under a folder
+# the site does not serve, is held there to the same gate by the box, which
+# holds no signing setup, and only then replaces the one people download.
+$checkOnBox = -not ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT)
+if ($checkOnBox) {
+  . (Join-Path $Here 'Sign-OnGitHub.ps1')
+  Write-Host '  publish sign gate: on the box, after the send and before it replaces the installer people download'
+} else {
+  $signWhy = Get-PublishSignRefusal -Path $exeItem.FullName -ExpectedSigner $expectWho
+  if ($signWhy) { throw $signWhy }
+  Write-Host ("  publish sign gate: {0} Authenticode Valid, ExpectedSigner {1}" -f $exeItem.Name, $expectWho) -ForegroundColor Green
+}
 
 # A one file build is decided by the exe rather than by the switch, because the
 # switch is easy to forget on a rerun and the file on disk is not. Anything
@@ -177,7 +188,29 @@ Write-Host ''
 Write-Host '  Sending. This is about a gigabyte, so it takes a few minutes.'
 Write-Host ''
 
-$send = @(, @($exeItem.FullName, $exeOut))
+if ($checkOnBox) {
+  # The gate above, on the box (#3412): sent beside the site rather than into
+  # files, checked there, and moved into place only once it passes.
+  $incoming = '_incoming-installer'
+  $made = @(Remote "New-Item -ItemType Directory -Force -Path '$rootWin\$incoming' | Out-Null; 'INCOMING|ready'")
+  if ($LASTEXITCODE -ne 0 -or -not (@($made | Where-Object { [string]$_ -eq 'INCOMING|ready' }).Count)) {
+    throw ("the box did not make $Root/$incoming for the installer to be checked in: " + (($made | ForEach-Object { [string]$_ }) -join ' ').Trim() + '. Nothing was sent.')
+  }
+  Invoke-ThornswoodNative { & scp @ssh $exeItem.FullName "$User@${Vps}:$Root/$incoming/$exeOut" }
+  if ($LASTEXITCODE -ne 0) { throw "scp failed: $exeOut. The installer people download is the one before." }
+  $signWhy = Get-SignedBoxFileRefusal "$rootWin\$incoming\$exeOut" $expectWho $repoRoot
+  if ($signWhy) {
+    $null = Remote "Remove-Item -LiteralPath '$rootWin\$incoming\$exeOut' -Force -ErrorAction SilentlyContinue"
+    throw ("$signWhy The installer people download is the one before.")
+  }
+  $moved = @(Remote "Move-Item -LiteralPath '$rootWin\$incoming\$exeOut' -Destination '$rootWin\files\$exeOut' -Force; 'MOVED|$exeOut'")
+  if ($LASTEXITCODE -ne 0 -or -not (@($moved | Where-Object { [string]$_ -eq "MOVED|$exeOut" }).Count)) {
+    throw ("the checked installer did not move into $Root/files: " + (($moved | ForEach-Object { [string]$_ }) -join ' ').Trim())
+  }
+  Write-Host "  $exeOut, held to the publish gate on the box"
+}
+$send = @()
+if (-not $checkOnBox) { $send += , @($exeItem.FullName, $exeOut) }
 if (-not $single) { $send += , @($zipItem.FullName, $zipOut) }
 foreach ($pair in $send) {
   Invoke-ThornswoodNative { & scp @ssh $pair[0] "$User@${Vps}:$Root/files/$($pair[1])" }

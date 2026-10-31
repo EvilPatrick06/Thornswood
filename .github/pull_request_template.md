@@ -17,7 +17,10 @@ nothing blank. -->
 
 - [ ] It changes one thing.
 - [ ] It removes the cause of the problem, not only what shows of it.
-- [ ] I have read LICENSE, which says what a contribution is given under.
+- [ ] I have read LICENSE and LICENSING.md, which say what a contribution is given under.
+
+Whose work: mine
+<!-- "Mine" when everything in it is yours. Otherwise name each part that is somebody else's, who it belongs to and how they gave leave (LICENSING.md, contributor term 3). -->
 
 ## For the Thornswood team
 

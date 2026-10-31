@@ -162,6 +162,15 @@ asks the same question the craft does, recipe by recipe, so a rank, a
 race's own gear and a roll all count. The menu then lists only what you
 may make.
 
+It sorts that list by kind first, with material groups inside (#3133).
+Weapons, armour, and arrows and bolts each have a header of their own,
+beside clothing, jewellery and food, and under each header the pieces sit
+in groups by material: Iron, Steel, Elven, Dragon and the rest, so the iron
+helmets and the iron swords are no longer one list. A piece whose record
+names no material is under its header and in no group. The groups are
+`game/ours/Data/SKSE/Plugins/CraftingCategories/Thornswood-Content.json`,
+and their names `game/ours/Data/Interface/Translations/Thornswood-Content_ENGLISH.txt`.
+
 Who each bench opens for. A half is one you can work at the rank named:
 your own half, or your sister half or a taught half at novice. No
 bench opens for everybody: the few things at a bench that nobody owns
@@ -187,6 +196,10 @@ are made by whoever the bench opens for.
 | Aetherium forge | Shut for everybody. Nobody works it |
 | Smelter | Platewright, from novice |
 
+A cooking spit is a cookpot: the same recipes, so it opens for the
+Hearthcook and nobody else. Boiling water there is not cooking, and
+anybody may boil water at a spit or a pot.
+
 A forge or a skyforge burns one charcoal, cheapest grade in the pack
 first. No charcoal, nothing is made. A war axe, a battleaxe, a
 warhammer, and a mace also take 1 Tool Handle. Swords, greatswords,
@@ -194,6 +207,15 @@ daggers, bows, and staves do not. The handle is novice
 [Charburner](professions/woodworker/charburner.md) work, so listing it
 does not move the rank. The plugin rows still omit it. The server
 already removes one when the craft goes through.
+
+A bench in a building you hold also draws from the chests in that
+building (#3159, Patrick, 22 Oct). While you are at it, the crafting
+menu lists what the chests hold beside what you carry, and a craft
+takes from your pack first and from the chests, nearest the bench
+first, for the rest. The charcoal and the handle come from the chests
+too when your pack has none. A guest, a partner with the master key
+and a bench outdoors get the pack alone. [Property](property.md) says
+which chests are yours.
 
 ## The book on K
 
@@ -228,6 +250,18 @@ gamemode's bench table, maneuvers and tuning by
 `scripts\dev\Build-ProfessionGuides.js`, which writes them into
 `game\ui\thornswood-skills.js`. Run it after any of those change;
 `tests\test-3165-profession-guides.js` fails while the page is behind.
+
+## Everything has a maker
+
+Everything in the world has a recipe or a class that gathers it, except
+named uniques and quest items (Patrick, 22 October 2026), and the
+Ancient Nord burial set, which is found in a dungeon and nowhere else
+(Patrick, 26 October 2026, #3524). That covers
+what a chest or a body pays, the clothes and tool a new character is
+handed, and whatever a recipe asks for. [Who makes what the world hands
+out](lists/who-makes-it.md) lists each item and its maker, and the few
+that have none yet, each with the issue that gives it one. The build
+fails when something new is handed out that nobody makes.
 
 ## Names that are not a profession
 

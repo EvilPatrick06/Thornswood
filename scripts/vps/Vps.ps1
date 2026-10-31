@@ -28,7 +28,9 @@
        for the user. For one shell or one scheduled task.
 
   So a machine that reaches the box by another address, or a new box being
-  tried before Set-Vps.ps1 moves everybody, needs no edit to a tracked file.
+  set up before its name points at it (docs\MOVING-THE-SERVER.md, step 3),
+  needs no edit to a tracked file. The tracked address is the game's name,
+  never the box's address (#3690).
   tests\test-vps-defaults.ps1 fails on the address written anywhere else in a
   script.
 #>
@@ -325,14 +327,28 @@ function Get-ThornswoodBridgeDigest([string]$Token) {
 }
 
 # A file nobody but this account can read, from its first byte: made empty,
-# locked, then filled.
+# locked, then filled. The rules are written whole, one for this account and
+# nothing else. icacls /inheritance:r takes off only the inherited rules, and
+# a file made in a folder that passes nothing down (TEMP on GitHub's runners)
+# holds the maker's default rules, SYSTEM and Administrators, as its own, so
+# those stayed beside this account's (#5062).
 function Write-ThornswoodPrivateFile([string]$Path, [string]$Text) {
     $dir = Split-Path -Parent $Path
     if ($dir -and -not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
     [IO.File]::WriteAllText($Path, '')
     if ($env:OS -eq 'Windows_NT') {
-        $null = & icacls $Path /inheritance:r /grant:r ('{0}:F' -f [Security.Principal.WindowsIdentity]::GetCurrent().Name) 2>&1
-        if ($LASTEXITCODE -ne 0) { Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue; throw "could not make $Path readable by this account alone, so nothing was written to it" }
+        $me = [Security.Principal.WindowsIdentity]::GetCurrent().User
+        try {
+            $acl = New-Object Security.AccessControl.FileSecurity
+            $acl.SetAccessRuleProtection($true, $false)
+            $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($me, 'FullControl', 'Allow')))
+            $item = Get-Item -LiteralPath $Path -Force
+            if ($PSVersionTable.PSEdition -eq 'Core') { [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]$item, $acl) } else { $item.SetAccessControl($acl) }
+            # Read back, not taken from the call (#3034).
+            $got = Get-Acl -LiteralPath $Path
+            $who = @($got.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | ForEach-Object { $_.IdentityReference.Value } | Sort-Object -Unique)
+            if (-not $got.AreAccessRulesProtected -or ($who -join ',') -ne $me.Value) { throw ('it holds rules for ' + ($who -join ', ')) }
+        } catch { Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue; throw "could not make $Path readable by this account alone, so nothing was written to it ($($_.Exception.Message))" }
     } else {
         & chmod 600 $Path
     }
