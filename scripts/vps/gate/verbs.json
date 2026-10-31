@@ -126,6 +126,12 @@
         "TaskOnly": "switch"
       }
     },
+    "Wipe-Dev": {
+      "script": "scripts/ops/Wipe-Saves.ps1",
+      "timeoutMinutes": 15,
+      "fixed": ["-Server", "dev", "-Yes", "-NoPause"],
+      "params": {}
+    },
     "Publish-Installer": {
       "script": "scripts/release/Publish-InstallerOnBox.ps1",
       "timeoutMinutes": 45,
