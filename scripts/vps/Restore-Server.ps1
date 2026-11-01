@@ -546,6 +546,7 @@ if ($rh) {
   Say ("  Start it by hand:   cd '{0}'; node dist_back/skymp5-server.js" -f $Root) 'DarkGray'
   Say ('  Point a launcher at it: in that launcher''s config.json, ServerAddress this machine (127.0.0.1 on it), ServerPort "{0}"' -f $rh.Port) 'DarkGray'
   Say '  and load a character from the backup while thornswood.log says it connected.' 'DarkGray'
+  Say ('  Or have a bot load it (#5196), once node is up: node scripts/bot/Check-Character.js --root "{0}" --profile <id>' -f $Root) 'DarkGray'
   Say ("  End it: stop node, then Remove-Item -LiteralPath '{0}' -Recurse -Force. RESTORING.md in the ops repo has the rest." -f $Root) 'DarkGray'
 } else {
   Say '  Start it with its scheduled task, Start-ScheduledTask -TaskName <its task>, which runs node High (#2491); node started by hand runs Normal and outside the task' 'DarkGray'
