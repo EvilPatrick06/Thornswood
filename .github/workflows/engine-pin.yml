@@ -205,7 +205,8 @@ jobs:
           $jobs = (gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID/jobs?per_page=100" | ConvertFrom-Json).jobs
           $make = @($jobs | Where-Object { [string]$_.name -eq 'Make the pin' -and [string]$_.conclusion -eq 'success' })
           if ($make.Count -ne 1) { Write-Host "::error::this run has $($make.Count) green Make the pin jobs, not one"; exit 1 }
-          $log = @(gh api "repos/$env:GITHUB_REPOSITORY/actions/jobs/$($make[0].id)/logs")
+          $flags = Get-GhLogFlags
+          $log = @(gh api "repos/$env:GITHUB_REPOSITORY/actions/jobs/$($make[0].id)/logs" @flags)
           if ($LASTEXITCODE -ne 0) { Write-Host '::error::make''s log could not be read'; exit 1 }
           $f = Join-Path $env:RUNNER_TEMP 'pin.bundle'
           [IO.File]::WriteAllBytes($f, (Read-LogHandBack $log ('ENGINE' + '-PIN')))
