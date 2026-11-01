@@ -51,10 +51,11 @@
 
   Builds Signature.cs with the .NET 10 SDK the way the launcher project
   does (tests\Launcher-Csc.ps1) and runs it in this PowerShell, which is
-  .NET 10 as the launcher is. Windows PowerShell 5.1 compiles the same file
-  with Add-Type when Assert-PublishSigned.ps1 runs there (the box's check
-  from Sign-OnGitHub.ps1), so that compile is run too. Windows only: the check
-  is WinVerifyTrust, and the certificates are Windows' own store.
+  .NET 10 as the launcher is. Assert-PublishSigned.ps1 compiles the same file
+  with Add-Type when it runs on the box (the check from Sign-OnGitHub.ps1),
+  which runs PowerShell 7 since #5356, so that compile is run too, in this
+  same PowerShell. Windows only: the check is WinVerifyTrust, and the
+  certificates are Windows' own store.
 #>
 [CmdletBinding()]
 param([string]$Signed = '')
@@ -133,20 +134,21 @@ function Drop-Cert([string]$thumb) {
 }
 
 try {
-    # Windows PowerShell's Add-Type is the .NET Framework compiler and stops
-    # at C# 5. Assert-PublishSigned.ps1 compiles this file with it wherever
-    # it runs in Windows PowerShell (the box's catalog check), so it is asked
-    # there, the way that script asks it.
-    $winps = Get-WindowsPowerShell
+    # Assert-PublishSigned.ps1 compiles this file with Add-Type where it runs
+    # on the box (the catalog check), and the box runs PowerShell 7 (#5356),
+    # the one running this harness. It is asked in a new process of that
+    # PowerShell, the way that script asks it, so no type this harness has
+    # already loaded answers for it.
+    $boxPs = [Environment]::ProcessPath
     $assert = Join-Path (Join-Path (Join-Path $Repo 'scripts') 'release') 'Assert-PublishSigned.ps1'
     # Single quotes after the path: $t is the child's, not this harness's.
     $probe = ". '" + $assert.Replace("'", "''") + "'; " + '$t = Get-LauncherSignatureType; if ($t) { ''COMPILED '' + $t.FullName } else { ''NO TYPE'' }'
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $said = @(& $winps -NoProfile -ExecutionPolicy Bypass -Command $probe 2>&1 | ForEach-Object { "$_" })
+    $said = @(& $boxPs -NoProfile -ExecutionPolicy Bypass -Command $probe 2>&1 | ForEach-Object { "$_" })
     $ErrorActionPreference = $old
     $compiled = @($said | Where-Object { $_ -match '^COMPILED ThornswoodSign[0-9a-f]+\.Signature$' }).Count -eq 1
     if (-not $compiled) { foreach ($l in @($said | Select-Object -First 20)) { Write-Host "      $l" } }
-    Yes 'Signature.cs compiles in Windows PowerShell''s Add-Type at C# 5, as Assert-PublishSigned.ps1 compiles it there' $compiled
+    Yes 'Signature.cs compiles in the box''s PowerShell with Add-Type, as Assert-PublishSigned.ps1 compiles it there' $compiled
 
     # The launcher's own build of it, by the project's settings.
     $asm = $null
