@@ -12,8 +12,9 @@
     1. Get-GhLogFlags (LogHandBack.ps1) gives the flag when gh's help names
        it, and nothing for an older gh, or one that cannot be run.
     2. Every job log read in scripts\ and .github\workflows\ passes what gh
-       needs told: Read-Board.ps1 its own $escFlag (#3192), every other one
-       Get-GhLogFlags, and each file that calls it loads LogHandBack.ps1.
+       needs told, from Get-GhLogFlags, and each file that calls it loads
+       LogHandBack.ps1. Read-Board.ps1 kept its own copy of the flag (#3192)
+       until it moved onto Get-GhLogFlags too, so there is one.
     Get-EngineRecords.ps1 run whole against a gh that refuses is in
     test-3399-engine-records.ps1.
 
@@ -64,9 +65,9 @@ try {
             $l = $lines[$i]
             if ($l -notmatch 'gh api "[^"]*/actions/jobs/[^"]+/logs"' -and $l -notmatch 'Get-Gh "[^"]*/actions/jobs/[^"]+/logs"') { continue }
             $reads++
-            $ok = $l -match '/logs" @(flags|escFlag)\b' -or $l -match '/logs" \(Get-GhLogFlags'
+            $ok = $l -match '/logs" @flags\b' -or $l -match '/logs" \(Get-GhLogFlags'
             Yes ("2. {0}:{1} passes what gh needs told" -f $rel, ($i + 1)) $ok
-            if ($l -match 'Get-GhLogFlags' -or $text -match '\$flags = Get-GhLogFlags') {
+            if ($l -match 'Get-GhLogFlags' -or $text -match '\$flags = (@\()?Get-GhLogFlags') {
                 $loads = $text -match "LogHandBack\.ps1" -or $rel -eq 'scripts/release/LogHandBack.ps1'
                 if ($rel -eq 'scripts/release/Get-EngineRecords.ps1') { $loads = (Read 'scripts/release/EngineRecords.ps1') -match "\. \(Join-Path \`$PSScriptRoot 'LogHandBack\.ps1'\)" }
                 Yes ("2.   and {0} loads LogHandBack.ps1, where Get-GhLogFlags is" -f $rel) $loads
