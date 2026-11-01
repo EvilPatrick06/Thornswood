@@ -53,7 +53,6 @@ $Repo = Split-Path -Parent (Split-Path -Parent $Here)
 function Say([string]$m) { Write-Host ('pre-push: ' + $m) }
 function Stop-Here([string]$m) { Say ('STOP. ' + $m); exit 2 }
 
-$Zero = '0' * 40
 $shas = [System.Collections.Generic.List[string]]::new()
 if ($Commit) {
     $s = (& git -C $Repo rev-parse --verify --quiet ($Commit + '^{commit}') 2>$null)
@@ -66,7 +65,7 @@ if ($Commit) {
         $parts = $line.Trim() -split '\s+'
         if ($parts.Count -lt 4) { Stop-Here ("git gave the hook a line it does not understand: {0}" -f $line) }
         $local = $parts[1]
-        if ($local -match '^0+$') { continue }
+        if ($local -match '^0+$') { continue }   # a deleted ref
         $s = (& git -C $Repo rev-parse --verify --quiet ($local + '^{commit}') 2>$null)
         if ($LASTEXITCODE -ne 0 -or -not $s) {
             # A tag of something that is not a commit: nothing here to parse.
