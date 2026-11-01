@@ -145,6 +145,10 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   yes('nor one whose shares disagree how many there are', r.run === '' && /do not agree/.test(r.why));
   r = await ask(world(21, null, { jobs: { 21: jobs(21, 'Launcher builds', 'success', 'success', shares(g => g).concat([{ name: 'Gate harnesses (2 of 5)', conclusion: 'success' }])) } }));
   yes('nor one with a share twice', r.run === '' && /ran twice/.test(r.why));
+  // Since #5183 a pull request's shares may run only what its change can
+  // reach, and say so in their names; main then runs the whole gate.
+  r = await ask(world(21, null, { jobs: { 21: jobs(21, 'Launcher builds', 'success', 'success', shares(g => Object.assign(g, { name: g.name.replace(')', ', what the change reaches)') }))) } }));
+  yes('nor one whose shares ran only what its change reaches: ' + r.why, r.run === '' && /only what its change can reach/.test(r.why));
   r = await ask({ pulls: [pull()], runs: [run(16), run(11)], jobs: { 16: jobs(16, 'Launcher builds', 'failure'), 11: good.jobs[11] }, logs: good.logs });
   yes('a failed build of the head beside a green one: the green one counts', r.run.endsWith('/11'));
   r = await ask({ pulls: [pull()], runs: [run(11), run(20)], jobs: { 11: good.jobs[11], 20: jobs(20, 'Launcher builds', 'success') }, logs: { 110: jobLog(TREE), 200: jobLog(OTHER) } });
@@ -209,27 +213,36 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   yes('  on a pull request only',
       /\n        if: github\.event_name == 'pull_request'\n/.test(note));
   // The gate runs in the job "gate" beside the launcher job, in shares
-  // (31 Oct 2026), and each share runs its part of the whole gate: no map
-  // chooses less. The script counts the note only when every share passed.
+  // (31 Oct 2026), after the job "pick" says what each runs (#5183). A
+  // share of what a change can reach says so in its name, and the script
+  // counts the note only when every share passed and none says that.
   const gj = build.indexOf('\n  gate:\n');
+  const pj = build.indexOf('\n  pick:\n');
+  const pickJob = pj < 0 ? '' : build.slice(pj, gj > pj ? gj : undefined);
   const gateJob = gj < 0 ? '' : build.slice(gj, lj > gj ? lj : undefined);
   const gateStep = (gateJob.split(/\n(?=      - )/).find(x => /^      - name: Run the gate harnesses\n/.test(x)) || '');
   const rg = read(path.join(REPO, 'scripts', 'dev', 'Run-Gate.ps1'));
-  yes('the gate is a job of its own before the launcher job, in shares the script reads by name',
-      gj > 0 && gj < lj && /\n    name: Gate harnesses \(\$\{\{ matrix\.shard \}\} of \$\{\{ strategy\.job-total \}\}\)\n/.test(gateJob) &&
-      T.GATE.test('Gate harnesses (1 of 5)') && /\n      fail-fast: false\n/.test(gateJob));
-  yes('  waiting for "tested" as the launcher job does', /\n    needs: tested\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' \}\}\n/.test(gateJob));
-  yes('the gate step is "gate", and runs its share through Run-Gate.ps1', /\n        id: gate\n/.test(gateStep) &&
+  const part = "${{ needs.pick.outputs.whole != 'true' && ', what the change reaches' || '' }}";
+  yes('the gate is a job of its own before the launcher job, in shares the script reads by name, a part saying so',
+      gj > 0 && gj < lj && gateJob.indexOf('\n    name: Gate harnesses (${{ matrix.shard }} of ${{ strategy.job-total }}' + part + ')\n') >= 0 &&
+      T.GATE.test('Gate harnesses (1 of 5)') && T.GATE.exec('Gate harnesses (1 of 5, what the change reaches)')[3] && /\n      fail-fast: false\n/.test(gateJob));
+  yes('  the pick waits for "tested" as the launcher job does, and the shares for both', pj > 0 && pj < gj &&
+      /\n    needs: tested\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' \}\}\n/.test(pickJob) &&
+      /\n    needs: \[tested, pick\]\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && needs\.pick\.result == 'success' \}\}\n/.test(gateJob));
+  yes('  the pick runs Run-Gate.ps1 -Pick on Linux, with the token, and hands on its plan',
+      /\n    runs-on: ubuntu-latest\n/.test(pickJob) && /\.\/scripts\/dev\/Run-Gate\.ps1 -Pick \(\[int\]\$env:SHARES\)\n/.test(pickJob) &&
+      /\n          GATE_MAP_TOKEN: \$\{\{ github\.token \}\}\n/.test(pickJob) && /\n      whole: \$\{\{ steps\.pick\.outputs\.whole \}\}\n/.test(pickJob));
+  yes('the gate step is "gate", and runs its share of the plan through Run-Gate.ps1', /\n        id: gate\n/.test(gateStep) &&
       /\.\\scripts\\dev\\Run-Gate\.ps1 -Shard \$env:SHARD -Of \$env:OF /.test(gateStep) &&
-      /\n          SHARD: \$\{\{ matrix\.shard \}\}\n          OF: \$\{\{ strategy\.job-total \}\}\n/.test(gateStep));
-  yes('  with no token: a share reads no map', !/GATE_MAP_TOKEN|github\.token/.test(gateJob));
-  yes('  and a share is a share of the whole gate, never a map\'s pick',
-      /\nif \(\$Of -gt 1\) \{\n[^\n]*\n    \$run = @\(for \(\$i = 0; \$i -lt \$gate\.Count; \$i\+\+\) \{ if \(\(\$i % \$Of\) -eq \(\$Shard - 1\)\) \{ \$gate\[\$i\] \} \}\)\n/.test(rg) &&
-      /\n\} elseif \(\$env:GITHUB_EVENT_NAME -eq 'pull_request'\) \{\n/.test(rg));
-  yes('  which says whole=true only when it ran every gate harness',
-      (rg.match(/Set-StepOutput 'whole'/g) || []).length === 1 && /\nif \(\$whole\) \{ Set-StepOutput 'whole' 'true' \}\n/.test(rg) &&
-      /\n\$run = \$gate\n\$whole = \$true\n/.test(rg) && (rg.match(/\$whole = \$false/g) || []).length === 1 &&
-      /\{ \$run = \$picked; \$whole = \$false \}/.test(rg) && /if \(\$picked\.Count -ge \$gate\.Count\) \{ return \$null \}/.test(rg));
+      /\n          SHARD: \$\{\{ matrix\.shard \}\}\n          OF: \$\{\{ strategy\.job-total \}\}\n          GATE_PLAN: \$\{\{ needs\.pick\.outputs\.plan \}\}\n/.test(gateStep) &&
+      /\n        shard: \$\{\{ fromJSON\(needs\.pick\.outputs\.shares\) \}\}\n/.test(gateJob));
+  yes('  with no token: a share fetches no map', !/GATE_MAP_TOKEN|github\.token/.test(gateJob));
+  yes('  and the plan says whole only when it holds every gate harness',
+      (rg.match(/Set-StepOutput 'whole'/g) || []).length === 2 && /\nif \(\$whole\) \{ Set-StepOutput 'whole' 'true' \}\n/.test(rg) &&
+      /Set-StepOutput 'whole' \$\(if \(\$whole\) \{ 'true' \} else \{ 'false' \}\)/.test(rg) &&
+      /\n\$run = \$gate\n\$whole = \$true\n/.test(rg) && /\{ \$list = \$picked; \$whole = \$false \}/.test(rg) &&
+      /if \(\$picked\.Count -ge \$gate\.Count\) \{ return \$null \}/.test(rg) &&
+      /if \(\$whole -and \$all\.Count -ne \$gate\.Count\)/.test(rg));
   yes('  writing the tree git gives for HEAD, in the line the script reads', /git rev-parse 'HEAD\^\{tree\}'/.test(note) &&
       note.indexOf("Write-Host ('" + T.MARK + " {0} commit {1} pull request {2} head {3}' -f $tree, $env:GITHUB_SHA, $env:PR_NUMBER, $env:PR_HEAD)") >= 0);
   yes('  the pull request number and head through env, never pasted into the script', /\n          PR_NUMBER: \$\{\{ github\.event\.pull_request\.number \}\}\n          PR_HEAD: \$\{\{ github\.event\.pull_request\.head\.sha \}\}\n/.test(note) &&
@@ -260,9 +273,7 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
     'tests/test-release-tag.ps1': 'reads release.yml\'s text for those names; sets them for Resolve-ReleaseTag.ps1 in a scratch process',
     'tests/test-3412-installer-on-github.ps1': 'reads installer.yml\'s text for those names; installer.yml is started by hand on main and is no check of a build (#3412)',
     'scripts/dev/Run-Gate.ps1': 'the gate step: the event chooses only how much of the gate runs (#3114), and a build that ran less than all of it keeps no note, held above',
-    'tests/test-3114-run-gate.ps1': 'sets those names for Run-Gate.ps1 in scratch processes, to hold what it does on each event',
-    'scripts/dev/Gate-Map.ps1': 'the step after the gate that hands main\'s map on (#4009): it checks nothing, never fails a build, and prints only in main\'s push build',
-    'tests/test-4009-gate-map.ps1': 'sets those names for Gate-Map.ps1 in scratch processes, to hold that only main\'s push build hands a map on'
+    'tests/test-3114-run-gate.ps1': 'sets those names for Run-Gate.ps1 in scratch processes, to hold what it does on each event'
   };
   const ENVREAD = /\b(GITHUB_(EVENT_NAME|EVENT_PATH|REF|REF_NAME|REF_TYPE|SHA|HEAD_REF|BASE_REF|RUN_ID|RUN_NUMBER|ACTOR))\b/;
   const found = [];

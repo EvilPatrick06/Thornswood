@@ -63,7 +63,11 @@ for (const [what, t] of [['main\'s build', build], ['the pull request build', pr
   const end = rest.search(/\n  \S/);
   const g = end < 0 ? rest : rest.slice(0, end + 1);
   yes(what + ' runs the gate in its own job on GitHub\'s hosted Windows runner', /\n    runs-on: windows-latest\n/.test(g) && !/self-hosted/.test(code(g)));
-  yes('  in shares, every one running to its end', /\n      fail-fast: false\n      matrix:\n        shard: \[1(, \d+)+\]\n/.test(g));
+  // How many is the pick job's SHARES (#5183), handed on as its output.
+  const p = t.indexOf('\n  pick:\n');
+  const pick = p < 0 || p > at ? '' : t.slice(p, at);
+  yes('  in shares, every one running to its end, as many as the pick says', /\n      fail-fast: false\n      matrix:\n        shard: \$\{\{ fromJSON\(needs\.pick\.outputs\.shares\) \}\}\n/.test(g) &&
+      /\n          SHARES: '([2-9]|\d\d)'\n/.test(pick) && /\n    runs-on: ubuntu-latest\n/.test(pick));
 }
 yes('  main\'s own build has no such job: only a pull request is held to it', !/\n  result:\n/.test(code(build)));
 let gen = null;
