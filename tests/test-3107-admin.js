@@ -86,6 +86,15 @@
 //      lands in the state folder, the setup is disarmed, and the key is in
 //      neither the page nor the log; an App another account made is refused
 //      and nothing is kept.
+//   6. the redesign's part 20 (1 Nov 2026): an App or a deploy key may bypass
+//      a tag ruleset and stops the record on a branch one; github-admin.yml's
+//      nightly schedule passes the token check but is refused any change, and
+//      its repository settings check opens one issue on the board while
+//      GitHub differs (#5298), says so once, closes it with a comment once a
+//      check matches, never touches a person's issue of the same title, and
+//      fails the run when the board cannot be told; go-public is gone, and
+//      the manifest asks for exactly what records/github-apps.json gives the
+//      box admin App.
 //
 // Nothing leaves loopback, and nothing outside the temp folder is touched.
 'use strict';
@@ -141,6 +150,7 @@ console.log('the OIDC check');
 yes('a hand-started run of the ops repository\'s github-admin.yml on main passes', why(sign(good())) === '');
 yes('the rules name the ops repository for the runners and this one for the records', admin.RULES.repositoryId === '1435123931' && admin.RUNNERS_REPO === 'ThornswoodRP/Thornswood-Ops' && admin.REPO === 'ThornswoodRP/Thornswood');
 yes('one a push started fails, since a push here cannot start it there (#4013)', /started by push/.test(why(sign(good({ event_name: 'push' })))));
+yes('its nightly schedule passes the token check (part 20); what a scheduled run may ask is held below', why(sign(good({ event_name: 'schedule' }))) === '');
 yes('this repository\'s own github-admin.yml on main fails', /from ThornswoodRP\/Thornswood \(repository id 1365246621\)$/.test(why(sign(good({ repository: 'ThornswoodRP/Thornswood', repository_id: '1365246621', job_workflow_ref: 'ThornswoodRP/Thornswood/.github/workflows/github-admin.yml@refs/heads/main' })))));
 // #5184: the ops repository is known by its id, so its move into the
 // Thornswood organization changes nothing here.
@@ -268,6 +278,13 @@ yes('an enforcement that is not active or disabled stops', /not active or disabl
 yes('a ruleset on no ref stops', /no ref/.test(rstops([with_(tagSet, 'conditions', { ref_name: { include: [] } })])));
 yes('one with no rules, or a rule with no type, stops', /no rules/.test(rstops([with_(tagSet, 'rules', [])])) && /no type/.test(rstops([with_(tagSet, 'rules', [{}])])));
 yes('one that does not say who may bypass it stops', /bypass/.test(rstops([with_(mainSet, 'bypass_actors', undefined)])));
+// The redesign's part 20 (1 Nov 2026): an App or a deploy key bypasses a tag
+// ruleset only, never a branch one.
+const appBypass = { actor_id: 15368, actor_type: 'Integration', bypass_mode: 'always' };
+yes('an App may bypass a tag ruleset', rstops([with_(tagSet, 'bypass_actors', [appBypass])]) === '');
+yes('an App that may bypass a branch ruleset stops, named', /main lets the App 15368 bypass a branch ruleset; an App or a deploy key may bypass only a tag ruleset/.test(rstops([with_(mainSet, 'bypass_actors', [appBypass])])));
+yes('  and so does a deploy key', /lets a deploy key bypass a branch ruleset/.test(rstops([with_(mainSet, 'bypass_actors', [{ actor_id: 7, actor_type: 'DeployKey', bypass_mode: 'always' }])])));
+yes('  while a role on a branch ruleset still passes', rstops([with_(mainSet, 'bypass_actors', [{ actor_id: 5, actor_type: 'RepositoryRole', bypass_mode: 'always' }])]) === '');
 yes('the body sent is the ruleset\'s own keys, never the record\'s note',
   JSON.stringify(Object.keys(admin.rulesetBody(tagSet))) === '["name","target","enforcement","conditions","rules","bypass_actors"]');
 // GitHub's copy, as it reads one back: ids, links and defaults of its own, lists in its own order.
@@ -385,6 +402,8 @@ const gh = {
   // holds Issues write yet.
   botToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
   botGranted: true,
+  issues: [{ number: 1, title: 'GitHub\'s repository settings differ from the record', body: 'by a person', state: 'open', user: { login: 'EvilPatrick06' }, comments: [] }],
+  nextIssue: 50,
   sets: { Thornswood: [], skymp: [] },
   pvr: { Thornswood: false, skymp: false },
   immutable: { Thornswood: false, skymp: false },
@@ -501,6 +520,25 @@ function standIn(req, res) {
       if (req.method === 'GET') return send(200, { enabled: gh.pvr[m[1]] });
       if (req.method === 'PUT') { gh.pvr[m[1]] = true; return send(204); }
       if (req.method === 'DELETE') { gh.pvr[m[1]] = false; return send(204); }
+    }
+    // The board, for a scheduled settings check (part 20), with the bot's
+    // issues token alone.
+    if (/^\/repos\/ThornswoodRP\/Thornswood\/issues/.test(P)) {
+      if (req.headers.authorization !== 'Bearer ' + gh.botToken) return send(401, { message: 'Bad credentials' });
+      if (P === '/repos/ThornswoodRP/Thornswood/issues' && req.method === 'GET') {
+        if (u.searchParams.get('state') !== 'open') return send(400, { message: 'ask for the open ones' });
+        return send(200, gh.issues.filter(i => i.state === 'open' && i.user.login === u.searchParams.get('creator')));
+      }
+      if (P === '/repos/ThornswoodRP/Thornswood/issues' && req.method === 'POST') {
+        const made = { number: gh.nextIssue++, title: body.title, body: body.body, state: 'open', user: { login: 'thornswood-box-admin[bot]' }, comments: [] };
+        gh.issues.push(made);
+        return send(201, made);
+      }
+      const mi = /^\/repos\/ThornswoodRP\/Thornswood\/issues\/(\d+)(\/comments)?$/.exec(P);
+      const issue = mi && gh.issues.find(i => i.number === Number(mi[1]));
+      if (!issue) return send(404, { message: 'Not Found' });
+      if (mi[2] && req.method === 'POST') { issue.comments.push(body.body); return send(201, { body: body.body }); }
+      if (!mi[2] && req.method === 'PATCH') { Object.assign(issue, body); return send(200, issue); }
     }
     if (P === '/repos/ThornswoodRP/Thornswood' && req.method === 'GET') return send(200, gh.repo);
     if (P === '/repos/ThornswoodRP/Thornswood' && req.method === 'PATCH') {
@@ -654,7 +692,9 @@ function start(stateDir, ghPort, more) {
     r = await ask4(bearer(sign(good())));
     yes('with no App yet it says how to make one (503)', r.status === 503 && /Install-AdminService\.ps1 -Setup/.test(r.text));
     r = await ask4(bearer(sign(good())), { what: 'secrets' });
-    yes('anything but runner-labels, installation-repos, repo-about, settings, repo-settings and go-public is refused (400)', r.status === 400 && /runner-labels, installation-repos, repo-about, settings, repo-settings and go-public/.test(r.text));
+    yes('anything but runner-labels, installation-repos, repo-about, settings and repo-settings is refused (400)', r.status === 400 && /runner-labels, installation-repos, repo-about, settings and repo-settings/.test(r.text));
+    r = await ask4(bearer(sign(good())), { what: 'go-public' });
+    yes('  go-public among them: it is retired (part 20), and the App no longer writes secrets', r.status === 400);
 
     // The App, as the setup would leave it.
     fs.writeFileSync(path.join(state, 'key.pem'), appKeyPem);
@@ -860,6 +900,49 @@ function start(stateDir, ghPort, more) {
     yes('push protection switched off on GitHub is switched on again, sending only that key', r.status === 200 && r.json.changed === 1 && scan(gh.repo) === 'enabled/enabled' &&
       JSON.stringify(patches()[0].body) === '{"security_and_analysis":{"secret_scanning_push_protection":{"status":"enabled"}}}' && has(/^ThornswoodRP\/Thornswood: push protection switched on$/));
 
+    // The nightly (part 20, #5298): a scheduled run may only check, and its
+    // repository settings check tells the board.
+    const sched = { event_name: 'schedule' };
+    const mine = () => gh.issues.filter(i => i.user.login === 'thornswood-box-admin[bot]');
+    gh.repo.security_and_analysis.secret_scanning = { status: 'disabled' };
+    gh.repo.security_and_analysis.secret_scanning_push_protection = { status: 'disabled' };
+    gh.calls = [];
+    r = await askRs(false, sched);
+    yes('a scheduled run that asks to change the settings is refused (403), with nothing asked of GitHub but the keys', r.status === 403 && /a scheduled run only checks/.test(r.text) && gh.calls.every(c => c.path === '/jwks'));
+    r = await ask4(bearer(sign(good(sched))), { what: 'runner-labels' });
+    yes('  and so is one that asks to change the runner labels', r.status === 403);
+    r = await ask4(bearer(sign(good(sched))), { what: 'repo-about', check: 'yes' });
+    yes('  and one whose check is not exactly true', r.status === 403);
+    gh.calls = [];
+    r = await askRs(true, sched);
+    yes('a scheduled check that finds scanning off opens one issue on the board, and changes nothing', r.status === 200 && r.json.differs === 2 && patches().length === 0 &&
+      mine().length === 1 && mine()[0].title === "GitHub's repository settings differ from the record" && has(/^board: issue #50 opened$/));
+    yes('  the issue names what differs and how it is done, and nothing that matches', /- ThornswoodRP\/Thornswood: secret scanning would be switched on\n- ThornswoodRP\/Thornswood: push protection would be switched on\n/.test(mine()[0].body) &&
+      /\nDone when: /.test(mine()[0].body) && !/as the record says/.test(mine()[0].body));
+    yes('  with the issues token for Thornswood alone', gh.calls.filter(c => c.path.startsWith('/repos/' + T + '/issues')).every(c => c.auth === 'Bearer ' + gh.botToken));
+    yes('  and leaves a person\'s issue of the same title alone', gh.issues[0].state === 'open' && gh.issues[0].body === 'by a person');
+    gh.calls = [];
+    r = await askRs(true, sched);
+    yes('the next night, still the same, it neither opens another nor writes', r.status === 200 && mine().length === 1 && has(/^board: issue #50 already says this$/) &&
+      !gh.calls.some(c => c.method !== 'GET' && c.path.startsWith('/repos/' + T + '/issues')));
+    r = await askRs();
+    gh.calls = [];
+    r = await askRs(true, sched);
+    yes('once a run puts it right, the next scheduled check closes the issue with a comment', r.status === 200 && r.json.differs === 0 && mine()[0].state === 'closed' && mine()[0].state_reason === 'completed' &&
+      mine()[0].comments.length === 1 && has(/^board: issue #50 closed: GitHub matches the record again$/));
+    gh.calls = [];
+    r = await askRs(true, sched);
+    yes('  and a night that matches with nothing open writes nothing', r.status === 200 && has(/^board: GitHub matches the record$/) && !gh.calls.some(c => c.method !== 'GET' && c.path.startsWith('/repos/' + T + '/issues')));
+    gh.calls = [];
+    r = await askRs(true);
+    yes('a check started by hand never tells the board', r.status === 200 && !gh.calls.some(c => c.path.startsWith('/repos/' + T + '/issues')) && !has(/^board:/));
+    gh.botGranted = false;
+    gh.repo.security_and_analysis.secret_scanning_push_protection = { status: 'disabled' };
+    r = await askRs(true, sched);
+    yes('a board GitHub will not give the token for fails the run (409), saying so', r.status === 409 && has(/^STOP the board was not told: GitHub gave the App no token/));
+    gh.botGranted = true;
+    r = await askRs();
+
     // Auto-merge (Patrick's A on #5182, 31 Oct 2026).
     gh.settingsRecord = settings();
     gh.settingsRecord.repositories[0].allow_auto_merge = true;
@@ -989,9 +1072,15 @@ function start(stateDir, ghPort, more) {
     const unesc = s => s.replace(/&quot;/g, '"').replace(/&#39;/g, '\'').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
     yes('the armed page, through Caddy, posts the manifest to GitHub with the state', r.status === 200 && form && unesc(form[1]) === 'http://127.0.0.1:' + ghPort + '/web/settings/apps/new?state=' + st);
     const mf = form ? JSON.parse(unesc(form[2])) : {};
-    yes('  the manifest: private, administration write, contents read, secrets and environments write for go-public (#4013), variables read, Actions write for the Ship verbs (#2841), Issues write for the Discord bot (#5184), no webhook, back to /github-app/setup/done',
-      mf.public === false && JSON.stringify(mf.default_permissions) === '{"administration":"write","contents":"read","secrets":"write","actions_variables":"read","environments":"write","actions":"write","issues":"write"}' && mf.hook_attributes.active === false &&
+    yes('  the manifest: private, administration write, contents read, secrets read, environments write for a box key (ops-access.js), variables read, Actions write for the Ship verbs (#2841), Issues write for the Discord bot (#5184), no webhook, back to /github-app/setup/done',
+      mf.public === false && JSON.stringify(mf.default_permissions) === '{"administration":"write","contents":"read","secrets":"read","actions_variables":"read","environments":"write","actions":"write","issues":"write"}' && mf.hook_attributes.active === false &&
       mf.redirect_url === 'https://thornswood.net/github-app/setup/done' && (mf.default_events || []).length === 0);
+    yes('  and it asks for exactly what records/github-apps.json gives the box admin App (part 20)', (() => {
+      const rec = JSON.parse(fs.readFileSync(path.join(REPO, 'records', 'github-apps.json'), 'utf8')).apps.find(a => a.slug === 'thornswood-box-admin');
+      const want = Object.assign({}, rec.permissions); delete want.metadata;
+      const have = mf.default_permissions || {};
+      return JSON.stringify(Object.keys(want).sort().map(k => k + want[k])) === JSON.stringify(Object.keys(have).sort().map(k => k + have[k]));
+    })());
     yes('  and the page is neither kept nor passed on', /no-store/.test(r.headers['cache-control'] || '') && r.headers['referrer-policy'] === 'no-referrer');
 
     // A key made here for the stand-in to hand over; a line of its body is
