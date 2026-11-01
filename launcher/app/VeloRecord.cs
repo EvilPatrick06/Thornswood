@@ -256,7 +256,8 @@ namespace Thornswood
         /// <summary>
         /// The record's part that holds a channel's Velopack files: "velopack"
         /// for dev, published with the merge release, and "main" for main,
-        /// held back until Patrick approves it (#5181, merge-release.yml).
+        /// held back until Patrick approves a promotion to main (#5181,
+        /// merge-release.yml and promote-main.yml).
         /// </summary>
         public static string PartOf(string channel)
         {
@@ -289,9 +290,11 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// The tag of the Release the approval publishes main's files on
-        /// (#5181): main- and the build's tag. The build's own Release never
-        /// carries them, so nothing reaches a main launcher unapproved.
+        /// The tag of the Release main's files go out on (#5181): main- and
+        /// the build's tag. A promotion to main puts it out once Patrick
+        /// approves it (.github/workflows/promote-main.yml), and the build's
+        /// own Release never carries them, so nothing reaches a main launcher
+        /// unapproved.
         /// </summary>
         public static string MainRelease(string buildTag)
         {

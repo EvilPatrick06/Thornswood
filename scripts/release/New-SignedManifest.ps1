@@ -50,9 +50,10 @@
   THE PART "main" IS HELD. Its files are listed in the manifest like any
   other, so the one signed record holds main's package too, and are copied
   into <Out>\held instead of assets: the build Release never carries them.
-  Main's files are published only by Patrick's approval (#5181), on a
-  Release of their own (main-<tag>), and merge-release.yml keeps them for
-  that step. Their names are still unique across the whole manifest.
+  Main's files are published only by a promotion to main Patrick approved
+  (promote-main.yml, #5181), on a Release of their own (main-<tag>), and
+  merge-release.yml keeps them for it as the artifact main-<tag>. Their
+  names are still unique across the whole manifest.
 
   Keep it ASCII.
 #>

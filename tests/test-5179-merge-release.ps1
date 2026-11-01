@@ -164,6 +164,73 @@ try {
     [IO.File]::WriteAllText($rf, '[]')
     Yes '  and with no build Release yet there is none' ($null -eq (Get-MergeReleasePrevious -ReleasesFile $rf -ManifestDir $rd))
 
+    # ---- main's launcher package, for promote-main.yml (#5181) ---------------------
+    Yes 'build tags order by day, then number' ((Get-MergeReleaseOrder 'build-20261102.2') -gt (Get-MergeReleaseOrder 'build-20261101.10') -and
+        (Get-MergeReleaseOrder 'build-20261101.10') -gt (Get-MergeReleaseOrder 'build-20261101.9') -and (Get-MergeReleaseOrder 'main-build-20261101.5') -eq -1)
+    $pkgSha = ('a' * 64); $feedSha = ('b' * 64)
+    function MM([string]$tag, [string]$lv, [string]$game, [bool]$withMain) {
+        $parts = [ordered]@{ game = @([ordered]@{ name = 'game.zip'; sha256 = $game; size = 1 }) }
+        if ($withMain) { $parts['main'] = @([ordered]@{ name = 'Thornswood-2026.1101.5-full.nupkg'; sha256 = $pkgSha; size = 1 }, [ordered]@{ name = 'releases.main.json'; sha256 = $feedSha; size = 1 }) }
+        [pscustomobject]@{ tag = $tag; commit = ('c' * 40); launcherVersion = $lv; parts = [pscustomobject]$parts }
+    }
+    function Rel([int]$id, [string]$tag, [bool]$draft, $assets) { [ordered]@{ id = $id; tag_name = $tag; draft = $draft; assets = @($assets) } }
+    function Asset([int]$id, [string]$name, [string]$sha) { [ordered]@{ id = $id; name = $name; digest = $(if ($sha) { 'sha256:' + $sha } else { $null }) } }
+    $md = Join-Path $tmp 'main-manifests'
+    New-Item -ItemType Directory -Force -Path $md | Out-Null
+    function Write-Rels($list) { $f = Join-Path $tmp ('rels-' + [guid]::NewGuid().ToString('N').Substring(0, 6) + '.json'); [IO.File]::WriteAllText($f, (ConvertTo-Json @($list) -Depth 6)); return $f }
+    function Write-M($m) { [IO.File]::WriteAllText((Join-Path $md ($m.tag + '.json')), ($m | ConvertTo-Json -Depth 6)) }
+    $lv = '2026.1031.1915'
+    $promoted = MM 'build-20261102.2' $lv 'g1' $false
+    Write-M (MM 'build-20261102.3' $lv 'g1' $true)
+    Write-M (MM 'build-20261101.5' $lv 'g1' $true)
+    Write-M (MM 'build-20261101.4' $lv 'g0' $true)
+    $base5181 = @(
+        (Rel 1 'build-20261102.3' $false @(Asset 101 'manifest.json' '')),
+        (Rel 2 'build-20261102.2' $false @(Asset 102 'manifest.json' '')),
+        (Rel 3 'build-20261102.1' $true @(Asset 103 'manifest.json' '')),
+        (Rel 4 'build-20261101.5' $false @(Asset 104 'manifest.json' '')),
+        (Rel 5 'build-20261101.4' $false @(Asset 105 'manifest.json' ''))
+    )
+    $pk = Find-MainPackage -Tag 'build-20261102.2' -Manifest $promoted -ReleasesFile (Write-Rels $base5181) -ManifestDir $md
+    Yes 'a promotion of a Release that made no package puts out the newest one before it, never a later one' (
+        $null -ne $pk -and $pk.From -eq 'build-20261101.5' -and $pk.MainTag -eq 'main-build-20261101.5' -and $pk.Commit -eq ('c' * 40) -and -not $pk.Published)
+    $own = MM 'build-20261102.2' $lv 'g1' $true
+    $pk = Find-MainPackage -Tag 'build-20261102.2' -Manifest $own -ReleasesFile (Write-Rels $base5181) -ManifestDir $md
+    Yes '  and its own when it made one' ($null -ne $pk -and $pk.From -eq 'build-20261102.2' -and $pk.MainTag -eq 'main-build-20261102.2')
+    Write-M (MM 'build-20261101.5' '2026.1030.1200' 'g1' $true)
+    $why = ''; try { Find-MainPackage -Tag 'build-20261102.2' -Manifest $promoted -ReleasesFile (Write-Rels $base5181) -ManifestDir $md | Out-Null } catch { $why = $_.Exception.Message }
+    Yes ('  a package before it of another launcher is not taken: ' + $why) ($why -match 'so no package goes with build-20261102\.2')
+    Write-M (MM 'build-20261101.5' $lv 'g1' $true)
+    $out5 = { param($assets, $draft) @($base5181) + @(Rel 9 'main-build-20261101.5' $draft $assets) }
+    $pk = Find-MainPackage -Tag 'build-20261102.2' -Manifest $promoted -ReleasesFile (Write-Rels (& $out5 @((Asset 201 'Thornswood-2026.1101.5-full.nupkg' $pkgSha), (Asset 202 'releases.main.json' $feedSha)) $false)) -ManifestDir $md
+    Yes 'main-<tag> out already with exactly the record''s files is left as it is' ($null -ne $pk -and $pk.Published)
+    $why = ''; try { Find-MainPackage -Tag 'build-20261102.2' -Manifest $promoted -ReleasesFile (Write-Rels (& $out5 @((Asset 201 'Thornswood-2026.1101.5-full.nupkg' ('d' * 64)), (Asset 202 'releases.main.json' $feedSha)) $false)) -ManifestDir $md | Out-Null } catch { $why = $_.Exception.Message }
+    Yes ('  one out with another file under a listed name stops it: ' + $why) ($why -match 'is out already and holds a Thornswood-2026\.1101\.5-full\.nupkg')
+    $why = ''; try { Find-MainPackage -Tag 'build-20261102.2' -Manifest $promoted -ReleasesFile (Write-Rels (& $out5 @() $true)) -ManifestDir $md | Out-Null } catch { $why = $_.Exception.Message }
+    Yes ('  and so does one left a draft: ' + $why) ($why -match 'main-build-20261101\.5 is a draft')
+    $none = @((Rel 2 'build-20261102.2' $false @(Asset 102 'manifest.json' '')), (Rel 6 'build-20261101.1' $false @(Asset 106 'notes.txt' '')))
+    Yes 'with no package made up to it, there is nothing for main''s launcher' ($null -eq (Find-MainPackage -Tag 'build-20261102.2' -Manifest $promoted -ReleasesFile (Write-Rels $none) -ManifestDir $md))
+    $why = ''; try { Find-MainPackage -Tag 'build-20261103.1' -Manifest $promoted -ReleasesFile (Write-Rels $base5181) -ManifestDir $md | Out-Null } catch { $why = $_.Exception.Message }
+    Yes ('a tag that is not among the Releases read stops it: ' + $why) ($why -match 'not among the hundred newest')
+    $rec = MM 'build-20261101.5' $lv 'g1' $true
+    $exact = @{ 'Thornswood-2026.1101.5-full.nupkg' = $pkgSha.ToUpperInvariant(); 'releases.main.json' = $feedSha }
+    Yes 'the files of main''s package are held to the record by name and sha256' ((Get-MainPackageProblem -Record $rec -Have $exact) -eq '')
+    Yes '  a file missing' ((Get-MainPackageProblem -Record $rec -Have @{ 'releases.main.json' = $feedSha }) -match '^lacks Thornswood-2026\.1101\.5-full\.nupkg')
+    Yes '  a file the record does not list' ((Get-MainPackageProblem -Record $rec -Have (@{ 'x.exe' = $feedSha } + $exact)) -match '^holds x\.exe, which')
+    Yes '  and a listed name with other bytes are each said' ((Get-MainPackageProblem -Record $rec -Have @{ 'Thornswood-2026.1101.5-full.nupkg' = $feedSha; 'releases.main.json' = $feedSha }) -match '^holds a Thornswood-2026\.1101\.5-full\.nupkg that is not')
+    Yes '  and a record with no main package is no package' ((Get-MainPackageProblem -Record (MM 'build-20261102.2' $lv 'g1' $false) -Have $exact) -match 'lists no main package')
+    function Art([string]$name, [bool]$expired, [string]$branch, [string]$sha, [long]$run) { [pscustomobject]@{ name = $name; expired = $expired; workflow_run = [pscustomobject]@{ id = $run; head_branch = $branch; head_sha = $sha } } }
+    $c40 = 'c' * 40
+    $arts = @((Art 'main-build-20261101.5' $true 'main' $c40 1), (Art 'main-build-20261101.5' $false 'dev' $c40 2), (Art 'main-build-20261101.5' $false 'main' ('e' * 40) 3), (Art 'main-build-20261101.5' $false 'main' $c40 4))
+    $a = Select-MainPackageArtifact -Artifacts $arts -Name 'main-build-20261101.5' -Commit $c40
+    Yes 'the artifact taken is the one kept on main at the record''s commit that has not expired' ($a.workflow_run.id -eq 4)
+    $why = ''; try { Select-MainPackageArtifact -Artifacts @($arts[0]) -Name 'main-build-20261101.5' -Commit $c40 | Out-Null } catch { $why = $_.Exception.Message }
+    Yes ('  an expired one says so: ' + $why) ($why -match 'has expired')
+    $why = ''; try { Select-MainPackageArtifact -Artifacts @($arts[3], $arts[3]) -Name 'main-build-20261101.5' -Commit $c40 | Out-Null } catch { $why = $_.Exception.Message }
+    Yes '  two is not one' ($why -match '2 artifacts')
+    $why = ''; try { Select-MainPackageArtifact -Artifacts @() -Name 'main-build-20261101.5' -Commit $c40 | Out-Null } catch { $why = $_.Exception.Message }
+    Yes '  and none says there is none' ($why -match 'no artifact main-build-20261101\.5')
+
     # ---- New-SignedManifest -Add -------------------------------------------------------
     $nsm = Join-Path $Repo 'scripts/release/New-SignedManifest.ps1'
     $gm = Join-Path $tmp 'in/gamemode.js'; Put $gm '// g'
