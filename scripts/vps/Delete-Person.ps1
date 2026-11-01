@@ -13,6 +13,14 @@
       .\scripts\vps\Remote.ps1 -File .\scripts\vps\Delete-Person.ps1 -Arguments '-Reapply'
       .\scripts\vps\Remote.ps1 -File .\scripts\vps\Delete-Person.ps1 -Arguments '-Reapply -Delete'
 
+  From a cloud session, or any machine with no key to the box, the deploy
+  gate's Delete-Person verb runs it on the box the same way (#2862), and
+  what it prints comes back sealed to the session that asked:
+
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Delete-Person -DiscordId 123456789012345678'
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Delete-Person -DiscordId 123456789012345678 -Delete -By Patrick'
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Delete-Person -Reapply'
+
   WHY. site\data\site\privacy.md promises that somebody who asks in the
   Discord has their Discord link, session records, chat and character
   deleted, by a person, and that staff reapply completed requests before an
