@@ -226,5 +226,6 @@ hub's other three pages stay `'admin'`.
 `tests\test-gallery.js` drives the routes end to end against a copy, and
 `tests\test-hub-staff-gallery.js` drives both gates with a stub standing in for
 Discord, so a Loremaster exists without anybody being in a real server.
-Deploy with `.\scripts\deploy\Deploy-Docs.ps1`, which sends `server.js`, the
-public and hub pages, and the empty queue and reports files.
+A merge puts `server.js` and the public and hub pages in through the box
+deploy agent (docs\DEPLOY-AGENT.md); `.\scripts\deploy\Deploy-Docs.ps1` sends
+the empty queue and reports files.

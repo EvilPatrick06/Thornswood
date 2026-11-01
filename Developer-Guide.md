@@ -1814,7 +1814,7 @@ The machine that runs `Ship.ps1` still has to sign the build. `records\signing\s
 | Main release | `.\scripts\release\Ship.ps1` plus the note | Live feed, launcher News tab, the site news page, Discord #news |
 | Discord news | Ship posts it. To post the current feed again: `.\scripts\ops\Publish-Discord.ps1` or `.\scripts\ops\Publish-Discord.ps1 -Dev` | #news for main, the dev updates channel for dev |
 | Game news | The same note. The launcher News tab reads the feed. The site news page is `.\scripts\ops\Publish-News.ps1`, which a main Ship already runs | Launcher News tab, and https://thornswood.net for main |
-| Docs site | `.\scripts\deploy\Deploy-Docs.ps1` for the app. `.\scripts\deploy\Deploy-Docs.ps1 -Site` for the public pages | https://thornswood.net |
+| Docs site | The merge's Release, put in by the box deploy agent: the app and the public pages. `.\scripts\deploy\Deploy-Docs.ps1` for the documents, the boards and the password | https://thornswood.net |
 | Dev gamemode | `.\scripts\deploy\Deploy-DevGamemode.ps1` | Dev server only |
 | Live gamemode | `.\scripts\deploy\Deploy-Server.ps1 -GamemodeOnly`, from any machine, needs no server build | Live server |
 | Live server build, or the live settings Deploy-Gamemode writes | `.\scripts\deploy\Deploy-Gamemode.ps1`, then `.\scripts\deploy\Deploy-Server.ps1`, from a machine with the fork built | Live server |
@@ -2001,7 +2001,7 @@ from that tag (`git checkout -b hotfix/<name> live-<version>`).
 
 Everything else, and which one each change needs, is the list under "After a
 pull request is merged" below: `Deploy-Server.ps1` pushes a server
-build, `Deploy-Server.ps1 -GamemodeOnly` the gamemode from any machine (`Deploy-DevGamemode.ps1` for dev), `Deploy-Docs.ps1` the site, `Install-Bot.ps1` the bot,
+build, `Deploy-Server.ps1 -GamemodeOnly` the gamemode from any machine (`Deploy-DevGamemode.ps1` for dev), the box deploy agent the site and the bot from each merge's Release,
 `Request-Restart.ps1` an announcement. `Rotate-ServerPassword.ps1` changes a
 password nothing checks any more; the secrets table below says why. Every
 script closes the launcher and Skyrim itself when it needs to.
@@ -2022,11 +2022,10 @@ live deploy, which wait for Patrick's word.
 | The gamemode on the dev server | `.\scripts\deploy\Deploy-DevGamemode.ps1` |
 | The gamemode on the live server, `game\gamemode.js` and `game\content\Thornswood-Content.esp` | `.\scripts\deploy\Deploy-Server.ps1 -GamemodeOnly`, from any machine |
 | The live server build, or the live settings Deploy-Gamemode writes | `.\scripts\deploy\Deploy-Gamemode.ps1`, then `.\scripts\deploy\Deploy-Server.ps1`, from a machine with the fork built |
-| The site's app or `site\public` | `.\scripts\deploy\Deploy-Docs.ps1` |
-| The public pages, `site\data\site\*.md` | `.\scripts\deploy\Deploy-Docs.ps1 -Site` |
-| The bot's code or join card art in `bot` | `.\scripts\deploy\Install-Bot.ps1 -CodeOnly` |
+| The site's app, `site\public` or the public pages, `site\data\site\*.md` | Nothing. The merge's Release carries them and the box deploy agent puts them in within minutes ([docs\DEPLOY-AGENT.md](docs/DEPLOY-AGENT.md)). `Deploy-Docs.ps1` sends neither once the agent has the site; it is for the documents, the boards and the password. |
+| The bot's code or join card art in `bot` | Nothing. The merge's Release carries it and the deploy agent swaps it in. `Install-Bot.ps1` is for the service, its libraries and its token. |
 | The bot's avatar, `bot\thornswood-bot-*.png` | No script sends it. Upload it by hand in the Discord developer portal. |
-| The voice service, `voice\voice-server.js` or `voice\headlines.js` | `.\scripts\deploy\Install-Voice.ps1` |
+| The voice service, `voice\voice-server.js` or `voice\headlines.js` | Dev voice: nothing, it goes in with the merge's Deployment to Dev. Live voice: `.\scripts\deploy\Install-Voice.ps1` |
 | Scripts that only change how a release is built (Ship.ps1, Publish-Update.ps1, the Deploy scripts) | Nothing more. The pull is the change. |
 
 3. Everybody else, once it is out, from the main folder: `git checkout main`, then
@@ -2587,14 +2586,13 @@ The website is the `site` folder. Public pages are `site\data\site`. On the VPS 
 
 #### Deploy
 
-From your clone, after the pull request that changed the site is merged:
+Nothing to run: the merge's Release carries the app and the public pages, and the box deploy agent puts them in within minutes ([docs\DEPLOY-AGENT.md](docs/DEPLOY-AGENT.md)). An older copy goes back by its tag:
 
 ```powershell
-.\scripts\deploy\Deploy-Docs.ps1
-.\scripts\deploy\Deploy-Docs.ps1 -Site
+pwsh scripts/vps/Box-Run.ps1 -Line 'Deploy-Release -Environment site -Tag <tag>'
 ```
 
-The first command deploys the app. `-Site` deploys the public pages. News for a main release is [section 4](#4-how-to-release-to-main).
+`Deploy-Docs.ps1` is for the documents, the boards and the password, and for a new box before the agent has the site. News for a main release is [section 4](#4-how-to-release-to-main).
 
 #### Learn more about Website
 
