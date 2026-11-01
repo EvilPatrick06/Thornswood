@@ -16,7 +16,8 @@
       nothing keeps a Windows PowerShell 5.1 path;
     - each [IO.FileSystemAclExtensions] call is given a typed item
       ([IO.DirectoryInfo] or [IO.FileInfo]), which is what the method takes;
-    - Send-Backups.ps1 locks its folder that way;
+    - Send-Backups.ps1 locks its folder that way, and -Install says the drop
+      key after the lock and before it asks the VM anything;
     - the same call, run for real on a scratch folder, leaves SYSTEM and the
       Administrators alone on it.
   Windows only: the last check prints SKIP elsewhere. Under ten seconds.
@@ -70,6 +71,13 @@ Yes ('each [IO.FileSystemAclExtensions] call is given a typed item or a variable
 $send = [IO.File]::ReadAllText((Join-Path $Repo 'scripts/vps/Send-Backups.ps1'))
 Yes 'Send-Backups.ps1 locks its folder through [IO.FileSystemAclExtensions]::SetAccessControl' (
     $send.Contains('[IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]'))
+# -Install says the drop key once the lock holds, and before it asks the VM
+# anything, so the key reaches Thornswood-Hermes even while the VM is not reachable.
+$lock = $send.IndexOf('[IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]')
+$drop = $send.IndexOf("Say ('The drop key, for Thornswood-Hermes deploy/keys/box-drop.pub: '")
+$scan = $send.IndexOf('& $scan -t ed25519 $VmHost')
+Yes 'Send-Backups -Install says the drop key after the lock and before it reads the VM''s host key' (
+    $lock -ge 0 -and $drop -gt $lock -and $scan -gt $drop)
 
 # ---- the call, for real -----------------------------------------------------------
 if (-not $IsWindows) {
