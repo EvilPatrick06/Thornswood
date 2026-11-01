@@ -163,7 +163,7 @@ Yes 'no-build: the fork has no build of the head' ((Step $w).Step -eq 'no-build'
 $E = '4444444444444444444444444444444444444444'
 $O = '5555555555555555555555555555555555555555'
 function Fork-Run([long]$id, [string]$sha, [string]$status, $conclusion) {
-    return [pscustomobject]@{ id = $id; status = $status; conclusion = $conclusion; head_sha = $sha; head_branch = 'thornswood/engine-changes'; event = 'push'; html_url = "https://example/$id"; repository = [pscustomobject]@{ full_name = 'EvilPatrick06/skymp' }; head_repository = [pscustomobject]@{ full_name = 'EvilPatrick06/skymp' } }
+    return [pscustomobject]@{ id = $id; status = $status; conclusion = $conclusion; head_sha = $sha; head_branch = 'thornswood/engine-changes'; event = 'push'; html_url = "https://example/$id"; repository = [pscustomobject]@{ id = 1375283516; full_name = 'EvilPatrick06/skymp' }; head_repository = [pscustomobject]@{ id = 1375283516; full_name = 'EvilPatrick06/skymp' } }
 }
 function New-Building {
     $w = New-World
@@ -190,6 +190,10 @@ Yes '  a build of a commit the head is not ahead of (lost to a force push) is pa
 $w = New-Building
 $w.compare["$P...$E"] = 'behind'
 Yes '  a build the pin is ahead of is never the target, nor any older one' ((Step $w).Step -eq 'building')
+$w = New-Building
+foreach ($run in $w.forkRuns) { $run.repository = [pscustomobject]@{ id = 1375283516; full_name = 'Thornswood/skymp' } }
+$s = Step $w
+Yes '  a build is the fork''s by its repository id, not its name, which an org move changes (#5228)' ($s.Step -eq 'record' -and $s.Head -eq $E)
 $w = New-Building
 $w.forkRuns = @((Fork-Run 12 $H 'in_progress' $null), (Fork-Run 11 $E 'completed' 'failure'))
 Yes '  an earlier head whose build ended red is not one' ((Step $w).Step -eq 'building')
