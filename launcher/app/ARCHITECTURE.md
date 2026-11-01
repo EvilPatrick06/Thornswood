@@ -362,12 +362,7 @@ stays the same when the three day certificate renews. Only then does it look
 for `ExpectedSigner` in the Subject. `scripts\release\Assert-PublishSigned.ps1`
 runs the same class before a Ship publishes, and
 `tests\test-signer-check.ps1` compiles it on its own and points it at signed,
-unsigned, self-signed and changed files. `Signature.cs:410 MicrosoftRefusal()`
-asks the same of a program Microsoft signed itself: the same Windows check,
-then the chain must end at Microsoft Root Certificate Authority 2011 and the
-certificate must be Microsoft Corporation's, for signing programs. It was for
-the WebView2 installer voice downloaded (issue #1330); voice needs no WebView2
-since #4823, and nothing in the launcher calls it now.
+unsigned, self-signed and changed files.
 
 **ReleaseManifest** (ReleaseManifest.cs, FeedManifest.cs). Whether the
 release's signed manifest vouches for every asset the feed names (#2163,
