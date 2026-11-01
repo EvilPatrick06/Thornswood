@@ -8,7 +8,7 @@ and removed on uninstall (Uninstall.cs). Issue #421.
   GPL-3.0.txt
     Byte for byte skyrim-platform/LICENSE at fork commit 1a2e5995, and at
     5c54e8b9 before it (the file did not change between them)
-    (https://github.com/EvilPatrick06/skymp). Same text as skymp5-client/LICENSE
+    (https://github.com/ThornswoodRP/skymp). Same text as skymp5-client/LICENSE
     at that commit. Covers the GPL client runtime files.
 
   AGPL-3.0.txt

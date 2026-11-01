@@ -139,7 +139,7 @@ try {
         ('Pages 1' + $en + '5 and a well-known name, both fine.'),
         'Ask gavin about it.',
         'Ask Patrick in the Discord.',
-        'Clone https://github.com/EvilPatrick06/Thornswood to start.'
+        'Clone https://github.com/ThornswoodRP/Thornswood to start.'
     )
     Put $tmp 'SECURITY.md' @('Fine.', 'An entity &mdash; here.', 'A number &#8212; here.', 'A hex one &#x2014; here.',
         'Signed as Ada  Signer; the oldest branches use the gavin/ prefix.', 'Patrick holds the key, and this page may say so.',
@@ -240,7 +240,7 @@ try {
 
     # Clean the seeded breaks away and the same tree passes, the one good
     # allowance still covering its line.
-    Put $tmp 'README.md' @('# Seeded', 'A multiplayer engine, a playtest, getPlayer() and PlayerCharacter.', 'Clone https://github.com/EvilPatrick06/Thornswood to start.')
+    Put $tmp 'README.md' @('# Seeded', 'A multiplayer engine, a playtest, getPlayer() and PlayerCharacter.', 'Clone https://github.com/ThornswoodRP/Thornswood to start.')
     Put $tmp 'SECURITY.md' @('Fine.', 'Signed as the name on the signing certificate; the oldest branches use the gavin/ prefix.', 'Patrick holds the key, and this page may say so.')
     Put $tmp 'CONTRIBUTING.md' @('Never "player".', 'And people here are customers.')
     Put $tmp 'launcher/ui.xaml' @('<TextBlock x:Name="PlayerList" Text="the multiplayer client"/>') $utf8bom

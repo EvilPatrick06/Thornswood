@@ -23,7 +23,7 @@
   else.
 
   HOW. It starts box-run.yml on main of the private ops repository,
-  EvilPatrick06/Thornswood-Ops, where the VPS runners are registered since
+  ThornswoodRP/Thornswood-Ops, where the VPS runners are registered since
   this repository went public (#4013), with the line. That run checks out
   this repository's main, takes a box runner and the desk's deploy key out
   of the ops repository's "desk" environment, which only main may use
@@ -50,7 +50,7 @@ param(
     [long]$Run = 0,
     [switch]$OnTheBox,
     # Where box-run.yml and the VPS runners are (#4013).
-    [string]$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'
+    [string]$GitHubRepo = 'ThornswoodRP/Thornswood-Ops'
 )
 
 $ErrorActionPreference = 'Stop'

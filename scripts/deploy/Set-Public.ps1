@@ -1,7 +1,7 @@
 <#
   Set-Public.ps1
 
-  The flip (#4013, #3721): makes EvilPatrick06/Thornswood public through the
+  The flip (#4013, #3721): makes ThornswoodRP/Thornswood public through the
   box's GitHub App, after taking off it the copies of the box's secrets that
   moved to the private ops repository with the box's workflows (#4039). From
   a cloud thread, One or a developer's PC.
@@ -51,7 +51,7 @@ param(
     [long]$Run,
     [int]$WaitMinutes = 15,
     # Where github-admin.yml and the VPS runners are (#4013).
-    [string]$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'
+    [string]$GitHubRepo = 'ThornswoodRP/Thornswood-Ops'
 )
 
 Set-StrictMode -Version Latest
@@ -106,8 +106,8 @@ if ($PSCmdlet.ParameterSetName -eq 'Run') {
 $said = @("$answer" -split "`n")
 foreach ($l in @($said | Select-Object -Skip 1)) { Say "  $l" }
 switch -Regex ($said[0]) {
-    '^MATCHES$' { Say 'EvilPatrick06/Thornswood is public and holds none of the box''s secrets.' 'Green'; exit 0 }
-    '^CHANGED (\d+)$' { Say ('Done: ' + $Matches[1] + ' change(s), above. EvilPatrick06/Thornswood is public.') 'Green'; exit 0 }
+    '^MATCHES$' { Say 'ThornswoodRP/Thornswood is public and holds none of the box''s secrets.' 'Green'; exit 0 }
+    '^CHANGED (\d+)$' { Say ('Done: ' + $Matches[1] + ' change(s), above. ThornswoodRP/Thornswood is public.') 'Green'; exit 0 }
     '^DIFFERS (\d+)$' { Say ($Matches[1] + ' thing(s) left, above. pwsh scripts/deploy/Set-Public.ps1 does them; the switch cannot be taken back.') 'Yellow'; exit 1 }
 }
 Die ("the run answered '" + $said[0] + "', which is none of the answers this knows.")

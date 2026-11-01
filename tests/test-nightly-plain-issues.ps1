@@ -64,7 +64,7 @@ function Invoke-RestMethod {
     Write-Output -NoEnumerate $slice
 }
 
-$env:REPO = 'EvilPatrick06/Thornswood'
+$env:REPO = 'ThornswoodRP/Thornswood'
 $env:GH_TOKEN = 'not-a-real-token'
 $scriptPath = Join-Path (Join-Path (Join-Path $repo 'scripts') 'dev') 'Nightly-PlainIssues.ps1'
 . $scriptPath

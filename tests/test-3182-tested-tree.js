@@ -38,7 +38,7 @@ function yes(what, ok) { if (ok) { pass++; console.log('  ok   ' + what); } else
 function read(f) { try { return fs.readFileSync(f, 'utf8').split('\r\n').join('\n'); } catch (e) { return ''; } }
 
 const T = require(path.join(REPO, 'scripts', 'dev', 'Tested-Tree.js'));
-const REPO_NAME = 'EvilPatrick06/Thornswood';
+const REPO_NAME = 'ThornswoodRP/Thornswood';
 const TREE = 'a'.repeat(40);
 const OTHER = 'b'.repeat(40);
 

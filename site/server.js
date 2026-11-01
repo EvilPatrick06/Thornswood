@@ -943,7 +943,7 @@ function readLines() {
 function fillCreditsCommits(md, deployed, feeds) {
   const FULL = /^[0-9a-f]{40}$/;
   const SOME = /^[0-9a-f]{7,40}$/;
-  const tree = 'https://github.com/EvilPatrick06/skymp/tree/';
+  const tree = 'https://github.com/ThornswoodRP/skymp/tree/';
   const link = function (c) { return '[`' + c.slice(0, 8) + '`](' + tree + c + ')'; };
   const pick = function (ch) {
     const e = deployed && typeof deployed === 'object' ? deployed[ch] : null;
@@ -958,7 +958,7 @@ function fillCreditsCommits(md, deployed, feeds) {
   // the dev engine went up through Publish-Server, kept the hand text, and the
   // hand text named the engine the main server had left behind.
   if (live || dev) {
-    const rec = /built from one commit,\s+\[`[0-9a-f]{7,40}`\]\(https:\/\/github\.com\/EvilPatrick06\/skymp\/tree\/([0-9a-f]{40})\)/.exec(out);
+    const rec = /built from one commit,\s+\[`[0-9a-f]{7,40}`\]\(https:\/\/github\.com\/ThornswoodRP\/skymp\/tree\/([0-9a-f]{40})\)/.exec(out);
     const recorded = rec ? rec[1] : '';
     let said;
     if (live && dev && live === dev) {
@@ -1131,7 +1131,7 @@ function readJsonQuiet(file) {
    which keeps the site inside GitHub's sixty unsigned calls an hour. The
    lookup never holds a download: the request that starts it is served from
    here. tests/test-release-copies.js drives this block. */
-const RELEASE_REPO = 'EvilPatrick06/Thornswood';
+const RELEASE_REPO = 'ThornswoodRP/Thornswood';
 const RELEASE_DOWNLOAD = 'https://github.com/' + RELEASE_REPO + '/releases/download/';
 const RELEASE_LOOK_MS = 10 * 60 * 1000;
 const RELEASE_TAG_RE = /^release\/(main|dev)\/\d{8}-\d{4,6}(-dev)?$/;

@@ -147,12 +147,12 @@ Yes '  Renew-BoxKey keeps the old line until the secret holds the new key, and p
     $rk.IndexOf('& gh secret set $K.Secret') -lt $rk.IndexOf('Where-Object { $old -notcontains $_ }') -and
     $rk.Contains('if ($changed -and -not $done) { [IO.File]::WriteAllBytes($KeysFile, $before) }'))
 Yes '  its key goes only to the two fixed secrets of the ops repository, with the old line''s options and the App''s environments token' (
-    $rk.Contains("`$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'") -and $rk.Contains("Secret = 'DESK_KEY_B64'") -and $rk.Contains("Secret = 'NOTICE_KEY_B64'") -and
+    $rk.Contains("`$GitHubRepo = 'ThornswoodRP/Thornswood-Ops'") -and $rk.Contains("Secret = 'DESK_KEY_B64'") -and $rk.Contains("Secret = 'NOTICE_KEY_B64'") -and
     $rk.Contains('$newLine = $opts + '' '' + $bare + $tag') -and $rk.Contains('Get-ThornswoodOpsAccess -Repo $RepoRoot -For keys') -and
     $rk.Contains('does not let in main alone'))
 $ir = Text 'scripts/deploy/Install-Runner.ps1'
 Yes '  Install-Runner from the gate is the ops repository''s, with the App''s runners token, and puts back only a runner the records or GitHub already name' (
-    $ir.Contains("`$Repo = 'EvilPatrick06/Thornswood-Ops'") -and $ir.Contains('Get-ThornswoodOpsAccess -Repo') -and $ir.Contains('-For runners') -and
+    $ir.Contains("`$Repo = 'ThornswoodRP/Thornswood-Ops'") -and $ir.Contains('Get-ThornswoodOpsAccess -Repo') -and $ir.Contains('-For runners') -and
     $ir.Contains('is in no runner record and not registered on') -and $ir.IndexOf('function Invoke-Gh') -lt $ir.IndexOf('is in no runner record and not registered on'))
 # Publish-Server through the gate is the dev server's, from the box's store,
 # and nothing else (#4987): main stays with a Main run Patrick approves.
@@ -584,7 +584,7 @@ else if (c === 'nothing') { }
 # ---- 8. box-run.yml, in the ops repository (#4013) ---------------------------
 Yes 'box-run.yml is not in this repository, which has no VPS runner once public' (-not (Test-Path -LiteralPath ([IO.Path]::Combine($Repo, '.github', 'workflows', 'box-run.yml'))))
 $br = Text 'scripts/vps/Box-Run.ps1'
-Yes '  Box-Run.ps1 starts it in the private ops repository, where the runners are registered' ($br.Contains("[string]`$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'") -and $br.Contains("`$Workflow = 'box-run.yml'"))
+Yes '  Box-Run.ps1 starts it in the private ops repository, where the runners are registered' ($br.Contains("[string]`$GitHubRepo = 'ThornswoodRP/Thornswood-Ops'") -and $br.Contains("`$Workflow = 'box-run.yml'"))
 
 # ---- 9. the seal, and the ssh it uses -------------------------------------------
 . (Join-Path $Repo 'scripts/ops/Sealed.ps1')

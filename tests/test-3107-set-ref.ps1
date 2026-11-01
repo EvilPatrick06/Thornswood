@@ -469,7 +469,7 @@ $s = Session @{ Run = '88' } $done.Replace('git-ref.yml', 'build.yml') @((Note '
 Yes '  of a git-ref run only' ($s.Code -eq 1)
 $s = Session @{ Fork = $true; DeleteBranch = $b; Commit = $main } $done.Replace('git-ref.yml', 'thornswood-git-ref.yml') @((Note 'notice' "DELETED $b $main"))
 Yes '-Fork: it starts the fork''s thornswood-git-ref.yml on main with the branch, exit 0' (
-    $s.Code -eq 0 -and $s.Calls[0] -match '^api -X POST repos/EvilPatrick06/skymp/actions/workflows/thornswood-git-ref\.yml/dispatches' -and $s.Body.ref -eq 'main' -and $s.Body.inputs.delete_branch -eq $b)
+    $s.Code -eq 0 -and $s.Calls[0] -match '^api -X POST repos/ThornswoodRP/skymp/actions/workflows/thornswood-git-ref\.yml/dispatches' -and $s.Body.ref -eq 'main' -and $s.Body.inputs.delete_branch -eq $b)
 $s = Session @{ Fork = $true; Run = 88 } $done @((Note 'notice' "GONE $b"))
 Yes '  and -Fork -Run reads only a run of that workflow' ($s.Code -eq 1)
 $threw = $false

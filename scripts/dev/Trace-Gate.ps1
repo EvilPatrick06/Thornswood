@@ -27,7 +27,7 @@
        with nothing lost. Without -SelfTest a failed self-test stops here.
     2. Starts the gate's trace session on the box, then dispatches
        trace-gate.yml on the main of the private ops repository,
-       EvilPatrick06/Thornswood-Ops, where the VPS runners are registered
+       ThornswoodRP/Thornswood-Ops, where the VPS runners are registered
        (#4013), with -Ref as the branch of this repository it checks out
        and traces. It runs the gate on a
        build runner the way build.yml does, with Nightly-Harnesses.ps1
@@ -99,7 +99,7 @@ param(
     [string]$Ref = 'main',
     [int]$WaitMinutes = 50,
     # Where trace-gate.yml and the VPS runners are (#4013).
-    [string]$Repo = 'EvilPatrick06/Thornswood-Ops',
+    [string]$Repo = 'ThornswoodRP/Thornswood-Ops',
     [string]$Vps = '',
     [string]$User = ''
 )

@@ -70,7 +70,7 @@ function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; ex
 
 # Each key this can renew, and all it can renew. Where it goes on GitHub is
 # fixed here, never said by the caller.
-$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'
+$GitHubRepo = 'ThornswoodRP/Thornswood-Ops'
 $Kinds = @{
     desk    = @{ Name = 'desk'; Environment = 'desk'; Secret = 'DESK_KEY_B64'; User = 'thornswood-deploy'; Gate = $true;
                  Proved = '^(@REFUSED the gate broker did not answer|\| GATE READY)' }

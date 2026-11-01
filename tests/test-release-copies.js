@@ -28,7 +28,7 @@ function yes(what, cond) {
 
 const A = 'a'.repeat(64), B = 'b'.repeat(64), C = 'c'.repeat(64), I = 'd'.repeat(64);
 const TAG = 'release/main/20261026-170000';
-const DL = 'https://github.com/EvilPatrick06/Thornswood/releases/download/release/main/20261026-170000/';
+const DL = 'https://github.com/ThornswoodRP/Thornswood/releases/download/release/main/20261026-170000/';
 
 const from = server.indexOf('/* ---- release copies (#3686) ----');
 const to = server.indexOf('/* ---- end release copies ---- */');

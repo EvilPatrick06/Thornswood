@@ -57,7 +57,7 @@ param(
     [string]$Line = '',
     [long]$Run = 0,
     [switch]$OnTheRunner,
-    [string]$GitHubRepo = 'EvilPatrick06/Thornswood'
+    [string]$GitHubRepo = 'ThornswoodRP/Thornswood'
 )
 
 $ErrorActionPreference = 'Stop'

@@ -11,7 +11,7 @@
       pwsh scripts/ops/Set-Ref.ps1 -DeleteBranch claude/what -Commit <40 hex>
                        the branch, when it is still at that commit
       pwsh scripts/ops/Set-Ref.ps1 -Fork -DeleteBranch claude/what -Commit <40 hex>
-                       the same in the fork, EvilPatrick06/skymp
+                       the same in the fork, ThornswoodRP/skymp
       pwsh scripts/ops/Set-Ref.ps1 -DeleteTag v1.1.47 -Commit <40 hex>
                        the tag, when it still names that commit
       pwsh scripts/ops/Set-Ref.ps1 -DeleteDraft 397526903
@@ -143,14 +143,14 @@ param(
     [Parameter(ParameterSetName = 'OnGitHub', Mandatory = $true)]
     [switch]$OnGitHub,
     [int]$WaitMinutes = 15,
-    [string]$GitHubRepo = 'EvilPatrick06/Thornswood'
+    [string]$GitHubRepo = 'ThornswoodRP/Thornswood'
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $workflow = 'git-ref.yml'
-if ($Fork) { $GitHubRepo = 'EvilPatrick06/skymp'; $workflow = 'thornswood-git-ref.yml' }
+if ($Fork) { $GitHubRepo = 'ThornswoodRP/skymp'; $workflow = 'thornswood-git-ref.yml' }
 $inActions = ($env:GITHUB_ACTIONS -eq 'true')
 $tagShape = '^release/(dev/\d{8}-\d{4}(\d{2})?-dev|main/\d{8}-\d{4}(\d{2})?)$'
 $maxMessage = 4000

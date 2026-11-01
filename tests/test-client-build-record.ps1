@@ -171,7 +171,7 @@ try {
         Yes 'the fork commit is HEAD, eight characters' ($r.Doc.forkCommit -eq $head8)
         Yes 'the branch of a detached clone is thornswood/engine-changes' ($r.Doc.forkBranch -eq 'thornswood/engine-changes')
         Yes 'the patch blocks are counted' ([int]$r.Doc.thornswoodPatchBlocks -eq 2)
-        Yes 'the fork named is EvilPatrick06/skymp' ($r.Doc.fork -eq 'https://github.com/EvilPatrick06/skymp')
+        Yes 'the fork named is ThornswoodRP/skymp' ($r.Doc.fork -eq 'https://github.com/ThornswoodRP/skymp')
         Yes 'builtUtc is the newest of the six' ([IO.File]::ReadAllText($r.Path) -match '"builtUtc":\s*"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ"')
         Yes 'no stale or dirty warning for a clean, newer build' ($r.Out -notmatch 'newer than the build' -and $r.Out -notmatch 'uncommitted')
     }
