@@ -92,11 +92,15 @@ function Fit([string]$t) {
     }
     return $stubs + $t
 }
+# From a file, as Invoke-ThornswoodRemote sends a long script: the install
+# script with the stand-ins is past Windows' 32,767-character command line
+# as an -EncodedCommand (measured on the gate harness runner, 1 Nov).
 function Run-Box([string]$t, [string]$stdin = '') {
-    $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($t))
+    $f = Join-Path $work ('box-' + [Guid]::NewGuid().ToString('N') + '.ps1')
+    [IO.File]::WriteAllText($f, $t, (New-Object Text.UTF8Encoding($true)))
     $psi = New-Object Diagnostics.ProcessStartInfo
     $psi.FileName = $boxShell
-    $psi.Arguments = '-NoProfile -NonInteractive -EncodedCommand ' + $enc
+    $psi.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + $f + '"'
     $psi.UseShellExecute = $false
     $psi.RedirectStandardInput = $true
     $psi.RedirectStandardOutput = $true
@@ -107,6 +111,7 @@ function Run-Box([string]$t, [string]$stdin = '') {
     $p.StandardInput.Close()
     $out = $p.StandardOutput.ReadToEnd() + $p.StandardError.ReadToEnd()
     $p.WaitForExit()
+    Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue
     return @($out -split "`r?`n" | Where-Object { $_ -ne '' })
 }
 
