@@ -117,6 +117,17 @@ Yes 'Set-InboundRules takes -Check and -Own, never another box, user, record or 
     (Words 'Set-InboundRules -Vps x') -eq 'REFUSED' -and (Words 'Set-InboundRules -Record x') -eq 'REFUSED' -and (Words 'Set-InboundRules -KnownHosts x') -eq 'REFUSED')
 Yes 'Setup-Discord runs on the box and only audits or checks: -Prune, -Posts, -Give and another guild wait for Patrick' ((Words 'Setup-Discord -Audit') -eq '-OnBox|-Audit' -and
     (Words 'Setup-Discord -Prune') -eq 'REFUSED' -and (Words 'Setup-Discord -Posts') -eq 'REFUSED' -and (Words 'Setup-Discord -Give x') -eq 'REFUSED' -and (Words 'Setup-Discord -Guild 1') -eq 'REFUSED')
+# What has a server's folder open, read on the box (#5211): live or dev, and
+# a minute of Defender's log, never a folder, a file or a process of the caller's.
+Yes 'Read-ServerHolders takes live or dev and a UTC minute of Defender''s log, never a folder, file or task' ((Words 'Read-ServerHolders') -eq '' -and
+    (Words 'Read-ServerHolders -Server dev') -eq '-Server|dev' -and (Words 'Read-ServerHolders -Server main') -eq 'REFUSED' -and
+    (Words 'Read-ServerHolders -DefenderFrom 2026-11-01T00:59 -DefenderMinutes 3') -eq '-DefenderFrom|2026-11-01T00:59|-DefenderMinutes|3' -and
+    (Words 'Read-ServerHolders -DefenderFrom yesterday') -eq 'REFUSED' -and (Words 'Read-ServerHolders -DefenderMinutes 100') -eq 'REFUSED' -and
+    (Words 'Read-ServerHolders -Root C:/x') -eq 'REFUSED' -and (Words 'Read-ServerHolders -Path x') -eq 'REFUSED' -and (Words 'Read-ServerHolders -TaskName x') -eq 'REFUSED')
+$rh = Text 'scripts/vps/Read-ServerHolders.ps1'
+Yes '  it finds the server''s processes by the installer''s own rule and reads only: no Stop-, no Remove-, no Set-, no Move' (
+    $rh.Contains("`$p.CommandLine.IndexOf(`$mark, [StringComparison]::OrdinalIgnoreCase)") -and $rh.Contains('Get-ThornswoodPathOpeners $Root') -and
+    (($rh -replace '(?s)<#.*?#>', '') -notmatch 'Stop-Process|Stop-ScheduledTask|Remove-Item|Set-Content|Set-MpPreference|Add-MpPreference|Move-ThornswoodPath|\.Kill\('))
 Yes 'Check-Site takes nothing of the caller''s' ((Words 'Check-Site') -eq '-NoPause' -and (Words 'Check-Site -Who 1') -eq 'REFUSED' -and (Words 'Check-Site -Site x') -eq 'REFUSED')
 # Box keys and runners, renewed from the cloud and never made new (#2862,
 # Patrick's A on q-retire-box-keys, 31 Oct 2026).
