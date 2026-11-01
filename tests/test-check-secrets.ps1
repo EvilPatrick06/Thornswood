@@ -341,22 +341,18 @@ try {
     yes 'this repository as it stands passes (exit 0)' ($r.Code -eq 0)
     if ($r.Code -ne 0) { Write-Host $r.Out }
 
-    # Wired in before anything leaves: the upload in Publish-Update, the
-    # compression in Package-Thornswood, both steps in the build check.
+    # Wired in before anything leaves: the upload in Publish-Update, and both
+    # steps in the build check. Package-Thornswood scanned the installer's
+    # stage until the old installer pipeline went (#4824).
     $pub = [IO.File]::ReadAllText((Join-Path $here 'scripts\release\Publish-Update.ps1'))
     $a = $pub.IndexOf("Check-Secrets.ps1')")
     $b = $pub.IndexOf('# ==== thornswood site upload ====')
     yes 'Publish-Update runs the scan over what it built' ($a -ge 0 -and $pub.Contains('-Zip $scanZips'))
     yes 'and before the upload' ($a -ge 0 -and $b -gt $a)
-    $pkg = [IO.File]::ReadAllText((Join-Path $here 'scripts\release\Package-Thornswood.ps1'))
-    $a = $pkg.IndexOf("Check-Secrets.ps1')")
-    yes 'Package-Thornswood scans the stage' ($a -ge 0 -and $pkg.Contains('-Dir $stage'))
-    yes 'held to the record of the launcher it packs (#3099)' ($pkg.Contains('-Dir $stage -ClientRecord $clientRecordPath') -and $pkg.IndexOf('Remove-Item -LiteralPath $clientRecordDir') -gt $a)
-    yes 'before -NoArchive hands it over and before it is compressed' ($a -ge 0 -and $a -lt $pkg.IndexOf('if ($NoArchive)') -and $a -lt $pkg.IndexOf("Head 'Compressing'"))
 
-    # And the two hooks themselves, run: the block out of each script, with Die
-    # recording instead of exiting. The rest of those scripts publish and
-    # upload, so they cannot be run here.
+    # And the hook itself, run: the block out of the script, with Die
+    # recording instead of exiting. The rest of that script publishes and
+    # uploads, so it cannot be run here.
     function Invoke-Hook([string]$src, [string]$from, [string]$to) {
         $i = $src.IndexOf($from); $j = $src.IndexOf($to)
         if ($i -lt 0 -or $j -le $i) { return 'no hook' }
@@ -367,8 +363,8 @@ try {
     }
     function Die($m) { $script:died = [string]$m }
     function Head($m) { }
-    # The two hooks run as if from their own folder, scripts\release, where
-    # their Join-Path $Here reaches Check-Secrets.ps1 in scripts\dev.
+    # The hook runs as if from its own folder, scripts\release, where its
+    # Join-Path $Here reaches Check-Secrets.ps1 in scripts\dev.
     $Here = Join-Path $here (Join-Path 'scripts' 'release')
     $pubFrom = '# ---- nothing that must never ship, read off what was built'
     # The upload, which is the site one since #897 and the only one since #907.
@@ -389,33 +385,16 @@ try {
     yes 'and reads the client runtime zip too' ($d -match 'Nothing was uploaded')
     $clientRel = $null
 
-    $pkgFrom = '# ---- nothing that must never ship ----'
-    $pkgTo = '# ---- archive ----'
-    # The record the packager saved for the launcher it packs (#3099), which
-    # the hook hands the scan and then removes.
-    $clientRecordDir = Join-Path $work 'package-client'
-    $clientRecordPath = Join-Path $clientRecordDir 'client-build.json'
-    $null = New-Item -ItemType Directory -Force -Path $clientRecordDir
-    Copy-Item -LiteralPath (Join-Path $repo 'records\client-build.json') -Destination $clientRecordPath
-    $d = Invoke-Hook $pkg $pkgFrom $pkgTo
-    yes 'Package-Thornswood stops on a stage carrying a token' ($d -ne 'no hook' -and $d -match 'staged installer')
-    $stageGood = Join-Path $work 'stage-good'
-    Write-Utf8 (Join-Path $stageGood 'payload\Data\Platform\Plugins\thornswood-front.js') "var a = 1;`n"
-    Write-Utf8 (Join-Path $stageGood 'config.json') "{}`n"
-    $stage = $stageGood
-    $null = New-Item -ItemType Directory -Force -Path $clientRecordDir
-    Copy-Item -LiteralPath (Join-Path $repo 'records\client-build.json') -Destination $clientRecordPath
-    $d = Invoke-Hook $pkg $pkgFrom $pkgTo
-    yes 'and lets a clean stage through' ($d -eq '')
     $yml = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\build.yml'))
     $t = $yml.IndexOf('name: Scan the tree for secrets')
     yes 'the build check scans the tree' ($t -ge 0)
-    # Since #3114 the launcher and setup program are built and scanned once,
-    # inside tests\test-498-msbuild.ps1, which a step of the build runs.
-    $t498 = [IO.File]::ReadAllText((Join-Path $repo 'tests\test-498-msbuild.ps1'))
-    $built = $t498.IndexOf('-File $blPath -Root $root -StubOut $stub')
-    $scan = $t498.IndexOf("scripts\dev\Check-Secrets.ps1') -Binary @(`$exe, `$stub)")
-    yes 'and the launcher and setup program it built, after building them' ($yml -match 'tests\\test-498-msbuild\.ps1 -RequireMSBuild' -and $built -gt 0 -and $scan -gt $built)
+    # Since #4823 the step that publishes the native launcher scans every
+    # program it published, after publishing them.
+    $pub = $yml.IndexOf('name: Publish the native launcher')
+    $built = $(if ($pub -ge 0) { $yml.IndexOf('scripts\release\Build-Launcher.ps1', $pub) } else { -1 })
+    $scan = $(if ($built -ge 0) { $yml.IndexOf('scripts\dev\Check-Secrets.ps1 -Binary $programs', $built) } else { -1 })
+    $next = $(if ($pub -ge 0) { $yml.IndexOf('- name:', $pub + 10) } else { -1 })
+    yes 'and the launcher programs it published, after publishing them' ($pub -ge 0 -and $built -gt $pub -and $scan -gt $built -and ($next -lt 0 -or $scan -lt $next))
 
     # ---------------------------------------------------------------- this machine
     # The two dev packs this machine still has that carried a real token. The

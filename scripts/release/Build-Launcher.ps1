@@ -158,14 +158,30 @@ Head 'Publishing the launcher'
 # as left behind.
 $pubDir = Join-Path ([IO.Path]::GetTempPath()) ('ThornswoodLauncherPublish-' + [guid]::NewGuid().ToString('N'))
 $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+# Every line is shown as dotnet says it and kept, for the check below.
+$said = New-Object System.Collections.Generic.List[string]
 & $dotnet.Source publish (Resolve-Path -LiteralPath $proj).Path --nologo -v minimal --disable-build-servers `
-    -c Release -r win-x64 --self-contained true -p:PublishAot=true "-p:Version=$Version" -o $pubDir
+    -c Release -r win-x64 --self-contained true -p:PublishAot=true "-p:Version=$Version" -o $pubDir 2>&1 |
+    ForEach-Object { $l = [string]$_; $said.Add($l); Write-Host $l }
 $rc = $LASTEXITCODE
 $ErrorActionPreference = $old
 $pubExe = Join-Path $pubDir 'Thornswood.exe'
 if ($rc -ne 0 -or -not (Test-Path -LiteralPath $pubExe)) {
     if (Test-Path -LiteralPath $pubDir) { Remove-Item -LiteralPath $pubDir -Recurse -Force }
     Die "dotnet publish exited with $rc"
+}
+# NO TRIM OR NATIVE CODE WARNING GOES OUT (#4823). An IL2xxx warning is code
+# the trimmer could not follow and an IL3xxx one code that needs the JIT the
+# native exe does not have: each is a call that can fail in the exe people
+# run and never in a JIT build. The publish says them and carries on, so the
+# build stops on them here, every build alike: the Launcher builds check, a
+# Ship and a merge release.
+$aot = @($said | Where-Object { $_ -match '\bwarning IL[23]\d{3}\b' } | Sort-Object -Unique)
+if ($aot.Count) {
+    Remove-Item -LiteralPath $pubDir -Recurse -Force
+    Write-Host ''
+    foreach ($w in $aot) { Write-Host "  $w" -ForegroundColor Red }
+    Die ("The native publish gave {0} trim or native code warning(s) (IL2xxx, IL3xxx), listed above. Each is code that may fail in the native exe; fix it at its cause. Nothing was put in $outDir." -f $aot.Count)
 }
 # The exe must say the number it was built with; the launcher reads it there.
 $fileVersion = (Get-Item -LiteralPath $pubExe).VersionInfo.FileVersion
