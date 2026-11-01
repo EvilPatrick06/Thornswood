@@ -41,8 +41,8 @@ function GitOk { $o = @(& git @args 2>&1); if ($LASTEXITCODE -ne 0) { throw ('gi
 
 # ---- read from this repository ----------------------------------------------
 $build = [IO.File]::ReadAllText((Join-Path $repo '.github/workflows/build.yml'))
-Yes 'build.yml parses the PowerShell scripts through Check-Parse.ps1' ($build -match '\\scripts\\dev\\Check-Parse\.ps1 -What PowerShell')
-Yes 'and the game scripts through it too, with no list of its own' (($build -match '\\scripts\\dev\\Check-Parse\.ps1 -What Scripts') -and ($build -notmatch 'ParseFile') -and ($build -notmatch 'node --check \$f'))
+Yes 'build.yml parses the PowerShell scripts through Check-Parse.ps1' ($build -match '[\\/]scripts[\\/]dev[\\/]Check-Parse\.ps1 -What PowerShell')
+Yes 'and the game scripts through it too, with no list of its own' (($build -match '[\\/]scripts[\\/]dev[\\/]Check-Parse\.ps1 -What Scripts') -and ($build -notmatch 'ParseFile') -and ($build -notmatch 'node --check \$f'))
 $eol = ((& git -C $repo ls-files --eol -- .githooks/pre-push) -join '').Trim()
 Yes ".githooks/pre-push is stored LF, so Git for Windows' sh reads it ($eol)" ($eol -match '^i/lf\s')
 $mode = ((& git -C $repo ls-files -s -- .githooks/pre-push) -join '').Trim()
