@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Windows;
-using System.Windows.Media;
+using Avalonia.Controls;
+using Avalonia.Media;
 
 namespace Thornswood
 {
@@ -253,7 +253,7 @@ namespace Thornswood
 
         static Color ColorOf(Theme t, string name)
         {
-            return (Color)ColorConverter.ConvertFromString(t.Colors[name]);
+            return Color.Parse(t.Colors[name]);
         }
 
         // A colour with some opacity, as it shows over what is under it. The
@@ -288,7 +288,7 @@ namespace Thornswood
         public static void Apply(Window w, Theme t)
         {
             foreach (KeyValuePair<string, string> kv in t.Colors)
-                w.Resources[kv.Key] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(kv.Value));
+                w.Resources[kv.Key] = new SolidColorBrush(Color.Parse(kv.Value));
         }
 
         public static void Apply(Window w, string name)
