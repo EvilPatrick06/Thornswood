@@ -88,4 +88,13 @@ jobs:
           }
           $throttle = 0
           if (-not [int]::TryParse($env:THROTTLE, [ref]$throttle)) { Write-Host ('::error::throttle is not a number: ' + $env:THROTTLE); exit 2 }
-          .\scripts\dev\Nightly-Harnesses.ps1 -Only $env:HARNESSES -Throttle $throttle -BudgetSeconds 2400
+          # One report (#5295): a test case for each check, and every failing
+          # one named on the run's page by scripts\dev\Merge-HarnessReports.ps1.
+          $report = Join-Path $env:RUNNER_TEMP 'harnesses.xml'
+          .\scripts\dev\Nightly-Harnesses.ps1 -Only $env:HARNESSES -Throttle $throttle -BudgetSeconds 2400 -Report $report
+          $code = $LASTEXITCODE
+          if ($code -ne 2) {
+            .\scripts\dev\Merge-HarnessReports.ps1 -Path $report -Expect 1 -Title 'Named harnesses'
+            if ($LASTEXITCODE -ne 0 -and $code -eq 0) { $code = 1 }
+          }
+          exit $code
