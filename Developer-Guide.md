@@ -181,7 +181,7 @@ The words this guide uses. The long alphabetical list, with file names, is [docs
 | Node | The program that runs the website, the voice service, and `node tests\...` |
 | Bot | The Discord bot in the `bot` folder |
 | Build check result | The check on a pull request: it passes only when Launcher builds and every share of the gate passed. Merge when it and Test tasks in the pull request say pass |
-| Test tasks in the pull request | The check that holds each `Test task for #N:` block in a pull request's body to the bot's post rules before the merge. An edit to the body runs it again |
+| Test tasks in the pull request | The check that holds each `Test task for #N:` block in a pull request's body to the bot's post rules before the merge. Editing the body runs it again |
 | Worktree | A second folder on this PC, checked out on its own branch |
 
 ## 1. First Time Setup
