@@ -589,6 +589,12 @@ const LEVEL = {
 /* The public front lives at / and needs no password. The working area moved
    to /hub, because a server nobody can read about is a server nobody joins,
    and a login box was the first thing anybody saw. */
+/* How long Cloudflare keeps a public page at its edge (#5190), by the
+   Cloudflare-CDN-Cache-Control header only those pages carry. Five minutes:
+   the box answers a page's first visitor in each of Cloudflare's places and
+   the rest from there, and a merge's change shows within five minutes of
+   going in. */
+const PUBLIC_EDGE_SECONDS = 300;
 const PUBLIC_PAGES = ['/', '/world', '/rules', '/credits', '/join',
                       '/classes', '/roadmap', '/news', '/gallery',
                       '/downloads', '/report',
@@ -7064,8 +7070,14 @@ async function handle(req, res) {
          everybody: nothing in it says who is asking. no-store kept every one
          of them out of the browser's back and forward cache, so Back from
          the rules to the front page fetched and drew the whole page again.
-         no-cache still asks the site each time the page is opened anew. */
-      return send(res, 200, html, TYPES['.html'], { 'Cache-Control': 'no-cache' });
+         no-cache still asks the site each time the page is opened anew.
+         Cloudflare, and only Cloudflare, keeps it for PUBLIC_EDGE_SECONDS
+         (#5190): its cache rule for these pages takes this header and caches
+         nothing that does not carry it, so a page that says who is asking
+         can never be kept at the edge. A merge's new page is out everywhere
+         within that time of the agent putting it in. */
+      return send(res, 200, html, TYPES['.html'],
+        { 'Cache-Control': 'no-cache', 'Cloudflare-CDN-Cache-Control': 'max-age=' + PUBLIC_EDGE_SECONDS });
     } catch (e) { return send(res, 500, 'no home.html', 'text/plain'); }
   }
 
