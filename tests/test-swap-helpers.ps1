@@ -32,7 +32,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $root = Split-Path -Parent $Here
 . (Join-Path $root 'scripts\deploy\Swap.ps1')
 . (Join-Path $root 'scripts\vps\Vps.ps1')
-. (Join-Path $Here 'Windows.ps1')
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 
 $script:pass = 0; $script:fail = 0
 function Check([string]$what, [bool]$ok) {
