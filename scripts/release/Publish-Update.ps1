@@ -53,9 +53,10 @@ param(
     # the dev server: its own release branch, its own baseline, its own pack
     # ids, and the dev ports in its version.json. Nothing about main moves.
     ,[ValidateSet('main', 'dev')][string]$Channel = 'main'
-    # The version to record for the launcher being published. Ship always
-    # passes the number its exe carries: git holds 0.0.0 in app\Updater.cs,
-    # and the real number lives only in the exe (#5179).
+    # The launcher's number, the one its build was given (-p:Version,
+    # Build-Launcher.ps1) and its exe carries. Needed with -Launcher: since
+    # #4825 no file in the checkout holds it, so nothing here can read it.
+    # Ship passes the number it built with.
     ,[string]$VersionOverride
     # With -Launcher: the fingerprint of what that exe is compiled from, which
     # Ship works out (Get-LauncherInputHash). Written to the feed as
@@ -1412,14 +1413,8 @@ $exePath = Get-LauncherExe (Join-Path $Root 'Launcher')
 $launcherVersion = ''
 if ($Launcher) {
     if (-not (Test-Path $exePath)) { Die "No launcher at $exePath. Run Build-Launcher.ps1 first." }
-    $updaterCs = Join-Path $Here '..\..\launcher\app\Updater.cs'
-    if (Test-Path $updaterCs) {
-        $m = [regex]::Match((Get-Content $updaterCs -Raw), 'Version\s*=\s*"([^"]+)"')
-        if ($m.Success) { $launcherVersion = $m.Groups[1].Value }
-    }
-    if ($VersionOverride) { $launcherVersion = $VersionOverride }
-    if (-not $launcherVersion) { Die 'Could not read the version out of app\Updater.cs, and no -VersionOverride was given.' }
-    if ($launcherVersion -eq '0.0.0') { Die 'Updater.cs holds git''s 0.0.0, which no launcher carries. Pass -VersionOverride with the number the exe was built with (Ship does).' }
+    $launcherVersion = $VersionOverride
+    if (-not $launcherVersion) { Die 'No launcher number was given. Pass -VersionOverride with the number the exe was built with (Ship does).' }
     # Before anything is sent (the launcher number block above, #2347).
     $numberWhy = Get-LauncherNumberRefusal $feedNow $launcherVersion (Get-FileHash $exePath -Algorithm SHA256).Hash $LauncherInputs $Channel 'Nothing was sent.'
     if ($numberWhy) { Die $numberWhy }
