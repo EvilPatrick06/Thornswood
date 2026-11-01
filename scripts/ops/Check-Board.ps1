@@ -18,12 +18,11 @@
 
   WHAT IT HOLDS EACH CARD TO (Developer-Guide.md, "Everything we need to do
   goes on the board"):
-    no order      an open issue with no Order. "Order is the do-order. A new
-                  issue gets the Order of where it belongs." Every open issue
-                  carries one (Patrick, 27 Oct 2026, #3534): order-on-filing.yml
-                  gives a new issue 10000 plus its number, and the board
-                  review moves it to where it belongs in the queue.
-    shared order  two open cards with the same Order, so neither is first.
+    no priority   an open issue whose card has no Priority, because the issue
+                  carries none of the labels P0, P1, P2 and P3. Every open
+                  issue has one (#5185, which replaced Order with them); the
+                  weekly review gives each one named here its label, and
+                  board.yml puts it on the card.
     no status     an open card with no Status. The options are Todo, In
                   Progress and Done.
     closed open   a closed issue whose Status is not Done. The board's own
@@ -31,9 +30,10 @@
                   is one it missed.
     statuses      the Status options are Todo, In Progress and Done, in that
                   order ("never add one through the API").
-    workflows     Auto-add to project on, so every issue gets a card;
-                  Auto-close issue off, since a Done issue still waits on its
-                  test (#3076).
+    workflows     Auto-close issue off, since a Done issue still waits on its
+                  test (#3076). Every issue gets its card from board.yml
+                  (#5185), so Auto-add to project is neither needed nor
+                  checked.
     no card       an open issue of the repository, made before the board was
                   read, with no card, when the open issues are read too
                   (-Issues, or gh; -NoIssues skips).
@@ -85,14 +85,14 @@ function Get-CardName($c) {
 # open issues, or $null when they were not read.
 function Find-BoardDrift($board, [string]$repo, $open) {
     $out = [ordered]@{}
-    foreach ($k in 'no order', 'shared order', 'no status', 'closed open', 'statuses', 'workflows', 'no card') { $out[$k] = New-Object System.Collections.Generic.List[string] }
+    foreach ($k in 'no priority', 'no status', 'closed open', 'statuses', 'workflows', 'no card') { $out[$k] = New-Object System.Collections.Generic.List[string] }
 
     $statuses = @(Get-Prop $board 'statuses')
     if (($statuses -join '|') -ne ($StatusOptions -join '|')) {
         $out['statuses'].Add(('the Status options are {0}, not {1}' -f ($(if ($statuses.Count) { $statuses -join ', ' } else { 'none' })), ($StatusOptions -join ', ')))
     }
     $flows = @(Get-Prop $board 'workflows')
-    foreach ($want in @(@{ n = 'Auto-add to project'; on = $true }, @{ n = 'Auto-close issue'; on = $false })) {
+    foreach ($want in @(@{ n = 'Auto-close issue'; on = $false })) {
         $f = @($flows | Where-Object { (Get-Prop $_ 'name') -eq $want.n })
         if (-not $f.Count) { $out['workflows'].Add(('the board has no "{0}" workflow' -f $want.n)); continue }
         if ([bool](Get-Prop $f[0] 'enabled') -ne $want.on) { $out['workflows'].Add(('"{0}" is {1}, and should be {2}' -f $want.n, $(if ($want.on) { 'off' } else { 'on' }), $(if ($want.on) { 'on' } else { 'off' }))) }
@@ -102,11 +102,8 @@ function Find-BoardDrift($board, [string]$repo, $open) {
     $mine = @($cards | Where-Object { -not [bool](Get-Prop $_ 'archived') })
     $liveOpen = @($mine | Where-Object { (Get-Prop $_ 'state') -eq 'OPEN' })
     foreach ($c in @($liveOpen | Sort-Object { [int](Get-Prop $_ 'number') })) {
-        if ((Get-Prop $c 'kind') -eq 'Issue' -and $null -eq (Get-Prop $c 'order')) { $out['no order'].Add((Get-CardName $c)) }
+        if ((Get-Prop $c 'kind') -eq 'Issue' -and -not (Get-Prop $c 'priority')) { $out['no priority'].Add((Get-CardName $c)) }
         if (-not (Get-Prop $c 'status')) { $out['no status'].Add((Get-CardName $c)) }
-    }
-    foreach ($g in @($liveOpen | Where-Object { $null -ne (Get-Prop $_ 'order') } | Group-Object { [double](Get-Prop $_ 'order') } | Where-Object { $_.Count -gt 1 } | Sort-Object { [double]$_.Name })) {
-        $out['shared order'].Add(('Order {0}: {1}' -f $g.Name, (@($g.Group | ForEach-Object { '#' + (Get-Prop $_ 'number') }) -join ', ')))
     }
     foreach ($c in @($mine | Where-Object { (Get-Prop $_ 'kind') -eq 'Issue' -and (Get-Prop $_ 'state') -eq 'CLOSED' -and (Get-Prop $_ 'status') -ne 'Done' } | Sort-Object { [int](Get-Prop $_ 'number') })) {
         $out['closed open'].Add(('{0} (Status {1})' -f (Get-CardName $c), $(if (Get-Prop $c 'status') { Get-Prop $c 'status' } else { 'none' })))

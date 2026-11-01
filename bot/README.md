@@ -145,10 +145,9 @@ once in the log.
   or Main Findings whose fix has not landed yet, tagged Dev or Main
   (Patrick, 22 Oct). Its fix has landed once the issue has a `Test task:`
   comment or is in Done: done-on-merge.yml's comment on it, `Pull request #N
-  merged (...)` written by the workflow, or the `board: Done` label for the
-  minute before board-status.yml takes it off. Then it is not a known issue
-  and its post goes at once. A card moved to Done by hand with no merge is
-  not seen, since the bot cannot read the board. A merged pull request alone does
+  merged (...)` written by the workflow, which comes with the card's Done
+  (since #5185 nobody moves a card by hand, and no `board: Done` label goes
+  on). Then it is not a known issue and its post goes at once. A merged pull request alone does
   not take a post down (#3140): when any merged pull request that named the
   issue did, a measuring step on the scripts finding, partial fixes and a
   `Refs` written by mistake kept bugs people still meet off the list. Each

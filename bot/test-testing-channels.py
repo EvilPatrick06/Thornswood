@@ -1632,18 +1632,25 @@ yes('  and no timeline is read for them',
     not [u for u in ASKED[asked_before:] if '/timeline' in u])
 COMMENTS[122] = [task('Ferry is smooth', 'Main', '1. Ride the ferry.')]
 bump(122)
+# Since #5185 no board: Done label goes on (the card follows the merge by
+# itself), so a stray one left from before is just a label, and keeps its post.
 bump(121, labels=[{'name': 'Main Findings'}, {'name': 'board: Done'}])
 posted, edited, removed = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))
-yes('a "Test task:" comment takes its post down, and so does the board\'s '
-    'Done label',
-    sorted(removed) == [121, 122]
-    and sorted(names(kf)) == ['Chairs stand you up', 'Scripts never fire'])
+yes('a "Test task:" comment takes its post down; a leftover board: Done '
+    'label does not',
+    sorted(removed) == [122]
+    and sorted(names(kf)) == ['Chairs stand you up', 'Killmoves unseen', 'Scripts never fire'])
 out = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))
 yes('  nothing comes back on the next pass', out == ([], [], [])
+    and sorted(names(kf)) == ['Chairs stand you up', 'Killmoves unseen', 'Scripts never fire'])
+bump(121, state='closed', state_reason='completed', closed_at=tick())
+removed = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))[2]
+yes('  it goes when it closes', removed == [121]
     and sorted(names(kf)) == ['Chairs stand you up', 'Scripts never fire'])
-# 26 Oct: board-status.yml takes board: Done off within a minute, so #613 and
-# #1626 were in Done and still posted. done-on-merge.yml's comment stays, its
-# test task inside a code block where "Test task:" is not the first line.
+# 26 Oct: board-status.yml took board: Done off within a minute, so #613 and
+# #1626 were in Done and still posted. done-on-merge.yml's comment is the
+# mark, its test task inside a code block where "Test task:" is not the first
+# line.
 issue(124, 'Forge list messy', ['Main Findings'])
 issue(125, 'Ladders creak', ['Main Findings'])
 run(bot.known_issues_once(kf, ks, gh, me_id=me.id))
@@ -1657,8 +1664,8 @@ COMMENTS[125] = [{'body': DOM, 'user': {'login': 'someone'},
 bump(124)
 bump(125)
 removed = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))[2]
-yes('  done-on-merge\'s comment takes its post down, the board: Done label '
-    'long gone; the same words from a person do not',
+yes('  done-on-merge\'s comment takes its post down; the same words from a '
+    'person do not',
     removed == [124] and 'Ladders creak' in names(kf)
     and 'Forge list messy' not in names(kf))
 bump(125, state='closed', state_reason='completed', closed_at=tick())
