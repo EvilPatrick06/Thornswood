@@ -13,7 +13,8 @@
 //
 // What goes into the copy, and what never does:
 //  - the engine (dist_back, scam_native.node, package.json, the DLLs beside
-//    it) from dev's folder, and gamemode.js and its stamp from the Release;
+//    it) from dev's folder, and gamemode.js and its stamp from the Release,
+//    with the gamemode's tables folder (#5191): the Release's, else dev's;
 //  - dev's data folder, which the server serves to anybody on its resources
 //    port, so nothing in it is private; but not the plugins and archives,
 //    which are read where they are kept for the bot pass (plugins\, copied
@@ -231,6 +232,11 @@ public sealed class BotPass(EnvConfig env, ITasks tasks)
         foreach (var dll in Directory.EnumerateFiles(dev, "*.dll")) Files.Copy(dll, Path.Combine(ServerDir, Path.GetFileName(dll)));
         foreach (var n in Server.ReloadFiles) Files.Copy(files[n], Path.Combine(ServerDir, n));
         foreach (var n in BotFiles) Files.Copy(files[n], Path.Combine(BotDir, n));
+        // The tables the gamemode reads beside it (#5191): the Release's, or,
+        // when it carries none, dev's own, which the Deployment leaves in place.
+        var devTables = Path.Combine(dev, Tables.Dir);
+        if (files.TryGetValue(Tables.Zip, out var tablesZip)) Tables.Expand(tablesZip, Path.Combine(ServerDir, Tables.Dir));
+        else if (Directory.Exists(devTables)) Tables.CopyDir(devTables, Path.Combine(ServerDir, Tables.Dir));
 
         // The data folder, without the game files, which are read where the
         // bot pass keeps them.

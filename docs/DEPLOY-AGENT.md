@@ -163,7 +163,9 @@ a copy of dev that nobody plays on:
 1. It takes the server folders' turn and makes the copy in
    `C:\Thornswood-BotPass\run\server`: dev's engine (`dist_back`,
    `scam_native.node`, `package.json`, any DLL beside it), the Release's
-   `gamemode.js` and stamp, and dev's data folder without its plugins and
+   `gamemode.js` and stamp, the `gamemode-tables` folder the gamemode reads
+   (the Release's `gamemode-tables.zip`, or dev's own folder when the
+   Release carries none, #5191), and dev's data folder without its plugins and
    archives. Those are read where the bot pass keeps them,
    `C:\Thornswood-BotPass\plugins`, copied from dev's only when one
    changes, by their full paths. Dev's world, its `private` folder (the

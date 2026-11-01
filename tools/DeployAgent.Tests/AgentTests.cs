@@ -1045,12 +1045,13 @@ public sealed class AgentTests : IDisposable
         ["Bot-Pass.js"] = B("// the pass"), ["bot.js"] = B("// the bot"), ["character.js"] = B("// the character"),
     };
 
-    static void BotRelease(FakeGitHub gh, string tag, string body, bool withBot = true)
+    static void BotRelease(FakeGitHub gh, string tag, string body, bool withBot = true, Dictionary<string, string>? tables = null)
     {
         var parts = new Dictionary<string, Dictionary<string, byte[]>>
         {
             ["gamemode"] = new() { ["gamemode.js"] = B(body), ["thornswood-build.json"] = B("{\"commit\":\"new\"}") },
         };
+        if (tables != null) parts["gamemode"][Tables.Zip] = TablesZip(tables);
         if (withBot) parts["bot"] = BotPart;
         gh.AddRelease(tag, ReleaseFiles(tag, Commit, "", parts));
     }
@@ -1229,6 +1230,31 @@ public sealed class AgentTests : IDisposable
         await a.Pass("dev", default);
         Assert.Equal("success", (string)gh.Last(id)!["state"]!);
         Assert.Contains("no bot pass: it is not set up on this box yet", s.Read(Path.Combine("data", $"deploy-{id}.log")));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task TheBotPassCopyHasTheTablesTheGamemodeReads(bool inRelease)
+    {
+        // A gamemode from #5191 on reads gamemode-tables beside it, and stops
+        // loading without it, so the copy carries the folder dev will have:
+        // the Release's, or dev's own when the Release carries none.
+        Dictionary<string, string>? copied = null;
+        var (a, gh, s, bp) = MakeWithPass(bp =>
+        {
+            var d = Path.Combine(bp.ServerDir, Tables.Dir);
+            copied = Directory.Exists(d) ? Directory.GetFiles(d).ToDictionary(f => Path.GetFileName(f), File.ReadAllText) : new();
+            return WriteResult(bp, true);
+        });
+        PutTables(s, new() { ["FOODS.json"] = "[\"dev\"]" });
+        BotRelease(gh, "build-1", Reading("new gamemode"), tables: inRelease ? new() { ["FOODS.json"] = "[\"new\"]", ["DATA.json"] = "{}" } : null);
+        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        Assert.Equal("success", (string)gh.Last(id)!["state"]!);
+        Assert.NotNull(copied);
+        Assert.Equal(inRelease ? "DATA.json={},FOODS.json=[\"new\"]" : "FOODS.json=[\"dev\"]",
+            string.Join(",", copied!.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => kv.Key + "=" + kv.Value)));
     }
 
     [Fact]
