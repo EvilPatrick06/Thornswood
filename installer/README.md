@@ -18,9 +18,10 @@ parts, and neither is a script:
   code (`launcher\app\InstallSteps.cs`), with the bar on the bytes copied and
   every line in the window and in `Profile\setup-log.txt`.
 
-Until #4824, `setup\Bootstrap.cs` built `Thornswood-Setup.exe`, which downloaded
-the payload from the site and ran `Setup-Thornswood.ps1` hidden in its window,
-and `Setup.bat` and `Install.bat` ran the same script in a console. A hidden
+Until #4824, `setup\Bootstrap.cs` built `Thornswood-Setup.exe`, which
+downloaded the payload from the site and ran the install script,
+Setup-Thornswood, hidden in its window, and `Setup.bat` and `Install.bat` ran
+the same script in a console. A hidden
 script is what antivirus reads hardest, and the install was written in two
 languages for one job, so the script, both batch files and the setup program
 are gone, and nothing falls back to them.
@@ -28,6 +29,25 @@ are gone, and nothing falls back to them.
 This folder keeps `READ ME FIRST.txt`, the page a person reads, and
 `licences\`, the GPL, AGPL and WebView2 texts handed over with the files
 (#421; `licences\README.txt` says where each comes from).
+
+## On your machine
+
+The install runs inside the launcher, so it builds with the launcher
+(`.\scripts\release\Build-Launcher.ps1`); this folder holds nothing to
+compile. Nothing here is run from the checkout. To try a change, install from
+a Velopack release on a machine that is not your own install, or start a built
+launcher whose folder has no `install-root.txt` above it, which opens on the
+install window. `tests\test-4824-install.py` builds the install steps with the
+.NET SDK, runs them against stand-in folders, and holds the window to the
+rules below.
+
+## Where it runs
+
+On the machine of anybody installing Thornswood for the first time, once:
+Velopack's Setup.exe from the release, then the launcher's first start on that
+machine. A launcher that finds its install folder recorded never shows the
+install window again; a stopped install records nothing, so the next start
+asks again.
 
 ## Why the install is in the launcher
 
@@ -127,13 +147,3 @@ Downgrade button's to fix.
 The script's other shape, a copy of the whole base game for a payload built
 with every mod in it, is not ported: no package carries that shape now, and
 the launcher's own folder and its Downgrade card do that job.
-
-## On your machine
-
-The install runs inside the launcher, so it builds with the launcher
-(`.\scripts\release\Build-Launcher.ps1`). Nothing here is run from the
-checkout. To try a change, install from a Velopack release on a machine that is
-not your own install, or start a built launcher whose folder has no
-`install-root.txt` above it.
-`tests\test-4824-install.ps1` runs the steps against stand-in folders and holds
-the window to the rules above.

@@ -87,7 +87,7 @@ $Named = @(
 # README.md and the component READMEs that tests\test-component-readmes.js reads.
 $NameFiles = @(
     'README.md', 'launcher/README.md', 'site/README.md', 'voice/README.md',
-    'game/plugins/README.md', 'game/ui/README.md', 'installer/setup/README.md'
+    'game/plugins/README.md', 'game/ui/README.md', 'installer/README.md'
 )
 $Rules = @(
     @{ Id = 'em-dash'; Case = 'IgnoreCase'; For = 'people'

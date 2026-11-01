@@ -78,9 +78,9 @@ menu set and unused fork assets a refresh must not copy back, and
 makes on each computer (#3715). `logo-dev.png` is the emblem the dev
 build shows in place of `logo.png` (Art.cs) and `app-dev.ico` is the icon its
 shortcuts carry in place of `app.ico` (Icons.cs); both are drawn for
-Thornswood, the same as the two they stand in for. The setup stub,
-`Thornswood-Setup.exe`, is `installer\setup\Bootstrap.cs` and `logo-192.png`,
-also Thornswood's own. Djinn made the emblems, the icons, the header strip and
+Thornswood, the same as the two they stand in for. The install window
+(`launcher\app\InstallWindow.cs`, #4824) is the launcher's own, with its
+emblem. Djinn made the emblems, the icons, the header strip and
 its video for Thornswood, and the rest of Thornswood's art too (the site's
 pictures, the main menu backdrop's picture, the start screen's scrolls and
 the Discord pictures), under the contributor terms in `LICENSE` (Patrick,
@@ -174,8 +174,8 @@ What the licence asks, and where it is done:
 
 Every launcher source file whose header names a project somebody else wrote,
 and whether its code is taken from that project. `tests\test-third-party.js`
-reads the header of every `.cs` file under `launcher\app` and
-`installer\setup` (its comments down to the first type it declares) and fails
+reads the header of every `.cs` file under `launcher\app` (its comments
+down to the first type it declares) and fails
 when one names an outside project and has no row here, or when a row says a
 file carries outside code and the file does not carry that project's notice.
 
@@ -1361,7 +1361,8 @@ help panel says under Getting help where the source is.
 
 The directions reach people in four places. The installer carries
 `SOURCE CODE.txt`, which Package-Thornswood.ps1 writes from the two build
-records and Setup-Thornswood.ps1 copies into the install folder (entry 170).
+records and the launcher's install (`launcher\app\InstallSteps.cs`) copies
+into the install folder (entry 170).
 The public credits page has them under "Source code", at
 https://thornswood.net/credits#source, which the download page links beside
 the installer (entry 170). `tests\test-source-offer.ps1` holds both to the

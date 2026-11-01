@@ -870,7 +870,7 @@ me. Each hit names the file, the line and the rule, and turns the build red:
 | `old-owner` | the old owner name |
 | `open-alpha` | calling the alpha a playtest that is closed; it is open by application |
 | `placeholder` | a marker left for later, in capitals (to do, to be decided, fix me), or filler Latin |
-| `names-person` | a person's name in README.md or the six component READMEs (launcher, site, voice, game\plugins, game\ui, installer\setup) |
+| `names-person` | a person's name in README.md or the six component READMEs (launcher, site, voice, game\plugins, game\ui, installer) |
 
 A line that has to say it anyway (this section naming the word it bans, a
 document quoting a note as it went out) goes in
@@ -1351,8 +1351,8 @@ from the board, none of these three puts an issue aside:
   and in his words "also we can lift the C# 5 rule"; the switch went in on
   15 Oct, once the VPS build runners had the Build Tools (option A, 12 Oct).
   `scripts\release\Build-Launcher.ps1` runs MSBuild on
-  `launcher\app\Thornswood.csproj` and `installer\setup\Setup.csproj` and
-  has no other way; the in-box .NET Framework 4 csc it used to call, and
+  `launcher\app\Thornswood.csproj` (the setup program's project went with
+  it in #4824) and has no other way; the in-box .NET Framework 4 csc it used to call, and
   the C# 5 limit that came with it (the rule was always about that compiler,
   never the framework, #499), are gone. `LangVersion` in both project files
   is 13.0, the newest the Visual Studio 2022 Build Tools compiler offers.
@@ -2091,7 +2091,6 @@ folder went:
 | File | Where | What it is | Read by |
 | --- | --- | --- | --- |
 | `signing.json` | `records\signing` | Whether this machine signs, and with what. No key in it | Sign-Artifact, Ship, Publish-Installer, Setup-ShipMachine |
-| `setup-stub.exe`, `setup-stub.pdb` | `out` | The setup program, compiled by Build-Launcher | Package-Thornswood, Ship |
 | `thornswood-front.zip` | `local` | The front build, made outside the repository | Go |
 | `mod-audit.json` | `local` | What Audit-Mods found last time | Audit-Mods |
 | `backups` | `local` | The backups brought off the VPS, since 5 Oct (`Downloads\Thornswood-Backups` before). Secrets are inside them | Fetch-Backups, Backup-Server, Clean-Everything |
@@ -2797,7 +2796,7 @@ Thornswood
 | `tests` | One file per check. `node tests\the-name.js` runs it | the `tests` folder |
 | `docs` | How the feed, the gamemode, and the game's systems fit | [docs/README.md](docs/README.md) |
 | `records` | What a Ship compares the build to, and signing | [records/README.md](records/README.md) |
-| `installer` | The small setup program people download first | [installer/setup/README.md](installer/setup/README.md) |
+| `installer` | What the install hands over; the install itself is the launcher's first start | [installer/README.md](installer/README.md) |
 | `engine` | SkyMP source. Leave it until you are building the server | [engine/README.md](engine/README.md) |
 | `lore` | The world. It is writing, not the server rules | the `lore` folder |
 
