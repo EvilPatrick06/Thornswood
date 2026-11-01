@@ -26,7 +26,8 @@
     - the stale and not-installed labels and the button name the revision;
     - the update log and Play's own refusal say which case holds updates;
     - READ ME FIRST says to install the revision the launcher opens;
-    - Publish-News links the feed's revision for the Downloads page, the
+    - the site's News page links the feed's revision for the Downloads page
+      (#5187: the site writes it from the feed itself), the
       site's public answer carries the number, and the Downloads button,
       join.md and help.md name it, help.md with a section for a copy ahead.
 
@@ -109,26 +110,29 @@ $rmf = [IO.File]::ReadAllText((Join-Path $repo 'installer\READ ME FIRST.txt')) -
 Yes 'READ ME FIRST says to install the revision the launcher opens' ($rmf.Contains('opens the revision the server was built against') -and $rmf.Contains('not a newer one Nexus may show first'))
 
 # ---- the site ---------------------------------------------------------------
-# Publish-News run for real over two small feeds, written to a file and sent
-# nowhere (-OutFile, a box name that cannot resolve), as test-public-news does.
+# The site writes its News page from the feed (#5187): its publicNews, lifted
+# out of server.js by its markers, run over two small feeds with node.
 $env:THORNSWOOD_HARNESS = '1'
 $tmp = if ($Scratch) { $Scratch } else { Join-Path ([IO.Path]::GetTempPath()) ('thornswood-4115-' + [guid]::NewGuid().ToString('N')) }
 New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+$lift = Join-Path $tmp 'news.js'
+[IO.File]::WriteAllText($lift, @'
+const fs = require('fs');
+const s = fs.readFileSync(process.argv[2], 'utf8');
+const block = s.slice(s.indexOf('/* ---- news from the Release (#5187) ----'), s.indexOf('/* ---- end news from the Release ---- */'));
+const api = new Function(block + '\nreturn { publicNews };')();
+console.log(JSON.stringify(api.publicNews(JSON.parse(fs.readFileSync(process.argv[3], 'utf8')), [], new Date())));
+'@)
 function News([string]$name, $feed) {
-    $dir = Join-Path $tmp $name
-    New-Item -ItemType Directory -Path $dir -Force | Out-Null
-    [IO.File]::WriteAllText((Join-Path $dir 'version.json'), ($feed | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding $false))
-    $out = Join-Path $tmp ($name + '-news.json')
-    try {
-        & (Join-Path $repo 'scripts\ops\Publish-News.ps1') -ReleaseDir $dir -OutFile $out -From '2026-09-01' `
-            -Vps 'nowhere.invalid' -User 'nobody' -Root 'C:/nowhere' -Quiet *>&1 | Out-Null
-    } catch { Write-Host ('      Publish-News stopped: ' + $_.Exception.Message); return $null }
-    if (-not (Test-Path -LiteralPath $out)) { return $null }
-    return (([IO.File]::ReadAllText($out)) -replace '^\uFEFF', '') | ConvertFrom-Json
+    $f = Join-Path $tmp ($name + '.json')
+    [IO.File]::WriteAllText($f, ($feed | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding $false))
+    $out = & node $lift (Join-Path $repo 'site\server.js') $f 2>&1
+    if ($LASTEXITCODE -ne 0) { Write-Host ('      the site''s news did not run: ' + ($out -join ' ')); return $null }
+    return ($out -join '') | ConvertFrom-Json
 }
 $c = 'https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf'
 $pinned = News 'pinned' ([ordered]@{ launcherVersion = '9.9.9'; collectionUrl = $c; collectionRevision = 2; news = @() })
-Yes 'Publish-News links the feed''s revision on the Downloads page' ($null -ne $pinned -and [string]$pinned.collection -eq ($c + '/revisions/2') -and [int]$pinned.collectionRevision -eq 2)
+Yes 'the site''s News page links the feed''s revision on the Downloads page' ($null -ne $pinned -and [string]$pinned.collection -eq ($c + '/revisions/2') -and [int]$pinned.collectionRevision -eq 2)
 $bare = News 'bare' ([ordered]@{ launcherVersion = '9.9.9'; collectionUrl = $c; news = @() })
 Yes 'with no revision in the feed it links the collection as it is, revision 0' ($null -ne $bare -and [string]$bare.collection -eq $c -and [int]$bare.collectionRevision -eq 0)
 Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue

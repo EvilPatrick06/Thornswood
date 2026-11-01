@@ -366,7 +366,7 @@ prints the public line. Send that line to Patrick; he runs
 `.\scripts\vps\Grant-BoxAccess.ps1 -Name <you> -FromClipboard` on One and
 sends you a token, which you paste when the same script asks
 (`docs\BOX-ACCESS.md` in the private ops repo). `.\scripts\vps\Setup-SshKey.ps1 -Test` proves it. Until then the scripts that talk to the VPS (`Ship`, `Deploy-*`,
-`Request-Restart`, `Install-Bot`, `Publish-Installer`, `Publish-News`) cannot
+`Request-Restart`, `Install-Bot`, `Publish-Installer`) cannot
 reach it, and Ship stops before it builds anything: the feed and its baseline
 are received from the VPS (#907).
 
@@ -1813,7 +1813,7 @@ The machine that runs `Ship.ps1` still has to sign the build. `records\signing\s
 | Dev release | `.\scripts\release\Ship.ps1 -Channel dev` plus the note | Dev feed, dev launcher News tab, dev updates channel in Discord |
 | Main release | `.\scripts\release\Ship.ps1` plus the note | Live feed, launcher News tab, the site news page, Discord #news |
 | Discord news | Ship posts it. To post the current feed again: `.\scripts\ops\Publish-Discord.ps1` or `.\scripts\ops\Publish-Discord.ps1 -Dev` | #news for main, the dev updates channel for dev |
-| Game news | The same note. The launcher News tab reads the feed. The site news page is `.\scripts\ops\Publish-News.ps1`, which a main Ship already runs | Launcher News tab, and https://thornswood.net for main |
+| Game news | The same note. The launcher News tab reads the feed. The site writes its News page itself from the main feed and its news file (the site's copy or the Release's) within a minute of a new feed (#5187); nothing is run | Launcher News tab, and https://thornswood.net for main |
 | Docs site | The merge's Release, put in by the box deploy agent: the app and the public pages. `.\scripts\deploy\Deploy-Docs.ps1` for the documents, the boards and the password | https://thornswood.net |
 | Dev gamemode | `.\scripts\deploy\Deploy-DevGamemode.ps1` | Dev server only |
 | Live gamemode | `.\scripts\deploy\Deploy-Server.ps1 -GamemodeOnly`, from any machine, needs no server build | Live server |
@@ -1831,10 +1831,9 @@ To post the current feed again:
 ```powershell
 .\scripts\ops\Publish-Discord.ps1 -DryRun
 .\scripts\ops\Publish-Discord.ps1 -Dev -DryRun
-.\scripts\ops\Publish-News.ps1 -OutFile news.json
 ```
 
-`-DryRun` and `-OutFile` send nothing. A real post remembers what it already announced and refuses to repeat it. `-Force` is how a deleted post is made again.
+`-DryRun` sends nothing. A real post remembers what it already announced and refuses to repeat it. `-Force` is how a deleted post is made again.
 
 ## 4. How to release to main
 

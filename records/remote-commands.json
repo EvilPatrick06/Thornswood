@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  80,
-    "callCount":  319,
+    "scriptCount":  79,
+    "callCount":  318,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -1454,15 +1454,6 @@
                       "does":  "reads files, settings, logs or status",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
-                  },
-                  {
-                      "script":  "scripts/ops/Publish-News.ps1",
-                      "scope":  "\u003ctop\u003e",
-                      "via":  "scp",
-                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $tmp \"$User@${Vps}:$Root/data/news.json\" }",
-                      "does":  "writes the feed, news or files store",
-                      "class":  "feed-send",
-                      "reason":  "writes the feed, news or files store"
                   },
                   {
                       "script":  "scripts/ops/Reset-Character.ps1",
