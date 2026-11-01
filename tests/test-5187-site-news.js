@@ -189,7 +189,7 @@ async function main() {
     t.setFeed(Object.assign({}, doc, { newsFile: { sha256: S } }), 1);
     await t.api.refreshNews();
     yes('a Release copy with ' + what + ' writes nothing, and says why', t.page() === null &&
-        t.log.some((l) => /news: release\/main/.test(l)) && !calls.includes('https://evil.example/news'));
+        t.log.some((l) => /news: release\/main/.test(l)) && !calls.some((u) => new URL(u).host === 'evil.example'));
   }
   const site = fs.readFileSync(path.join(REPO, 'site', 'server.js'), 'utf8');
   yes('the site asks for its news every minute and once it starts', /setInterval\(refreshNews, NEWS_LOOK_MS\)/.test(site) &&

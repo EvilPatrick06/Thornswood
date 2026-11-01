@@ -63,7 +63,10 @@ function run(live, out) {
         html('index.html').length > 0 && md.every((p) => html(p + '.html').includes('<title>')) && !fs.existsSync(path.join(out, 'known.html')));
     yes('each is the site\'s own page, its words in it', /<title>Rules · Thornswood<\/title>/.test(html('rules.html')) &&
         html('rules.html').includes('</h1>'));
-    yes('the invite is the one the live site says', html('index.html').includes(invite) && !html('index.html').includes('DISCORD_URL'));
+    // Each link of the page, held whole to the invite: a link is the invite
+    // or it is not, never one that has it somewhere inside.
+    const links = [...html('index.html').matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
+    yes('the invite is the one the live site says', links.some((l) => l === invite) && !html('index.html').includes('DISCORD_URL'));
     yes('the site\'s files are beside them, and the hub\'s and the template are not', fs.existsSync(path.join(out, 'home.css')) &&
         fs.existsSync(path.join(out, 'home.js')) && !fs.existsSync(path.join(out, 'hub.js')) && !fs.existsSync(path.join(out, 'home.html')));
     const redirects = html('_redirects');
