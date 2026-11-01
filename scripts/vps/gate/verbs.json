@@ -289,6 +289,30 @@
         "VmHost": "^[0-9]{1,3}([.][0-9]{1,3}){3}$",
         "Status": "switch"
       }
+    },
+    "Start-Backup": {
+      "script": "scripts/vps/Start-Backup.ps1",
+      "timeoutMinutes": 45,
+      "fixed": ["-NoPause"],
+      "params": {}
+    },
+    "Set-InboundRules": {
+      "script": "scripts/vps/Set-InboundRules.ps1",
+      "timeoutMinutes": 15,
+      "fixed": ["-NoPause"],
+      "params": {
+        "Check": "switch",
+        "Own": "switch"
+      }
+    },
+    "Setup-Discord": {
+      "script": "scripts/deploy/Setup-Discord.ps1",
+      "timeoutMinutes": 20,
+      "fixed": ["-OnBox"],
+      "params": {
+        "Audit": "switch",
+        "Check": "switch"
+      }
     }
   }
 }
