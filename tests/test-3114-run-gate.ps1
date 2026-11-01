@@ -40,7 +40,9 @@
        gate, split by the map's seconds, longest first to the least loaded
        share, or by place with no map; each share given the plan in
        GATE_PLAN runs its part, fetching nothing, and one given a plan it
-       cannot trust runs nothing and fails.
+       cannot trust runs nothing and fails. #5292: it makes no more shares
+       than there are harnesses to run, and none (shares=[]) for a change
+       that reaches none.
 
   Writes only its scratch folder, in the system's temp folder, and deletes it.
 #>
@@ -280,6 +282,32 @@ exit 0
         if ($r.Asked) { $union += @($r.Asked.Only -split ' ') }
     }
     Yes 'the shares of the plan together run what it picked, each once' ((($union | Sort-Object) -join ' ') -eq 'test-a.js test-c.js')
+
+    # #5292: no more shares than harnesses to run, since an empty share still
+    # waited for a Windows runner of its own; and none at all for a change
+    # that reaches none, so build.yml skips the job "gate".
+    $r = Invoke-Gate 'pull_request' 'github-hosted' -extra @('-Pick', '5')
+    $p = $null; if ($r.Plan) { $p = $r.Plan | ConvertFrom-Json }
+    Yes ('two harnesses picked for five shares make two shares, and say so (' + $r.Plan + ')') ($r.Code -eq 0 -and $p -and [int]$p.of -eq 2 -and @($p.shares).Count -eq 2 -and $r.Outputs -match '(?m)^shares=\[1,2\]\s*$' -and $r.Text -match '2 share\(s\), not 5')
+    $quiet = Join-Path $scratch 'quiet'
+    $null = New-Item -ItemType Directory -Path $quiet
+    $quietTraces = Join-Path $scratch 'quiet.traces.jsonl.gz'
+    [IO.File]::WriteAllBytes($quietTraces, (Gzip ((@(
+        '{"harness":"test-a.js","platform":"windows","listings":"enumerated","exit":0,"seconds":1,"skipped":false,"execs":["node.exe"],"paths":{"a.txt":"read"}}',
+        '{"harness":"test-b.js","platform":"windows","listings":"enumerated","exit":0,"seconds":1,"skipped":false,"execs":["node.exe"],"paths":{"b.txt":"read"}}',
+        '{"harness":"test-c.js","platform":"windows","listings":"enumerated","exit":0,"seconds":1,"skipped":false,"execs":["node.exe"],"paths":{"a.txt":"read"}}'
+    )) -join "`n")))
+    $null = & node (Join-Path $dev 'Affected-Harnesses.js') build $quietTraces (Join-Path $quiet ($key + '.map.json')) $base
+    Copy-Item -LiteralPath (Join-Path $handed ($key + '.tree.gz')), (Join-Path $handed 'latest.json') -Destination $quiet
+    $env:STUB_MAP = $quiet
+    $null = GitOk -C $sr reset -q --hard $base
+    Set-Content -LiteralPath (Join-Path $sr 'd.txt') -Value 'd, which no harness reads'
+    $null = GitOk -C $sr commit -q -am 'change d'
+    $r = Invoke-Gate 'pull_request' 'github-hosted' -extra @('-Pick', '5')
+    $p = $null; if ($r.Plan) { $p = $r.Plan | ConvertFrom-Json }
+    Yes ('a change no harness reads gets no share: shares=[] and a plan of none (' + $r.Plan + ')') ($r.Code -eq 0 -and $p -and [int]$p.of -eq 0 -and @($p.shares).Count -eq 0 -and $r.Outputs -match '(?m)^shares=\[\]\s*$' -and $r.Outputs -match '(?m)^whole=false\s*$')
+    Yes '  says no Windows runner is started for the gate, and runs nothing' (-not $r.Asked -and $r.Text -match 'No gate harness can be reached by this change')
+    $env:STUB_MAP = $handed
 
     # A plan the share cannot trust stops it red, running nothing.
     $bad = @(

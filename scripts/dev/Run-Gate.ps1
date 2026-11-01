@@ -348,17 +348,28 @@ if ($Pick -gt 0) {
         $maps = Find-Map
         if ($maps) { $null = Read-Map $maps }
     }
-    $parts = Split-Shares $list $Pick
-    if ($script:Seconds.Count) { Say ('Split by the seconds each took when traced.') }
-    else { Say ('Split by place in the list, with no seconds to split by: ' + $(if ($script:MapWhy) { $script:MapWhy } else { 'the map holds none' }) + '.') }
-    for ($k = 0; $k -lt $Pick; $k++) {
+    # At most -Pick shares, and no more than there are harnesses to run
+    # (#5292): a share with nothing in it still waited for a Windows runner
+    # of its own, about a minute, to run nothing. A change that reaches no
+    # harness gets no share, shares=[], and build.yml skips the job "gate".
+    $n = [Math]::Min($Pick, $list.Count)
+    $parts = @()
+    if ($n -eq 0) {
+        Say ('No gate harness can be reached by this change, so no share runs and no Windows runner is started for the gate.')
+    } else {
+        $parts = Split-Shares $list $n
+        if ($script:Seconds.Count) { Say ('Split by the seconds each took when traced.') }
+        else { Say ('Split by place in the list, with no seconds to split by: ' + $(if ($script:MapWhy) { $script:MapWhy } else { 'the map holds none' }) + '.') }
+        if ($n -lt $Pick) { Say ('{0} share(s), not {1}: there are only {0} harness(es) to run.' -f $n, $Pick) }
+    }
+    for ($k = 0; $k -lt $n; $k++) {
         $secs = $(if ($script:Seconds.Count) { (' about {0:N0} s' -f $script:Loads[$k]) } else { '' })
-        Say ('Share {0} of {1}: {2} harnesses{3}.' -f ($k + 1), $Pick, $parts[$k].Count, $secs)
+        Say ('Share {0} of {1}: {2} harnesses{3}.' -f ($k + 1), $n, $parts[$k].Count, $secs)
     }
     Say ('{0} of the gate''s {1} harnesses run, {2}.' -f $list.Count, $gate.Count, $(if ($whole) { 'the whole gate' } else { 'what this change can reach' }))
-    $plan = [ordered]@{ of = $Pick; whole = $whole; gate = $gate.Count; shares = $parts }
+    $plan = [ordered]@{ of = $n; whole = $whole; gate = $gate.Count; shares = $parts }
     Set-StepOutput 'plan' ($plan | ConvertTo-Json -Compress -Depth 4)
-    Set-StepOutput 'shares' ('[' + ((1..$Pick) -join ',') + ']')
+    Set-StepOutput 'shares' $(if ($n -eq 0) { '[]' } else { '[' + ((1..$n) -join ',') + ']' })
     Set-StepOutput 'whole' $(if ($whole) { 'true' } else { 'false' })
     exit 0
 }

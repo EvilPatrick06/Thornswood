@@ -18,7 +18,10 @@
 // passed too, and each was a share of the whole gate: since #5183 a pull
 // request's shares run only what its change can reach, from main's nightly
 // map, and then each says so in its name ("Gate harnesses (n of N, what the
-// change reaches)"), and main builds and runs the whole gate. Until then it was
+// change reaches)"), and main builds and runs the whole gate. Since #5292
+// the checks that need no Windows run in the job "Tree checks" on Linux, and
+// the note counts only when that job passed in the same run too. Until then
+// it was
 // written only when the gate step ran every gate harness (#3114: a pull
 // request built on the VPS could run only those its change could reach, and
 // then main built in full and was traced), and only on GitHub's hosted
@@ -63,6 +66,10 @@ const WORKFLOW = '.github/workflows/build-pr.yml';
 // so its name never counted for anything and is not read.
 const JOBS = ['Launcher builds'];
 const STEP = 'Write down the tree these checks passed on';
+// The checks of the tree that need no Windows run in a job of their own on
+// Linux since 1 Nov 2026 (#5292), so the note counts only beside that job's
+// success in the same run.
+const CHECKS = 'Tree checks';
 // The gate runs beside the launcher job in shares since 31 Oct 2026 (build.yml,
 // the job "gate"): "Gate harnesses (n of N)", one job for each n from 1 to N,
 // with ", what the change reaches" before the bracket when the pick gave the
@@ -131,6 +138,7 @@ async function find(o) {
         JOBS.indexOf(x.name) >= 0 && x.conclusion === 'success' &&
         (Array.isArray(x.steps) ? x.steps : []).some(s => s.name === STEP && s.conclusion === 'success'));
       if (!job) { whys.push('run ' + id + ': no Launcher builds job passed through to its last step'); continue; }
+      if (!all.some(x => x && x.name === CHECKS && x.conclusion === 'success')) { whys.push('run ' + id + ': its ' + CHECKS + ' job did not pass'); continue; }
       const gate = gateShares(all);
       if (gate) { whys.push('run ' + id + ': ' + gate); continue; }
       const trees = treesInLog(await o.getText('repos/' + o.repo + '/actions/jobs/' + job.id + '/logs'));
@@ -173,4 +181,4 @@ async function main(argv, env, get) {
 }
 
 if (require.main === module) { main(process.argv.slice(2), process.env).then(() => process.exit(0), () => process.exit(0)); }
-module.exports = { find: find, main: main, treesInLog: treesInLog, gateShares: gateShares, WORKFLOW: WORKFLOW, JOBS: JOBS, STEP: STEP, MARK: MARK, GATE: GATE };
+module.exports = { find: find, main: main, treesInLog: treesInLog, gateShares: gateShares, WORKFLOW: WORKFLOW, JOBS: JOBS, STEP: STEP, CHECKS: CHECKS, MARK: MARK, GATE: GATE };
