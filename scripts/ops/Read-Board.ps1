@@ -36,6 +36,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# Get-GhLogFlags, for reading the job's log (#5202).
+. (Join-Path $PSScriptRoot '..\release\LogHandBack.ps1')
+
 $workflow = 'board-read.yml'
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Die($m) { Write-Host "STOP. $m" -ForegroundColor Red; exit 1 }
@@ -143,14 +146,14 @@ if ($jobs.Count -ne 1) { Die ("run $id has $($jobs.Count) jobs, not the one boar
 # A runner's log carries terminal escape sequences (its colours). gh 2.92 and
 # newer refuse to hand over an answer that holds any (CVE-2026-45803) unless
 # told --allow-escape-sequences, so a main Ship's board read on such a gh
-# stopped here on 27 Oct 2026 and closed no issue. The log goes into $log and
-# only its BOARD-JSON lines are read; nothing of it reaches the terminal as it
-# is (the refusal below strips ESC first). An older gh has no such flag and
-# refuses no log, so it is passed only when gh's own help names it.
-$escFlag = @()
-if ((& gh api --help 2>&1 | Out-String) -match '--allow-escape-sequences') { $escFlag = @('--allow-escape-sequences') }
+# stopped here on 27 Oct 2026 and closed no issue. Get-GhLogFlags gives the
+# flag when gh's own help names it, as for every other reader of a job's log
+# (#5202). The log goes into $log and only its BOARD-JSON lines are read;
+# nothing of it reaches the terminal as it is (the refusal below strips ESC
+# first).
+$flags = @(Get-GhLogFlags)
 $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-$log = @(& gh api "repos/$GitHubRepo/actions/jobs/$($jobs[0].id)/logs" @escFlag 2>&1 | ForEach-Object { "$_" })
+$log = @(& gh api "repos/$GitHubRepo/actions/jobs/$($jobs[0].id)/logs" @flags 2>&1 | ForEach-Object { "$_" })
 $c = $LASTEXITCODE
 $ErrorActionPreference = $old
 if ($c -ne 0) { Die ("GitHub did not hand over run $id's log: " + ((($log | Select-Object -Last 2) -join ' ') -replace "`e", '')) }

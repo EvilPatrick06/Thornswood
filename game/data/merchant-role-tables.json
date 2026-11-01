@@ -272,7 +272,7 @@
     },
     {
       "name": "Thornswood-Content.esp",
-      "sha256": "5f9dc1a9badc23fcb169ce03815f9d2f29775a0ad243757d0bd4110b67ac4323",
+      "sha256": "d60f6410a2c20f6114ec20f40e9c00f80913e2cc71e60505ff1af2616199105b",
       "repository": true
     },
     {
@@ -537,7 +537,7 @@
     },
     {
       "name": "Thornswood-Last.esp",
-      "sha256": "a3dfabe1d2fddd148f09b44548325728dfa65e9caa37a448f210e42356e8e3b6",
+      "sha256": "ab273429f04d39d94ace25990231eea2ec37dc8a8ce564431829603d40b086fa",
       "repository": false
     }
   ],

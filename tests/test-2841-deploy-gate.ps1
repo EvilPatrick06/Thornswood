@@ -108,7 +108,52 @@ Yes 'Install-Bridge takes -Status, -Record and -Wait, never -Remove or a site' (
 Yes 'Setup-Domain takes -TaskOnly and -SkipDnsCheck, never a domain, an address or another Caddy' ((Words 'Setup-Domain -TaskOnly') -eq '-TaskOnly' -and
     (Words 'Setup-Domain -Domain x.net') -eq 'REFUSED' -and (Words 'Setup-Domain -Email a') -eq 'REFUSED' -and (Words 'Setup-Domain -CaddyVersion 1') -eq 'REFUSED' -and (Words 'Setup-Domain -AsSystem') -eq 'REFUSED')
 Yes 'Read-Availability reads the box''s own alerts.jsonl over -Days, never a path' ((Words 'Read-Availability -Days 28') -eq '-NoPause|-Days|28' -and (Words 'Read-Availability -Path x') -eq 'REFUSED')
+Yes 'Send-Backups installs with an IPv4 address only, reads its status, or sends; never another root, folder or user' ((Words 'Send-Backups -Install -VmHost 10.0.0.5') -eq '-NoPause|-Install|-VmHost|10.0.0.5' -and
+    (Words 'Send-Backups') -eq '-NoPause' -and (Words 'Send-Backups -Status') -eq '-NoPause|-Status' -and
+    (Words 'Send-Backups -Install -VmHost vm.example') -eq 'REFUSED' -and (Words 'Send-Backups -Root x') -eq 'REFUSED' -and
+    (Words 'Send-Backups -WatchRoot x') -eq 'REFUSED' -and (Words 'Send-Backups -Days 400') -eq 'REFUSED')
+Yes 'Start-Backup takes nothing: it starts the nightly''s own task' ((Words 'Start-Backup') -eq '-NoPause' -and (Words 'Start-Backup -TaskName x') -eq 'REFUSED' -and (Words 'Start-Backup -Minutes 1') -eq 'REFUSED')
+Yes 'Set-InboundRules takes -Check and -Own, never another box, user, record or known_hosts' ((Words 'Set-InboundRules -Own -Check') -eq '-NoPause|-Own|-Check' -and
+    (Words 'Set-InboundRules -Vps x') -eq 'REFUSED' -and (Words 'Set-InboundRules -Record x') -eq 'REFUSED' -and (Words 'Set-InboundRules -KnownHosts x') -eq 'REFUSED')
+Yes 'Setup-Discord runs on the box and only audits or checks: -Prune, -Posts, -Give and another guild wait for Patrick' ((Words 'Setup-Discord -Audit') -eq '-OnBox|-Audit' -and
+    (Words 'Setup-Discord -Prune') -eq 'REFUSED' -and (Words 'Setup-Discord -Posts') -eq 'REFUSED' -and (Words 'Setup-Discord -Give x') -eq 'REFUSED' -and (Words 'Setup-Discord -Guild 1') -eq 'REFUSED')
+# What has a server's folder open, read on the box (#5211): live or dev, and
+# a minute of Defender's log, never a folder, a file or a process of the caller's.
+Yes 'Read-ServerHolders takes live or dev and a UTC minute of Defender''s log, never a folder, file or task' ((Words 'Read-ServerHolders') -eq '' -and
+    (Words 'Read-ServerHolders -Server dev') -eq '-Server|dev' -and (Words 'Read-ServerHolders -Server main') -eq 'REFUSED' -and
+    (Words 'Read-ServerHolders -DefenderFrom 2026-11-01T00:59 -DefenderMinutes 3') -eq '-DefenderFrom|2026-11-01T00:59|-DefenderMinutes|3' -and
+    (Words 'Read-ServerHolders -DefenderFrom yesterday') -eq 'REFUSED' -and (Words 'Read-ServerHolders -DefenderMinutes 100') -eq 'REFUSED' -and
+    (Words 'Read-ServerHolders -Root C:/x') -eq 'REFUSED' -and (Words 'Read-ServerHolders -Path x') -eq 'REFUSED' -and (Words 'Read-ServerHolders -TaskName x') -eq 'REFUSED')
+$rh = Text 'scripts/vps/Read-ServerHolders.ps1'
+Yes '  it finds the server''s processes by the installer''s own rule and reads only: no Stop-, no Remove-, no Set-, no Move' (
+    $rh.Contains("`$p.CommandLine.IndexOf(`$mark, [StringComparison]::OrdinalIgnoreCase)") -and $rh.Contains('Get-ThornswoodPathOpeners $Root') -and
+    (($rh -replace '(?s)<#.*?#>', '') -notmatch 'Stop-Process|Stop-ScheduledTask|Remove-Item|Set-Content|Set-MpPreference|Add-MpPreference|Move-ThornswoodPath|\.Kill\('))
 Yes 'Check-Site takes nothing of the caller''s' ((Words 'Check-Site') -eq '-NoPause' -and (Words 'Check-Site -Who 1') -eq 'REFUSED' -and (Words 'Check-Site -Site x') -eq 'REFUSED')
+# Box keys and runners, renewed from the cloud and never made new (#2862,
+# Patrick's A on q-retire-box-keys, 31 Oct 2026).
+Yes 'Renew-BoxKey takes desk or notices and nothing else: no name, environment, repository or file' ((Words 'Renew-BoxKey -Which desk') -eq '-NoPause|-Which|desk' -and
+    (Words 'Renew-BoxKey -Which notices') -eq '-NoPause|-Which|notices' -and (Words 'Renew-BoxKey -Which cloud') -eq 'REFUSED' -and
+    (Words 'Renew-BoxKey -Which desk -AdminState x') -eq 'REFUSED' -and (Words 'Renew-BoxKey -Name djinn') -eq 'REFUSED')
+Yes 'Install-Runner runs from the gate with a number, -Status, -Lock or -NetworkOnly: never -Remove, -OffBox, another repository, name or folder' (
+    (Words 'Install-Runner -Number 2') -eq '-FromGate|-AllowHost|pypi.org,files.pythonhosted.org,registry.npmjs.org|-NoPause|-Number|2' -and
+    (Words 'Install-Runner -Number 2 -Status') -ne 'REFUSED' -and (Words 'Install-Runner -Remove') -eq 'REFUSED' -and (Words 'Install-Runner -OffBox') -eq 'REFUSED' -and
+    (Words 'Install-Runner -Repo x/y') -eq 'REFUSED' -and (Words 'Install-Runner -RunnerName x') -eq 'REFUSED' -and (Words 'Install-Runner -Root C:/x') -eq 'REFUSED' -and
+    (Words 'Install-Runner -Number 100') -eq 'REFUSED' -and (Words 'Install-Runner -AllowHost x') -eq 'REFUSED')
+$rk = Text 'scripts/vps/Renew-BoxKey.ps1'
+Yes '  Renew-BoxKey keeps the old line until the secret holds the new key, and puts the file back on any stop before that' (
+    $rk.IndexOf('[IO.File]::WriteAllLines($KeysFile, [string[]](@($have) + $newLine)') -gt 0 -and
+    $rk.IndexOf('[IO.File]::WriteAllLines($KeysFile, [string[]](@($have) + $newLine)') -lt $rk.IndexOf('& $ssh -n -F none -i $keyFile') -and
+    $rk.IndexOf('& $ssh -n -F none -i $keyFile') -lt $rk.IndexOf('& gh secret set $K.Secret') -and
+    $rk.IndexOf('& gh secret set $K.Secret') -lt $rk.IndexOf('Where-Object { $old -notcontains $_ }') -and
+    $rk.Contains('if ($changed -and -not $done) { [IO.File]::WriteAllBytes($KeysFile, $before) }'))
+Yes '  its key goes only to the two fixed secrets of the ops repository, with the old line''s options and the App''s environments token' (
+    $rk.Contains("`$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'") -and $rk.Contains("Secret = 'DESK_KEY_B64'") -and $rk.Contains("Secret = 'NOTICE_KEY_B64'") -and
+    $rk.Contains('$newLine = $opts + '' '' + $bare + $tag') -and $rk.Contains('Get-ThornswoodOpsAccess -Repo $RepoRoot -For keys') -and
+    $rk.Contains('does not let in main alone'))
+$ir = Text 'scripts/deploy/Install-Runner.ps1'
+Yes '  Install-Runner from the gate is the ops repository''s, with the App''s runners token, and puts back only a runner the records or GitHub already name' (
+    $ir.Contains("`$Repo = 'EvilPatrick06/Thornswood-Ops'") -and $ir.Contains('Get-ThornswoodOpsAccess -Repo') -and $ir.Contains('-For runners') -and
+    $ir.Contains('is in no runner record and not registered on') -and $ir.IndexOf('function Invoke-Gh') -lt $ir.IndexOf('is in no runner record and not registered on'))
 # Publish-Server through the gate is the dev server's, from the box's store,
 # and nothing else (#4987): main stays with a Main run Patrick approves.
 Yes 'Publish-Server is held to -Channel dev' ((Words 'Publish-Server') -eq '-Channel|dev' -and

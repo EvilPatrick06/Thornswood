@@ -61,10 +61,10 @@ function Stop-Here($m) {
 
 if (-not (Get-Command $Gh -ErrorAction SilentlyContinue)) { Stop-Here 'gh is not here. winget install --id GitHub.cli -e, then gh auth login.' }
 # gh api through the gh this was given; its error stops the run with what it said.
-function Get-Gh([string]$path) {
+function Get-Gh([string]$path, [string[]]$flags = @()) {
   $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-  try { $out = @(& $Gh api $path 2>&1 | ForEach-Object { [string]$_ }); $code = $LASTEXITCODE } finally { $ErrorActionPreference = $old }
-  if ($code -ne 0) { Stop-Here ("GitHub answered GET $path with: " + (($out | Select-Object -Last 2) -join ' ')) }
+  try { $out = @(& $Gh api $path @flags 2>&1 | ForEach-Object { [string]$_ }); $code = $LASTEXITCODE } finally { $ErrorActionPreference = $old }
+  if ($code -ne 0) { Stop-Here ("GitHub answered GET $path with: " + ((($out | Select-Object -Last 2) -join ' ') -replace "`e", '')) }
   return , $out
 }
 
@@ -77,7 +77,9 @@ Say ("engine.yml run {0} ({1}), green" -f $Run, $r.html_url) 'Cyan'
 # the steps and succeeded (engine.yml, WHERE IT RUNS).
 $jobs = @((((Get-Gh "repos/$GitHubRepo/actions/runs/$Run/jobs") -join "`n") | ConvertFrom-Json).jobs | Where-Object { [string]$_.conclusion -eq 'success' })
 if ($jobs.Count -ne 1) { Stop-Here ("run $Run has $($jobs.Count) jobs that succeeded, and engine.yml's records come from the one: " + $r.html_url) }
-$log = Get-Gh "repos/$GitHubRepo/actions/jobs/$($jobs[0].id)/logs"
+# The log keeps the runner's colours, which a newer gh hands over only when
+# told (Get-GhLogFlags, #5202).
+$log = Get-Gh "repos/$GitHubRepo/actions/jobs/$($jobs[0].id)/logs" (Get-GhLogFlags $Gh)
 try { $bytes = Read-LogHandBack $log $EngineRecordsMark } catch { Stop-Here ("run $Run's log does not hold the records whole: " + $_.Exception.Message + '. A run from before #3399 kept them as an artifact instead.') }
 try {
   $files = Read-EngineRecordsBundle $bytes

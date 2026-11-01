@@ -59,17 +59,18 @@ is not work and is not a rank.
 
 A semester is 24 hours of real time.
 
-Stand in the College, press K, open College and press Study. The
-rooms that count are the Hall of the Elements, the courtyard, the Hall
-of Countenance, the Hall of Attainment, and the Arcanaeum. Anywhere
-else refuses. Nothing is typed.
+A semester is taken at a study desk in the College halls: walk up to
+one and press E. A desk stands in each of the four halls, the Hall of
+the Elements, the Hall of Countenance, the Hall of Attainment, and the
+Arcanaeum. Nothing is typed. The College page on K says where the
+desks are and when your next semester opens.
 
 A mage receives 2 spell points.
 
 A person a master has taught receives 1, and it can only be spent on a
 novice spell of the school they were taught.
 
-Study gives nothing again until 24 hours have passed. Logging out
+A desk gives nothing again until 24 hours have passed. Logging out
 does not reset it. The College does not have to be held by you. The
 doors follow [Property](property.md): if the Archmage's office holds
 the halls, you need to be let in.
@@ -82,7 +83,7 @@ mage is not the Archmage because they hit the rank. See
 [Offices](offices.md).
 
 The College does not set prices, mint coin, or grant a profession.
-Study is the only thing the building adds to the numbers.
+The study desks are the only thing the building adds to the numbers.
 
 The halls are claimable buildings. A claim on them is the College's
 problem and the court's, the same as any other hall.
@@ -121,10 +122,13 @@ Somebody a master has taught learns a spell only by reading its tome.
 The spell book on K is a mage's, and the server refuses its pick for
 anybody else with a line naming the tome to read.
 
-A semester is in the server. The College page on K has the Study
-button. The server checks the room: the four halls by their cells, and
-the courtyard as the open ground the halls' outside doors stand in. A
-mage receives 2 points and a person a master has taught receives 1.
+A semester is in the server, at the study desks. Patrick decided on 22
+October that it is taken at a study desk in the College halls, not a
+command (issue 1387). The content plugin stands one desk in each of the
+four halls, measured from the plugins the way the crafting stations
+are, and E at one is the semester; the server says which hall by the
+desk's cell. A mage receives 2 points and a person a master has taught
+receives 1.
 The moment is kept on the character, so logging out and a restart do
 not reset the 24 hours.
 

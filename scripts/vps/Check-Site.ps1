@@ -20,11 +20,14 @@
   the bot can read the server, and whether every role the config names
   exists. Same check as before.
 
-  Nothing here names a machine. The site address and the box come from the
-  launcher's own config (launcher\app\Config.cs), which is the one place
-  Set-Vps.ps1 keeps them, and the ssh user comes from the Host entry
-  Setup-SshKey.ps1 wrote into ~\.ssh\config. Without that entry the ssh half
-  is skipped and says so.
+  Nothing here names a machine. The site address comes from the launcher's
+  own config (launcher\app\Config.cs). The ssh half reaches the box the way
+  every box script does, at scripts\vps\vps.json's address and user
+  (Vps.ps1), which each machine's own ssh config carries the rest of the
+  way: the bridge on a PC, loopback in the deploy gate. Until 1 Nov it took
+  the game's name from Config.cs and the user from a Host entry for that
+  name, which the gate's ssh config does not hold, so the gate's Check-Site
+  verb skipped the box and still ended 0 (#2862).
 
   Run it when somebody says they cannot get in. It tells you in ten seconds
   which of the possible reasons it is, rather than guessing from what the
@@ -34,9 +37,9 @@
 param(
   # https://thornswood.net unless Config.cs says otherwise.
   [string]$Site,
-  # The box. Read from Config.cs when not given.
+  # The box. vps.json's address (Vps.ps1) when not given.
   [string]$Vps,
-  # The ssh user. Read from ~\.ssh\config when not given.
+  # The ssh user. vps.json's (Vps.ps1) when not given.
   [string]$User,
   [string]$Root = 'C:/Thornswood-Docs',
   # Check one person: their Discord id. Right click them, Copy User ID.
@@ -61,9 +64,7 @@ if ($Who -and $Who -notmatch '^[0-9]{17,20}$') {
 
 # ------------------------------------------------------------ where it is
 # The launcher's config is what every installed copy uses, so it is the one
-# place the address and the site are true. The address is the game's name
-# (#3690), so a box move changes nothing here, and Set-Vps.ps1 rewrites it
-# when the name itself changes.
+# place the site's address is true.
 $configCs = Join-Path $Here '..\..\launcher\app\Config.cs'
 $cs = ''
 if (Test-Path -LiteralPath $configCs) { $cs = [IO.File]::ReadAllText($configCs) }
@@ -72,20 +73,11 @@ if (-not $Site) {
   $Site = if ($m.Success) { $m.Groups[1].Value } else { 'https://thornswood.net' }
 }
 $Site = $Site.TrimEnd('/')
-if (-not $Vps) {
-  $m = [regex]::Match($cs, 'public\s+string\s+ServerAddress\s*=\s*"([^"]+)"')
-  if ($m.Success) { $Vps = $m.Groups[1].Value }
-}
-if (-not $User -and $Vps) {
-  $sshCfg = Join-Path (Join-Path $HOME '.ssh') 'config'
-  if (Test-Path -LiteralPath $sshCfg) {
-    $inHost = $false
-    foreach ($line in [IO.File]::ReadAllLines($sshCfg)) {
-      if ($line -match '^\s*Host\s+(.+?)\s*$') { $inHost = (($Matches[1] -split '\s+') -contains $Vps); continue }
-      if ($inHost -and $line -match '^\s*User\s+(\S+)') { $User = $Matches[1]; break }
-    }
-  }
-}
+# The box, as every box script reaches it (Vps.ps1 reads vps.json and this
+# machine's own override of it).
+. (Join-Path $Here 'Vps.ps1')
+if (-not $Vps) { try { $Vps = Get-ThornswoodVpsAddress } catch { $Vps = '' } }
+if (-not $User -and $Vps) { try { $User = Get-ThornswoodVpsUser } catch { $User = '' } }
 
 Write-Host ''
 Write-Host '  THORNSWOOD  -  is the site actually working' -ForegroundColor White
@@ -238,8 +230,7 @@ else { Write-Host '  Nothing wrong from the outside.' -ForegroundColor Green }
 
 # --------------------------------------------------------------- the box
 if ($NoSsh) { Say '  -NoSsh, the box was not asked.' 'DarkGray' }
-elseif (-not $Vps) { Say '  No box address in launcher\app\Config.cs, the box was not asked.' 'DarkGray' }
-elseif (-not $User) { Say "  No Host entry for $Vps in ~\.ssh\config, so no ssh user. Run .\scripts\vps\Setup-SshKey.ps1 first. The box was not asked." 'DarkGray' }
+elseif (-not $Vps -or -not $User) { Bad 'scripts\vps\vps.json gives no box address or user, so the box was not asked.' }
 else {
   Head 'What the site holds, asked on the box'
   $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
@@ -251,7 +242,7 @@ else {
     # it off the box before it runs, and the far side's exit code comes back. A copy
     # that did not arrive is said here rather than stopping the whole check.
     try { return (Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script) }
-    catch { return "  could not send the check to $Vps" }
+    catch { $script:problems++; return "  could not send the check to $Vps" }
   }
 
   # All of this runs up there in node, because node is what the site uses and a
@@ -362,3 +353,7 @@ Remove-Item `$f -Force -EA SilentlyContinue
 
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+# A problem found, outside or on the way to the box, ends it 1, so the gate's
+# Check-Site verb and anything else that runs it can tell (#2862).
+if ($problems) { exit 1 }
+exit 0
