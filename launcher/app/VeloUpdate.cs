@@ -28,7 +28,7 @@ namespace Thornswood
     ///   3. Every file in the package, however it was put together (whole, or
     ///      rebuilt from the version before and its deltas): each game file by
     ///      size and sha256 against the signed game-files.json, each file
-    ///      beside them against the signed setup-files.json, each program by
+    ///      beside them against the signed setup-files.&lt;channel&gt;.json, each program by
     ///      Signature.Refusal (VeloPackage.cs).
     ///   4. The Update.exe Velopack took out of the package, by Signature.Refusal,
     ///      since it is what applies the update.

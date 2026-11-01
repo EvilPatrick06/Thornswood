@@ -86,8 +86,8 @@ namespace Thornswood
 
         /// <summary>
         /// game-files.json as Build-GameFiles.ps1 writes it: every game file in
-        /// the package. setup-files.json (Build-SetupFiles.ps1) is the same
-        /// shape, for the files beside Game the install reads.
+        /// the package. setup-files.&lt;channel&gt;.json (Build-SetupFiles.ps1)
+        /// is the same shape, for the files beside Game the install reads.
         /// </summary>
         public sealed class GameList
         {
@@ -96,7 +96,7 @@ namespace Thornswood
             [JsonPropertyName("channel")] public string Channel { get; set; }
             [JsonPropertyName("from")] public string From { get; set; }
             [JsonPropertyName("files")] public GameFile[] Files { get; set; }
-            /// <summary>game-files.json only: what the release no longer ships. Null in setup-files.json.</summary>
+            /// <summary>game-files.json only: what the release no longer ships. Null in a setup list.</summary>
             [JsonPropertyName("gone")] public GoneFile[] Gone { get; set; }
         }
 
@@ -281,7 +281,7 @@ namespace Thornswood
             if (!string.Equals(Sha256(raw), f.Sha256, StringComparison.OrdinalIgnoreCase))
                 throw new Exception(name + " of " + m.Tag + " is not the one its signed release record lists.");
             GameList list = JsonSerializer.Deserialize(raw, VeloJson.Default.GameList);
-            if (list == null || list.Schema != 1 || list.Files == null)
+            if (list == null || list.Schema != 1 || list.Files == null || !string.Equals(list.Channel, channel, StringComparison.Ordinal))
                 throw new Exception(name + " of " + m.Tag + " is not a list this launcher reads.");
             if (!string.Equals(list.Commit, m.Commit, StringComparison.OrdinalIgnoreCase))
                 throw new Exception(name + " of " + m.Tag + " was built from " + list.Commit + ", and the release from " + m.Commit + ".");
