@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -1088,24 +1087,10 @@ namespace Thornswood
             return (int)(crc ^ 0xFFFFFFFFu);
         }
 
-        // WebClient has no timeout worth the name. This one does.
+        // ms for the answer to start and ms for each read of it (Http).
         static byte[] Get(string url, int ms)
         {
-            try
-            {
-                var req = (HttpWebRequest)WebRequest.Create(url);
-                req.Timeout = ms;
-                req.ReadWriteTimeout = ms;
-                req.UserAgent = "ThornswoodLauncher/" + Updater.Version;
-                using (var res = (HttpWebResponse)req.GetResponse())
-                using (var s = res.GetResponseStream())
-                using (var ms_ = new MemoryStream())
-                {
-                    s.CopyTo(ms_);
-                    return ms_.ToArray();
-                }
-            }
-            catch { return null; }
+            return Http.GetOrNull(url, ms, ms);
         }
 
         /// <summary>

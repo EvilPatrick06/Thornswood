@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Net;
 
 namespace Thornswood
 {
@@ -102,7 +101,6 @@ namespace Thornswood
             if (raw == null)
             {
                 if (fetchWith == null) throw new Exception("The update feed's settings file is not on this machine.");
-                ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // Tls12 added, never replaced (#1360)
                 string url = assets + sha;
                 using (var wc = Client(fetchWith, true, url)) raw = wc.DownloadData(url);
                 if (ShaOf(raw) != sha)

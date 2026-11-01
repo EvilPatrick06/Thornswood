@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -54,7 +53,6 @@ namespace Thornswood
             try
             {
                 CheckUrl(v.newsRef.url);
-                ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // Tls12 added, never replaced (#1360)
                 v.news = MergeNews(v.news, NewsFile(cfg, v.newsRef));
             }
             catch (Exception ex) { Swallow.Note("Updater.FillNews, " + v.newsRef.url, ex); }

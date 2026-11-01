@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Net;
 using System.Security.Cryptography;
 
 namespace Thornswood
@@ -76,7 +75,6 @@ namespace Thornswood
             string cat = null, json = null;
             try
             {
-                ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // Tls12 added, never replaced (#1360)
                 cat = FetchAsset(cfg, v.manifestRef.catalogUrl, v.manifestRef.catalogSha256, ".cat");
                 json = FetchAsset(cfg, v.manifestRef.url, v.manifestRef.sha256, ".json");
                 string said;

@@ -1,5 +1,4 @@
 using System;
-using System.Net;
 
 namespace Thornswood
 {
@@ -34,7 +33,6 @@ namespace Thornswood
         /// </summary>
         public static string MainLauncherVersion(Config cfg)
         {
-            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // Tls12 added, never replaced (#1360)
             CheckUrl(MainFeed);
             return MainVersionAt(cfg, MainFeed);
         }
