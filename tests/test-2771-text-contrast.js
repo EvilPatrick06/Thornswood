@@ -13,8 +13,8 @@
 //      and AccentInk on Accent;
 //   2. Muted stays brighter than Faint against every surface, so raising
 //      Faint did not make the two one colour;
-//   3. the placeholders at the top of launcher\ui.xaml are Forge's, so the
-//      window never opens on the old values for a moment;
+//   3. the placeholders at the top of launcher\app\MainWindow.axaml are
+//      Forge's, so the window never opens on the old values for a moment;
 //   4. the launcher measures the same pairs at the same line (Themes.cs
 //      MinContrast, TextNames, SurfaceNames), and the DIY editor and
 //      ApplyCustomTheme both say what it finds;
@@ -117,12 +117,12 @@ for (const p of palettes) {
   yes(p.name + ': Muted stands out more than Faint on every surface' + (flat.length ? ' (not on ' + flat.join(', ') + ')' : ''), flat.length === 0);
 }
 
-// ---- 3. ui.xaml's placeholders are Forge's --------------------------------
-const xaml = read('launcher', 'ui.xaml');
+// ---- 3. the window's placeholders are Forge's --------------------------------
+const xaml = read('launcher', 'app', 'MainWindow.axaml');
 const forge = palettes.find((p) => p.name === 'Forge');
 for (const n of TEXT.concat(['AccentInk'])) {
   const m = new RegExp('<SolidColorBrush x:Key="' + n + '"\\s+Color="(#[0-9A-Fa-f]+)"').exec(xaml);
-  yes('ui.xaml: ' + n + ' starts as Forge\'s ' + (forge ? forge.colors[n] : '?') + (m ? ' (it is ' + m[1] + ')' : ' (not found)'),
+  yes('MainWindow.axaml: ' + n + ' starts as Forge\'s ' + (forge ? forge.colors[n] : '?') + (m ? ' (it is ' + m[1] + ')' : ' (not found)'),
     !!m && !!forge && m[1].toUpperCase() === forge.colors[n].toUpperCase());
 }
 
