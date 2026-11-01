@@ -171,3 +171,19 @@ it let go (the GitHub stand-in in `test-site-assets.ps1`, the game server in
 and polled the port. `test-1703-test-ports.js` fails on any `.js` harness here
 or in `voice\` that names a fixed port, or on any `.js` or `.ps1` harness that
 starts the site without waiting for that line.
+
+## A harness that runs the launcher's voice
+
+Since #4823 the launcher's voice is C# (`launcher\app\VoiceSession.cs` and
+the `Voice*.cs` beside it), not the page `voice-host.html` that harnesses ran
+in node's vm. A `.js` harness runs it with `tests\voice-launcher.js`, which
+builds `tests\voice-launcher\VoiceDriver.csproj` with the .NET 10 SDK on any
+machine, into the temp folder, and starts one copy per launcher. The driver
+compiles the launcher's own voice files with a stand-in only for the Windows
+audio (a tone for a microphone, and the session's own mixer read back for the
+speakers), and is driven by JSON lines: `clock: 'manual'` with `wire: 'fake'`
+runs the session's jobs and timers only when the harness says, against
+sockets the harness answers for the service, and `clock: 'real'` with
+`wire: 'ws'` connects it to a voice service the harness started, with real
+connections between launchers. The header of `voice-launcher.js` has the
+calls.

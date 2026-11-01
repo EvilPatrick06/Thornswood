@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -35,28 +34,67 @@ namespace Thornswood
     ///
     /// The page ran on one thread, a browser's event loop, and so does this:
     /// every message, timer and connection event is a job on one queue, run
-    /// in order by one thread. Only the audio itself goes around it: the
+    /// in order by one thread (VoiceLoop.cs), and an await in a job comes
+    /// back to that thread. Only the audio itself goes around it: the
     /// microphone's frames go from its thread to the connections, and what
     /// comes in goes from each connection to the mixer.
     /// </summary>
     sealed class VoiceSession : IDisposable
     {
+        /// <summary>
+        /// What the session takes from the world besides the launcher: the
+        /// loop its jobs run on, the clock and its timers, the random part of
+        /// each wait before a retry, and how a socket to the service is
+        /// opened. The launcher runs on the real ones. tests\voice-launcher
+        /// hands in a loop it runs itself, a clock it moves by hand and
+        /// sockets it answers for the service, so the voice harnesses run this
+        /// class itself rather than a copy of what it does, the way they ran
+        /// the page's own script in a sandbox before #4823.
+        /// </summary>
+        internal sealed class World
+        {
+            public Func<VoiceLoop> Loop = delegate { return new VoiceThread(); };
+            public TimeProvider Time = TimeProvider.System;
+            public Func<double> Jitter = Random.Shared.NextDouble;
+            public Func<Uri, IReadOnlyList<string>, CancellationToken, Task<WebSocket>> Dial = DialSocket;
+        }
+
+        /// <summary>The real socket: a ClientWebSocket offering the protocols, connected.</summary>
+        static async Task<WebSocket> DialSocket(Uri url, IReadOnlyList<string> protocols, CancellationToken stop)
+        {
+            var ws = new ClientWebSocket();
+            try
+            {
+                foreach (string p in protocols) ws.Options.AddSubProtocol(p);
+                await ws.ConnectAsync(url, stop).ConfigureAwait(false);
+                return ws;
+            }
+            catch
+            {
+                ws.Dispose();
+                throw;
+            }
+        }
+
         // What the page's host(kind, text) told the launcher: status, log,
         // debug, peers, talking and token.
         readonly Action<string, string> host;
         readonly Config conf;
-        readonly BlockingCollection<Action> jobs = new BlockingCollection<Action>();
-        readonly Thread loop;
+        readonly World world;
+        readonly VoiceLoop loop;
         readonly VoiceMix mix = new VoiceMix();
         readonly IOpusEncoder encoder;
         readonly byte[] packet = new byte[1275];
         VoiceAudio audio;
         volatile bool disposed;
 
-        public VoiceSession(Action<string, string> host, Config conf)
+        public VoiceSession(Action<string, string> host, Config conf) : this(host, conf, new World()) { }
+
+        internal VoiceSession(Action<string, string> host, Config conf, World world)
         {
             this.host = host;
             this.conf = conf;
+            this.world = world;
             OpusCodecFactory.AttemptToUseNativeLibrary = false;
             encoder = OpusCodecFactory.CreateEncoder(VoiceMix.Rate, 1, OpusApplication.OPUS_APPLICATION_VOIP);
             // What a browser sends for voice: about 32 kbit/s, and in-band
@@ -65,27 +103,16 @@ namespace Thornswood
             encoder.Bitrate = 32000;
             encoder.UseInbandFEC = true;
             encoder.PacketLossPercent = 5;
-            loop = new Thread(Run) { IsBackground = true, Name = "Voice" };
-            loop.Start();
-            pinger = new Timer(delegate { Post(Ping); }, null, PING_EVERY, PING_EVERY);
+            loop = world.Loop();
+            pinger = world.Time.CreateTimer(delegate { Post(Ping); }, null,
+                                            TimeSpan.FromMilliseconds(PING_EVERY), TimeSpan.FromMilliseconds(PING_EVERY));
             Post(delegate { Host("status", "waiting for config"); });
-        }
-
-        void Run()
-        {
-            foreach (Action a in jobs.GetConsumingEnumerable())
-            {
-                if (disposed) return;
-                try { a(); }
-                catch (Exception ex) { Swallow.Note("VoiceSession, a job", ex); }
-            }
         }
 
         void Post(Action a)
         {
             if (disposed) return;
-            try { jobs.Add(a); }
-            catch (InvalidOperationException ex) { Swallow.Note("VoiceSession.Post, after the end", ex); }
+            loop.Add(a);
         }
 
         void Host(string kind, string text) { host(kind, text); }
@@ -283,7 +310,10 @@ namespace Thornswood
         /// <summary>One socket to the voice service, and the writer that keeps its messages in order.</summary>
         sealed class Sock
         {
-            public readonly ClientWebSocket Ws = new ClientWebSocket();
+            // Null until the handshake is answered; Stop ends a handshake
+            // still waiting.
+            public WebSocket Ws;
+            public readonly CancellationTokenSource Stop = new CancellationTokenSource();
             public readonly Channel<string> Out = Channel.CreateUnbounded<string>();
             public bool Open;
         }
@@ -363,28 +393,29 @@ namespace Thornswood
         const int RETRY_FIRST = 2000, RETRY_MOST = 60000;
         const int PING_EVERY = 25000, SILENT_AFTER = 70000;
         int tries;
-        Timer retry;
+        ITimer retry;
         long heard;
         bool asking;
-        readonly Timer pinger;
-        static readonly Random Jitter = new Random();
+        readonly ITimer pinger;
 
         int RetryIn()
         {
             double cap = Math.Min(RETRY_MOST, RETRY_FIRST * Math.Pow(2, Math.Min(tries, 10)));
             tries++;
-            return (int)Math.Round(cap / 2 + Jitter.NextDouble() * cap / 2);
+            return (int)Math.Round(cap / 2 + world.Jitter() * cap / 2);
         }
 
         void Later(int ms)
         {
             if (retry != null) retry.Dispose();
-            Timer t = null;
-            t = new Timer(delegate { Post(delegate { if (retry != t) return; retry = null; Connect(); }); }, null, ms, Timeout.Infinite);
+            ITimer t = null;
+            t = world.Time.CreateTimer(delegate { Post(delegate { if (retry != t) return; retry = null; Connect(); }); }, null,
+                                       TimeSpan.FromMilliseconds(ms), Timeout.InfiniteTimeSpan);
             retry = t;
         }
 
-        static long Now() { return Environment.TickCount64; }
+        // Milliseconds on a clock that only goes forward.
+        long Now() { return world.Time.GetTimestamp() * 1000 / world.Time.TimestampFrequency; }
 
         void Ping()
         {
@@ -415,6 +446,8 @@ namespace Thornswood
         static void Close(Sock s)
         {
             s.Out.Writer.TryComplete();
+            s.Stop.Cancel();
+            if (s.Ws == null) return;
             s.Ws.Abort();
             s.Ws.Dispose();
         }
@@ -503,72 +536,75 @@ namespace Thornswood
             }
             Say("connecting to " + url + (tries > 0 ? " (try " + (tries + 1) + ")" : ""));
 
+            // The token goes with the handshake, as the protocol after
+            // 'thornswood', and is what says who we are (#1337). It is never
+            // in the url, which is written to the launcher's log.
             var s = new Sock();
-            try
-            {
-                // The token goes with the handshake, as the protocol after
-                // 'thornswood', and is what says who we are (#1337). It is
-                // never in the url, which is written to the launcher's log.
-                s.Ws.Options.AddSubProtocol("thornswood");
-                s.Ws.Options.AddSubProtocol(token);
-            }
-            catch (Exception e) { Say("socket refused: " + e.Message); Later(RetryIn()); return; }
             ws = s;
-            Task.Run(delegate { return Pump(s, new Uri(url)); });
+            _ = Pump(s, new Uri(url), new[] { "thornswood", token });
         }
 
         /// <summary>
-        /// The socket's life off the voice thread: connect, then read until it
-        /// closes, each message handed to the voice thread in order, and a
-        /// writer that sends what Send queued, one at a time as the socket
-        /// requires.
+        /// The socket's life: the handshake, then each message as it comes,
+        /// until it closes. It runs on the voice thread, and each await comes
+        /// back to it (VoiceLoop), so a message is handled in order with every
+        /// other job. A socket that is no longer ws was closed by this side
+        /// (Connect, Ping, Dispose), and nothing it still says is read.
         /// </summary>
-        async Task Pump(Sock s, Uri url)
+        async Task Pump(Sock s, Uri url, string[] protocols)
         {
-            try { await s.Ws.ConnectAsync(url, CancellationToken.None).ConfigureAwait(false); }
+            try { s.Ws = await world.Dial(url, protocols, s.Stop.Token); }
             catch (Exception e)
             {
-                Post(delegate { if (ws != s) return; Quiet("the voice server did not answer (" + e.Message + ")"); ws = null; Lost(); });
+                if (ws != s) return;
+                Quiet("the voice server did not answer (" + e.Message + ")");
+                ws = null;
+                Lost();
                 return;
             }
-            Post(delegate { if (ws == s) Opened(s); });
-            _ = Task.Run(async delegate
-            {
-                try
-                {
-                    while (await s.Out.Reader.WaitToReadAsync().ConfigureAwait(false))
-                    {
-                        string m;
-                        while (s.Out.Reader.TryRead(out m))
-                            await s.Ws.SendAsync(Encoding.UTF8.GetBytes(m), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(false);
-                    }
-                }
-                catch (Exception e) { Post(delegate { if (ws == s) Quiet("could not write to the voice server (" + e.Message + ")"); }); }
-            });
+            // Closed while the handshake was still on its way: nobody holds it now.
+            if (ws != s) { s.Ws.Abort(); s.Ws.Dispose(); return; }
+            Opened(s);
+            _ = Write(s);
 
             var buf = new byte[64 * 1024];
             var acc = new MemoryStream();
             try
             {
-                while (true)
+                while (ws == s)
                 {
-                    WebSocketReceiveResult r = await s.Ws.ReceiveAsync(buf, CancellationToken.None).ConfigureAwait(false);
+                    WebSocketReceiveResult r = await s.Ws.ReceiveAsync(buf, CancellationToken.None);
                     if (r.MessageType == WebSocketMessageType.Close) break;
                     acc.Write(buf, 0, r.Count);
                     if (!r.EndOfMessage) continue;
                     string text = Encoding.UTF8.GetString(acc.GetBuffer(), 0, (int)acc.Length);
                     acc.SetLength(0);
-                    Post(delegate { if (ws == s) Message(text); });
+                    if (ws == s) Message(text);
                 }
             }
-            catch (Exception e) { Post(delegate { if (ws == s) Quiet("the voice server's socket closed (" + e.Message + ")"); }); }
-            Post(delegate
+            catch (Exception e) { if (ws == s) Quiet("the voice server's socket closed (" + e.Message + ")"); }
+            if (ws != s) return;
+            ws = null;
+            Close(s);
+            Lost();
+        }
+
+        /// <summary>
+        /// What Send queued, one message at a time, as a WebSocket needs its
+        /// sends to be.
+        /// </summary>
+        async Task Write(Sock s)
+        {
+            try
             {
-                if (ws != s) return;
-                ws = null;
-                Close(s);
-                Lost();
-            });
+                while (await s.Out.Reader.WaitToReadAsync())
+                {
+                    string m;
+                    while (s.Out.Reader.TryRead(out m))
+                        await s.Ws.SendAsync(Encoding.UTF8.GetBytes(m), WebSocketMessageType.Text, true, CancellationToken.None);
+                }
+            }
+            catch (Exception e) { if (ws == s) Quiet("could not write to the voice server (" + e.Message + ")"); }
         }
 
         void Opened(Sock s)
@@ -1057,17 +1093,13 @@ namespace Thornswood
         public void Dispose()
         {
             if (disposed) return;
-            var done = new ManualResetEventSlim(false);
-            Post(delegate
+            loop.Finish(delegate
             {
                 if (retry != null) { retry.Dispose(); retry = null; }
                 foreach (int id in new List<int>(conns.Keys)) Drop(id);
-                if (ws != null) { Close(ws); ws = null; }
-                done.Set();
+                if (ws != null) { Sock s = ws; ws = null; Close(s); }
             });
-            done.Wait(2000);
             disposed = true;
-            jobs.CompleteAdding();
             pinger.Dispose();
             if (audio != null) audio.Dispose();
             encoder.Dispose();
