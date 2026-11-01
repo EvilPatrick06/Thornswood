@@ -33,7 +33,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [deploy/Deploy-DevGamemode.ps1](deploy/Deploy-DevGamemode.ps1) | Sends game\gamemode.js to the dev server on the VPS, which loads it while it runs when nothing else changes, and otherwise restarts only that server. |
 | [deploy/Deploy-Docs.ps1](deploy/Deploy-Docs.ps1) | Puts the Thornswood docs site on the VPS and keeps it running. |
 | [deploy/Deploy-Gamemode.ps1](deploy/Deploy-Gamemode.ps1) | Puts gamemode.js into the built server and writes a server load order that actually lines up with the client's. |
-| [deploy/Deploy-Release.ps1](deploy/Deploy-Release.ps1) | Puts one signed build Release on the dev server by its tag (#5180, the deploy gate verb that comes first, Patrick 31 Oct 2026). |
+| [deploy/Deploy-Release.ps1](deploy/Deploy-Release.ps1) | Puts one signed build Release on the dev server, the site or the Discord bot by its tag (#5180, the deploy gate verb that comes first, Patrick 31 Oct 2026; the site and the bot since #5190 and #5187). |
 | [deploy/Deploy-Server.ps1](deploy/Deploy-Server.ps1) | Sends the built server up to the VPS and restarts it. |
 | [deploy/DeployedBuild.ps1](deploy/DeployedBuild.ps1) | What each server actually runs, where the site can read it. |
 | [deploy/DocsPasswordFile.ps1](deploy/DocsPasswordFile.ps1) | Where the site's member password comes from for Deploy-Docs.ps1 -Password, when nobody types it (issue #2116): a file on the box, locked to the box's Administrators and the deploy account. |
@@ -177,6 +177,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [ops/Wipe-Saves.ps1](ops/Wipe-Saves.ps1) | Starts the world over. Everybody begins again, nothing is claimed, nothing has been looted, and every container in the province is holding what Bethesda put in it. |
 | [ops/WorkflowRun.ps1](ops/WorkflowRun.ps1) | Starts a workflow on main and reads the answer its runner left, for a script whose session cannot make the change itself: Set-Ref.ps1 (a ref write, which a cloud session's proxy refuses) and Set-BuildRunners.ps1 (a runner label, which needs the box's GitHub App). |
 | [release/Add-VirusTotalComment.ps1](release/Add-VirusTotalComment.ps1) | Optional manual tool: leaves one community comment on a build's VirusTotal report, or says plainly that it is not commenting and carries on. |
+| [release/App-Part.ps1](release/App-Part.ps1) | Makes the zip of one app the box deploy agent puts in from a build Release (#5190, #5187): the site, the Discord bot or the voice service, each as the folder it lands in on the box holds it. |
 | [release/Assert-PublishSigned.ps1](release/Assert-PublishSigned.ps1) | Helpers for the publish sign gate. Dot-source this from Ship.ps1 and Publish-Installer.ps1. |
 | [release/Build-Engine.ps1](release/Build-Engine.ps1) | Takes a machine from a fresh clone to a built engine: the SkyMP server and the client runtime, out of the fork in engine\skymp. |
 | [release/Build-Front.ps1](release/Build-Front.ps1) | Builds the front, the in-game page Data\Platform\UI comes from, from the fork at the pinned commit, into local\thornswood-front.zip. |
