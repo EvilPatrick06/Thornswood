@@ -233,12 +233,13 @@ try {
     # Two clients since the service's own page went (#1822): the game's voice
     # page, and the launcher's. Since #4823 the launcher's is its own code,
     # VoiceMix.cs, in place of voice-host.html in a web view, so its panner
-    # is the one VoiceMix.Pan uses rather than a Web Audio panningModel.
+    # is the HrtfPanner each source in VoiceMix.cs holds (VoiceHrtf.cs, the
+    # port of Chromium's) rather than a Web Audio panningModel.
     $t = Read 'game\ui\thornswood-voice.js'
     $models = @([regex]::Matches($t, "panningModel\s*=\s*'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
     Yes "voice: the game's voice page pans with HRTF, not the cheaper equalpower ($($models -join ', '))" ($models.Count -eq 1 -and $models[0] -eq 'HRTF' -and $t -notmatch 'equalpower')
     $mix = Read 'launcher\app\VoiceMix.cs'
-    Yes "voice: the launcher's voice mix (VoiceMix.cs) pans with HRTF too, not the cheaper equal power" ($null -ne $mix -and $mix -notmatch '\bEqualPower\s*\(')
+    Yes "voice: the launcher's voice mix (VoiceMix.cs) pans with HRTF too, not the cheaper equal power" ($null -ne $mix -and $mix -match 'new HrtfPanner\(' -and $mix -notmatch '\bEqualPower\s*\(')
 
     # --------------------------------------------- 5. half-rate updates off
     if ($OnWindows) {
