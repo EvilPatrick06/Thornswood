@@ -25,6 +25,18 @@
           ]
         },
         {
+          "name": "release tags made by the release workflow",
+          "why": "Patrick's A on q-3721-release-tags (26 Oct 2026) asked for this from the start: a v* tag is made only by release-tag.yml, with the run's own token, which GitHub names the App GitHub Actions (15368). GitHub refused that with 422 on 31 Oct 2026 while the repository was a personal one, so making a v* tag was left open (q-3683-lock-tag-creation, A). Since the move to ThornswoodRP on 1 Nov 2026 an organization's ruleset may name an App, and an App may bypass only a tag ruleset (the redesign's part 20). Every Ship makes its launcher tag through release-tag.yml, from the cloud and on the box (ship-access.js), so a v* tag pushed by a person or a Bot is refused; a pushed v* tag would otherwise start release.yml from that tag's own commit. Kept apart from release tags so the release workflow may make a v* tag and never move or delete one.",
+          "target": "tag",
+          "enforcement": "active",
+          "conditions": { "ref_name": { "include": ["refs/tags/v*"], "exclude": [] } },
+          "rules": [{ "type": "creation" }],
+          "bypass_actors": [
+            { "actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always" },
+            { "actor_id": 15368, "actor_type": "Integration", "bypass_mode": "always" }
+          ]
+        },
+        {
           "name": "main",
           "why": "Patrick's A on q-3721-main-protection, 26 Oct 2026: admins included, no force push or deletion, and the build check required: the one always-run Build check result job (q-3683-required-check A), since a skipped Launcher builds counts as passing. Active since #3684's history rewrite had its force push (step 7, 31 Oct 2026) and that job runs on every pull request now the repository is public (first passed on #5066, 31 Oct 2026). Test tasks in the pull request (.github/workflows/test-tasks.yml, #5199, the redesign's part 18, 31 Oct 2026) is required beside it: the bot's own post rules read the pull request's test tasks before the merge, so one that the bot would refuse to post is fixed in the body, not found on the issue days after. A pull request is required too (Patrick's yes on q-p20-main-needs-pr, 31 Oct 2026, 7:18 PM, the redesign's part 20): nothing reaches main except through a pull request with its checks, and auto-merge does the merging. No review is required (0 approvals), because the checks are the gate and nobody waits to press approve. Nothing in the repository pushes straight to main (searched 1 Nov 2026).",
           "target": "branch",
