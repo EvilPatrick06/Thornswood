@@ -240,9 +240,11 @@ if (-not `$svc) {
 & sc.exe failure `$service reset= 86400 actions= restart/10000/restart/10000/restart/60000 | Out-Null
 & sc.exe failureflag `$service 1 | Out-Null
 
-Start-Service -Name `$service
+# A start that fails or does not finish in time is said here and answered
+# below, where the agent it replaced goes back.
 `$svc = Get-Service -Name `$service
-try { `$svc.WaitForStatus('Running', [TimeSpan]::FromSeconds(60)) } catch { }
+try { Start-Service -Name `$service; `$svc.WaitForStatus('Running', [TimeSpan]::FromSeconds(60)) }
+catch { 'the service did not reach Running: ' + `$_.Exception.Message }
 `$svc.Refresh()
 if (`$svc.Status -ne 'Running') {
   'the new agent did not start (' + `$svc.Status + ')'
