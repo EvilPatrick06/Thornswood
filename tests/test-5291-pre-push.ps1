@@ -122,7 +122,8 @@ exit 0
     $null = GitOk -C $sr add -A; $null = GitOk -C $sr commit -q -m 'broken ps1'
     $r = Push @('main')
     Yes "2. a commit with a script that does not parse is not pushed (exit $($r.Code))" ($r.Code -ne 0 -and (Remote 'main') -eq $good)
-    Yes '   and the file and its line are named' ($r.Text -match 'scripts/dev/broken\.ps1:\d+:' -and $r.Text -match 'parse FAILED')
+    # Check-Parse.ps1 names it file:line:, or as an annotation (file=...,line=n::) on a GitHub runner.
+    Yes '   and the file and its line are named' ($r.Text -match 'scripts/dev/broken\.ps1(:\d+:|,line=\d+::)' -and $r.Text -match 'parse FAILED')
     $null = GitOk -C $sr reset -q --hard $good
     Set-Content -LiteralPath (Join-Path $sr 'game/broken.js') -Value "function ( {"
     $null = GitOk -C $sr add -A; $null = GitOk -C $sr commit -q -m 'broken js'
