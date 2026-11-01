@@ -206,10 +206,29 @@ function Get-ThornswoodSshFingerprint([string]$Line) {
     finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
 }
 
-# One folder at a time, so the path is right in a cloud thread too (#2753):
-# PowerShell on Linux takes '.ssh\known_hosts' as one file name in $HOME.
+# The known_hosts file ssh itself reads for -Address: the first
+# UserKnownHostsFile that `ssh -G` (which reads the config and connects
+# nowhere) gives for it. On the box through the deploy gate that is the
+# gate's own box_known_hosts, which SYSTEM's ssh config names for the box
+# (Install-Gate.ps1); until 1 Nov 2026 this always gave $HOME\.ssh\known_hosts,
+# which the gate does not use, so Set-InboundRules -Check through the gate
+# stopped saying known_hosts held no pinned key. With no address, or an ssh
+# that will not say, the user's own file. One folder at a time, so the path
+# is right in a cloud thread too (#2753): PowerShell on Linux takes
+# '.ssh\known_hosts' as one file name in $HOME.
 function Get-ThornswoodKnownHostsPath {
-    return (Join-Path (Join-Path $HOME '.ssh') 'known_hosts')
+    param([string]$Address = '')
+    $own = Join-Path (Join-Path $HOME '.ssh') 'known_hosts'
+    if (-not $Address -or -not (Get-Command ssh -ErrorAction SilentlyContinue)) { return $own }
+    $said = @(Invoke-ThornswoodNative { & ssh -G -o StrictHostKeyChecking=yes $Address } 2>$null)
+    foreach ($l in $said) {
+        $m = [regex]::Match([string]$l, '^userknownhostsfile\s+("[^"]+"|\S+)')
+        if (-not $m.Success) { continue }
+        $f = $m.Groups[1].Value.Trim('"')
+        if ($f -eq '~' -or $f.StartsWith('~/') -or $f.StartsWith('~\')) { $f = Join-Path $HOME $f.Substring([Math]::Min(2, $f.Length)) }
+        return [IO.Path]::GetFullPath($f)
+    }
+    return $own
 }
 
 # What known_hosts holds for the address, against the pin. Read only.
@@ -220,7 +239,7 @@ function Get-ThornswoodKnownHostsPath {
 function Test-ThornswoodKnownHost {
     param(
         [Parameter(Mandatory = $true)][string]$Address,
-        [string]$KnownHosts = (Get-ThornswoodKnownHostsPath),
+        [string]$KnownHosts = (Get-ThornswoodKnownHostsPath -Address $Address),
         [string[]]$Pinned = (Get-ThornswoodVpsHostKeys)
     )
     $held = @()
@@ -253,7 +272,7 @@ function Test-ThornswoodKnownHost {
 function Add-ThornswoodKnownHost {
     param(
         [Parameter(Mandatory = $true)][string]$Address,
-        [string]$KnownHosts = (Get-ThornswoodKnownHostsPath),
+        [string]$KnownHosts = (Get-ThornswoodKnownHostsPath -Address $Address),
         [string[]]$Pinned = (Get-ThornswoodVpsHostKeys),
         [string[]]$Scanned = $null
     )

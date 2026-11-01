@@ -94,7 +94,7 @@ $ErrorActionPreference = 'Stop'   # before any file loads, so one that is missin
 . (Join-Path $Here '..\deploy\CloudflareRanges.ps1')
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 if (-not $User) { $User = Get-ThornswoodVpsUser }
-if (-not $KnownHosts) { $KnownHosts = Get-ThornswoodKnownHostsPath }
+if (-not $KnownHosts) { $KnownHosts = Get-ThornswoodKnownHostsPath -Address $Vps }
 if (-not $RangesFile) { $RangesFile = Join-Path (Split-Path -Parent $Here) 'deploy\cloudflare-ranges.txt' }
 
 $BoxScript = Join-Path $Here 'vps-web-firewall.ps1'

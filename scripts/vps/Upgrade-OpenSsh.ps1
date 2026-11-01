@@ -101,7 +101,7 @@ $ErrorActionPreference = 'Stop'   # before any file loads, so one that is missin
 . (Join-Path $Here 'Send-Script.ps1')
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 if (-not $User) { $User = Get-ThornswoodVpsUser }
-if (-not $KnownHosts) { $KnownHosts = Get-ThornswoodKnownHostsPath }
+if (-not $KnownHosts) { $KnownHosts = Get-ThornswoodKnownHostsPath -Address $Vps }
 
 $BoxScript = Join-Path $Here 'vps-openssh.ps1'
 $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes', '-o', 'ConnectTimeout=10')
