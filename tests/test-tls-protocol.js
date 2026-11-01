@@ -92,9 +92,12 @@ replaces.forEach(function (a) { console.log('      ' + a.rel + ':' + a.line + ' 
 yes('every one of them adds TLS 1.2 and takes nothing away', replaces.length === 0);
 
 // The places issue #1360 named, by file, so a rewrite that drops the setting
-// altogether or puts the old form back is caught where it was found.
+// altogether or puts the old form back is caught where it was found. The
+// setup program, Bootstrap.cs, was one; it retired in #4824, and the install
+// in the launcher asks the site through HttpClient, which takes the TLS
+// versions Windows offers and has no setting of its own to replace.
 ['launcher/app/Updater.cs', 'launcher/app/Discord.cs', 'launcher/app/Shell.cs',
- 'launcher/app/Gallery.cs', 'launcher/app/Sync.cs', 'installer/setup/Bootstrap.cs'].forEach(function (rel) {
+ 'launcher/app/Gallery.cs', 'launcher/app/Sync.cs'].forEach(function (rel) {
   const mine = found.filter(function (a) { return a.rel === rel; });
   yes(rel + ' still sets TLS 1.2, and only by adding it',
     mine.length > 0 && mine.every(function (a) { return a.adds; }));
