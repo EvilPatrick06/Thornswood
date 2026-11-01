@@ -30,7 +30,9 @@ server build** (the engine).
 | Dev engine (the server build) | Applied by the agent (#5219): every Release carries the server build its commit records, and when dev runs another one the agent stops dev, swaps in the build and the gamemode together and starts it under a hold. So a merged engine pin reaches dev with no Publish-Server and no Deploy-DevGamemode. See "A new server build" below. |
 | Dev plugins, settings | Not yet. Like the engine they need a stop and a swap under a hold, but nothing puts them on a Release yet. Deploy-DevGamemode and Ship still do them. |
 | Main | Not yet. Main waits on a Main environment that only Patrick can approve (#5181). The agent refuses any environment but dev. |
-| Bot, site | Not yet. Their own slices. |
+| Site, Discord bot | Applied by the agent (#5190, #5187): a merge that changes either makes a Deployment to **Site** or **Discord bot** with the Release's `site.zip` or `discord.zip`, and the agent swaps it in the way Deploy-Docs and Install-Bot -CodeOnly do. See "The site, the Discord bot and voice" below. |
+| Dev voice | Applied with dev's Deployment (#5187): voice has no Deployment of its own, because the gamemode pushes positions to it. |
+| Release news | After a Deployment goes in, the agent leaves its Release's notes for the bot, which posts them once (#5187). See "Release news" below. |
 | Launcher and game files | Not the agent's job: they reach people through the launcher's feed and a Ship. The release workflow (#5179) moves them onto Releases. |
 | Bot pass before each dev Deployment | Once `Install-DeployAgent` has set up its task, every Deployment waits on a bot pass on a throwaway copy of dev with the new gamemode (#5196, below). A FAIL fails the Deployment and dev keeps what it runs. A deploy by tag (the gate's `Deploy-Release`, a rollback) does not wait on one. |
 | Parity check after a deploy | Not yet. The agent is to run `Check-ProdParity.ps1` after each deploy and file what differs as an issue, never putting it back by itself. That needs the parity scripts on the box from a signed Release, and the App to hold Issues write; until then the `Check-ProdParity` gate verb runs it. |
@@ -219,6 +221,54 @@ What the bot cannot reach yet: stations, claims and keys, needs, merchants
 and jail go over the voice relay, which the copy does not start, so they
 wait on a relay client for the bot (#5196).
 
+## The site, the Discord bot and voice
+
+Each is one zip on the Release, made by
+[App-Part.ps1](../scripts/release/App-Part.ps1) the same way every time, so
+the same files give the same bytes and a merge that does not touch one does
+not count as a change to it. The agent (`tools/DeployAgent/App.cs`) puts one
+in with the same halves as Swap.ps1's service swap:
+
+1. The zip is opened into `<root>\.agent-stage-<stamp>` while the app runs.
+   Every entry has to be a plain path to one of the files a Release may carry
+   (the site: `server.js`, `public\*`, `data\site\*`; the bot: its code and
+   `assets\*`, never anything `Get-ThornswoodBotOwned` names; voice:
+   `voice-server.js`, `headlines.js`, `server-log.js`). Only the files that
+   differ are kept, the programs are parsed and the JSON read. A bot whose
+   `requirements.txt` changed gets its libraries installed into the stage,
+   held to their hashes. A refusal here touches nothing.
+2. Under a hold (#5155) the app is stopped and waited for, each new file is
+   moved in, and what it replaces goes to `<root>\.prev-<stamp>`, so
+   `Deploy-Docs.ps1 -PutBack`, `Install-Bot.ps1 -PutBack` and
+   `Install-Voice.ps1 -PutBack` put back what the agent put in. The site's
+   public files the Release no longer has, and anything in the bot's folder
+   that is not the bot's own, go aside too.
+3. It is started and has to answer: the site's front page under 500, the bot
+   saying in its log that it is watching its server, and voice's `/health`,
+   asked on the box, naming the `BUILD` of the `voice-server.js` in its
+   folder, so an old copy still on the port is not taken for the new one.
+4. When it does not, everything goes back and it is started on the old files.
+
+Voice goes in with dev's Deployment, after the bot pass and before the
+gamemode, and a voice that does not answer fails the Deployment with the
+gamemode untouched. `Install-DeployAgent` names each one only where its full
+install has set it up (the task `Thornswood Docs`, the service
+`ThornswoodBot`, the task `Thornswood Dev Voice`). The site's and the bot's
+Deployment logs go in the dev server's data folder beside dev's. The gate's
+`Deploy-Release -Environment site` or `discord` rolls either back by tag.
+
+## Release news
+
+Once a Deployment's success is on GitHub, the agent reads its Release again
+and writes the tag, name and notes to
+`C:\Thornswood-Deploys\for-bot\news-<environment>.json`, a folder only
+SYSTEM, Administrators and the bot's account read. The bot
+(`watch_release_news` in `bot/bot.py`) posts each tag once: a merge's release
+in the dev updates channel, a main release in #news, each by its id. A release
+whose notes start "Nothing people would notice" (merge-release.yml's line for
+a merge whose pull requests say none), and one deployed over a day ago, are
+written down without a post. A rollback by tag is not news and leaves none.
+
 ## Why "Dev server" and not "Dev"
 
 Deployments to **Dev** and **Main** already exist. `release-files.yml` writes
@@ -310,7 +360,12 @@ token, what the newest Deployment says, and whether the dev server answers.
   a new engine that does not start and a gamemode that does not load on it
   both put back with the old build started, and a server build refused
   before anything stops,
-  the turn, the App token and what it asks for, and the config.
+  the turn, the App token and what it asks for, and the config; and for the
+  site, the bot and voice: a swap with what left, an unchanged app not
+  stopped, a put back, each refusal, a stop that leaves a process, the bot's
+  libraries, voice answering with the old build, the news left after a
+  Deployment and not after a failure or a rollback, and two swaps in one
+  second.
   `dotnet test tools/DeployAgent.Tests` runs them.
 - `tests/test-5180-deploy-agent.ps1` checks the manifest script, both gate
   verbs, the scripts they send the box, and both workflows, and runs the C#

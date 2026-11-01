@@ -369,6 +369,13 @@ webhook posts), `#council-decisions`, `#staff-updates`, `#staff-general`,
 `#dev-test-tasks` (a forum the bot keeps, see Testing above) and
 `#dev-test-findings` are in the Dev space.
 
+A staff notice can be filed as an issue labelled `notice: staff`, its body
+the notice: the bot says it in `#staff-updates` within a minute, comments and
+closes the issue, and the label `notice: take back` takes it out again
+(#5187). That is how `scripts\ops\Say-Staff.ps1` posts from a machine with
+no ssh to the box. The issue is public, so a notice that must stay with
+staff goes over ssh.
+
 `#dev-notes`, `#deploys` and `#reports` were here and are gone, and like
 `#bugs` the builder keeps their names so that a prune cannot take a channel of
 that name and no run makes them again.
@@ -539,6 +546,14 @@ every `test-*.py`, and Install-Bot.ps1 sends it with bot.py.
 
 ## Putting a bot change on the VPS
 
+A merged change to the bot's files goes on by itself (#5187): the merge's
+Release carries `discord.zip`, its Deployment to **Discord bot** is applied
+by the box's deploy agent the way `-CodeOnly` below does it, libraries
+included when `requirements.txt` changed, and the old files go back when the
+bot does not say it is watching its server. `docs/DEPLOY-AGENT.md` has how.
+What follows is the hand way, for a box without the agent or a change that is
+not merged.
+
 From a checkout of main that has just been pulled, never from a copy of the
 repository that was downloaded earlier:
 
@@ -619,6 +634,14 @@ yourself on the deploy machine is only that machine saying it has no such
 folder.
 
 ## Release notes posting themselves
+
+Since #5187 a release's news is posted when the release is deployed. The box's
+deploy agent leaves each deployed Release's notes in
+`C:\Thornswood-Deploys\for-bot`, and the bot posts each release once: a
+merge's release in the dev updates channel (`dev-channel.txt`), a main release
+in #news (`news-channel.txt`, by id). Notes that say nothing people would
+notice are not posted. What follows is how a Ship posts, which still holds
+for a release the agent does not deploy.
 
 The build makes a webhook in `#news` and saves it to `news-webhook.txt` beside
 these files. `Ship.ps1` calls `Publish-Discord.ps1` at the end of every
