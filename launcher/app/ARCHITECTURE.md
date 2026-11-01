@@ -247,7 +247,9 @@ dev feed.
 script in the temp folder, `thornswood-update-<process id>.cmd`, that swaps it in once
 this process has gone and keeps the old one until the new one has started
 (see SelfSwap below). `Version` at the top of the file is the launcher's
-version, moved by `scripts\release\Bump-Version.ps1` before a Ship. In the launcher,
+version: `0.0.0` in git, and the build writes the real one in for the compile
+(`scripts\release\LauncherVersion.ps1` works it out from when the launcher's
+sources last changed, #5179). In the launcher,
 `ShellUpdate.cs:28 CheckUpdatesBackground()` asks, `OnVersionDoc` decides,
 `ShellUpdate.cs:372 RunUpdate()` installs, in two halves (UpdateStages.cs,
 #2210): `FetchUpdate` downloads the release's files into `Profile\Sync`, the
@@ -922,5 +924,5 @@ machines work in them.
 | `launcher\app\Checks.cs` | The rows that gate Play, and finding and closing the game. | A new requirement for Play is a new row here. |
 | `launcher\app\Keep.cs` | Our Data\Platform files put back and other plugins parked. | Anything new the plugins ship under Data\Platform, and how the main and dev builds share a game. |
 | `launcher\app\Hold.cs` | The read-only hold while the game runs. | It holds exactly what Keep keeps, so they change together. |
-| `launcher\app\Updater.cs` | The feed, the packs, the self update, and `Version`. | Every release moves `Version`, from whichever machine ran Bump-Version. |
+| `launcher\app\Updater.cs` | The feed, the packs, the self update, and `Version`. | `Version` is `0.0.0` in git and nobody moves it; the build writes the number in (#5179). |
 | `scripts\release\Publish-Update.ps1` | Diffs the build, packs what belongs by Ship-Rules.ps1, uploads, writes version.json. | Ship runs it on whichever machine ships: main from Patrick's, dev from either. |

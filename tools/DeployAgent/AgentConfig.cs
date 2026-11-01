@@ -4,9 +4,10 @@
 // after, applies that Deployment's signed Release, checks the server is
 // healthy, and says how it went on the Deployment. It only ever calls out.
 //
-// This first slice looks after the dev server only and applies only the
-// gamemode, by the reload Deploy-DevGamemode.ps1 already uses (Reload.ps1,
-// #3196). The same code also deploys one Release by its tag for the deploy
+// This first slice looks after the dev server only. It applies the gamemode
+// by the reload Deploy-DevGamemode.ps1 already uses (Reload.ps1, #3196), and
+// a new server build (an engine pin) by a stop, swap and start under a hold,
+// the way Swap.ps1 does (#5219). The same code also deploys one Release by its tag for the deploy
 // gate's Deploy-Release verb, which comes first (Patrick, 31 Oct 2026).
 // docs/DEPLOY-AGENT.md has the whole design.
 using System.Text.Json;
@@ -46,6 +47,11 @@ public sealed class Config
         LoadSeconds = 300,
         TurnSeconds = 1200,
         LivePort = 7777,
+        Task = "Thornswood Dev Server",
+        Watch = @"C:\Thornswood-Watch",
+        // ServerReadyWait.ps1: the slower of the measured starts (dev, 113 s)
+        // and half again, the wait every swap gives a started server (#1938).
+        StartSeconds = 170,
     };
 
     static readonly Regex RepoShape = new(@"^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$");
@@ -101,7 +107,7 @@ public sealed class Config
                 throw new ConfigException($"environment {name}: githubEnvironment \"{e.GitHubEnvironment}\" must be named, and not Dev or Main, which hold the release records");
             if (e.Root == "" || !(Path.IsPathRooted(e.Root) || e.Root.Contains(@":\"))) throw new ConfigException($"environment {name}: root \"{e.Root}\" is not a full path");
             if (e.Health == "") throw new ConfigException($"environment {name}: no health address");
-            if (e.LoadSeconds < 10 || e.TurnSeconds < 10) throw new ConfigException($"environment {name}: loadSeconds and turnSeconds must be 10 or more");
+            if (e.LoadSeconds < 10 || e.TurnSeconds < 10 || e.StartSeconds < 10) throw new ConfigException($"environment {name}: loadSeconds, turnSeconds and startSeconds must be 10 or more");
         }
     }
 }
@@ -130,6 +136,16 @@ public sealed class EnvConfig
     public int TurnSeconds { get; set; }
     /// <summary>The live server's port: a root whose settings name it is refused.</summary>
     public int LivePort { get; set; }
+    /// <summary>The server's scheduled task, which a server build swap stops
+    /// and starts (Install-ThornswoodServer.ps1 registers it). "" refuses
+    /// every swap, so only a gamemode reload is done.</summary>
+    public string Task { get; set; } = "";
+    /// <summary>The watchdog's folder, whose holds\ a swap writes its hold in
+    /// (#5155, ServerHold.ps1). "" when no watchdog runs.</summary>
+    public string Watch { get; set; } = "";
+    /// <summary>How long a started server has to answer on both its ports
+    /// before a swap puts the old build back.</summary>
+    public int StartSeconds { get; set; } = 170;
 
     internal EnvConfig Overlay(JsonElement e)
     {
@@ -144,6 +160,9 @@ public sealed class EnvConfig
         LoadSeconds = I("loadSeconds", LoadSeconds);
         TurnSeconds = I("turnSeconds", TurnSeconds);
         LivePort = I("livePort", LivePort);
+        Task = S("task", Task);
+        Watch = S("watch", Watch);
+        StartSeconds = I("startSeconds", StartSeconds);
         return this;
     }
 }

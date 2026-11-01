@@ -188,7 +188,7 @@ try {
     Yes ("2 not on dev yet, it goes to dev as 1.2.3: " + (Said $r)) (Chose $r '1.2.3' $true)
     Yes '2 and it is main''s own launcher, so a Ship from the feed takes main''s exe' ($r -isnot [string] -and $r.MainsOwn)
     $r = Run @{ Aligned = $true; Current = '1.2.3'; Inputs = $M; Main = "1.2.3|$M"; DevFeed = "1.2.3|$D"; Ever = @('1.2.3') }
-    Yes ("2 main's launcher cannot go to dev as 1.2.3 while dev's 1.2.3 is another launcher, so it stops: " + (Said $r)) ($r -is [string] -and $r -like 'STOP.*1.2.3 is already out*Bump-Version*')
+    Yes ("2 main's launcher cannot go to dev as 1.2.3 while dev's 1.2.3 is another launcher, so it stops: " + (Said $r)) ($r -is [string] -and $r -like 'STOP.*1.2.3 is already out*LauncherVersion.ps1*history was rewritten*')
     $r = Run @{ Aligned = $true; Current = '1.2.3'; Inputs = $M; Main = "1.2.3|$M"; DevFeed = "1.2.3.1|$D"; Ever = @('1.2.3.1') }
     Yes ("2 nor below a dev number already out, which still stops as before: " + (Said $r)) ($r -is [string] -and $r -like 'STOP.*downgrade*')
 
@@ -204,7 +204,7 @@ try {
     $r = Run @{ Aligned = $false; Current = '1.2.2'; Inputs = $E; Main = "1.2.3|$M"; DevFeed = "1.2.3|$D"; Ever = @('1.2.3') }
     Yes ("3 a branch behind main climbs from main's number: " + (Said $r)) (Chose $r '1.2.3.1' $true)
 
-    # ---- 4. main moved first with Bump-Version, the main Ship not run -------
+    # ---- 4. the launcher changed on main, the main Ship not run ----------
     $r = Run @{ Aligned = $true; Current = '1.2.4'; Inputs = $G; Main = "1.2.3|$M"; DevFeed = "1.2.3.2|$D"; Ever = @('1.2.3.1', '1.2.3.2') }
     Yes ("4 clean main on 1.2.4 before main ships it goes to dev as 1.2.4: " + (Said $r)) (Chose $r '1.2.4' $true)
     Yes '4 and a dev launcher on 1.2.3.2 is offered it' (IsNewer '1.2.4' '1.2.3.2')
@@ -245,8 +245,8 @@ try {
     Yes ("7 main's own launcher still cannot take a dev number by -Version: " + (Said $r)) ($r -is [string] -and $r -like 'STOP.*Main-equivalent*')
 
     # ---- 8. the main Ship of the next version is not in the way -------------
-    # A main Ship reads none of the dev numbers: main moves with Bump-Version
-    # and ships what main says.
+    # A main Ship reads none of the dev numbers: main's number moves with its
+    # sources (LauncherVersion.ps1) and it ships that.
     $r = Run @{ Dev = $false; Aligned = $true; Current = '1.2.4'; Inputs = $G; Main = "1.2.3|$M"; DevFeed = "1.2.3.3|$D"; Ever = @('1.2.3.3') }
     Yes ("8 main ships 1.2.4 with dev on 1.2.3.3: " + (Said $r)) (Chose $r '1.2.4' $true)
     $r = Run @{ Dev = $false; Aligned = $true; Current = '1.2.3'; Inputs = $M; Main = "1.2.3|$M"; DevFeed = "1.2.3.3|$D"; Ever = @('1.2.3.3') }
@@ -256,7 +256,7 @@ try {
     # offers 1.2.3, and a main Ship of 1.2.3 whose launcher sources are not the
     # ones it was built from would sign CI's exe again and send it as 1.2.3.
     $r = Run @{ Dev = $false; Aligned = $true; Current = '1.2.3'; Inputs = $D; Main = "1.2.3|$M"; DevFeed = "1.2.3.3|$D"; Ever = @('1.2.3.3') }
-    Yes ("9 a main Ship of 1.2.3 from other launcher sources than main's 1.2.3 stops before the exe is fetched or signed: " + (Said $r)) ($r -is [string] -and $r -like 'STOP.*1.2.3 is already out*Bump-Version*')
+    Yes ("9 a main Ship of 1.2.3 from other launcher sources than main's 1.2.3 stops before the exe is fetched or signed: " + (Said $r)) ($r -is [string] -and $r -like 'STOP.*1.2.3 is already out*LauncherVersion.ps1*history was rewritten*')
     $r = Run @{ Dev = $false; Aligned = $true; Current = '1.2.3'; Inputs = $M; Main = "1.2.3|$M"; DevFeed = "1.2.3.3|$D"; Ever = @('1.2.3.3'); Rebuild = $true }
     Yes ("9 -RebuildLauncher from main's own sources goes, since it is the same launcher: " + (Said $r)) (Chose $r '1.2.3' $true)
     $r = Run @{ Dev = $false; Aligned = $true; Current = '1.2.3'; Inputs = $D; Main = "1.2.3|$M"; DevFeed = "1.2.3.3|$D"; Ever = @('1.2.3.3'); ModsOnly = $true }

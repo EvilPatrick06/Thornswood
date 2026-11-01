@@ -21,12 +21,14 @@ It does two jobs with the same code:
 
 ## What this first slice does, and what it does not
 
-It looks after the **dev server only** and applies **the gamemode only**.
+It looks after the **dev server only** and applies **the gamemode and the
+server build** (the engine).
 
 | Part | Today |
 | --- | --- |
 | Dev gamemode | Applied by the agent: a merge that changes `game/gamemode.js` makes a signed Release and a Deployment, and the agent reloads the dev server's gamemode with nobody dropped. The gate's `Deploy-Release` verb puts in any such Release by its tag. |
-| Dev plugins, settings, engine | Not yet. These need the server stopped and its files swapped, with a watchdog hold (#5155). Deploy-DevGamemode, Publish-Server and Ship still do them. |
+| Dev engine (the server build) | Applied by the agent (#5219): every Release carries the server build its commit records, and when dev runs another one the agent stops dev, swaps in the build and the gamemode together and starts it under a hold. So a merged engine pin reaches dev with no Publish-Server and no Deploy-DevGamemode. See "A new server build" below. |
+| Dev plugins, settings | Not yet. Like the engine they need a stop and a swap under a hold, but nothing puts them on a Release yet. Deploy-DevGamemode and Ship still do them. |
 | Main | Not yet. Main waits on a Main environment that only Patrick can approve (#5181). The agent refuses any environment but dev. |
 | Bot, site | Not yet. Their own slices. |
 | Launcher and game files | Not the agent's job: they reach people through the launcher's feed and a Ship. The release workflow (#5179) moves them onto Releases. |
@@ -58,11 +60,15 @@ the App holds Deployments.
 
 ## How a change reaches dev
 
-1. A pull request that changes `game/gamemode.js` merges to main.
+1. A pull request that changes `game/gamemode.js` or
+   `records/server-build.json` (an engine pin) merges to main.
 2. [gamemode-release.yml](../.github/workflows/gamemode-release.yml) runs on
    GitHub's Windows runner in the `release` environment (main only). It
+   fetches CI's build of the pin, held to the records
+   (Get-EngineArtifact.ps1, the server zip ServerArtifact.ps1 makes),
    stamps the gamemode (`thornswood-build.json`, BuildStamp.ps1), writes a
-   manifest listing both files with their sha256
+   manifest listing the gamemode, its stamp, the server zip and the record
+   inside it, each with its sha256
    ([New-SignedManifest.ps1](../scripts/release/New-SignedManifest.ps1)),
    makes a catalog over the manifest and signs it with ThornswoodRelease
    ([Sign-OnRunner.ps1](../scripts/release/Sign-OnRunner.ps1)), then
@@ -75,6 +81,10 @@ the App holds Deployments.
    holds an update to, and `Test-FileCatalog` has to say it covers the
    manifest. Then each file is downloaded and held to the manifest's size
    and sha256, and the manifest's commit has to be the Deployment's commit.
+   The server zip is downloaded only when dev runs another server build than
+   the Release's record names (read from dev's `server-build.json`, each CR
+   LF read as LF, the way the deploy scripts compare records); then the
+   steps are the ones under "A new server build" instead of 4 to 6.
 4. The agent takes the server folders' turn, keeps the running
    `gamemode.js`, `thornswood-build.json`, `server-settings.json` and the
    deploy record in `.prev-<stamp>`, and moves the new stamp and then the new
@@ -95,6 +105,39 @@ Every Deployment's log is left in the dev server's data folder as
 newest ten. The status's log link points there:
 `http://play.thornswood.net:7788/deploy-<id>.log`. Network addresses in
 server log lines are taken out before they go in.
+
+## A new server build
+
+When dev runs another server build than the Release records, the agent puts
+the build and the gamemode in together, the way Swap.ps1 swaps a server:
+
+1. The stage, while dev still runs: every fork file out of the zip into
+   `.agent-stage-<stamp>`, held to the record by sha256 and commit
+   (ServerBuild.ps1's rules, ported to `ServerBuild.cs`), the zip's own
+   record the one the signed manifest names, and the new engine one that
+   says how a gamemode load went (#3196). A refusal here touches nothing.
+2. The server folders' turn (#3247), and a hold on the task `Thornswood Dev
+   Server` in `C:\Thornswood-Watch\holds` (#5155, the file ServerHold.ps1
+   writes), so neither the nightly backup nor the watchdog steps in.
+3. The stop: the process holding dev's own UDP port and nothing else, waited
+   for until it has exited, and a `restart.json` it never read removed.
+4. One rename per file. What each replaces goes to `.prev-<stamp>`, and so
+   does any fork file the new record does not list, so the folder holds one
+   build.
+5. The start, then both ports from the box (UDP, and the resources port
+   taking a connection) within 170 seconds (ServerReadyWait.ps1's wait),
+   then `server.log` saying the new gamemode's git blob loaded, then the
+   health address.
+6. If any of that fails: the stop again, the new files out, the old ones in,
+   the old server started and asked the same way. The Deployment says
+   **failure** and that the previous server build is back and answering. If
+   even that does not take it says **error**, keeps `.prev-<stamp>`, and dev
+   needs `Publish-Server -PutBack`.
+7. The hold is taken away on every way out.
+
+Anybody on dev is dropped for the minute or two of the restart, as with
+Publish-Server. Deploying an older tag by the gate verb swaps its server
+build back in the same way.
 
 When several Deployments are waiting, only the newest is applied, and the
 older ones are marked inactive. The newest is the state dev should be in, and
@@ -177,6 +220,10 @@ token, what the newest Deployment says, and whether the dev server answers.
   a deploy by tag and a rollback to the Release before, a gamemode that does
   not load, a failed health check, each refusal, only the newest Deployment
   applied, a Deployment cut short, the self-update, the git blob, a log roll,
+  a new server build swapped in under a hold, the same build not fetched,
+  a new engine that does not start and a gamemode that does not load on it
+  both put back with the old build started, and a server build refused
+  before anything stops,
   the turn, the App token and what it asks for, and the config.
   `dotnet test tools/DeployAgent.Tests` runs them.
 - `tests/test-5180-deploy-agent.ps1` checks the manifest script, both gate
