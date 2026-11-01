@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  80,
-    "callCount":  318,
+    "callCount":  319,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -219,6 +219,15 @@
                       "via":  "Invoke-ThornswoodRemote",
                       "anchor":  "$probe = @(Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script (Get-ThornswoodDocsPasswordProbe $PasswordFile) |",
                       "does":  "checks the site password file is there",
+                      "class":  "read-status",
+                      "reason":  "read only"
+                  },
+                  {
+                      "script":  "scripts/deploy/Deploy-Docs.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$agentSaid = @(Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script @\"",
+                      "does":  "reads whether the deploy agent's agent.json names the site",
                       "class":  "read-status",
                       "reason":  "read only"
                   },
