@@ -180,7 +180,8 @@ The words this guide uses. The long alphabetical list, with file names, is [docs
 | Creation Kit | Bethesda's tool for plugin records. A release does not ship the kit itself |
 | Node | The program that runs the website, the voice service, and `node tests\...` |
 | Bot | The Discord bot in the `bot` folder |
-| Build check result | The check on a pull request: it passes only when Launcher builds and every share of the gate passed. Merge when it says pass |
+| Build check result | The check on a pull request: it passes only when Launcher builds and every share of the gate passed. Merge when it and Test tasks in the pull request say pass |
+| Test tasks in the pull request | The check that holds each `Test task for #N:` block in a pull request's body to the bot's post rules before the merge. An edit to the body runs it again |
 | Worktree | A second folder on this PC, checked out on its own branch |
 
 ## 1. First Time Setup
@@ -787,7 +788,7 @@ If the stop was a rebase rather than a merge, the last step is `git rebase --con
 
 #### Merge your own pull request
 
-Wait until the check named `Build check result` is green on the commit you are merging. It passes only when `Launcher builds` and the five `Gate harnesses (n of 5)` checks all passed. Pending means it is still running. A red check means the branch is not ready. Fix it on the same branch and push again.
+Wait until the check named `Build check result` is green on the commit you are merging. It passes only when `Launcher builds` and the five `Gate harnesses (n of 5)` checks all passed. Main also requires `Test tasks in the pull request`, which holds the test tasks in the body to the bot's rules; when it is red, fix the body, and the edit runs it again. Pending means it is still running. A red check means the branch is not ready. Fix it on the same branch and push again.
 
 ```powershell
 gh pr checks
@@ -1128,6 +1129,19 @@ ordinary playtester steps with no staff or dev command (that is Main). Main:
 the fix commit is in the newest `release/main/` tag, and no staff or dev
 command. Known issues: open, no merged pull request names it, no test task.
 One post per issue per forum. The bot's token needs issues write to comment.
+
+The same rules run on a pull request before it merges (#5199). The check
+`Test tasks in the pull request` (`.github\workflows\test-tasks.yml`, with
+`bot\pr_tasks.py`) reads each `Test task for #N:` block in the body the way
+done-on-merge.yml will copy it, and calls `post_problems` on it for the forum
+its Server line names. It also refuses what only a pull request gets wrong:
+two of one kind for one issue, a Main one longer than the bot's first post,
+a body that also says `Closes #N` for that issue (the merge would close it
+before the test task is copied), and an issue that is closed or is not an
+issue. Main's ruleset requires it beside `Build check result`. A body with
+no test task passes. When it is red, edit the body; the edit runs it again.
+To run it on a body before you push:
+`python bot\pr_tasks.py --file <the body, saved as a file>`.
 
 Three Discord forums show testing, and the bot keeps all three from the
 board (`bot\README.md`, Testing). Patrick, 22 Oct: "dev test tasks are for
