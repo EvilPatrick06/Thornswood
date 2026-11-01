@@ -41,6 +41,10 @@ const { Bot, MSG, loadAddon } = require('./bot.js');
 const LOADED = '[thornswood] gamemode client scripts ';
 const NOT_LOADED = ['[thornswood] gamemode did not load', 'Bad syntax, ignoring'];
 const BLOB = /gamemode\.js is git blob ([0-9a-f]{40})/;
+// gamemode.js's creation lines (log('chargen', ...)), and the steps whose
+// FAIL carries them.
+const CHARGEN = '[thornswood] chargen ';
+const CHARGEN_STEPS = ['new', 'face', 'saved'];
 // A Nord, the race the game's own race menu opens on (NordRace,
 // 0x13746:Skyrim.esm), with the shape unit/TestUtils.hpp sends.
 const NORD = 0x13746;
@@ -172,7 +176,18 @@ async function pass(opts) {
   const loadMs = opts.loadMs || 600000;
   const stepMs = opts.stepMs || 60000;
   const lines = [];
-  const say = (step, ok, detail) => { lines.push({ step, ok, detail }); log((ok ? 'PASS  ' : 'FAIL  ') + step + ': ' + detail); return ok; };
+  // A FAIL from the character on says what the gamemode's creation said
+  // about it (the copy has nobody else on it), so the Deployment's log holds
+  // the reason and nobody has to fetch the server's log off the box.
+  const said = (step) => {
+    if (!CHARGEN_STEPS.includes(step)) { return ''; }
+    const c = server.lines.filter((l) => l.indexOf(CHARGEN) >= 0).slice(-3).map((l) => l.trim().slice(0, 300));
+    return c.length ? '. The gamemode said: ' + c.join(' | ') : '. The gamemode said nothing about creating it';
+  };
+  const say = (step, ok, detail) => {
+    if (!ok) { detail += said(step); }
+    lines.push({ step, ok, detail }); log((ok ? 'PASS  ' : 'FAIL  ') + step + ': ' + detail); return ok;
+  };
   const settings = readJson(path.join(root, 'server-settings.json'));
   const port = Number(settings.port);
   const password = settings.password === undefined ? '' : String(settings.password);

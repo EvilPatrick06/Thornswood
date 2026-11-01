@@ -63,6 +63,8 @@ function folder(name, settings) {
 // The stand-in. break_ names the one thing it gets wrong.
 function standIn(root, break_) {
   const state = { up: false, runs: 0, moved: false };
+  // The running server, so the stand-in engine can print the gamemode's lines.
+  let child0 = null;
   const blob = botPass.gitBlob(path.join(root, 'gamemode.js'));
   const formFile = path.join(root, 'world', 'changeForms', '1.json');
 
@@ -71,6 +73,7 @@ function standIn(root, break_) {
     child.stdout = new EventEmitter();
     child.stderr = new EventEmitter();
     state.runs++;
+    child0 = child;
     child.kill = () => { setTimeout(() => { state.up = false; child.emit('exit', null, 'SIGTERM'); }, 5); };
     setTimeout(() => {
       child.stdout.emit('data', 'Using data dir \'data\'\n');
@@ -120,7 +123,10 @@ function standIn(root, break_) {
               // plain clothes (giveShift), or a returning character's close.
               out.push({ type: 'message', message: { t: 28, inventory: { entries: [{ baseId: 0xf, count: 5 }] } } });
               setTimeout(() => {
-                if (break_ === 'no creation') { return; }
+                if (break_ === 'no creation') {
+                  child0.stdout.emit('data', '[thornswood] chargen ff000801 profile 5 already has a character and is carrying nothing, not in the hall, no face, so creation is skipped for them\n');
+                  return;
+                }
                 if (break_ === 'returning') { out.push({ type: 'message', message: { t: 29, open: false } }); return; }
                 stage = 'appearance';
                 out.push({ type: 'message', message: { t: 28, inventory: { entries: [{ baseId: 0xf, count: 5 }, { baseId: 0x12eb7, count: 1, worn: true }] } } });
@@ -197,9 +203,15 @@ function failedAt(r, step) {
   const nocreate = await run('nocreate', 'no creation');
   yes('creation never starts: FAIL on new, saying what it waited for',
     failedAt(nocreate.r, 'new') && /creation starting/.test(nocreate.r.lines.find((l) => !l.ok).detail));
+  yes('  and the FAIL carries what the gamemode said about creating it',
+    /The gamemode said: \[thornswood\] chargen ff000801 profile 5 .*not in the hall/.test(nocreate.r.lines.find((l) => !l.ok).detail));
+  yes('  and a PASS line carries none of it', nocreate.r.lines.filter((l) => l.ok).every((l) => !/gamemode said/.test(l.detail)));
   const returning = await run('returning', 'returning');
   yes('taken for a returning character: FAIL on new, saying so',
     failedAt(returning.r, 'new') && /returning/.test(returning.r.lines.find((l) => !l.ok).detail));
+  yes('  and a FAIL where the gamemode said nothing says that',
+    /The gamemode said nothing about creating it/.test(returning.r && returning.r.lines.find((l) => !l.ok).detail || ''));
+
   const unsaved = await run('unsaved', 'not saved');
   yes('nothing written to the world: FAIL on saved', failedAt(unsaved.r, 'saved') && /holds no character/.test(unsaved.r.lines.find((l) => !l.ok).detail));
   const moved = await run('moved', 'moved');
