@@ -20,9 +20,10 @@
   Each prints the token alone on its own line. It is for the ops repository
   alone, with that one permission and nothing more, and GitHub ends it within
   the hour. Nothing keeps it: the caller hands it to gh through GH_TOKEN for
-  that run and takes it away after. The App already holds both permissions
+  that run and takes it away after. The App holds both permissions
   (administration write since #3107 for the runner labels, environments write
-  since #4013's go-public), so nothing has to be added on its page.
+  for this; records/github-apps.json lists them), so nothing has to be added
+  on its page.
 
   The key is read and never shown, logged or sent; only the App's own short
   token (appJwt in admin.js) goes to GitHub.

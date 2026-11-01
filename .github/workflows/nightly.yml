@@ -309,6 +309,22 @@ jobs:
           # runs it against a stand-in GitHub.
           .\scripts\dev\Nightly-PlainIssues.ps1 -Run
 
+      - name: Each GitHub App holds only what its record gives it
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The redesign's part 20 (plan line 26): the Bots' two Apps, the
+          # box admin App, the watcher and the pin robot each hold exactly
+          # the permissions and events records/github-apps.json gives them,
+          # read from GitHub's GET /apps/<slug>. One holding more, or less,
+          # is named and the night is red until Patrick changes the App or a
+          # pull request changes the record. tests\test-app-permissions.js
+          # runs it against a stand-in GitHub.
+          node scripts/dev/Check-AppPermissions.js
+          exit $LASTEXITCODE
+
   harnesses:
     # The test harnesses, in shares (#2357). One job for each entry under
     # shard, each on a runner of its own with 45 minutes of its own; another

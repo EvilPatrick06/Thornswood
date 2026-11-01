@@ -29,9 +29,12 @@
         "branch main"
       ],
       "secrets": [
-        "BOARD_TOKEN"
+        "BOARD_APP_KEY"
       ],
-      "variables": []
+      "variables": [
+        "BOARD_APP_CLIENT_ID",
+        "BOARD_NUMBER"
+      ]
     },
     "desk": {
       "deploy_from": [

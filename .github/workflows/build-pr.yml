@@ -2,13 +2,16 @@
 # change build.yml and run  node scripts/dev/Build-PrWorkflow.js
 #
 # Every pull request runs the same checks as build.yml, on GitHub's hosted
-# windows-latest runner (#1306, #4983). No secrets, no live folders: every
+# windows-latest runner (#1306, #4983), and again on the merge queue's
+# merge of it onto the newest main (#5182). No secrets, no live folders: every
 # scratch path is under RUNNER_TEMP. The job keeps the name "Launcher builds",
 # and the gate runs beside it in shares, "Gate harnesses (n of 5)", after
 # the job "Pick the gate harnesses" says what each runs.
 name: Build check (pull requests)
 on:
   pull_request:
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 permissions:
   contents: read
@@ -51,9 +54,22 @@ jobs:
   # would run twice or not at all. With no map the pull request runs the
   # whole gate, split by place in the list. How many shares there are is
   # SHARES below, and nowhere else.
+  #
+  # ON ARM64 (the plan's runner part, 1 Nov 2026). The pick, main's "tested"
+  # job and the pull request's "Build check result" only read files and ask
+  # GitHub, so they run on GitHub's arm64 Linux runner, free on a public
+  # repository like the x64 one, and leave the x64 Linux pool to CodeQL and
+  # the pull request body and test task checks. Every job of the
+  # organisation, either kind, counts toward the one limit of 20 at once
+  # (GitHub's Actions limits page), so this is held to what it measures. In
+  # the 60 pull request runs before it (31 Oct to 1 Nov 2026) the result job
+  # waited 2 s for a runner (median; 397 s at most, all in the #5250 hour)
+  # and ran 3 s, and the pick, in the 14 of them that had one, waited 2 s
+  # (median, 28 s at most) and ran 15 s. Its own pull request's runs say
+  # what arm64 changes.
   pick:
     name: Pick the gate harnesses
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     permissions:
       contents: read
@@ -544,15 +560,16 @@ jobs:
         # PSScriptAnalyzer into RUNNER_TEMP on every job and linted every
         # file, 35 s a build on average. Lint.ps1 keeps each pinned tool in
         # the runner account's own folder, named by its version, and a pull
-        # request lints only the files it changed against its base; main
-        # and a manual run lint everything, and so does the nightly. The
+        # request lints only the files it changed against its base, and so
+        # does its run in the merge queue, against the queue's base (#5182);
+        # main and a manual run lint everything, and so does the nightly. The
         # last step before the note below, because it fetches the base
         # commit: no check after it reads git history.
         continue-on-error: true
         timeout-minutes: 8
         shell: pwsh
         env:
-          BASE: ${{ github.event.pull_request.base.sha }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: |
           if ($env:BASE -match '^[0-9a-f]{40}$') {
             git fetch -q --depth=1 --no-tags origin $env:BASE
@@ -579,8 +596,10 @@ jobs:
       # October's whole allowance by 23 Oct 2026, and from then the note's
       # upload failed and took every pull request's build red. A log costs no
       # storage and is kept 90 days; scripts\dev\Tested-Tree.js reads it.
+      # In the merge queue (#5182) the checkout is the queue's own merge, the
+      # very commit that lands on main, so the note is written there too.
       - name: Write down the tree these checks passed on
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         shell: pwsh
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -605,7 +624,7 @@ jobs:
     name: Build check result
     needs: [launcher, gate]
     if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     steps:
       - name: The launcher build and the gate passed

@@ -12,10 +12,16 @@
 //      not merged or from a fork, a question GitHub will not answer: main
 //      builds. Since #3399 the note is a line of the log, not an artifact,
 //      so this asks no artifact anything.
+//   1a. the merge queue (#5182): a passed merge_group run of build-pr.yml on
+//      a gh-readonly-queue/ branch, whose commit is HEAD or whose commit's
+//      tree is HEAD's, counts under the same rules, and is read before any
+//      pull request's own run; a run of another tree, of another workflow,
+//      of a fork, of a gate that ran less, or one that is not the queue's
+//      does not.
 //   2. build.yml asks first, on push only, on a light runner, with nothing
 //      but actions, contents and pull-requests read; the launcher job waits
 //      for it and builds when it found nothing; the note is the last step of
-//      the checks, pull request only, under the name the script looks for,
+//      the checks, pull request and merge queue only, under the name the script looks for,
 //      and counts only beside every share of the gate passed (the job
 //      "gate", 31 Oct 2026), and no step of either build uploads an
 //      artifact.
@@ -52,7 +58,9 @@ function github(o) {
   const get = async p => {
     asked.push(p);
     if (o.down) { throw new Error('GET answered 502'); }
-    let m = /^repos\/[^/]+\/[^/]+\/commits\/([0-9a-f]{40})\/pulls\?per_page=100$/.exec(p);
+    let m = /^repos\/[^/]+\/[^/]+\/actions\/workflows\/build-pr\.yml\/runs\?event=merge_group&status=success&per_page=50$/.exec(p);
+    if (m) { return { workflow_runs: o.groups || [] }; }
+    m = /^repos\/[^/]+\/[^/]+\/commits\/([0-9a-f]{40})\/pulls\?per_page=100$/.exec(p);
     if (m) { return m[1] === COMMIT ? (o.pulls || []) : []; }
     m = /^repos\/[^/]+\/[^/]+\/actions\/workflows\/build-pr\.yml\/runs\?event=pull_request&head_sha=([0-9a-f]{40})&per_page=100$/.exec(p);
     if (m) { return { workflow_runs: (o.runs || []).filter(r => r.head_sha === m[1]) }; }
@@ -92,6 +100,14 @@ function jobLog(tree) {
 }
 function world(id, name, extra) {
   return Object.assign({ pulls: [pull()], runs: [run(id)], jobs: { [id]: jobs(id, name || 'Launcher builds', 'success') }, logs: { [id * 10]: jobLog(TREE) } }, extra || {});
+}
+// A passed run of the merge queue (#5182): its commit COMMIT, of tree TREE.
+function group(id, extra) {
+  return Object.assign(run(id, { event: 'merge_group', head_sha: COMMIT, head_branch: 'gh-readonly-queue/main/pr-3190-' + 'e'.repeat(40),
+    head_commit: { id: COMMIT, tree_id: TREE } }), extra || {});
+}
+function queueWorld(id, extra) {
+  return Object.assign({ pulls: [], runs: [], groups: [group(id)], jobs: { [id]: jobs(id, 'Launcher builds', 'success') }, logs: { [id * 10]: jobLog(TREE) } }, extra || {});
 }
 async function ask(o, tree) { const g = github(o); return T.find({ tree: tree || TREE, commit: COMMIT, repo: REPO_NAME, get: g, getText: g }); }
 
@@ -166,6 +182,35 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   await T.find({ tree: TREE, commit: COMMIT, repo: REPO_NAME, get: g2, getText: g2 });
   yes('no artifact is asked about any more (#3399)', g2.asked.every(p => !/artifacts/.test(p)));
 
+  // ---- 1a. the merge queue (#5182) ---------------------------------------------
+  const queue = queueWorld(31);
+  const gq = github(queue);
+  r = await T.find({ tree: TREE, commit: COMMIT, repo: REPO_NAME, get: gq, getText: gq });
+  yes('a passed merge queue run of HEAD counts, with no pull request asked about: ' + r.why,
+      r.run.endsWith('/31') && /merge queue/.test(r.why) && gq.asked.every(p => !/\/pulls\?/.test(p)));
+  r = await ask(queueWorld(31, { groups: [group(31, { head_sha: 'f'.repeat(40) })] }));
+  yes('  so does one of another commit with HEAD\'s tree, if the queue lands a new commit: ' + r.why, r.run.endsWith('/31'));
+  r = await ask(queueWorld(31, { groups: [group(31, { head_sha: 'f'.repeat(40), head_commit: { id: 'f'.repeat(40), tree_id: OTHER } })] }));
+  yes('  one of another commit and tree is not read at all: ' + r.why, r.run === '' && /no passed merge queue run/.test(r.why));
+  r = await ask(queueWorld(31, { logs: { 310: jobLog(OTHER) } }));
+  yes('  one whose note names another tree does not: ' + r.why, r.run === '' && /another tree/.test(r.why));
+  r = await ask(queueWorld(31, { groups: [group(31, { head_branch: 'main' })] }));
+  yes('  a merge_group run off the queue\'s branches does not: ' + r.why, r.run === '' && /not a run of the merge queue/.test(r.why));
+  r = await ask(queueWorld(31, { groups: [group(31, { event: 'pull_request' })] }));
+  yes('  nor a run of another event the answer slipped in', r.run === '' && /not a run of the merge queue/.test(r.why));
+  r = await ask(queueWorld(31, { groups: [group(31, { path: '.github/workflows/build.yml' })] }));
+  yes('  nor a run of another workflow', r.run === '' && /not \.github\/workflows\/build-pr\.yml/.test(r.why));
+  r = await ask(queueWorld(31, { groups: [group(31, { head_repository: { full_name: 'someone/Thornswood' } })] }));
+  yes('  nor a fork\'s', r.run === '' && /not this repository/.test(r.why));
+  r = await ask(queueWorld(31, { jobs: { 31: jobs(31, 'Launcher builds', 'success', 'success', shares(g => Object.assign(g, { name: g.name.replace(')', ', what the change reaches)') }))) } }));
+  yes('  nor one whose gate ran only what a change reaches', r.run === '' && /only what its change can reach/.test(r.why));
+  r = await ask(queueWorld(31, { jobs: { 31: jobs(31, 'Launcher builds', 'success', null) } }));
+  yes('  nor one whose launcher job never reached the note', r.run === '' && /no Launcher builds job passed/.test(r.why));
+  r = await ask(Object.assign(world(11), { groups: [group(31, { head_commit: { id: COMMIT, tree_id: OTHER }, head_sha: 'f'.repeat(40) })] }));
+  yes('  with no queue run, a pull request merged before the queue still counts: ' + r.why, r.run.endsWith('/11') && /#3190/.test(r.why));
+  r = await ask(Object.assign(queueWorld(31, { logs: { 310: jobLog(OTHER) } }), { pulls: [] }));
+  yes('  and when neither counts, both reasons are given: ' + r.why, r.run === '' && /another tree/.test(r.why) && /no pull request/.test(r.why));
+
   // GitHub that will not answer: main builds, and the script still ends 0.
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'tested-tree-'));
   const out = path.join(scratch, 'output');
@@ -193,7 +238,7 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   yes('  on a push only, so a manual run always builds', /\n    if: \$\{\{ github\.event_name == 'push' \}\}\n/.test(tj));
   // #3551: the build waits for this answer, so it asks on GitHub's runner.
   const runsOn = (/\n    runs-on: ([^\n]*)\n/.exec(tj) || ['', ''])[1];
-  yes('  on GitHub\'s hosted runner, not the box (#3551): ' + runsOn, runsOn === 'ubuntu-latest' && !/self-hosted|thornswood-/.test(runsOn));
+  yes('  on GitHub\'s hosted runner, not the box (#3551): ' + runsOn, runsOn === 'ubuntu-24.04-arm' && !/self-hosted|thornswood-/.test(runsOn));
   yes('  with no fallback on the box (#4983)', build.indexOf('\n  tested-vps:\n') < 0 && build.indexOf('\n  launcher-vps:\n') < 0);
   yes('  with only actions, contents and pull-requests read', /\n    permissions:\n      actions: read\n      contents: read\n      pull-requests: read\n    outputs:/.test(tj));
   yes('  and no secrets', !/secrets\./.test(tj));
@@ -210,8 +255,8 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   yes('the note is the last step of the checks, under the name the script looks for', note.indexOf('- name: ' + T.STEP + '\n') === 6);
   // #3874 wrote it only on GitHub's hosted runner, so a VPS build left main
   // to be built and traced. Every build is on GitHub's runner since #4983.
-  yes('  on a pull request only',
-      /\n        if: github\.event_name == 'pull_request'\n/.test(note));
+  yes('  on a pull request and in the merge queue only (#5182)',
+      /\n        if: github\.event_name == 'pull_request' \|\| github\.event_name == 'merge_group'\n/.test(note));
   // The gate runs in the job "gate" beside the launcher job, in shares
   // (31 Oct 2026), after the job "pick" says what each runs (#5183). A
   // share of what a change can reach says so in its name, and the script
@@ -229,8 +274,8 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   yes('  the pick waits for "tested" as the launcher job does, and the shares for both', pj > 0 && pj < gj &&
       /\n    needs: tested\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' \}\}\n/.test(pickJob) &&
       /\n    needs: \[tested, pick\]\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && needs\.pick\.result == 'success' \}\}\n/.test(gateJob));
-  yes('  the pick runs Run-Gate.ps1 -Pick on Linux, with the token, and hands on its plan',
-      /\n    runs-on: ubuntu-latest\n/.test(pickJob) && /\.\/scripts\/dev\/Run-Gate\.ps1 -Pick \(\[int\]\$env:SHARES\)\n/.test(pickJob) &&
+  yes('  the pick runs Run-Gate.ps1 -Pick on GitHub\'s arm64 Linux runner, with the token, and hands on its plan',
+      /\n    runs-on: ubuntu-24\.04-arm\n/.test(pickJob) && /\.\/scripts\/dev\/Run-Gate\.ps1 -Pick \(\[int\]\$env:SHARES\)\n/.test(pickJob) &&
       /\n          GATE_MAP_TOKEN: \$\{\{ github\.token \}\}\n/.test(pickJob) && /\n      whole: \$\{\{ steps\.pick\.outputs\.whole \}\}\n/.test(pickJob));
   yes('the gate step is "gate", and runs its share of the plan through Run-Gate.ps1', /\n        id: gate\n/.test(gateStep) &&
       /\.\\scripts\\dev\\Run-Gate\.ps1 -Shard \$env:SHARD -Of \$env:OF /.test(gateStep) &&
@@ -251,6 +296,7 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   yes('no step of either build uploads an artifact (#3399)', !/actions\/upload-artifact@/.test(build.replace(/^\s*#.*$/gm, '')) && !/actions\/upload-artifact@/.test(pr.replace(/^\s*#.*$/gm, '')));
   for (const n of T.JOBS) { yes('the script\'s job name "' + n + '" is a job in build-pr.yml', pr.indexOf('\n    name: ' + n + '\n') >= 0); }
   yes('the script\'s workflow is the pull request build', fs.existsSync(path.join(REPO, T.WORKFLOW)) && /\non:\n  pull_request:\n/.test(pr));
+  yes('  and runs in the merge queue, whose run the script reads first (#5182)', /\non:\n  pull_request:\n  merge_group:\n    types: \[checks_requested\]\n/.test(pr));
 
   // ---- 3. why the tree is enough ---------------------------------------------
   const checkout = steps[0] || '';

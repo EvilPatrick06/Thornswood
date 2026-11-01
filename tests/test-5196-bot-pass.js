@@ -5,20 +5,22 @@
 // #5196. scripts/bot/Bot-Pass.js, the pass a dev deploy waits on, against a
 // stand-in server: a process that prints what the engine prints as it loads
 // a gamemode, and a stand-in for the engine's createBotClient that answers as
-// the fork and the gamemode do (a new character with the race menu open; a
-// moment later, once it has settled, creation starting with the plain
-// clothes; a face then closing the race menu and the character written to
-// the world; after a restart, the character as the world holds it). As in
-// the engine and gamemode.js, the race menu takes one face, and a face that
-// arrives before creation starts is kept as the starting face and closes
-// nothing, so the good pass passes only if the bot waits for the clothes.
-// Then the same with each part broken, one at a time, and the pass has to
-// FAIL on that step and name it:
+// the fork and the gamemode do. A new character comes with the race menu
+// open and creation already open in its first packet (the thornswoodChargen
+// property at stage appearance, and the plain clothes in its pack), because
+// gamemode.js opens creation before the engine hands the character over
+// (spawn.ts, __thornswoodChargen.created). A face then moves creation on to
+// choosing, which comes as an UpdateProperty, and the character is written
+// to the world. The race menu's close is never sent after a face: the engine
+// closes the menu as it takes the face, so the gamemode's closeRaceMenu sends
+// nothing (PartOne::SetRaceMenuOpen). After a restart the character comes
+// as the world holds it. Then the same with each part broken, one at a
+// time, and the pass has to FAIL on that step and name it:
 //
 //  - the gamemode does not load, or a different one loads;
 //  - the server holds logins for a join pass (not a bot pass copy);
-//  - the character is not new; creation never starts; the gamemode takes it
-//    for a returning character; the race menu does not close;
+//  - the character is not new; creation is not opened for it; the gamemode
+//    takes it for a returning one; creation does not move on after a face;
 //  - nothing is written to the world;
 //  - after the restart the character comes back somewhere else, or nameless.
 //
@@ -63,6 +65,8 @@ function folder(name, settings) {
 // The stand-in. break_ names the one thing it gets wrong.
 function standIn(root, break_) {
   const state = { up: false, runs: 0, moved: false };
+  // Every message the stand-in sent a bot.
+  const sent = [];
   // The running server, so the stand-in engine can print the gamemode's lines.
   let child0 = null;
   const blob = botPass.gitBlob(path.join(root, 'gamemode.js'));
@@ -91,15 +95,15 @@ function standIn(root, break_) {
       const out = [];
       let actor = null;
       let open = true;
-      // gamemode.js's chargen stage: none until the arrival settles, then
-      // 'appearance' (the clothes), then 'choosing' once a face lands in it.
-      let stage = 'none';
+      // gamemode.js's chargen stage: 'appearance' from creation, 'choosing'
+      // once a face lands in it.
+      let stage = '';
       const settings = JSON.parse(fs.readFileSync(path.join(root, 'server-settings.json'), 'utf8'));
       if (!state.up) { out.push({ type: 'connectionFailed' }); }
       else if (password !== settings.password) { out.push({ type: 'connectionDenied', error: 'Invalid password' }); }
       else { out.push({ type: 'connectionAccepted' }); }
       return {
-        tick() { return out.splice(0); },
+        tick() { const got = out.splice(0); for (const e of got) { if (e.message) { sent.push(e.message); } } return got; },
         isConnected() { return true; },
         destroy() { },
         send(m) {
@@ -117,35 +121,34 @@ function standIn(root, break_) {
               actor = { t: 33, idx: 5, isMe: true, transform: { pos, rot: [0, 0, 90], worldOrCell: 0x3c },
                         appearance: ap, props: {} };
             } else {
+              // spawn.ts: the gamemode's created() runs before the owner gets
+              // anything, so the first packet carries creation and the clothes.
+              stage = break_ === 'no creation' ? '' : break_ === 'returning' ? 'done' : 'appearance';
+              if (break_ === 'no creation') {
+                child0.stdout.emit('data', '[thornswood] chargen ff000801 profile 5 already has a character and is carrying nothing, not in the hall, no face, so creation is skipped for them\n');
+              }
+              const custom = stage ? [{ propName: 'thornswoodChargen', propValueJsonDump: JSON.stringify({ stage, at: 1 }) }] : [];
               actor = { t: 33, idx: 4, isMe: true, transform: { pos: SPAWN.slice(), rot: [0, 0, 0], worldOrCell: 0x3c },
-                        props: break_ === 'not new' ? {} : { isRaceMenuOpen: true } };
-              // The settle, then creation: the pack has only gold until the
-              // plain clothes (giveShift), or a returning character's close.
-              out.push({ type: 'message', message: { t: 28, inventory: { entries: [{ baseId: 0xf, count: 5 }] } } });
-              setTimeout(() => {
-                if (break_ === 'no creation') {
-                  child0.stdout.emit('data', '[thornswood] chargen ff000801 profile 5 already has a character and is carrying nothing, not in the hall, no face, so creation is skipped for them\n');
-                  return;
-                }
-                if (break_ === 'returning') { out.push({ type: 'message', message: { t: 29, open: false } }); return; }
-                stage = 'appearance';
-                out.push({ type: 'message', message: { t: 28, inventory: { entries: [{ baseId: 0xf, count: 5 }, { baseId: 0x12eb7, count: 1, worn: true }] } } });
-              }, 100);
+                        props: Object.assign(break_ === 'not new' ? {} : { isRaceMenuOpen: true },
+                          { inventory: { entries: [{ baseId: 0x12eb7, count: 1, worn: true }, { baseId: 0xf, count: 40 }] } }),
+                        customPropsJsonDumps: custom };
             }
             out.push({ type: 'message', message: actor });
             return;
           }
-          // The engine takes one face per race menu and stores it; the
-          // gamemode moves the character on only when it lands in creation.
+          // The engine takes one face per race menu, stores it and closes
+          // the menu itself; the gamemode moves creation on when the face
+          // lands in it. No race menu message is sent either way.
           if (m.t === 4 && actor && open && m.idx === actor.idx) {
             open = false;
             if (break_ !== 'not saved') {
               fs.writeFileSync(formFile, JSON.stringify({ profileId: actor ? lastPid(m) : 0, position: SPAWN.map((x) => x + 0.25),
                                                           appearanceDump: JSON.stringify(m.data) }));
             }
-            if (stage !== 'appearance') { return; }
+            if (stage !== 'appearance' || break_ === 'stays') { return; }
             stage = 'choosing';
-            if (break_ !== 'menu stays') { out.push({ type: 'message', message: { t: 29, open: false } }); }
+            out.push({ type: 'message', message: { t: 7, idx: actor.idx, refrId: 0xff000801, propName: 'thornswoodChargen',
+                                                  dataDump: JSON.stringify({ stage, at: 2 }) } });
           }
         }
       };
@@ -153,7 +156,7 @@ function standIn(root, break_) {
   };
   // The profile is in the name the bot sends ("Bot Pass <id>").
   function lastPid(m) { return Number(String(m.data.name).replace('Bot Pass ', '')); }
-  return { spawn, addon, state };
+  return { spawn, addon, state, sent };
 }
 
 async function run(name, break_, settings) {
@@ -197,18 +200,18 @@ function failedAt(r, step) {
   const unset = await run('unset', null, { thornswoodRequirePass: undefined });
   yes('a server that does not say it holds no pass is refused too', failedAt(unset.r, 'loads') && unset.s.state.runs === 0);
   yes('not new: FAIL on new', failedAt((await run('notnew', 'not new')).r, 'new'));
-  const stays = await run('stays', 'menu stays');
-  yes('the race menu does not close: FAIL on face, saying what it waited for',
-    failedAt(stays.r, 'face') && /race menu closing/.test(stays.r.lines.find((l) => !l.ok).detail));
+  const stays = await run('stays', 'stays');
+  yes('creation does not move on after the face: FAIL on face, saying what it waited for',
+    failedAt(stays.r, 'face') && /creation moving on to choosing/.test(stays.r.lines.find((l) => !l.ok).detail));
   const nocreate = await run('nocreate', 'no creation');
-  yes('creation never starts: FAIL on new, saying what it waited for',
-    failedAt(nocreate.r, 'new') && /creation starting/.test(nocreate.r.lines.find((l) => !l.ok).detail));
+  yes('creation is not opened for it: FAIL on new, saying so',
+    failedAt(nocreate.r, 'new') && /no creation stage/.test(nocreate.r.lines.find((l) => !l.ok).detail));
   yes('  and the FAIL carries what the gamemode said about creating it',
     /The gamemode said: \[thornswood\] chargen ff000801 profile 5 .*not in the hall/.test(nocreate.r.lines.find((l) => !l.ok).detail));
   yes('  and a PASS line carries none of it', nocreate.r.lines.filter((l) => l.ok).every((l) => !/gamemode said/.test(l.detail)));
   const returning = await run('returning', 'returning');
   yes('taken for a returning character: FAIL on new, saying so',
-    failedAt(returning.r, 'new') && /returning/.test(returning.r.lines.find((l) => !l.ok).detail));
+    failedAt(returning.r, 'new') && /at stage done, not appearance/.test(returning.r.lines.find((l) => !l.ok).detail));
   yes('  and a FAIL where the gamemode said nothing says that',
     /The gamemode said nothing about creating it/.test(returning.r && returning.r.lines.find((l) => !l.ok).detail || ''));
 
@@ -220,22 +223,11 @@ function failedAt(r, step) {
   yes('back with no name: FAIL on loads back', failedAt(nameless.r, 'loads back') && /its name is/.test(nameless.r.lines.find((l) => !l.ok).detail));
   yes('a failed pass still stops its server', [other, held, nocreate, returning, stays, unsaved, moved, nameless].every((x) => x.s.state.up === false));
 
-  // ----------------------- a face before creation is what failed on the box
-  // The stand-in keeps an early face as the starting face, as gamemode.js
-  // does, so a bot that sent it at login would never see the menu close.
-  {
-    const root = folder('early');
-    const s = standIn(root);
-    s.state.up = true;
-    const settings = JSON.parse(fs.readFileSync(path.join(root, 'server-settings.json'), 'utf8'));
-    const c = s.addon.createBotClient('127.0.0.1', 7801, settings.password);
-    c.send({ t: 1, contentJsonDump: JSON.stringify({ customPacketType: 'loginWithSkympIo', gameData: { profileId: 5 } }) });
-    c.send({ t: 4, idx: 4, data: botPass.face('Bot Pass 5') });
-    await new Promise((r) => setTimeout(r, 300));
-    const got = c.tick().filter((e) => e.type === 'message').map((e) => e.message);
-    yes('a face sent before creation starts closes no race menu (the box\'s first pass)',
-      got.some((m) => m.t === 28 && m.inventory.entries.length > 1) && !got.some((m) => m.t === 29));
-  }
+  // ------------------- what the first two passes on the box waited for
+  // Neither comes from the engine and gamemode: no inventory message after
+  // the first packet, and no race menu close after a face.
+  yes('the good pass got no inventory message and no race menu message, and did not need one',
+    good.r.ok && !good.s.sent.some((m) => m.t === 28 || m.t === 29));
 
   // ---------------------------------------- the world folder is the engine's
   const w = folder('worldname', { databaseName: 'saves' });

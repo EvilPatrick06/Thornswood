@@ -201,7 +201,7 @@ function Show-Lines($lines) {
     switch ($b[0]) {
       'NPCRESET'    { Say ("  NPCs: {0}   characters kept: {1}   other references kept: {2}   not read, kept: {3}" -f $b[1], $b[2], $b[3], $b[4]) 'Yellow' }
       'NPCKINDS'    { Say ('  of them: ' + (($b | Select-Object -Skip 1) -join ', ')) 'DarkGray' }
-      'NPCMARKS'    { Say ("  NPCs carrying the engine's own-gear mark (#98): {0}; without it: {1}" -f $b[1], $b[2]) 'DarkGray' }
+      'NPCMARKS'    { Say ("  what they carry: every item with the engine's own-gear mark (#98): {0}; an item without it: {1}; nothing: {2}" -f $b[1], $b[2], $b[3]) 'DarkGray' }
       'KILLHISTORY' { if ([int]$b[1]) { Say ("  {0} character(s) hold kill-contract history for {1} of these NPCs; each of those NPCs starts again at life 0" -f $b[1], $b[2]) 'Yellow' } }
       'STAFFKEPT'   { Say ("  a creature staff kept: {0}, record {1}, in {2} at {3}" -f $b[1], $b[2], $b[3], $b[4]) 'Yellow' }
       'NOTREAD'     { Say ("  kept, not read: {0} ({1})" -f $b[1], $b[2]) 'Yellow' }
