@@ -183,12 +183,18 @@ const PLAIN = 'box admin: not here';
 const REPO = 'EvilPatrick06/Thornswood';
 const RUNNERS_REPO = 'EvilPatrick06/Thornswood-Ops';
 const OWNER = 'EvilPatrick06';
+// A run is known by its repository's id, which GitHub never changes, not by
+// its owner/name, which a move into the Thornswood organization changes
+// (#5184): matched by name, the box refused every admin run the moment the
+// ops repository moved, until this file was changed and the service put back
+// by hand. The workflow must be that same repository's own github-admin.yml
+// on main, so it is checked against the name the token itself carries.
 const RULES = {
   iss: 'https://token.actions.githubusercontent.com',
   aud: 'thornswood-admin',
-  repository: RUNNERS_REPO,
+  repositoryId: '1435123931', // EvilPatrick06/Thornswood-Ops (repos API, 1 Nov 2026)
   ref: 'refs/heads/main',
-  workflow: RUNNERS_REPO + '/.github/workflows/github-admin.yml@refs/heads/main',
+  workflow: '/.github/workflows/github-admin.yml@refs/heads/main',
   events: ['workflow_dispatch'],
 };
 // The labels every VPS runner carries, or GitHub gives itself; a record may
@@ -282,9 +288,9 @@ function verifyOidc(token, jwks, now, rules) {
   if (aud.indexOf(rules.aud) < 0) throw new Error('for the audience ' + aud.join(', '));
   if (!(Number(claims.exp) > now)) throw new Error('expired');
   if (claims.nbf !== undefined && Number(claims.nbf) > now + 60) throw new Error('not valid yet');
-  if (claims.repository !== rules.repository) throw new Error('from ' + claims.repository);
+  if (String(claims.repository_id) !== rules.repositoryId || !claims.repository) throw new Error('from ' + claims.repository + ' (repository id ' + claims.repository_id + ')');
   if (claims.ref !== rules.ref) throw new Error('from ' + claims.ref + ', not ' + rules.ref);
-  if (claims.job_workflow_ref !== rules.workflow) throw new Error('from the workflow ' + claims.job_workflow_ref);
+  if (claims.job_workflow_ref !== claims.repository + rules.workflow) throw new Error('from the workflow ' + claims.job_workflow_ref);
   if (rules.events.indexOf(claims.event_name) < 0) throw new Error('started by ' + claims.event_name);
   return claims;
 }
@@ -523,7 +529,25 @@ function planAbout(rec, repo, topics) {
 // ------------------------------------------------------------------ GitHub --
 // One HTTPS call. Resolves { status, body } with the body parsed when it is
 // JSON; never rejects for a status, only when nothing answered.
-function call(method, url, headers, body) {
+// GitHub answers a request to a repository that moved (a rename, or the move
+// into the Thornswood organization, #5184) with a redirect to where it is
+// now, and its REST guide says a client follows it: 301, 302 and 303 for a
+// read, 307 and 308 for anything, with the same method and body. Only one on
+// the same host as the request is followed, so the App's or a run's token
+// never goes anywhere else, and at most five, so a loop ends.
+const REDIRECTS = 5;
+function call(method, url, headers, body, hops) {
+  return send(method, url, headers, body).then(a => {
+    const to = a.location ? new URL(a.location, url) : null;
+    const read = method === 'GET' || method === 'HEAD';
+    const follows = to && ([307, 308].includes(a.status) || (read && [301, 302, 303].includes(a.status)));
+    if (!follows) return { status: a.status, body: a.body };
+    if (to.host !== new URL(url).host) return { status: a.status, body: { message: 'redirected to another host, ' + to.host + ', which is not followed' } };
+    if ((hops || 0) >= REDIRECTS) return { status: a.status, body: { message: 'redirected more than ' + REDIRECTS + ' times' } };
+    return call(method, to.toString(), headers, body, (hops || 0) + 1);
+  });
+}
+function send(method, url, headers, body) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
     const data = body === undefined ? null : Buffer.from(JSON.stringify(body));
@@ -536,7 +560,7 @@ function call(method, url, headers, body) {
         const text = Buffer.concat(chunks).toString('utf8');
         let parsed = text;
         if (text.trim()) { try { parsed = JSON.parse(text); } catch (e) { parsed = text; } } else parsed = null;
-        resolve({ status: res.statusCode, body: parsed });
+        resolve({ status: res.statusCode, body: parsed, location: res.headers.location });
       });
     });
     req.on('timeout', () => req.destroy(new Error(method + ' ' + u.pathname + ' had no answer in 30 seconds')));
@@ -1288,5 +1312,5 @@ function serve() {
   return server;
 }
 
-module.exports = { verifyOidc, appJwt, planCollaborators, planPublic, publicStops, PUBLIC_DROPS, OPS_COPIES, PUBLIC_KEEPS, planLabels, planLeftovers, checkRecords, checkAbout, planAbout, runnerNumber, checkRulesets, checkSettings, planRulesets, rulesetBody, says, manifest, RULES, ASKS, REPO, RUNNERS_REPO, SETTINGS_REPOS, SCANNING_KEYS, MERGE_KEYS, SETTINGS_PERMISSIONS, SETTINGS_EXTRA, serve };
+module.exports = { verifyOidc, appJwt, call, planCollaborators, planPublic, publicStops, PUBLIC_DROPS, OPS_COPIES, PUBLIC_KEEPS, planLabels, planLeftovers, checkRecords, checkAbout, planAbout, runnerNumber, checkRulesets, checkSettings, planRulesets, rulesetBody, says, manifest, RULES, ASKS, REPO, RUNNERS_REPO, SETTINGS_REPOS, SCANNING_KEYS, MERGE_KEYS, SETTINGS_PERMISSIONS, SETTINGS_EXTRA, serve };
 if (require.main === module) serve();
