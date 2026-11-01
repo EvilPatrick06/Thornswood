@@ -44,10 +44,10 @@ namespace Thornswood
     // LowContrast below is the measure, and the DIY editor shows what it
     // finds.
     //
-    // Shared: installer\setup\Setup.csproj compiles this file into the setup
-    // program too, which draws its window in Forge from here (#2851), so the
-    // first window a new tester sees has the same colours as the launcher
-    // and cannot fall behind them. It uses nothing else from launcher\app.
+    // The install window (InstallWindow.cs, #4824) draws in Forge from here,
+    // as the setup program it replaced did (#2851), so the first window a new
+    // tester sees has the same colours as the launcher and cannot fall behind
+    // them. It uses nothing else from launcher\app.
     static class Themes
     {
         // The sixteen colour names, in the order the editor lays them out.

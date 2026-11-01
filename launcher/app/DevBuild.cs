@@ -95,8 +95,8 @@ namespace Thornswood
             Directory.CreateDirectory(Path.Combine(root, "Launcher"));
             Directory.CreateDirectory(Path.Combine(root, "Profile"));
 
-            // The program: exe, WebView2 loader, icon, the voice host page.
-            // Never a half-downloaded .new.
+            // The program: whatever is in this install's Launcher folder, the
+            // exe and the native libraries beside it. Never a half-downloaded .new.
             int copied = 0;
             foreach (string f in Directory.GetFiles(Paths.LauncherDir))
             {

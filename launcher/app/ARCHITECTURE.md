@@ -144,7 +144,7 @@ unless it says a pool thread.
 | 18 | `Shell.cs:489 Display.MatchScreen` | Unless Lock resolution is ticked: the game's resolution follows the screen. |
 | 19 | `Shell.cs:502 Icons.Ensure` | Pool thread. The shortcut icon follows the exe. `Shell.cs:519 ClearLeftovers` (pool) ends a windowless Skyrim over three minutes old. `Shell.cs:533 Uninstall.DropScratch` (pool) deletes the installer's leftover `Thornswood-setup` folder. |
 | 20 | `Shell.cs:550 RunScan` | `Verify.Run` against the server's manifest and Upkeep's quick checks (#2627), then the Scan and Fix card. Then DrawStatus fills the checklist (on Diagnostics since #607), the Play summary and the button (see "The gate" below). |
-| 21 | `Shell.cs:557 HealClientBackground` | Pool thread, only when the six client runtime files are not the recorded build: `ClientRuntime.cs:222 Heal()` fetches them. Then `Shell.cs:558 AutoDisplayOnce` marks `config.json` so it never runs again and, on an install that has never played, matches the game's resolution to the screen; `Shell.cs:559 StartPing` asks whether the server is up, and `Shell.cs:560 StartGallery` fills Play's spotlight. |
+| 21 | `Shell.cs:557 HealClientBackground` | Pool thread, only when the six client runtime files are not the recorded build: `ClientRuntime.cs:223 Heal()` fetches them. Then `Shell.cs:558 AutoDisplayOnce` marks `config.json` so it never runs again and, on an install that has never played, matches the game's resolution to the screen; `Shell.cs:559 StartPing` asks whether the server is up, and `Shell.cs:560 StartGallery` fills Play's spotlight. |
 | 22 | `Shell.cs:563 CheckUpdatesBackground` | Pool thread: the update check (see Updater in section 2). Always: config.json cannot switch it off, and Play stays shut until it answers (#937). Then `Shell.cs:564 StartFeedWatch`. |
 | 23 | `Shell.cs:569 Voice.Start` | Voice comes up with the launcher, in its own code on threads of its own, with no window and nothing to prepare (see Voice in section 2). Then `Shell.cs:574 StartMenuMusic` is queued until the window is idle on screen. |
 | 24 | `Shell.cs:582 win.ContentRendered` | Once the window has drawn its first frame (MainWindow.axaml.cs), `Shell.cs:584 LogStartTime` writes one line to `Profile\launcher.log`, `Launcher start: the window was on screen <s> s after the launcher started, <s> s of it the mod check, on launcher <version>.`, timed from the process's own start and the Stopwatch around RunScan (#3534); the weekly review totals them with `scripts\vps\Read-LauncherStarts.ps1`. When `Shell.cs:585 Velo.Restarted` says Velopack started this launcher straight after putting an update to it in, a pool thread brings the shortcut icons up to date (`Shell.cs:589 Icons.Ensure`) and then, in Thornswood's own folder, Fix runs as it does after any update (`Shell.cs:595 RunFix`, #3201), so the update that restarted the launcher ends the way Install now does. Every other start skips that. Last, `Shell.cs:599 Ask.Owner` gives message boxes the window. |
@@ -353,16 +353,16 @@ packages folder.
 **Signature** (Signature.cs). Whether a program is really Thornswood's, asked
 of every program in a launcher update (VeloPackage.cs) and of Velopack's
 `Update.exe` (VeloUpdate.cs), and of the signed release catalogs (issue
-#912). `Signature.cs:101 Refusal()` has Windows verify the signature and its
+#912). `Signature.cs:102 Refusal()` has Windows verify the signature and its
 chain (WinVerifyTrust, the call behind Get-AuthenticodeSignature's Valid),
-takes the chain Windows built from `Signature.cs:299 Trust()`, and then pins
+takes the chain Windows built from `Signature.cs:300 Trust()`, and then pins
 Microsoft's Artifact Signing: the root, an "ID Verified CS" issuer, a
 timestamp, and Thornswood's durable identity value in the certificate, which
 stays the same when the three day certificate renews. Only then does it look
 for `ExpectedSigner` in the Subject. `scripts\release\Assert-PublishSigned.ps1`
 runs the same class before a Ship publishes, and
 `tests\test-signer-check.ps1` compiles it on its own and points it at signed,
-unsigned, self-signed and changed files. `Signature.cs:408 MicrosoftRefusal()`
+unsigned, self-signed and changed files. `Signature.cs:410 MicrosoftRefusal()`
 asks the same of a program Microsoft signed itself: the same Windows check,
 then the chain must end at Microsoft Root Certificate Authority 2011 and the
 certificate must be Microsoft Corporation's, for signing programs. It was for
@@ -678,8 +678,8 @@ never runs again; a file it could not delete keeps it running at each start.
 
 **ClientRuntime** (ClientRuntime.cs). The six files that are the SkyMP client,
 checked by SHA-256 against `records\client-build.json`, which is compiled into
-the exe (`ClientRuntime.cs:195 Good()`), and put back from a pack when they
-are not (`ClientRuntime.cs:222 Heal()`).
+the exe (`ClientRuntime.cs:196 Good()`), and put back from a pack when they
+are not (`ClientRuntime.cs:223 Heal()`).
 
 **Downgrade** (Downgrade.cs). Gets Skyrim 1.6.1170's own files through
 Steam's own console, after asking, since it takes over Steam's window and the
