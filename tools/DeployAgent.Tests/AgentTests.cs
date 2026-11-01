@@ -206,8 +206,9 @@ sealed class FakeServer : IDisposable
     public HttpResponseMessage Health(HttpRequestMessage r) =>
         new(Healthy && !(SickWhen?.Invoke() ?? false) ? HttpStatusCode.OK : HttpStatusCode.ServiceUnavailable) { Content = new StringContent("{}") };
 
-    /// <summary>What a load says in server.log, as the gamemode says it.</summary>
-    string LoadLines(string gm, byte[] b)
+    /// <summary>What a load says in server.log, as the gamemode says it, of
+    /// the bytes it loaded.</summary>
+    string LoadLines(byte[] b)
     {
         var dir = Path.Combine(Root, Tables.Dir);
         var reads = Encoding.UTF8.GetString(b).Contains(Tables.TreeSaid);
@@ -215,7 +216,7 @@ sealed class FakeServer : IDisposable
                      (reads && Directory.Exists(dir) && Directory.GetFiles(dir).Any(f => File.ReadAllText(f).Contains("BROKEN")));
         if (broken) return $"SyntaxError: Unexpected token at 10.1.2.3:7787\n{EngineSays}\n";
         var tree = reads ? Tables.Tree(dir) : "";
-        return $"[thornswood] gamemode.js is git blob {Thornswood.DeployAgent.Files.GamemodeBlob(gm)}, {b.Length} bytes\n" +
+        return $"[thornswood] gamemode.js is git blob {Thornswood.DeployAgent.Files.GamemodeBlob(b)}, {b.Length} bytes\n" +
                (tree != "" ? $"[thornswood] gamemode tables are git tree {tree}, {Tables.Count(dir)} files, in {dir}\n" : "") +
                "[thornswood] gamemode client scripts abc (3), changed since the last load\n";
     }
@@ -223,8 +224,8 @@ sealed class FakeServer : IDisposable
     async Task Engine()
     {
         var gm = Path.Combine(Root, "gamemode.js");
-        var last = Thornswood.DeployAgent.Files.ReadShared(gm);
         var lastWrite = File.GetLastWriteTimeUtc(gm);
+        var last = Thornswood.DeployAgent.Files.ReadShared(gm);
         while (!stop.IsCancellationRequested)
         {
             try { await Task.Delay(5, stop.Token); } catch (OperationCanceledException) { return; }
@@ -233,14 +234,20 @@ sealed class FakeServer : IDisposable
 
         void Look()
         {
-            if (!Running) { try { last = Thornswood.DeployAgent.Files.ReadShared(gm); lastWrite = File.GetLastWriteTimeUtc(gm); } catch (IOException) { } return; }
+            // The write time first, then the bytes, as the engine's watcher
+            // stats the file and then loads it: a gamemode put in between is
+            // read as the one loaded. Read the other way round, the old bytes
+            // went with the new file's time and were loaded again, and the
+            // load said the new file's blob, so a gamemode that does not load
+            // read as loaded (Linux agent tests, #5325, 1 Nov).
+            if (!Running) { try { lastWrite = File.GetLastWriteTimeUtc(gm); last = Thornswood.DeployAgent.Files.ReadShared(gm); } catch (IOException) { } return; }
             byte[] b;
             DateTime w;
-            try { b = Thornswood.DeployAgent.Files.ReadShared(gm); w = File.GetLastWriteTimeUtc(gm); } catch (IOException) { return; }
+            try { w = File.GetLastWriteTimeUtc(gm); b = Thornswood.DeployAgent.Files.ReadShared(gm); } catch (IOException) { return; }
             if (b.AsSpan().SequenceEqual(last) && w == lastWrite) return;
             last = b;
             lastWrite = w;
-            try { File.AppendAllText(Path.Combine(Root, "server.log"), LoadLines(gm, b)); } catch (IOException) { }
+            try { File.AppendAllText(Path.Combine(Root, "server.log"), LoadLines(b)); } catch (IOException) { }
         }
     }
 
@@ -274,7 +281,7 @@ sealed class FakeServer : IDisposable
     {
         if (Read(Path.Combine("dist_back", "skymp5-server.js")).Contains("WONTSTART")) return;
         var gm = Path.Combine(Root, "gamemode.js");
-        File.AppendAllText(Path.Combine(Root, "server.log"), "server started\n" + LoadLines(gm, File.ReadAllBytes(gm)));
+        File.AppendAllText(Path.Combine(Root, "server.log"), "server started\n" + LoadLines(File.ReadAllBytes(gm)));
         Running = true;
     }
 
