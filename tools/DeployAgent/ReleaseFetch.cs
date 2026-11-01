@@ -22,8 +22,9 @@ public sealed class Manifest
     [JsonPropertyName("tag")] public string Tag { get; set; } = "";
     [JsonPropertyName("version")] public string Version { get; set; } = "";
     [JsonPropertyName("made")] public string Made { get; set; } = "";
-    /// <summary>What the Release carries, by part: "gamemode" for this slice,
-    /// "agent" on an agent Release. A part not applied yet is named in the log.</summary>
+    /// <summary>What the Release carries, by part: "gamemode" and "server"
+    /// (the server build's zip and its record) on a build Release, "agent" on
+    /// an agent Release. A part not applied yet is named in the log.</summary>
     [JsonPropertyName("parts")] public Dictionary<string, List<ManifestFile>> Parts { get; set; } = new();
 }
 
@@ -103,8 +104,12 @@ public static class ReleaseFetch
 
     /// <summary>Downloads manifest.json and manifest.cat into dir, checks the
     /// signature, then downloads each file of the parts named and holds it to
-    /// the manifest's size and sha256. Nothing is applied here.</summary>
-    public static async Task<Fetched> Fetch(GitHub gh, IVerifier v, Release rel, string dir, string[] parts, Action<string> log, CancellationToken ct)
+    /// the manifest's size and sha256. Nothing is applied here. A part in
+    /// optional is fetched when the Release carries it; a file later names is
+    /// left for FetchFile, when it turns out to be needed (the server build's
+    /// zip, which dev does not need when it already runs that build).</summary>
+    public static async Task<Fetched> Fetch(GitHub gh, IVerifier v, Release rel, string dir, string[] parts, Action<string> log, CancellationToken ct,
+        string[]? optional = null, Func<string, bool>? later = null)
     {
         if (Directory.Exists(dir)) Directory.Delete(dir, true);
         var signed = Path.Combine(dir, "signed");
@@ -128,25 +133,35 @@ public static class ReleaseFetch
         var files = Path.Combine(dir, "files");
         Directory.CreateDirectory(files);
         var got = new Dictionary<string, string>();
-        foreach (var part in parts)
+        foreach (var part in parts.Concat((optional ?? []).Where(m.Parts.ContainsKey)))
         {
             if (!m.Parts.TryGetValue(part, out var list) || list.Count == 0) throw new InvalidDataException($"release {rel.TagName} carries no {part}");
+            var n = 0;
             foreach (var mf in list)
             {
-                if (!FileNameShape.IsMatch(mf.Name) || mf.Name is "manifest.json" or "manifest.cat")
-                    throw new InvalidDataException($"release {rel.TagName}: \"{mf.Name}\" is not a file name the agent takes");
-                if (!Sha256Shape.IsMatch(mf.Sha256)) throw new InvalidDataException($"release {rel.TagName}: {mf.Name} has no sha256 in the manifest");
-                var a = rel.Asset(mf.Name) ?? throw new InvalidDataException($"release {rel.TagName}: the manifest lists {mf.Name} and the Release does not carry it");
-                if (a.Size != mf.Size) throw new InvalidDataException($"release {rel.TagName}: {mf.Name} is {a.Size} bytes on the Release and {mf.Size} in the manifest");
-                var to = Path.Combine(files, mf.Name);
-                await gh.Download(a, to, ct);
-                var sha = FileSha256(to);
-                if (sha != mf.Sha256) throw new InvalidDataException($"release {rel.TagName}: {mf.Name} has sha256 {sha}, and the signed manifest says {mf.Sha256}");
-                got[mf.Name] = to;
+                if (later != null && later(mf.Name)) continue;
+                got[mf.Name] = await FetchFile(gh, rel, mf, files, ct);
+                n++;
             }
-            log($"{part}: {list.Count} file(s), each held to the signed manifest");
+            log($"{part}: {n} file(s), each held to the signed manifest" + (n < list.Count ? $", and {list.Count - n} left until they are needed" : ""));
         }
         return new Fetched(m, files, got);
+    }
+
+    /// <summary>Downloads one file the signed manifest lists into dir and
+    /// holds it to the manifest's size and sha256.</summary>
+    public static async Task<string> FetchFile(GitHub gh, Release rel, ManifestFile mf, string dir, CancellationToken ct)
+    {
+        if (!FileNameShape.IsMatch(mf.Name) || mf.Name is "manifest.json" or "manifest.cat")
+            throw new InvalidDataException($"release {rel.TagName}: \"{mf.Name}\" is not a file name the agent takes");
+        if (!Sha256Shape.IsMatch(mf.Sha256)) throw new InvalidDataException($"release {rel.TagName}: {mf.Name} has no sha256 in the manifest");
+        var a = rel.Asset(mf.Name) ?? throw new InvalidDataException($"release {rel.TagName}: the manifest lists {mf.Name} and the Release does not carry it");
+        if (a.Size != mf.Size) throw new InvalidDataException($"release {rel.TagName}: {mf.Name} is {a.Size} bytes on the Release and {mf.Size} in the manifest");
+        var to = Path.Combine(dir, mf.Name);
+        await gh.Download(a, to, ct);
+        var sha = FileSha256(to);
+        if (sha != mf.Sha256) throw new InvalidDataException($"release {rel.TagName}: {mf.Name} has sha256 {sha}, and the signed manifest says {mf.Sha256}");
+        return to;
     }
 
     public static string FileSha256(string path)

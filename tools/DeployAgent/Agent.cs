@@ -22,7 +22,9 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
     // ---- one Release, applied -------------------------------------------------
 
     /// <summary>Fetches a build Release, holds it to its signature, and applies
-    /// its gamemode to the environment's server. expectCommit, when given, is
+    /// its gamemode to the environment's server: by a reload when the server
+    /// runs the server build the Release records, and with that build by a
+    /// stop, swap and start when it does not. expectCommit, when given, is
     /// the commit the Release must be (a Deployment's). Writes the record on
     /// success. Every line goes to log.</summary>
     public async Task<Outcome> ApplyRelease(string env, string tag, string expectCommit, string workName, Action<string> logf, CancellationToken ct)
@@ -37,7 +39,9 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
         try
         {
             Fetched f;
-            try { f = await ReleaseFetch.Fetch(gh, verify, rel, dir, ["gamemode"], logf, ct); }
+            // The server build's zip is fetched only when dev does not run it
+            // already: most Releases change the gamemode alone.
+            try { f = await ReleaseFetch.Fetch(gh, verify, rel, dir, ["gamemode"], logf, ct, optional: ["server"], later: IsServerZip); }
             catch (Exception e) when (e is InvalidDataException or IOException or HttpRequestException) { return new Outcome("failure", "not applied: " + e.Message); }
             var m = f.Manifest;
             // The name, not the owner: the repositories move to an
@@ -47,10 +51,41 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
                 return new Outcome("failure", $"not applied: the Release was built from {m.Repo}, not {cfg.Repo}");
             if (expectCommit != "" && m.Commit != expectCommit)
                 return new Outcome("failure", $"not applied: the Release is commit {Short(m.Commit)} and the Deployment is {Short(expectCommit)}");
-            var others = m.Parts.Keys.Where(k => k != "gamemode").OrderBy(k => k, StringComparer.Ordinal).ToList();
+            var others = m.Parts.Keys.Where(k => k is not "gamemode" and not "server").OrderBy(k => k, StringComparer.Ordinal).ToList();
             if (others.Count > 0) logf($"the Release also carries {string.Join(", ", others)}, which this agent does not apply yet; left alone");
             logf($"release {rel.TagName}, commit {m.Commit}");
-            var outc = await srv.ApplyGamemode(f.Files, $"the deploy agent, {workName}", logf, ct);
+            var who = $"the deploy agent, {workName}";
+            Outcome outc;
+            if (m.Parts.TryGetValue("server", out var serverPart))
+            {
+                // A Release carries the server build its commit records, so a
+                // gamemode never goes onto an engine it was not written for,
+                // and an engine pin reaches dev with the gamemode beside it.
+                if (!f.Files.TryGetValue("server-build.json", out var recPath)) return new Outcome("failure", "not applied: the Release's server part has no server-build.json");
+                var zipMf = serverPart.Where(x => IsServerZip(x.Name)).ToList();
+                if (zipMf.Count != 1) return new Outcome("failure", $"not applied: the Release's server part carries {zipMf.Count} server zips, not one");
+                var record = File.ReadAllBytes(recPath);
+                var running = srv.RunningRecordSum();
+                ServerBuild.Record rec;
+                try { rec = ServerBuild.Read(record); }
+                catch (JsonException e) { return new Outcome("failure", "not applied: the Release's server-build.json does not read: " + e.Message); }
+                if (running == ServerBuild.RecordSum(record))
+                {
+                    logf($"dev already runs server build {rec.Short}, the one this Release records, so only the gamemode is reloaded");
+                    outc = await srv.ApplyGamemode(f.Files, who, logf, ct);
+                }
+                else
+                {
+                    logf(running == "" ? $"dev has no server-build.json, so it is given server build {rec.Short} with the gamemode"
+                                       : $"dev runs another server build than {rec.Short}, the one this Release records, so the server is swapped with the gamemode under a hold");
+                    string zip;
+                    try { zip = await ReleaseFetch.FetchFile(gh, rel, zipMf[0], f.Dir, ct); }
+                    catch (Exception e) when (e is InvalidDataException or IOException or HttpRequestException) { return new Outcome("failure", "not applied: " + e.Message); }
+                    logf($"server: {zipMf[0].Name}, held to the signed manifest");
+                    outc = await srv.ApplyServerBuild(zip, record, f.Files, who, logf, ct);
+                }
+            }
+            else outc = await srv.ApplyGamemode(f.Files, who, logf, ct);
             if (outc.State != "success") return outc;
             var gm = Path.Combine(srv.Env.Root, "gamemode.js");
             Records.Write(srv, new DeployRecord
@@ -208,6 +243,9 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
     }
 
     static string Short(string s) => s.Length > 12 ? s[..12] : s;
+
+    /// <summary>The server build's zip, as ServerArtifact.ps1 names it: server-&lt;commit&gt;-&lt;sum&gt;.zip.</summary>
+    static bool IsServerZip(string name) => name.StartsWith("server-", StringComparison.Ordinal) && name.EndsWith(".zip", StringComparison.Ordinal);
 
     // ---- self-update ------------------------------------------------------------
 
