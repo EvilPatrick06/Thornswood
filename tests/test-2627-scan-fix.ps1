@@ -49,7 +49,8 @@
        button and Settings' are one handler, the automatic update is the
        same press, the update is followed by Fix's whole path (scan, put
        right, scan again), which never takes the update it just tried a
-       second time, and the first start of a new launcher runs that Fix.
+       second time, and the first start of a new launcher (Velopack's
+       Velo.Restarted, the start right after an update went in) runs that Fix.
        By the source, in the wiring section.
 
   HOW. Every file in launcher\app is compiled with a driver into one program,
@@ -94,7 +95,7 @@ $shell = Src (Join-Path $App 'Shell.cs')
 $sf = Src (Join-Path $App 'ShellScanFix.cs')
 $own = Src (Join-Path $App 'ShellOwnGame.cs')
 $upd = Src (Join-Path $App 'ShellUpdate.cs')
-$xaml = Src (Join-Path $Repo 'launcher\ui.xaml')
+$xaml = Src (Join-Path $App 'MainWindow.axaml')
 $upkeep = Src (Join-Path $App 'Upkeep.cs')
 $checks = Src (Join-Path $App 'Checks.cs')
 
@@ -151,7 +152,7 @@ Yes 'a folder being prepared holds Fix after an update until it is ready, and it
     $runFix -match 'if \(ownGameBusy && afterUpdate\) \{ fixWhenFolderReady = true;' -and
     $own -match '(?s)if \(fixWhenFolderReady\)\s*\{\s*fixWhenFolderReady = false;\s*(if \(fixWhenFolderReadyAfterVortex\) \{ fixWhenFolderReadyAfterVortex = false; RunFix\(false, true\); \}\s*else )?RunFix\(true\);')
 Yes 'the first start of a new launcher runs that Fix, after the icon pass, in a folder of its own' (
-    $shell -match '(?s)moved = Icons\.Ensure\(true\);.*?if \(!Paths\.Collection\)\s*try \{ win\.Dispatcher\.BeginInvoke\(\(Action\)delegate \{ RunFix\(true\); \}\);')
+    $shell -match '(?s)if \(Velo\.Restarted\)\s*ThreadPool\.QueueUserWorkItem\(delegate\s*\{.*?moved = Icons\.Ensure\(true\);.*?if \(!Paths\.Collection\)\s*try \{ Dispatcher\.UIThread\.Post\(\(Action\)delegate \{ RunFix\(true\); \}\);')
 Yes 'Fix writes into the game folder with the folder to itself (OwnGame.Alone)' ($upkeep -match '(?s)OwnGame\.Alone\(delegate\s*\{.*?Verify\.Fix\(cfg, say, Updater\.ReleaseCopy\(cfg, v\)\).*?\}, delegate')
 Yes 'a game whose path cannot be read counts as ours only while our own file of that name runs (#2856)' (
     $checks -match '\(at == null && !OwnImageRunning\(n\)\)\) skip = true;')
