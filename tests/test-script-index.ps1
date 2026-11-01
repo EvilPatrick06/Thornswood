@@ -137,7 +137,7 @@ try { $versionHelp = (Get-Help $Ship -Parameter Version -ErrorAction Stop | Out-
 $versionHelp = $versionHelp -replace '\s+', ' '
 $channelFlat = $channel -replace '\s+', ' '
 $refusesVersion = $shipText -match '-not \$Dev -and \$Version -ne \$current'
-$saysVersion = ($versionHelp -match '(?i)a main release refuses it') -and ($versionHelp -match 'Bump-Version\.ps1 -To')
+$saysVersion = ($versionHelp -match '(?i)a main release refuses it') -and ($versionHelp -match 'LauncherVersion\.ps1')
 Yes ('Get-Help -Parameter Version says a main release refuses it, exactly when the code does' +
      ' (code refuses: ' + $refusesVersion + ', help says: ' + $saysVersion + ')') ($refusesVersion -eq $saysVersion)
 $refusesLoose = $shipText -match 'ls-files --others --exclude-standard -- @moreRoots'

@@ -132,11 +132,12 @@ try {
     $env:LOCALAPPDATA = Join-Path $work 'appdata'
     [IO.File]::WriteAllText((Join-Path $script:relDev 'version.json'), '{"launcherVersion":"1.1.67","packs":[]}')
 
-    # Updater.cs as it stands after a -Version bump, which is when there is a
-    # number to put back.
+    # Updater.cs as it stands while Ship builds: the number it worked out from
+    # git written in over the 0.0.0 git holds (#5179), which is when there is
+    # a number to put back.
     $updaterCs = Join-Path $work 'Updater.cs'
     [IO.File]::WriteAllText($updaterCs, "        public const string Version = `"1.1.68`";`r`n")
-    $current = '1.1.67'
+    $committed = '0.0.0'
     $target = '1.1.68'
 
     # What the publisher does under -NoUpload -NoPush: it writes version.json
@@ -178,7 +179,7 @@ try {
     Yes 'the publisher did change both files, or this proves nothing' ($script:during.feed -ne $feedWas -and $script:during.base -ne $baseWas)
     Yes 'after a dry run version.json is byte for byte what it was' ((Hash $feed) -eq $feedWas)
     Yes '  and so is the baseline' ((Hash $base) -eq $baseWas)
-    Yes '  and Updater.cs is back on the version it had' ((Read-Version $updaterCs) -eq $current)
+    Yes '  and Updater.cs is back on the 0.0.0 git holds' ((Read-Version $updaterCs) -eq $committed)
     Yes '  and the copies it kept are cleaned up' (@($r.Keep | Where-Object { $_.Copy -and (Test-Path -LiteralPath $_.Copy) }).Count -eq 0)
 
     # ---- a dev dry run on a machine with no dev baseline yet ---------------------
@@ -220,13 +221,13 @@ try {
     [IO.File]::WriteAllText((Join-Path $live 'thornswood-chat.js'), "// thornswood-chat.js as it was yesterday`n")
     $said = Invoke-Guard $repoTools $game
     Yes 'a day old plugin in the game folder stops the release' ($said -match 'not the ones in this repo')
-    Yes '  and puts the version back' ((Read-Version $updaterCs) -eq $current)
+    Yes '  and puts git''s 0.0.0 back' ((Read-Version $updaterCs) -eq $committed)
     Copy-ThornswoodShippedFile (Join-Path $plugins 'thornswood-chat.js') (Join-Path $live 'thornswood-chat.js')
 
     [IO.File]::WriteAllText($updaterCs, "        public const string Version = `"1.1.68`";`r`n")
     Remove-Item -LiteralPath (Join-Path $live 'thornswood-voice.js') -Force
     Yes 'a plugin that never arrived stops the release' ((Invoke-Guard $repoTools $game) -match 'not the ones in this repo')
-    Yes '  and puts the version back' ((Read-Version $updaterCs) -eq $current)
+    Yes '  and puts git''s 0.0.0 back' ((Read-Version $updaterCs) -eq $committed)
 
     Get-ChildItem -LiteralPath $plugins -Filter *.js | Remove-Item -Force
     Yes 'a source folder with no plugins in it stops the release' ((Invoke-Guard $repoTools $game) -match 'has no \.js')

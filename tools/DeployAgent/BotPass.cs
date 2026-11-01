@@ -129,8 +129,11 @@ public sealed class BotPass(EnvConfig env, ITasks tasks)
     public string PluginDir => Path.Combine(Root, "plugins");
 
     /// <summary>Makes the copy, runs the task, reads what it wrote. files are
-    /// the Release's gamemode and bot parts, each held to the signed manifest.</summary>
-    public async Task<Outcome> Run(IReadOnlyDictionary<string, string> files, Action<string> log, CancellationToken ct)
+    /// the Release's gamemode and bot parts, each held to the signed manifest.
+    /// serverZip, when given, is the server build the Deployment swaps dev
+    /// onto (#5219), held to the signed manifest too: the copy runs that
+    /// engine and not dev's, so the pass checks what dev will run.</summary>
+    public async Task<Outcome> Run(IReadOnlyDictionary<string, string> files, Action<string> log, CancellationToken ct, string? serverZip = null)
     {
         foreach (var n in BotFiles.Concat(Server.ReloadFiles))
             if (!files.ContainsKey(n)) return new Outcome("failure", $"not applied: the Release has no {n}, and dev's deploys wait on the bot pass");
@@ -138,7 +141,7 @@ public sealed class BotPass(EnvConfig env, ITasks tasks)
         using (var turn = TakeTurn(log, out why))
         {
             if (turn == null) return new Outcome("failure", "not applied: " + why);
-            try { why = Prepare(files, log); }
+            try { why = Prepare(files, log, serverZip); }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException or InvalidDataException) { why = e.Message; }
         }
         if (why != "") return new Outcome("failure", "not applied: the bot pass copy could not be made: " + why);
@@ -198,7 +201,7 @@ public sealed class BotPass(EnvConfig env, ITasks tasks)
     }
 
     /// <summary>The copy, made fresh: "" when it is ready, else why not.</summary>
-    public string Prepare(IReadOnlyDictionary<string, string> files, Action<string> log)
+    public string Prepare(IReadOnlyDictionary<string, string> files, Action<string> log, string? serverZip = null)
     {
         if (!Directory.Exists(RunDir)) return $"{RunDir} is not there; Install-DeployAgent.ps1 makes it with the task";
         // The folder stays, with the rights the installer gave the task on it;
@@ -210,17 +213,22 @@ public sealed class BotPass(EnvConfig env, ITasks tasks)
         var settings = JsonNode.Parse(File.ReadAllText(Path.Combine(dev, "server-settings.json")).TrimStart('﻿'))?.AsObject()
             ?? throw new InvalidDataException("dev's server-settings.json is not an object");
 
-        // The engine.
-        foreach (var name in new[] { "scam_native.node", "package.json" })
+        // The engine: dev's, or the server build the Deployment swaps dev
+        // onto, whose fork files (data\scripts among them) go in after the
+        // data folder below.
+        if (serverZip == null)
         {
-            var at = Path.Combine(dev, name);
-            if (File.Exists(at)) Files.Copy(at, Path.Combine(ServerDir, name));
-            else if (name == "scam_native.node") return "dev has no scam_native.node";
+            foreach (var name in new[] { "scam_native.node", "package.json" })
+            {
+                var at = Path.Combine(dev, name);
+                if (File.Exists(at)) Files.Copy(at, Path.Combine(ServerDir, name));
+                else if (name == "scam_native.node") return "dev has no scam_native.node";
+            }
+            var back = Path.Combine(dev, "dist_back");
+            if (!File.Exists(Path.Combine(back, "skymp5-server.js"))) return "dev has no dist_back\\skymp5-server.js";
+            CopyTree(back, Path.Combine(ServerDir, "dist_back"), _ => true);
         }
         foreach (var dll in Directory.EnumerateFiles(dev, "*.dll")) Files.Copy(dll, Path.Combine(ServerDir, Path.GetFileName(dll)));
-        var back = Path.Combine(dev, "dist_back");
-        if (!File.Exists(Path.Combine(back, "skymp5-server.js"))) return "dev has no dist_back\\skymp5-server.js";
-        CopyTree(back, Path.Combine(ServerDir, "dist_back"), _ => true);
         foreach (var n in Server.ReloadFiles) Files.Copy(files[n], Path.Combine(ServerDir, n));
         foreach (var n in BotFiles) Files.Copy(files[n], Path.Combine(BotDir, n));
 
@@ -229,8 +237,17 @@ public sealed class BotPass(EnvConfig env, ITasks tasks)
         var dataSetting = settings["dataDir"]?.GetValue<string>() ?? "data";
         var devData = Path.IsPathRooted(dataSetting) ? dataSetting : Path.Combine(dev, dataSetting);
         if (!Directory.Exists(devData)) return $"dev's data folder {devData} is not there";
+        var devScripts = Path.Combine(devData, "scripts") + Path.DirectorySeparatorChar;
         CopyTree(devData, Path.Combine(ServerDir, "data"), f =>
-            !GameFileKinds.Contains(Path.GetExtension(f).ToLowerInvariant()) && !AgentOrServerMade(Path.GetFileName(f)));
+            !GameFileKinds.Contains(Path.GetExtension(f).ToLowerInvariant()) && !AgentOrServerMade(Path.GetFileName(f)) &&
+            !(serverZip != null && f.StartsWith(devScripts, StringComparison.OrdinalIgnoreCase)));
+        if (serverZip != null)
+        {
+            var sums = ServerBuild.Expand(serverZip, ServerDir, out _);
+            if (!sums.ContainsKey("scam_native.node") || !sums.ContainsKey("dist_back/skymp5-server.js"))
+                return "the new server build has no scam_native.node or dist_back\\skymp5-server.js";
+            log($"the copy runs the new server build ({sums.Count} fork file(s)), not dev's");
+        }
 
         string Resolve(string entry) => Path.IsPathRooted(entry) || entry.Contains(":\\") ? entry : Path.Combine(devData, entry);
         var order = settings["loadOrder"] is JsonArray lo ? lo.Select(x => x!.GetValue<string>()).ToList() : FiveMasters.ToList();

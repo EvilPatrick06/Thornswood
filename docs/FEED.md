@@ -628,8 +628,10 @@ is behind and offers only the launcher update.
 It reaches launchers with the site deployed and the first launcher at 1.2.6
 or above on a channel: Publish-Update writes minLauncher as the launcher it
 publishes, so that Ship is the one the site starts splitting on. Bump-Version
-moves main's number to 1.2.6, and dev's numbers climb from main's, so dev
-splits from its first 1.2.6.N and main from its 1.2.6 Ship. A launcher at 1.2.6
+moved main's number to 1.2.6, and dev's numbers climb from main's, so dev
+split from its first 1.2.6.N and main from its 1.2.6 Ship. Since 1 Nov 2026
+the number comes from the build (`LauncherVersion.ps1`, #5179), 2026.1101.1745
+and the like, above every 1.2 number. A launcher at 1.2.6
 reads a feed that is not split the same as before, so the site can go first.
 
 ## Checks on every download

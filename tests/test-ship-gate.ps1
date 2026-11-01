@@ -192,7 +192,7 @@ try {
     # V1: THE HOLE. A new number on a main release.
     $r = Ver '1.1.92' '1.2.0' $false $false
     Yes "V1 -Version 1.2.0 on a main release is refused: '$r'" ($r -like 'STOP.*')
-    Yes 'V1 and it says how the number does move' ($r -match 'Bump-Version\.ps1 -To 1\.2\.0')
+    Yes 'V1 and it says main ships its own number, worked out from git' ($r -match 'LauncherVersion\.ps1' -and $r -match 'Ship without -Version')
 
     # V2 to V5: everything else about the version stays as it was.
     $r = Ver '1.1.92' '' $false $false

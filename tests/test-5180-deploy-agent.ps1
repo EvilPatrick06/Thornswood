@@ -8,13 +8,19 @@
     - New-SignedManifest.ps1 writes the manifest the agent reads
       (tools/DeployAgent/ReleaseFetch.cs): schema 1, repo, commit, tag,
       version, parts with name, sha256 and size, an array even for one file,
-      and refuses a tag that is not build-<...> or agent-v<a.b.c>.
+      and refuses a tag that is not build-<...> or agent-v<a.b.c>. With
+      -ServerZip it adds the server part: the zip and the record it carries,
+      as server-build.json, each with its sha256 (#5219).
+    - gamemode-release.yml runs when the server build record changes too,
+      fetches CI's build of the pin and puts its zip on the Release.
     - The gate has the verbs Deploy-Release (-Tag build-<...> only, dev
       fixed) and Install-DeployAgent (-Status and -Tag only).
     - Deploy-Release.ps1 and Install-DeployAgent.ps1 send the box scripts that
       parse; the install one carries the signer read from Updater.cs, the
       launcher's own Signature.cs and the repository it was given, and no
-      account name is written into either script or the agent.
+      account name is written into either script or the agent. The install
+      script's choice of Release, run against a stand-in GitHub that answers
+      with one array, takes the newest agent-v tag by version.
     - The agent compiles launcher/app/Signature.cs in from where it lives,
       and keeps no copy of its own.
     - The agent's Deployments use "Dev server" on both sides, never Dev or
@@ -71,6 +77,32 @@ try {
     Yes '  a tag that is neither build-<...> nor agent-v<a.b.c> is refused' ($LASTEXITCODE -ne 0)
     $null = & pwsh -NoProfile -File (Join-Path $Repo 'scripts\release\New-SignedManifest.ps1') -Out $out -Tag 'agent-v1.0.8' -Commit $commit -Part agent -Files $exe -Version '1.0.7' -NoCatalog 2>&1
     Yes '  an agent tag that does not say its version is refused' ($LASTEXITCODE -ne 0)
+
+    # The server build beside the gamemode (#5219): the zip as ServerArtifact.ps1 names it.
+    $zdir = Join-Path $tmp 'zip'
+    New-Item -ItemType Directory -Force -Path $zdir | Out-Null
+    $recText = '{"source":{"commit":"' + ('b' * 40) + '"}}'
+    [IO.File]::WriteAllText((Join-Path $zdir 'server-build.json'), $recText)
+    [IO.File]::WriteAllText((Join-Path $zdir 'scam_native.node'), 'native')
+    $zip = Join-Path $tmp 'server-bbbbbbbbbbbb-0123456789abcdef.zip'
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [IO.Compression.ZipFile]::CreateFromDirectory($zdir, $zip)
+    $gmf = Join-Path $tmp 'gamemode.js'
+    [IO.File]::WriteAllText($gmf, '// gm')
+    $out2 = Join-Path $tmp 'rel2'
+    & pwsh -NoProfile -Command "& '$(Join-Path $Repo 'scripts\release\New-SignedManifest.ps1')' -Out '$out2' -Tag 'build-20261101.3' -Commit '$commit' -Part gamemode -Files '$gmf' -ServerZip '$zip' -Repo 'O/R' -NoCatalog" | Out-Null
+    Yes 'New-SignedManifest.ps1 -ServerZip writes a build manifest' ($LASTEXITCODE -eq 0)
+    if ($LASTEXITCODE -eq 0) {
+        $m2 = [IO.File]::ReadAllText((Join-Path $out2 'files\manifest.json')) | ConvertFrom-Json
+        $sv = @($m2.parts.server)
+        Yes '  with a server part of the record and the zip' ((@($sv | ForEach-Object { $_.name }) -join ',') -eq 'server-build.json,server-bbbbbbbbbbbb-0123456789abcdef.zip')
+        Yes '  the record is the one inside the zip, by its sha256' ($sv[0].sha256 -eq (Get-FileHash -LiteralPath (Join-Path $zdir 'server-build.json') -Algorithm SHA256).Hash.ToLowerInvariant())
+        Yes '  and both are copied beside the manifest' ((Test-Path (Join-Path $out2 'assets\server-build.json')) -and (Test-Path (Join-Path $out2 'assets\server-bbbbbbbbbbbb-0123456789abcdef.zip')))
+    }
+    $bad = Join-Path $tmp 'server.zip'
+    Copy-Item -LiteralPath $zip -Destination $bad
+    $null = & pwsh -NoProfile -Command "& '$(Join-Path $Repo 'scripts\release\New-SignedManifest.ps1')' -Out '$out2' -Tag 'build-20261101.4' -Commit '$commit' -Part gamemode -Files '$gmf' -ServerZip '$bad' -NoCatalog" 2>&1
+    Yes '  a zip not named as ServerArtifact.ps1 names one is refused' ($LASTEXITCODE -ne 0)
 
     # ---- the gate verbs ---------------------------------------------------------
     $verbs = Get-Content -Raw (Join-Path $Repo 'scripts\vps\gate\verbs.json') | ConvertFrom-Json
@@ -130,6 +162,27 @@ try {
             Yes '  and names the folder in agent.json only once the task is set up' ($t.Contains('-NotePropertyName botPassRoot') -and $t.Contains('$noPass = [bool]0'))
             $off = Probe 'Install-DeployAgent.ps1' 'INSTALLED: probe' @('-Repo', 'O/R', '-NoBotPass')
             Yes '  -NoBotPass sends a script that parses and leaves the bot pass off' ($null -ne $off -and $off.Parses -and $off.Text.Contains('$noPass = [bool]1'))
+            # How it picks the Release, run against a stand-in GitHub that hands
+            # each JSON array back as one object, the way Invoke-RestMethod does:
+            # the box once refused agent-v1.0.6 because the list was read whole.
+            $at = $r.Text.IndexOf('$tag = $want'); $end = $r.Text.IndexOf('function Fetch(')
+            $picked = ''
+            if ($at -ge 0 -and $end -gt $at) {
+                $pick = Join-Path $tmp 'pick.ps1'
+                [IO.File]::WriteAllText($pick, @'
+function Invoke-RestMethod { param($Uri, $Headers)
+  if ($Uri -like '*/git/matching-refs/tags/agent-v') {
+    $list = @('agent-v1.0.9', 'agent-v1.0.10', 'agent-v1.0.2', 'agent-v2.0.0-rc') | ForEach-Object { [pscustomobject]@{ ref = 'refs/tags/' + $_ } }
+    Write-Output -NoEnumerate @($list) }
+  elseif ($Uri -match '/releases/tags/(.+)$') { [pscustomobject]@{ tag_name = $Matches[1]; draft = $false } }
+  else { throw "no such address in the stand-in: $Uri" } }
+function Refuse($w) { 'REFUSED: ' + $w; exit 1 }
+$h = @{}; $want = ''
+
+'@ + $r.Text.Substring($at, $end - $at))
+                $picked = (& pwsh -NoProfile -File $pick 2>&1 | Out-String).Trim()
+            }
+            Yes ('  and takes the newest agent-v tag''s Release when GitHub answers with one array: ' + $picked) ($picked -eq 'release agent-v1.0.10')
         }
     }
 
@@ -163,6 +216,8 @@ try {
     $cfg = [IO.File]::ReadAllText((Join-Path $Repo 'tools\DeployAgent\AgentConfig.cs'))
     $gw = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\gamemode-release.yml'))
     Yes 'the agent watches "Dev server" and the workflow asks "Dev server"' ($cfg.Contains('GitHubEnvironment = "Dev server"') -and $gw.Contains("environment = 'Dev server'"))
+    Yes 'gamemode-release.yml runs when the server build record changes (an engine pin)' ($gw -match "(?m)^\s+- 'records/server-build\.json'\s*$")
+    Yes '  fetches CI''s build of the pin and puts its zip on the Release' ($gw.Contains('./scripts/release/Get-EngineArtifact.ps1 -NoPause') -and $gw.Contains('-ServerZip $env:SERVER_ZIP'))
     $aw = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\deploy-agent.yml'))
     foreach ($w in @(@{ N = 'deploy-agent.yml'; T = $aw }, @{ N = 'gamemode-release.yml'; T = $gw })) {
         Yes ("$($w.N) signs through Sign-OnRunner.ps1 in the release environment") ($w.T.Contains('Sign-OnRunner.ps1') -and $w.T -match '(?m)^\s+environment: release\s*$')

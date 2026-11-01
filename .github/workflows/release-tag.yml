@@ -13,9 +13,9 @@
 # by itself, which is why it starts release.yml by name.
 #
 # WHAT IT HOLDS before it makes anything:
-#   - the tag is v<a.b.c> (a main release, the number Updater.cs already
-#     says, which release.yml checks again) or v<a.b.c.d> (a dev number,
-#     which release.yml writes into Updater.cs, the way a dev Ship does);
+#   - the tag is v<a.b.c> (a main release, the launcher's number at that
+#     commit, LauncherVersion.ps1, which release.yml checks again) or
+#     v<a.b.c.d> (a dev number, that number with a fourth part);
 #   - the commit is a full SHA on main (GitHub's compare says main is that
 #     commit or ahead of it), so nothing off main is ever tagged here;
 #   - a tag that is already there must already be that commit: the same

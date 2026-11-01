@@ -106,14 +106,14 @@ if ($LASTEXITCODE -ne 0) { Stop-Here 'git add failed' }
 
 try { $notes = Get-EnginePinNotes $old $Commit $get } catch { Stop-Here ("the fork pull requests could not be read: " + $_.Exception.Message) }
 $facts = Get-EnginePinFacts $repo
-$title = "The engine pin moves to the fork's head $($facts.Short)"
+$title = "The engine pin moves to fork commit $($facts.Short)"
 if ($notes.Issues.Count) {
     $named = @($notes.Issues | Select-Object -First 8 | ForEach-Object { "#$_" }) -join ', '
     $title += " (Refs $named$(if ($notes.Issues.Count -gt 8) { ', and more' }))"
 }
 $body = New-Object System.Collections.Generic.List[string]
 $body.Add('## What changed'); $body.Add('')
-$body.Add(("The engine pin moves from ``{0}`` to the fork's head ``{1}`` (in full ``{2}``)." -f $old.Substring(0, 8), $facts.Short, $Commit))
+$body.Add(("The engine pin moves from ``{0}`` to fork commit ``{1}`` (in full ``{2}``)." -f $old.Substring(0, 8), $facts.Short, $Commit))
 $body.Add(("Cause: the fork's {0} had {1} merged pull request(s) that main did not pin, so no release carried them." -f $ForkEngineBranch, $notes.Count))
 $body.Add('')
 $body.Add('Fork pull requests it brings in:')

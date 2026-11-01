@@ -11,7 +11,8 @@
       asks for administrator;
     - an assemblyIdentity (Thornswood.Launcher.Thornswood and
       Thornswood.Installer.Setup) whose version is the launcher's own, the
-      Version in launcher\app\Updater.cs in four parts. The manifest files in
+      number the build wrote into launcher\app\Updater.cs (#5179: git holds
+      0.0.0 there), in four parts. The manifest files in
       the repository hold a placeholder and the project files stamp a copy,
       so the identity cannot drift the way a kept 1.1.101.0 did.
   Until then the launcher's identity sat at 1.1.101.0 while the launcher was
@@ -33,8 +34,12 @@
   monitors, and the Downgrade click still landing in Steam's console.
 
   Usage:
-    pwsh -File tests\test-app-manifest.ps1 -Exe <Thornswood.exe> [-Stub <setup-stub.exe>]
+    pwsh -File tests\test-app-manifest.ps1 -Exe <Thornswood.exe> [-Stub <setup-stub.exe>] [-Version <a.b.c>]
     pwsh -File tests\test-app-manifest.ps1 -Root <scratch folder>    builds there first
+  -Version is the number the pair was built with (tests\test-498-msbuild.ps1
+  passes the one it gave Build-Launcher.ps1); without it, the number this
+  checkout's history gives (scripts\release\LauncherVersion.ps1), which is the
+  one Build-Launcher.ps1 takes when it is given none.
   With neither, on the build runner it reads the exe the build step made
   ($env:RUNNER_TEMP\Thornswood\Launcher\Thornswood.exe). -Stub defaults to
   out\setup-stub.exe, which Build-Launcher.ps1 writes.
@@ -45,7 +50,8 @@ param(
     [string]$Exe,
     [string]$Stub,
     [string]$Root,
-    [string]$Scratch
+    [string]$Scratch,
+    [string]$Version
 )
 
 Set-StrictMode -Version Latest
@@ -65,9 +71,22 @@ function Yes([string]$what, [bool]$cond) {
 $updater = [IO.File]::ReadAllText((Join-Path $repo 'launcher\app\Updater.cs'))
 $m = [regex]::Match($updater, 'Version\s*=\s*"([0-9.]+)"')
 Yes 'Updater.cs names the launcher version' $m.Success
-$ver4 = $m.Groups[1].Value
-while (($ver4 -split '\.').Count -lt 4) { $ver4 = "$ver4.0" }
-Write-Host "      launcher version $ver4"
+# The number the built pair should carry: -Version, else the one the build
+# wrote over git's 0.0.0 (LauncherVersion.ps1, #5179), worked out only where
+# there is a pair to read, so a shallow checkout's text checks still run.
+function Get-WantVersion {
+    $v = $Version
+    if (-not $v) { $v = $m.Groups[1].Value }
+    if ($v -eq '0.0.0') {
+        . (Join-Path $repo 'scripts\release\LauncherVersion.ps1')
+        try { $v = Get-LauncherVersion -RepoDir $repo }
+        catch { Yes ("the launcher's number for this checkout is known (pass -Version): " + $_.Exception.Message) $false; $v = '' }
+    }
+    while ($v -and ($v -split '\.').Count -lt 4) { $v = "$v.0" }
+    if ($v) { Write-Host "      launcher version $v" }
+    return $v
+}
+$ver4 = $null
 
 $win10 = '{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}'
 $allOs = @($win10, '{1f676c76-80e1-4239-95bb-83d0f6d0da78}', '{4a2f28e3-53b9-4441-ba9c-d69d4a4a6e38}',
@@ -212,6 +231,7 @@ foreach ($pair in @(@('the built launcher', $Exe, 'Thornswood.Launcher.Thornswoo
         continue
     }
     $full = (Resolve-Path -LiteralPath $path).Path
+    if ($null -eq $ver4) { $ver4 = Get-WantVersion }
     $text = [ManifestProbe]::Read($full, 1)
     Yes "$label has an embedded manifest (RT_MANIFEST 1)" ($null -ne $text)
     if ($null -eq $text) { continue }

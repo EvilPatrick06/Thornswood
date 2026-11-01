@@ -109,7 +109,7 @@ try {
 # ---- 3. the step, over stand-in answers --------------------------------------
 $H = '1111111111111111111111111111111111111111'
 $P = '2222222222222222222222222222222222222222'
-function New-World { return @{ head = $H; prs = @(); files = @{}; branchPin = $null; forkRuns = @(); arts = @{}; engineRuns = @() } }
+function New-World { return @{ head = $H; prs = @(); files = @{}; branchPin = $null; forkRuns = @(); arts = @{}; engineRuns = @(); compare = @{} } }
 function Get-Answer($w) {
     return {
         param([string]$path)
@@ -120,11 +120,15 @@ function Get-Answer($w) {
         if ($path -like 'repos/EvilPatrick06/skymp/actions/workflows/*') { return [pscustomobject]@{ workflow_runs = @($w.forkRuns) } }
         if ($path -match '^repos/EvilPatrick06/skymp/actions/runs/(\d+)/artifacts') { return [pscustomobject]@{ artifacts = @($w.arts[[long]$Matches[1]]) } }
         if ($path -like 'repos/EvilPatrick06/Thornswood/actions/workflows/engine.yml/runs*') { return [pscustomobject]@{ workflow_runs = @($w.engineRuns) } }
+        if ($path -match '^repos/EvilPatrick06/skymp/compare/([0-9a-f]{40})\.\.\.([0-9a-f]{40})$') {
+            $k = $Matches[1] + '...' + $Matches[2]
+            if ($w.compare.ContainsKey($k)) { return [pscustomobject]@{ status = $w.compare[$k] } }
+        }
         throw "the stand-in has no answer for $path"
     }.GetNewClosure()
 }
 function Step($w, [string]$pin = $P) { return (Get-EnginePinStep $pin (Get-Answer $w)) }
-$green = [pscustomobject]@{ id = 7; status = 'completed'; conclusion = 'success'; head_sha = $H; head_branch = 'thornswood/engine-changes'; event = 'push'; html_url = 'https://example/7'; repository = [pscustomobject]@{ full_name = 'EvilPatrick06/skymp' }; head_repository = [pscustomobject]@{ full_name = 'EvilPatrick06/skymp' } }
+$green = [pscustomobject]@{ id = 7; status = 'completed'; conclusion = 'success'; head_sha = $H; head_branch = 'thornswood/engine-changes'; event = 'push'; html_url = 'https://example/7'; repository = [pscustomobject]@{ id = 1375283516; full_name = 'EvilPatrick06/skymp' }; head_repository = [pscustomobject]@{ id = 1375283516; full_name = 'EvilPatrick06/skymp' } }
 $art = [pscustomobject]@{ name = "thornswood-engine-$H"; expired = $false }
 
 $w = New-World
@@ -147,11 +151,52 @@ $s = Step $w
 Yes '  and with its pull request open, which is not a reason to stand aside' ($s.Step -eq 'ready' -and $s.Pr -eq 42)
 
 $w = New-World
-$w.forkRuns = @([pscustomobject]@{ id = 8; status = 'in_progress'; conclusion = $null; head_sha = $H; head_branch = 'thornswood/engine-changes'; event = 'push'; html_url = 'https://example/8'; repository = [pscustomobject]@{ full_name = 'EvilPatrick06/skymp' }; head_repository = [pscustomobject]@{ full_name = 'EvilPatrick06/skymp' } })
+$w.forkRuns = @([pscustomobject]@{ id = 8; status = 'in_progress'; conclusion = $null; head_sha = $H; head_branch = 'thornswood/engine-changes'; event = 'push'; html_url = 'https://example/8'; repository = [pscustomobject]@{ id = 1375283516; full_name = 'EvilPatrick06/skymp' }; head_repository = [pscustomobject]@{ id = 1375283516; full_name = 'EvilPatrick06/skymp' } })
 Yes 'building: the fork is still building the head' ((Step $w).Step -eq 'building')
 
 $w = New-World
 Yes 'no-build: the fork has no build of the head' ((Step $w).Step -eq 'no-build')
+
+# While the head builds, the newest earlier head since the pin that the fork
+# built green goes first (1 Nov 2026: b8666ff was built and waiting when
+# 2cfff29 merged, and the pin waited again).
+$E = '4444444444444444444444444444444444444444'
+$O = '5555555555555555555555555555555555555555'
+function Fork-Run([long]$id, [string]$sha, [string]$status, $conclusion) {
+    return [pscustomobject]@{ id = $id; status = $status; conclusion = $conclusion; head_sha = $sha; head_branch = 'thornswood/engine-changes'; event = 'push'; html_url = "https://example/$id"; repository = [pscustomobject]@{ id = 1375283516; full_name = 'EvilPatrick06/skymp' }; head_repository = [pscustomobject]@{ id = 1375283516; full_name = 'EvilPatrick06/skymp' } }
+}
+function New-Building {
+    $w = New-World
+    $w.forkRuns = @((Fork-Run 12 $H 'in_progress' $null), (Fork-Run 11 $E 'completed' 'success'), (Fork-Run 10 $O 'completed' 'success'))
+    $w.arts[[long]11] = [pscustomobject]@{ name = "thornswood-engine-$E"; expired = $false }
+    $w.arts[[long]10] = [pscustomobject]@{ name = "thornswood-engine-$O"; expired = $false }
+    $w.compare["$E...$H"] = 'ahead'; $w.compare["$P...$E"] = 'ahead'
+    $w.compare["$O...$H"] = 'ahead'; $w.compare["$P...$O"] = 'behind'
+    return $w
+}
+$w = New-Building
+$s = Step $w
+Yes 'record: while the head builds, the newest earlier head the fork built is the one recorded' ($s.Step -eq 'record' -and $s.Head -eq $E -and $s.ForkHead -eq $H)
+$w.engineRuns = @([pscustomobject]@{ id = 94; status = 'completed'; conclusion = 'success'; display_title = "Engine build of $E"; html_url = 'u' })
+$s = Step $w
+Yes '  pin: and once engine.yml recorded it, it is the commit pinned' ($s.Step -eq 'pin' -and $s.Head -eq $E -and $s.Run -eq 94)
+$w.branchPin = $E
+$s = Step $w
+Yes '  ready: engine-pin/next pinning it already is nothing more to do until the head is built' ($s.Step -eq 'ready' -and $s.Head -eq $E -and $s.Why -match 'still building')
+$w = New-Building
+$w.compare["$E...$H"] = 'diverged'
+$s = Step $w
+Yes '  a build of a commit the head is not ahead of (lost to a force push) is passed over' ($s.Step -eq 'building' -and $s.Head -eq $H)
+$w = New-Building
+$w.compare["$P...$E"] = 'behind'
+Yes '  a build the pin is ahead of is never the target, nor any older one' ((Step $w).Step -eq 'building')
+$w = New-Building
+foreach ($run in $w.forkRuns) { $run.repository = [pscustomobject]@{ id = 1375283516; full_name = 'Thornswood/skymp' } }
+$s = Step $w
+Yes '  a build is the fork''s by its repository id, not its name, which an org move changes (#5228)' ($s.Step -eq 'record' -and $s.Head -eq $E)
+$w = New-Building
+$w.forkRuns = @((Fork-Run 12 $H 'in_progress' $null), (Fork-Run 11 $E 'completed' 'failure'))
+Yes '  an earlier head whose build ended red is not one' ((Step $w).Step -eq 'building')
 
 $w = New-World
 $w.forkRuns = @($green); $w.arts[[long]7] = $art
@@ -209,11 +254,16 @@ $code = (@($wf -split "`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n")
 $jobsText = $code.Substring([Math]::Max(0, $code.IndexOf("`njobs:")))
 function Get-Job([string]$name) { return [regex]::Match($jobsText, "(?ms)^  ${name}:\n.*?(?=^  \S|\z)").Value }
 $look = Get-Job 'look'; $make = Get-Job 'make'; $push = Get-Job 'push'
-Yes 'engine-pin.yml ticks on a schedule and runs by hand' ($code -match "(?m)^  schedule:\n    - cron: '[^']+'" -and $code -match '(?m)^  workflow_dispatch:')
+Yes 'engine-pin.yml runs by hand and when woken, never on a clock (plan part 8)' ($code -match '(?m)^  workflow_dispatch:' -and $code -notmatch '(?m)^\s*schedule:')
 Yes '  a push to main that moves engine/skymp starts a look (plan part 8)' ($code -match '(?m)^  push:\n    branches: \[main\]\n    paths: \[engine/skymp\]$')
 $eng0 = [IO.File]::ReadAllText((Join-Path $root '.github/workflows/engine.yml')).Replace("`r`n", "`n")
 Yes '  engine.yml starts a look when a record run on main ends (plan part 8)' ($eng0 -match 'gh workflow run engine-pin\.yml --repo \$env:GITHUB_REPOSITORY --ref main')
-Yes '  one tick at a time, never cancelling the one before' ($code -match '(?m)^  group: engine-pin\n  cancel-in-progress: false')
+$asideWf = [IO.File]::ReadAllText((Join-Path $root '.github/workflows/engine-pin-aside.yml')).Replace("`r`n", "`n")
+$aside = (@($asideWf -split "`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n")
+Yes '  a pull request that moves engine/skymp closed unmerged starts a look (engine-pin-aside.yml)' ($aside -match '(?m)^on:\n  pull_request:\n    types: \[closed\]\n    branches: \[main\]\n    paths: \[engine/skymp\]\n(?!    )' -and $aside -match 'gh workflow run engine-pin\.yml --repo \$env:GITHUB_REPOSITORY --ref main')
+Yes '    only one not merged, from this repository, and never engine-pin/next''s own' ($aside -match "(?m)^    if: github\.event\.pull_request\.merged == false && github\.event\.pull_request\.head\.ref != 'engine-pin/next' && github\.event\.pull_request\.head\.repo\.full_name == github\.repository$")
+Yes '    it checks out and runs nothing from the pull request, and its token may only start a workflow' ($aside -notmatch 'actions/checkout|github\.event\.pull_request\.(head\.sha|title|body)' -and $aside -match '(?m)^permissions: \{\}$' -and $aside -match '(?m)^    permissions:\n      actions: write\n(?!      )')
+Yes '  one look at a time, never cancelling the one before' ($code -match '(?m)^  group: engine-pin\n  cancel-in-progress: false')
 Yes '  the workflow''s own token reads only' ($code -match '(?m)^permissions:\n  contents: read\n(?!  )')
 Yes '  three jobs, look, make and push' ($look -and $make -and $push)
 Yes '  make holds a token that only reads' ($make -match '(?m)^    permissions:\n      contents: read\n      actions: read\n(?!      )')

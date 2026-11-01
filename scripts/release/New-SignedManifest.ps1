@@ -3,7 +3,7 @@
 
   Writes the manifest a Release for the box deploy agent carries (#5180), and
   the catalog over it that Sign-OnRunner.ps1 then signs. The agent reads both
-  (agent/internal/agent/release.go):
+  (tools/DeployAgent/ReleaseFetch.cs):
 
       manifest.json   { schema: 1, repo, commit, tag, version, made,
                         parts: { <part>: [ { name, sha256, size } ] } }
@@ -13,12 +13,18 @@
 
       pwsh -File scripts/release/New-SignedManifest.ps1 -Out <folder> -Tag <tag>
            -Commit <40 hex> -Part gamemode -Files <path>,<path> [-Version a.b.c]
-           [-BotFiles <path>,<path>]
+           [-BotFiles <path>,<path>] [-ServerZip <server-<commit>-<sum>.zip>]
 
-  -BotFiles adds a second part, "bot": the bot pass a dev Deployment waits
+  -BotFiles adds a part, "bot": the bot pass a dev Deployment waits
   on (#5196, scripts\bot\Bot-Pass.js and what it needs). The agent puts
   every file of a Release in one folder, so no two files of a Release may
   have the same name.
+
+  -ServerZip adds a part, server: the server build's zip as
+  ServerArtifact.ps1 makes it (Get-EngineArtifact.ps1 puts CI's build of the
+  pin there), and the record it carries, server-build.json, beside it, so the
+  agent can tell from the record alone whether dev runs that build already
+  and fetch the zip only when it does not (#5219).
 
   It writes <Out>\files\manifest.json, <Out>\manifest.cat, and copies each
   file into <Out>\assets beside the manifest and the catalog, so the folder
@@ -37,6 +43,7 @@ param(
   [Parameter(Mandatory = $true)][string[]]$Files,
   [string]$Version = '',
   [string[]]$BotFiles = @(),
+  [string]$ServerZip = '',
   [string]$Repo = $env:GITHUB_REPOSITORY,
   [switch]$NoCatalog
 )
@@ -74,6 +81,31 @@ if (@($BotFiles).Count) {
   $parts['bot'] = Get-PartList $BotFiles
 }
 
+if ($ServerZip) {
+  if ($Part -ne 'gamemode') { throw "a server build goes on a build Release beside the gamemode, not on an $Part Release" }
+  if (-not (Test-Path -LiteralPath $ServerZip -PathType Leaf)) { throw "there is no server zip at $ServerZip" }
+  $zipName = Split-Path -Leaf $ServerZip
+  if ($zipName -notmatch '^server-[0-9a-f]{12}-[0-9a-f]{16}\.zip$') { throw "$zipName is not a server build zip as ServerArtifact.ps1 names one" }
+  foreach ($n in 'server-build.json', $zipName) {
+    if ($names.ContainsKey($n)) { throw "two files are called $n, and the agent puts a Release's files in one folder" }
+    $names[$n] = $true
+  }
+  Copy-Item -LiteralPath $ServerZip -Destination (Join-Path $assets $zipName) -Force
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
+  $za = [IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $ServerZip).ProviderPath)
+  try {
+    $ze = $za.Entries | Where-Object { $_.FullName -eq 'server-build.json' } | Select-Object -First 1
+    if (-not $ze) { throw "$zipName carries no server-build.json" }
+    [IO.Compression.ZipFileExtensions]::ExtractToFile($ze, (Join-Path $assets 'server-build.json'), $true)
+  } finally { $za.Dispose() }
+  $server = @()
+  foreach ($n in 'server-build.json', $zipName) {
+    $item = Get-Item -LiteralPath (Join-Path $assets $n)
+    $server += [ordered]@{ name = $n; sha256 = (Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash.ToLowerInvariant(); size = $item.Length }
+  }
+  $parts['server'] = @($server)
+}
+
 $m = [ordered]@{
   schema  = 1
   repo    = $Repo
@@ -87,6 +119,7 @@ $json = Join-Path $filesDir 'manifest.json'
 [IO.File]::WriteAllText($json, ($m | ConvertTo-Json -Depth 6 -Compress), (New-Object Text.UTF8Encoding($false)))
 Copy-Item -LiteralPath $json -Destination (Join-Path $assets 'manifest.json') -Force
 Write-Host ("manifest.json for {0}: {1} file(s) of {2}{3}, commit {4}" -f $Tag, $list.Count, $Part, $(if ($parts.Contains('bot')) { ' and ' + @($parts['bot']).Count + ' of bot' } else { '' }), $Commit)
+if ($ServerZip) { Write-Host ("  and the server build {0} with its record" -f (Split-Path -Leaf $ServerZip)) }
 if ($NoCatalog) { exit 0 }
 
 $cat = Join-Path $Out 'manifest.cat'

@@ -78,8 +78,8 @@
 # THE PIN HEARS AT ONCE (plan part 8, Patrick's yes of 31 Oct 2026). When a
 # run on main ends, however it ended, its second job "wake" starts
 # engine-pin.yml, which moves the pin once this has recorded the commit, or
-# goes red with this run's link when it did not. Until then engine-pin.yml
-# only learned of it at its next ten-minute tick. It is started by name
+# goes red with this run's link when it did not. Before that, engine-pin.yml
+# only learned of it at a ten-minute tick, which has since gone. It is started by name
 # because GitHub starts no workflow_run for a run its own token started, and
 # engine-pin.yml starts this one with that token: measured on 31 Oct, run
 # 41253887577 (started by engine-pin.yml at 11:46 PM UTC) ended green and
@@ -188,7 +188,6 @@ jobs:
         env:
           COMMIT: ${{ steps.which.outputs.commit }}
           GH_TOKEN: ${{ github.token }}
-          FORK_REPO: EvilPatrick06/skymp
         run: |
           # Header, THE FORK'S OWN BUILD, AND ONLY IT: the fork's build goes in
           # engine\skymp\build, and with none, one still running or one red
@@ -212,7 +211,13 @@ jobs:
           # Header, THE BUILD IS SIGNED (#5153): the fork's own workflow, at
           # this commit, on its branch, on GitHub's runner, made this
           # fork-build.json, which names every file just held to it.
-          gh attestation verify $kept --repo $env:FORK_REPO --signer-workflow "$env:FORK_REPO/.github/workflows/thornswood-pr-windows.yml" --source-ref refs/heads/thornswood/engine-changes --source-digest $env:COMMIT --deny-self-hosted-runners
+          # The fork's name now, asked by the name ForkEngineBuild.ps1 knows and
+          # held to its id (#5184): the signature names the repository the
+          # build ran in, which is the fork's name after a move, not before.
+          $fork = "$(gh api "repos/$ForkEngineRepo" --jq '[.id, .full_name] | @tsv')".Trim() -split "`t"
+          if ($LASTEXITCODE -ne 0 -or $fork.Count -ne 2 -or $fork[0] -ne [string]$ForkEngineRepoId) { Write-Host "::error::GitHub did not answer the fork's id $ForkEngineRepoId for $ForkEngineRepo (it said '$($fork -join ' ')')"; exit 1 }
+          $forkRepo = $fork[1]
+          gh attestation verify $kept --repo $forkRepo --signer-workflow "$forkRepo/.github/workflows/thornswood-pr-windows.yml" --source-ref refs/heads/thornswood/engine-changes --source-digest $env:COMMIT --deny-self-hosted-runners
           if ($LASTEXITCODE -ne 0) { Write-Host "::error::the fork's fork-build.json for $env:COMMIT has no attestation from its thornswood-pr-windows.yml push build at that commit, so this build is not recorded (#5153)"; exit 1 }
           Write-Host ("the fork's build of {0}, {1} files held to fork-build.json, is in engine\skymp\build" -f $env:COMMIT.Substring(0, 12), @($m.files.PSObject.Properties).Count)
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ('run=' + $f.Run.html_url)
@@ -302,5 +307,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh workflow run engine-pin.yml --repo $env:GITHUB_REPOSITORY --ref main
-          if ($LASTEXITCODE -ne 0) { Write-Host '::error::engine-pin.yml could not be started, so the pin waits for its next tick; gh says why above'; exit 1 }
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::engine-pin.yml could not be started, so the pin waits for the next fork build or pin merge; gh says why above'; exit 1 }
           Write-Host 'engine-pin.yml started: it moves the pin, or names this run if it ended red'

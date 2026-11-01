@@ -313,8 +313,13 @@ A change to the engine goes like this:
    which moves the pin in the index, runs `Get-EngineRecords.ps1`,
    `Build-Front.ps1 -Record` and `Write-EnginePinText.ps1`, runs the checks
    and stages the change.
-5. After it merges: the server to the dev server with `Publish-Server.ps1
-   -Channel dev`, the client with the next dev Ship. A machine without that
+5. After it merges, the dev server takes it by itself (#5219):
+   `gamemode-release.yml` runs because the pin changed
+   `records\server-build.json`, puts CI's server build of the pin on a signed
+   Release beside the gamemode, and the box deploy agent swaps it in under a
+   hold and starts dev on it (docs\DEPLOY-AGENT.md, "A new server build").
+   The client goes with the next dev Ship. By hand, as before: the server
+   to the dev server with `Publish-Server.ps1 -Channel dev`. A machine without that
    build puts it on from the store on the box, where the publish or deploy
    that sent it kept it: `Publish-Server.ps1 -Channel dev -FromStore`, and
    for live `Deploy-Server.ps1 -FromStore` (#459). `-ServerBuild <zip>` sends a
@@ -367,11 +372,18 @@ choice:
   moves `engine/skymp` starts it, and the fork starts it when its push build
   ends green (the fork's `thornswood-wake-pin.yml`, with the fork's one
   secret, `THORNSWOOD_PIN_WAKE`: a fine-grained token scoped to this
-  repository that may start its workflows and nothing else). It also still
-  looks every ten minutes until the fork's wake has run for real. Each look
+  repository that may start its workflows and nothing else), and
+  `engine-pin-aside.yml` starts it when another pull request that moves
+  `engine/skymp` closes without merging. Nothing starts it on a clock: the
+  ten-minute tick went once the fork's wake had run for real (1 November
+  2026). Closing `engine-pin/next`'s own pull request starts no look, since
+  that means "not this pin"; the next fork build looks again. Each look
   asks GitHub what the pin needs
   (`scripts\release\EnginePin.ps1`, `Get-EnginePinStep`): nothing, when main
-  pins the fork's head or the fork is still building it; wait, when another
+  pins the fork's head, or when the fork is still building it and no earlier
+  head since the pin is built; while the head builds, the newest earlier
+  head the fork built green goes first, so a fork merge during a build never
+  holds the pin back, and the head follows when its build ends; wait, when another
   open pull request moves `engine/skymp` (a pin made by hand goes first);
   start `engine.yml` for the head, when the fork built it green and nothing
   recorded it; move the pin, when `engine.yml` recorded it green.
@@ -382,7 +394,7 @@ choice:
   on it and opens or updates the pull request (`Open-EnginePinPr.ps1`). The
   branch always starts from main as it is, so it never needs a merge.
 - An `engine.yml` run that ends red is never started again for that commit.
-  The tick goes red with its link until the cause is fixed and the run is
+  The look goes red with its link until the cause is fixed and the run is
   started by hand, or the fork's head moves on.
 - The run's own token opens the pull request, which GitHub allows while
   Thornswood's Actions setting "Allow GitHub Actions to create and approve

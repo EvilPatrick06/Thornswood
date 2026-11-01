@@ -57,7 +57,13 @@ param(
     # Leaves the launcher unsigned even on a machine with records\signing\signing.json.
     # For a test build that never ships, so it spends no signing; Ship never
     # passes it, and Ship and Publish-Installer refuse an unsigned exe.
-    [switch]$NoSign
+    [switch]$NoSign,
+    # The number the exe carries (scripts\release\LauncherVersion.ps1, #5179).
+    # Ship.ps1 and release.yml write theirs into Updater.cs themselves before
+    # they call this; given here it must be the one they wrote. Left out on a
+    # checkout whose Updater.cs holds git's 0.0.0, this checkout's own number
+    # is worked out from its history and written in for the compile.
+    [string]$Version
 )
 
 Set-StrictMode -Version Latest
@@ -120,63 +126,107 @@ if (Test-Path -LiteralPath $exe) {
                  "Close it, or build somewhere else with -OutDir. Ship builds into a folder of its own and closes it for you.") }
 }
 
-Head 'Compiling'
-# -nr:false: without it MSBuild leaves its worker processes running after the
-# build, holding files under out\obj, and a runner names them as left behind.
-# UseSharedCompilation=false for the same reason (#3169): otherwise the Csc
-# task hands each compile to the Roslyn compiler server, VBCSCompiler, which
-# stays up about ten minutes after the last one. A build here compiles each
-# project once, so the server never serves a second compile; it only lingers.
-$msbArgs = @('-nologo', '-v:minimal', '-nr:false', '-p:UseSharedCompilation=false', '-p:Configuration=Release')
-$old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-& $found.MSBuild (Resolve-Path -LiteralPath $proj).Path @msbArgs ('-p:OutDir=' + $outDir.TrimEnd('\') + '\')
-$rc = $LASTEXITCODE
-$ErrorActionPreference = $old
-if ($rc -ne 0 -or -not (Test-Path $exe)) { Die "MSBuild exited with $rc" }
-Say ("  Thornswood.exe  {0:n0} KB" -f ((Get-Item $exe).Length / 1KB)) 'Green'
-$pdb = [IO.Path]::ChangeExtension($exe, '.pdb')
-if (Test-Path -LiteralPath $pdb) {
-    Say ("  Thornswood.pdb  {0:n0} KB (kept beside the exe; packs and the installer leave it out)" -f ((Get-Item $pdb).Length / 1KB)) 'DarkGray'
-} else {
-    Say '  Thornswood.pdb did not appear beside the exe' 'Yellow'
-}
-
-# ------------------------------------------------------------ setup stub
-Head 'Setup stub'
-# Built under the name it ships as (the project's AssemblyName is
-# Thornswood-Setup, because Windows reads OriginalFilename and InternalName
-# from the name it was built as), into a scratch folder, then moved onto
-# out\setup-stub.exe, which packaging copies from. Deleting the old one up
-# front meant a failed build left no installer at all, and the only sign of
-# it was a red STOP an hour before anyone noticed the package had no exe in
-# it, so a failed build leaves the last working copy. out\ is the build
-# output, the folder Where.ps1 calls Out, ignored by git.
-$stub = Join-Path (Join-Path $Here '..\..\out') 'setup-stub.exe'
-if ($StubOut) { $stub = $StubOut }
-New-Item -ItemType Directory -Force -Path (Split-Path -Parent $stub) | Out-Null
-$stubBuild = Join-Path ([IO.Path]::GetTempPath()) 'ThornswoodSetupBuild'
-if (Test-Path -LiteralPath $stubBuild) { Remove-Item -LiteralPath $stubBuild -Recurse -Force }
-$old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-& $found.MSBuild (Resolve-Path -LiteralPath $stubProj).Path @msbArgs ('-p:OutDir=' + $stubBuild + '\')
-$rc2 = $LASTEXITCODE
-$ErrorActionPreference = $old
-$stubNew = Join-Path $stubBuild 'Thornswood-Setup.exe'
-if ($rc2 -ne 0 -or -not (Test-Path -LiteralPath $stubNew)) {
-    Write-Host ''
-    Say "  MSBuild exited with $rc2. The installer program did NOT build." 'Red'
-    if (Test-Path $stub) {
-        Die 'setup-stub.exe did not rebuild. The last working copy is still here, but a release must not ship on a failed stub build. Fix the compile error above and run Build-Launcher again.'
-    } else {
-        Die 'There is no setup-stub.exe at all. A package built now would have no installer in it. Fix the compile error above and run Build-Launcher again.'
+# ------------------------------------------------------------ the number
+# THE VERSION COMES FROM THE BUILD (#5179). Git holds 0.0.0 in Updater.cs,
+# and both projects read the number from there (the const the updater
+# compares, the file details, the manifest identity), so the real one is
+# written in for the compile and the bytes git holds are put back after it,
+# whatever happens. Ship.ps1 and release.yml have already written theirs (a
+# dev number among them); a hand build or a test build takes this checkout's
+# own, so a launcher built here never sees the feed's number as newer and
+# replaces itself.
+. (Join-Path $Here 'LauncherVersion.ps1')
+$updaterCs = Join-Path $Src 'Updater.cs'
+if (-not (Test-Path -LiteralPath $updaterCs)) { Die "Updater.cs is not at $updaterCs. It is in the repository, so the path is wrong; nothing was built." }
+$updaterBytes = [IO.File]::ReadAllBytes($updaterCs)
+$updaterText = [Text.Encoding]::UTF8.GetString($updaterBytes)
+$have = [regex]::Match($updaterText, 'Version\s*=\s*"([^"]+)"')
+if (-not $have.Success) { Die 'Updater.cs has no Version = "..." line, so the exe would carry no version. Nothing was built.' }
+$stamp = $false
+if (Test-LauncherVersionPlaceholder $updaterText) {
+    if (-not $Version) {
+        try { $Version = Get-LauncherVersion -RepoDir (Join-Path $Here '..\..') }
+        catch { Die ($_.Exception.Message + ' Pass -Version to build with a number of your own. Nothing was built.') }
     }
+    if ($Version -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') { Die "-Version $Version is not a.b.c or a.b.c.d. Nothing was built." }
+    # A file version and a manifest identity hold each part in 0 to 65534.
+    if (@($Version.Split('.') | Where-Object { [long]$_ -gt 65534 }).Count) { Die "-Version $Version has a part over 65534, which a Windows file version cannot hold. Nothing was built." }
+    $stamp = $true
+} elseif ($Version -and $Version -ne $have.Groups[1].Value) {
+    Die "Updater.cs already says $($have.Groups[1].Value), written by whatever called this, and -Version says $Version. Nothing was built."
+} else {
+    $Version = $have.Groups[1].Value
 }
-if (Test-Path $stub) { Remove-Item $stub -Force }
-Move-Item -LiteralPath $stubNew -Destination $stub
-Say ("  setup-stub.exe  {0:n0} KB" -f ((Get-Item $stub).Length / 1KB)) 'Green'
-$stubPdb = [IO.Path]::ChangeExtension($stub, '.pdb')
-if (Test-Path -LiteralPath $stubPdb) { Remove-Item -LiteralPath $stubPdb -Force }
-Move-Item -LiteralPath ([IO.Path]::ChangeExtension($stubNew, '.pdb')) -Destination $stubPdb
-Remove-Item -LiteralPath $stubBuild -Recurse -Force
+Say "  launcher $Version" 'DarkGray'
+
+try {
+    if ($stamp) {
+        $stamped = [regex]::Replace($updaterText, 'Version\s*=\s*"[^"]+"', ('Version = "' + $Version + '"'), 1)
+        [IO.File]::WriteAllText($updaterCs, $stamped, (New-Object Text.UTF8Encoding $false))
+    }
+
+    Head 'Compiling'
+    # -nr:false: without it MSBuild leaves its worker processes running after the
+    # build, holding files under out\obj, and a runner names them as left behind.
+    # UseSharedCompilation=false for the same reason (#3169): otherwise the Csc
+    # task hands each compile to the Roslyn compiler server, VBCSCompiler, which
+    # stays up about ten minutes after the last one. A build here compiles each
+    # project once, so the server never serves a second compile; it only lingers.
+    $msbArgs = @('-nologo', '-v:minimal', '-nr:false', '-p:UseSharedCompilation=false', '-p:Configuration=Release')
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    & $found.MSBuild (Resolve-Path -LiteralPath $proj).Path @msbArgs ('-p:OutDir=' + $outDir.TrimEnd('\') + '\')
+    $rc = $LASTEXITCODE
+    $ErrorActionPreference = $old
+    if ($rc -ne 0 -or -not (Test-Path $exe)) { Die "MSBuild exited with $rc" }
+    Say ("  Thornswood.exe  {0:n0} KB" -f ((Get-Item $exe).Length / 1KB)) 'Green'
+    $pdb = [IO.Path]::ChangeExtension($exe, '.pdb')
+    if (Test-Path -LiteralPath $pdb) {
+        Say ("  Thornswood.pdb  {0:n0} KB (kept beside the exe; packs and the installer leave it out)" -f ((Get-Item $pdb).Length / 1KB)) 'DarkGray'
+    } else {
+        Say '  Thornswood.pdb did not appear beside the exe' 'Yellow'
+    }
+
+    # ------------------------------------------------------------ setup stub
+    Head 'Setup stub'
+    # Built under the name it ships as (the project's AssemblyName is
+    # Thornswood-Setup, because Windows reads OriginalFilename and InternalName
+    # from the name it was built as), into a scratch folder, then moved onto
+    # out\setup-stub.exe, which packaging copies from. Deleting the old one up
+    # front meant a failed build left no installer at all, and the only sign of
+    # it was a red STOP an hour before anyone noticed the package had no exe in
+    # it, so a failed build leaves the last working copy. out\ is the build
+    # output, the folder Where.ps1 calls Out, ignored by git.
+    $stub = Join-Path (Join-Path $Here '..\..\out') 'setup-stub.exe'
+    if ($StubOut) { $stub = $StubOut }
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $stub) | Out-Null
+    $stubBuild = Join-Path ([IO.Path]::GetTempPath()) 'ThornswoodSetupBuild'
+    if (Test-Path -LiteralPath $stubBuild) { Remove-Item -LiteralPath $stubBuild -Recurse -Force }
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    & $found.MSBuild (Resolve-Path -LiteralPath $stubProj).Path @msbArgs ('-p:OutDir=' + $stubBuild + '\')
+    $rc2 = $LASTEXITCODE
+    $ErrorActionPreference = $old
+    $stubNew = Join-Path $stubBuild 'Thornswood-Setup.exe'
+    if ($rc2 -ne 0 -or -not (Test-Path -LiteralPath $stubNew)) {
+        Write-Host ''
+        Say "  MSBuild exited with $rc2. The installer program did NOT build." 'Red'
+        if (Test-Path $stub) {
+            Die 'setup-stub.exe did not rebuild. The last working copy is still here, but a release must not ship on a failed stub build. Fix the compile error above and run Build-Launcher again.'
+        } else {
+            Die 'There is no setup-stub.exe at all. A package built now would have no installer in it. Fix the compile error above and run Build-Launcher again.'
+        }
+    }
+    if (Test-Path $stub) { Remove-Item $stub -Force }
+    Move-Item -LiteralPath $stubNew -Destination $stub
+    Say ("  setup-stub.exe  {0:n0} KB" -f ((Get-Item $stub).Length / 1KB)) 'Green'
+    $stubPdb = [IO.Path]::ChangeExtension($stub, '.pdb')
+    if (Test-Path -LiteralPath $stubPdb) { Remove-Item -LiteralPath $stubPdb -Force }
+    Move-Item -LiteralPath ([IO.Path]::ChangeExtension($stubNew, '.pdb')) -Destination $stubPdb
+    Remove-Item -LiteralPath $stubBuild -Recurse -Force
+}
+finally {
+    # The bytes git holds, exactly, so nothing shows as changed.
+    if ($stamp) { [IO.File]::WriteAllBytes($updaterCs, $updaterBytes) }
+}
 
 # ------------------------------------------------------------ signing
 #

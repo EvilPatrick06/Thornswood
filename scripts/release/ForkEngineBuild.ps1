@@ -48,6 +48,14 @@
 #>
 
 $ForkEngineRepo = 'EvilPatrick06/skymp'
+# THE FORK BY ITS ID (#5184). A repository moved to another owner keeps its
+# id and changes its name, so a build is held to the fork by the id: a run
+# by its repository.id, and fork-build.json by its repositoryId. A
+# fork-build.json from before the fork wrote its id (fork #142) was made
+# while the fork was EvilPatrick06/skymp, so one with no id is held to that
+# name. The name above is only where the API is asked.
+$ForkEngineRepoId = 1375283516
+$ForkEngineRepoNameBeforeId = 'EvilPatrick06/skymp'
 $ForkEngineWorkflow = 'thornswood-pr-windows.yml'
 $ForkEngineBranch = 'thornswood/engine-changes'
 
@@ -74,7 +82,7 @@ function Get-ForkEngineBuildRuns([string]$Commit, [scriptblock]$Get) {
     # branch, this commit.
     return @(@(Get-ForkEngineValue $list 'workflow_runs') | Where-Object {
             $_ -and [string]$_.head_sha -eq $Commit -and [string]$_.event -eq 'push' -and [string]$_.head_branch -eq $ForkEngineBranch -and
-            [string](Get-ForkEngineValue (Get-ForkEngineValue $_ 'repository') 'full_name') -eq $ForkEngineRepo
+            [string](Get-ForkEngineValue (Get-ForkEngineValue $_ 'repository') 'id') -eq [string]$ForkEngineRepoId
         } | Sort-Object { [long]$_.id } -Descending)
 }
 
@@ -149,7 +157,9 @@ function Get-ForkEngineBuildProblems([string]$Dir, [string]$Commit, [long]$RunId
     $why = @()
     if ([string]$m.commit -ne $Commit) { $why += "fork-build.json names commit $($m.commit), not $Commit" }
     if ([long]$m.runId -ne $RunId) { $why += "fork-build.json names run $($m.runId), not $RunId" }
-    if ([string]$m.repository -ne $ForkEngineRepo) { $why += "fork-build.json names repository $($m.repository), not $ForkEngineRepo" }
+    $id = Get-ForkEngineValue $m 'repositoryId'
+    if ($null -ne $id) { if ([string]$id -ne [string]$ForkEngineRepoId) { $why += "fork-build.json names repository id $id ($($m.repository)), not the fork's $ForkEngineRepoId" } }
+    elseif ([string]$m.repository -ne $ForkEngineRepoNameBeforeId) { $why += "fork-build.json names repository $($m.repository) and no id, not $ForkEngineRepoNameBeforeId" }
     if ([string]$m.event -ne 'push' -or [string]$m.ref -ne ('refs/heads/' + $ForkEngineBranch)) { $why += "fork-build.json is of a $($m.event) of $($m.ref), not a push to $ForkEngineBranch" }
     $files = Get-ForkEngineValue $m 'files'
     $named = @{}

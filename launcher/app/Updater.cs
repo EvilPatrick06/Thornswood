@@ -10,7 +10,11 @@ namespace Thornswood
 {
     static partial class Updater
     {
-        public const string Version = "1.2.16";
+        // The launcher's number. Git holds 0.0.0 here and never another: the
+        // build writes the real one in for the compile and puts this back
+        // (scripts\release\LauncherVersion.ps1 says how it is worked out,
+        // Build-Launcher.ps1 and Ship.ps1 write it, #5179).
+        public const string Version = "0.0.0";
 
         /// <summary>
         /// The collection revision the last feed named, or 0 when it named
