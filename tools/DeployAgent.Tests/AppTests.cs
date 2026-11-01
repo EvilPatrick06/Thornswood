@@ -211,6 +211,68 @@ public sealed class AppTests : IDisposable
     }
 
     [Fact]
+    public void TwoSwapsInOneSecondGetFoldersOfTheirOwn()
+    {
+        var root = Temp();
+        var now = new DateTime(2026, 11, 1, 19, 49, 26);
+        Assert.Equal("20261101-194926", Swap.FreeStamp(root, now));
+        Directory.CreateDirectory(Path.Combine(root, ".prev-20261101-194926"));
+        Assert.Equal("20261101-194926-2", Swap.FreeStamp(root, now));
+        Directory.CreateDirectory(Path.Combine(root, ".undone-20261101-194926-2"));
+        Assert.Equal("20261101-194926-3", Swap.FreeStamp(root, now));
+        // The newest is still the last by name, which is how the old ones are pruned.
+        Assert.True(string.CompareOrdinal("20261101-194926-3", "20261101-194926") > 0);
+    }
+
+    // ---- the news the bot posts (#5187) -------------------------------------
+
+    [Fact]
+    public async Task ADeploymentThatWentInLeavesItsReleaseNewsForTheBot()
+    {
+        var r = Make(AppKinds.Site);
+        Directory.CreateDirectory(Path.Combine(r.Store, News.Folder));
+        Put(r.Root, new() { ["server.js"] = "// v1" });
+        AppRelease(r.Gh, "build-3", "site", Zip(new() { ["server.js"] = "// v2" }));
+        r.Gh.Releases["build-3"]["name"] = "The forge lists each ingot once";
+        r.Gh.Releases["build-3"]["body"] = "- The forge lists each ingot once.";
+        r.Gh.Releases["build-3"]["html_url"] = "https://github.test/O/R/releases/tag/build-3";
+        var id = r.Gh.AddDeployment("Site", Commit, "{\"release\":\"build-3\",\"part\":\"site\"}");
+        await r.Agent.Pass(AppKinds.Site, CancellationToken.None);
+        States(r, id, "in_progress,success");
+        using var doc = JsonDocument.Parse(File.ReadAllText(News.FileFor(r.Store, AppKinds.Site)));
+        var e = doc.RootElement;
+        Assert.Equal(("site", "build-3", "The forge lists each ingot once", "- The forge lists each ingot once.", Commit),
+            (e.GetProperty("environment").GetString(), e.GetProperty("tag").GetString(), e.GetProperty("name").GetString(),
+             e.GetProperty("body").GetString(), e.GetProperty("commit").GetString()));
+        Assert.Equal("https://github.test/O/R/releases/tag/build-3", e.GetProperty("url").GetString());
+    }
+
+    [Fact]
+    public async Task NoNewsIsLeftForAFailureARollbackOrABoxWithNoBot()
+    {
+        var r = Make(AppKinds.Site);
+        var news = News.FileFor(r.Store, AppKinds.Site);
+        Directory.CreateDirectory(Path.GetDirectoryName(news)!);
+        Put(r.Root, new() { ["server.js"] = "// v1" });
+        AppRelease(r.Gh, "build-4", "site", Zip(new() { ["server.js"] = "// BROKEN" }));
+        var id = r.Gh.AddDeployment("Site", Commit, "{\"release\":\"build-4\",\"part\":\"site\"}");
+        await r.Agent.Pass(AppKinds.Site, CancellationToken.None);
+        States(r, id, "in_progress,failure");
+        Assert.False(File.Exists(news));
+        // A rollback by tag is not news.
+        AppRelease(r.Gh, "build-5", "site", Zip(new() { ["server.js"] = "// v5" }));
+        Assert.Equal("success", (await r.Agent.DeployTag(AppKinds.Site, "build-5", CancellationToken.None)).State);
+        Assert.False(File.Exists(news));
+        // No for-bot folder: the Deployment still goes in, and the log says why there is no news.
+        Directory.Delete(Path.GetDirectoryName(news)!);
+        AppRelease(r.Gh, "build-6", "site", Zip(new() { ["server.js"] = "// v6" }));
+        var id2 = r.Gh.AddDeployment("Site", Commit, "{\"release\":\"build-6\",\"part\":\"site\"}");
+        await r.Agent.Pass(AppKinds.Site, CancellationToken.None);
+        States(r, id2, "in_progress,success");
+        lock (said) Assert.Contains(said, l => l.Contains("no news left for the bot"));
+    }
+
+    [Fact]
     public async Task ASiteThatAlreadyHasEveryFileIsNotStopped()
     {
         var r = Make(AppKinds.Site);

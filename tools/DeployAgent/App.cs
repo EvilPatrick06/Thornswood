@@ -133,7 +133,7 @@ public sealed class App(EnvConfig env, HttpClient http, IAppControl control)
         if (why != "") return new Outcome("failure", "not applied: " + why);
         if (!Directory.Exists(Root)) return new Outcome("failure", $"not applied: there is no {Root}; a full install puts the app there first");
 
-        var stamp = Now().ToString("yyyyMMdd-HHmmss");
+        var stamp = Swap.FreeStamp(Root, Now());
         // Not .stage-*: Deploy-Docs.ps1 and Install-Bot.ps1 clear every
         // .stage-* they find as they start, and either may still be run by
         // the gate. Inside the root, so a file moved in carries the root's
@@ -560,4 +560,24 @@ public sealed class App(EnvConfig env, HttpClient http, IAppControl control)
     }
 
     static string Trim(string s) => s.Length > 110 ? s[..107] + "..." : s;
+}
+
+/// <summary>The stamp a swap names its folders by.</summary>
+public static class Swap
+{
+    /// <summary>now to the second, with -2, -3 and on after it when a folder
+    /// of that stamp is already in root: two swaps in one second (a
+    /// Deployment, then a rollback by tag) would otherwise move the second's
+    /// old files into the first's .prev- folder, find them there and put
+    /// everything back. The suffix sorts after the bare stamp, so the newest
+    /// is still the last by name.</summary>
+    public static string FreeStamp(string root, DateTime now)
+    {
+        var bare = now.ToString("yyyyMMdd-HHmmss");
+        for (var n = 1; ; n++)
+        {
+            var s = n == 1 ? bare : $"{bare}-{n}";
+            if (!new[] { ".prev-", ".undone-", ".agent-stage-" }.Any(k => Directory.Exists(Path.Combine(root, k + s)))) return s;
+        }
+    }
 }

@@ -59,7 +59,10 @@
   service ThornswoodBot), and the agent then applies every Deployment to
   Site and to Discord bot: the Release's site.zip or discord.zip swapped in
   the way Deploy-Docs.ps1 and Install-Bot.ps1 -CodeOnly swap the app, with
-  the logs in the dev server's data folder.
+  the logs in the dev server's data folder. Where the bot is, it also makes
+  C:\Thornswood-Deploys\for-bot, which only SYSTEM, Administrators and the
+  bot's account read, for the release news the agent leaves after each
+  Deployment and the bot posts.
 
   WHAT IT CANNOT DO YET. Until the box admin App holds Deployments: Read and
   write (its permissions page, then Accept on its installation, an owner's
@@ -295,6 +298,17 @@ foreach (`$app in @(
   `$cfg.environments | Add-Member -NotePropertyName `$app.name -NotePropertyValue `$e -Force
   'apps: ' + `$app.name + ' named; the agent applies its Deployments'
 }
+
+# The release news (#5187): after a Deployment goes in, the agent leaves its
+# Release's notes in for-bot for the bot to post (tools\DeployAgent\News.cs).
+# Only the bot's own account reads there besides SYSTEM and Administrators.
+`$newsDir = 'C:\Thornswood-Deploys\for-bot'
+if (Get-Service -Name 'ThornswoodBot' -ErrorAction SilentlyContinue) {
+  New-Item -ItemType Directory -Force -Path `$newsDir | Out-Null
+  & icacls.exe `$newsDir /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' 'NT SERVICE\ThornswoodBot:(OI)(CI)RX' | Out-Null
+  if (`$LASTEXITCODE -eq 0) { 'news: ' + `$newsDir + ' is there, readable by the bot; the agent leaves each Release''s news in it' }
+  else { 'NEWS: icacls could not set the rules on ' + `$newsDir + ', so the bot may not read the news there' }
+} else { 'news: the bot''s service ThornswoodBot is not on this box, so no news is left for it' }
 
 # The bot pass (#5196): its folder, its task, and agent.json naming the
 # folder only once the task runs as its own SID with rights there alone.

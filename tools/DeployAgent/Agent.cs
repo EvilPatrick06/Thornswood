@@ -313,10 +313,10 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
             await gh.SetStatus(d.Id, "in_progress", "the deploy agent on the box is applying this", "", ct);
             Logf($"deploy agent {version} on {Host}, deployment {d.Id} of {Short(d.Sha)} by {d.Creator?.Name}");
             Outcome outc;
+            var tag = "";
             if (d.Task != "" && d.Task != "deploy") outc = new Outcome("failure", $"not applied: the Deployment's task is {d.Task}, and the agent applies deploy only");
             else
             {
-                string tag;
                 try
                 {
                     tag = PayloadRelease(d.Payload);
@@ -330,8 +330,24 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
             Logf(outc.State.ToUpperInvariant() + ": " + outc.Summary);
             var url = PublishLog(env, d.Id.ToString(), lines);
             await gh.SetStatus(d.Id, outc.State, outc.Summary, url, ct);
+            if (outc.State == "success") await LeaveNews(env, tag, d, ct);
         }
         finally { File.Delete(StatePath); }
+    }
+
+    /// <summary>The news of the Release a Deployment put in, for the bot
+    /// (News). Its notes are read again here: a Release's body is not part
+    /// of what is signed, and is what GitHub shows as its notes now. A
+    /// failure is said in the agent's log and changes nothing deployed.</summary>
+    async Task LeaveNews(string env, string tag, Deployment d, CancellationToken ct)
+    {
+        var store = servers.TryGetValue(env, out var srv) ? srv.Env.Store : Apps.TryGetValue(env, out var app) ? app.Env.Store : "";
+        void Logf(string s) => log($"{env} deployment {d.Id}: {s}");
+        try { News.Write(store, env, await gh.ReleaseByTag(tag, ct), d.Sha, Logf); }
+        catch (Exception e) when (e is GitHubException or HttpRequestException or TaskCanceledException or JsonException)
+        {
+            Logf($"THE NEWS OF {tag} WAS NOT LEFT FOR THE BOT: the Release could not be read again ({e.Message})");
+        }
     }
 
     static string Short(string s) => s.Length > 12 ? s[..12] : s;
