@@ -177,7 +177,6 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Build-Launcher.ps1](release/Build-Launcher.ps1) | Compiles the launcher into a real Thornswood.exe, and the setup program into out\setup-stub.exe. |
 | [release/Build-Server.ps1](release/Build-Server.ps1) | Compiles the game server out of our fork and puts the result where Deploy-Server.ps1 and Publish-Server.ps1 expect to find it. |
 | [release/BuildStamp.ps1](release/BuildStamp.ps1) | What a server's gamemode is, written down beside it. |
-| [release/Bump-Version.ps1](release/Bump-Version.ps1) | Moves the launcher's version number, commits that one file, and stops. |
 | [release/Check-Build.ps1](release/Check-Build.ps1) | The server does not check plugin names. It checks size and crc32 of every plugin it names, so the wrong version of a mod is the same to it as not having the mod. |
 | [release/Check-CollectionRevisions.ps1](release/Check-CollectionRevisions.ps1) | Holds Nexus's newest published collection revision, the record and both feeds to each other, and keeps one issue on the board for the rebuild while they part (#4068). |
 | [release/Check-Records.ps1](release/Check-Records.ps1) | Holds the committed high-risk records to their shape and version, fail closed (#2180). |
@@ -209,6 +208,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Install-Launcher.ps1](release/Install-Launcher.ps1) | Puts a launcher that Build-Launcher.ps1 has already built into an install, and does the things around it that only an install should do. |
 | [release/Install-NexusRevision.ps1](release/Install-NexusRevision.ps1) | Lays out one revision of the Thornswood collection on Nexus Mods (slug 7essxf) into a game folder, the way Vortex installs and deploys it, without Vortex (#2754). |
 | [release/Installer-OnGitHub.ps1](release/Installer-OnGitHub.ps1) | What .github\workflows\installer.yml does with GitHub's releases, as functions a harness can drive with a stand-in GitHub (#3412). |
+| [release/LauncherVersion.ps1](release/LauncherVersion.ps1) | Works out the launcher's number from git, so it is never committed. |
 | [release/LogHandBack.ps1](release/LogHandBack.ps1) | A file handed back from a workflow run in its job's log rather than as an artifact. |
 | [release/New-ClientBuildRecord.ps1](release/New-ClientBuildRecord.ps1) | Records what the client runtime is and which fork commit it was built from, into records\client-build.json. |
 | [release/New-ClientLicenceRecord.ps1](release/New-ClientLicenceRecord.ps1) | Records which libraries are in the client files, vcpkg's and the others, with each one's licence text, into records\client-licences.json and records\client-licences\. |

@@ -21,8 +21,9 @@
   signs first; the box takes a release up when the hosted job is refused or
   fails, and signs it on runner 3 alone, through the same OIDC identity, with
   no Azure CLI and no sign in kept on the box. A v<a.b.c.d> tag is a dev
-  number release.yml writes into Updater.cs, and release-tag.yml makes the
-  tag a cloud Ship cannot push.
+  number release.yml hands Build-Launcher.ps1, held to the launcher's own
+  number at the commit (LauncherVersion.ps1, #5179), and release-tag.yml
+  makes the tag a cloud Ship cannot push.
 
   THE BOX JOB ENDED WITH THE FLIP (#4013, Patrick's A of 27 Oct 2026). A
   public repository has GitHub's runners free with no minute limit and no
@@ -118,15 +119,16 @@ Yes '  and reads the signature back, Valid and timestamped' ($sign.Contains("`$s
 Yes '  and does not sign setup-stub.exe (Package signs the finished Setup)' (-not ($sign -match 'setup-stub'))
 Yes 'the signing setup comes off the runner after every run, failed ones too' ($clean.Contains('if: ${{ always() }}') -and $clean.Contains('records\signing\signing.json') -and $clean.Contains('records\signing\client'))
 Yes 'no step in release.yml reads a secret but the repository token' (-not (($wf -replace '\$\{\{ github\.token \}\}', '') -match 'secrets\.'))
-$num = Get-Step $wf 'Put the tag''s number in Updater.cs'
-Yes 'a v<a.b.c.d> tag writes its dev number into Updater.cs with Ship.ps1''s own replace' ($num.Contains("`$src -replace 'Version\s*=\s*`"[^`"]+`"', ('Version = `"' + `$want + '`"')"))
-Yes '  a v<a.b.c> tag must be the number Updater.cs already says' ($num.Contains('if ($have -ne $want)'))
-Yes '  and a dev number is never below the commit''s own' ($num.Contains('-lt [version]$have'))
+$num = Get-Step $wf 'Hold the tag''s number to the launcher''s'
+Yes 'the tag''s number is held to the launcher''s number at the commit, worked out by LauncherVersion.ps1' ($num.Contains('. .\scripts\release\LauncherVersion.ps1') -and $num.Contains('Get-LauncherVersion -RepoDir .'))
+Yes '  a v<a.b.c> tag must be that number and no other' ($num.Contains('$parts.Count -eq 3 -and $want -ne $main'))
+Yes '  and a v<a.b.c.d> tag must start with it' ($num.Contains('$parts.Count -eq 4 -and $base -ne $main'))
+Yes '  and the number goes to the build as -Version, so git''s Updater.cs is never edited' ($wf.Contains('LAUNCHER_VERSION: ${{ steps.number.outputs.version }}') -and $wf.Contains('Build-Launcher.ps1 -Root $root -NoSign -NoPause -Version $env:LAUNCHER_VERSION'))
 $build = Get-Step $wf 'Build the launcher into RUNNER_TEMP'
 Yes 'the build is MSBuild on either runner, with no -With (#498 switched)' ($build.Contains('Build-Launcher.ps1 -Root $root -NoSign -NoPause') -and $build -notmatch '-With\b' -and $build -notmatch "'csc'")
 $iBuild = $wf.IndexOf('- name: Build the launcher into RUNNER_TEMP')
 $iFetch = $wf.IndexOf('- name: Fetch the signing client')
-$iNum = $wf.IndexOf("- name: Put the tag's number in Updater.cs")
+$iNum = $wf.IndexOf("- name: Hold the tag's number to the launcher's")
 $iClean = $wf.IndexOf('- name: Take the signing setup off')
 $iSign = $wf.IndexOf('- name: Sign the launcher')
 $iSums = $wf.IndexOf('- name: Collect the exe')

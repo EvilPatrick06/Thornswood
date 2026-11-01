@@ -58,6 +58,9 @@ foreach ($n in $want) { if (-not $fns.ContainsKey($n)) { Done } }
 foreach ($n in $want) { Invoke-Expression $fns[$n] }
 # The fingerprint reads each file as it ships (#2903).
 . (Join-Path $repo 'scripts\release\ShippedBytes.ps1')
+# and its list of files outside launcher\ is LauncherVersion.ps1's, the same
+# list the launcher's number is worked out from (#5179), as Ship.ps1 loads it.
+. (Join-Path $repo 'scripts\release\LauncherVersion.ps1')
 
 function Run-Git {
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
