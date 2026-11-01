@@ -71,7 +71,7 @@ $keepSrc = Read 'launcher\app\LocalKeep.cs'
 $shellSrc = Read 'launcher\app\Shell.cs'
 $uninstallSrc = Read 'launcher\app\Uninstall.cs'
 $discordSrc = Read 'launcher\app\Discord.cs'
-$xaml = Read 'launcher\ui.xaml'
+$xaml = Read 'launcher\app\MainWindow.axaml'
 $privacy = (Read 'site\data\site\privacy.md') -replace "`r`n", "`n"
 
 # ---- 2: the start, by text ---------------------------------------------------
