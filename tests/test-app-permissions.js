@@ -138,7 +138,7 @@ function asGitHub(record) {
 
   // 4. the nightly runs it
   console.log('4. the nightly');
-  const night = fs.readFileSync(path.join(REPO, '.github', 'workflows', 'nightly.yml'), 'utf8');
+  const night = fs.readFileSync(path.join(REPO, '.github', 'workflows', 'nightly.yml'), 'utf8').replace(/\r\n/g, '\n'); // a Windows checkout has CRLF
   const step = /- name: Each GitHub App holds only what its record gives it\n([\s\S]*?)(?=\n      - name:|\n  [a-z]+:\n)/.exec(night);
   yes('nightly.yml has the step', !!step);
   yes('  it runs this script', !!step && /node scripts\/dev\/Check-AppPermissions\.js/.test(step[1]));
