@@ -83,11 +83,19 @@ function Get-NexusField($obj, [string]$name) {
 
 # Main's launcher number for this checkout (LauncherVersion.ps1, #5179): git
 # holds 0.0.0 in Updater.cs, so the number is worked out from the history,
-# which a shallow checkout does not have and says so.
+# which a shallow checkout does not have and says so. Worked out once in a
+# run, the first time a request needs it: the checkout does not move under a
+# run, so every request sends the same number. Asked of git for each request,
+# as it was from #5179 until 1 Nov, every request started two git processes,
+# and tests\test-2914-nexus-scripts.ps1 went from about 390 processes to
+# about 1300 and past its 300 seconds on a Windows runner.
+$script:NexusAppVersion = ''
 function Get-NexusAppVersion {
+  if ($script:NexusAppVersion) { return $script:NexusAppVersion }
   . (Join-Path $script:NexusHere 'LauncherVersion.ps1')
-  try { return (Get-LauncherVersion -RepoDir (Join-Path $script:NexusHere '..\..')) }
+  try { $script:NexusAppVersion = Get-LauncherVersion -RepoDir (Join-Path $script:NexusHere '..\..') }
   catch { throw ($_.Exception.Message + ' It is sent to Nexus as Application-Version.') }
+  return $script:NexusAppVersion
 }
 
 # The address every request goes to: Nexus itself, or the harness's stand-in.
