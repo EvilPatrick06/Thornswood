@@ -127,6 +127,7 @@
   },
   {
    "slug": "thornswood-pin-robot",
+   "id": 5562975,
    "for": "the engine pin robot (.github/workflows/engine-pin.yml, #5148, #5256): pushes engine-pin/next and opens the pin's pull request",
    "held_by": "the engine-pin environment of Thornswood, main only (PIN_APP_KEY)",
    "installed_on": [
