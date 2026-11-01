@@ -110,7 +110,7 @@ if (-not $Tool) {
     $found = Find-ThornswoodMSBuild
     if (-not $found.MSBuild -or -not $found.RefAssemblies) {
         Die ('MSBuild and the .NET Framework 4.8.1 reference assemblies build the ship root tool, as they build the launcher, and this machine lacks ' +
-             $(if (-not $found.MSBuild) { 'MSBuild' } else { 'the reference assemblies' }) + '. Developer-Guide.md "Setting up a machine" has the install line. The ship root was not touched.')
+             $(if (-not $found.MSBuild) { 'MSBuild' } else { 'the reference assemblies' }) + '. docs/guide/set-up-a-machine.md "Setting up a machine" has the install line. The ship root was not touched.')
     }
     $proj = Join-Path $Here 'ShipRoot\ShipRoot.csproj'
     if (-not (Test-Path -LiteralPath $proj)) { Die "$proj is not there. It is in the repository, so the path is wrong. The ship root was not touched." }

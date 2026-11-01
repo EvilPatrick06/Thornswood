@@ -164,7 +164,7 @@ yes('B9 and Refusal still pins the Artifact Signing root and Thornswood\'s ident
     /if \(!String\.Equals\(root\.Thumbprint, Root, StringComparison\.OrdinalIgnoreCase\)\)/.test(sigCs));
 // Signature.cs stays C# 5 after #498's switch: Assert-PublishSigned.ps1
 // compiles it with Add-Type, and C# inside PowerShell keeps the Framework
-// compiler's C# 5 (Developer-Guide.md, Settled design). Voice.Bootstrap is
+// compiler's C# 5 (docs/guide/settled-design.md). Voice.Bootstrap is
 // launcher code, built by MSBuild at C# 13, so it is no longer held to C# 5.
 yes('B10 C# 5 in Signature.cs, which Assert-PublishSigned.ps1 compiles with Add-Type: no $"", no ?., no nameof, no out var',
     !/\$"|\?\.[A-Za-z]|nameof\(|out var /.test(code(sigCs)));

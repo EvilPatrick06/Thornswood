@@ -502,7 +502,7 @@ Head 'The build'
 # The launcher builds only with MSBuild from its project files (#498).
 $msb = Find-ThornswoodMSBuild
 Ready 'MSBuild and the .NET Framework 4.8.1 reference assemblies are here' ([bool]($msb.MSBuild -and $msb.Csc -and $msb.RefAssemblies)) $msb.MSBuild `
-  'Developer-Guide.md "Setting up a machine" has the one install line (Visual Studio 2022 Build Tools with the MSBuild workload and the 4.8.1 targeting pack)'
+  'docs/guide/set-up-a-machine.md "Setting up a machine" has the one install line (Visual Studio 2022 Build Tools with the MSBuild workload and the 4.8.1 targeting pack)'
 
 $node = $null
 $nodeCmd = Get-Command node -ErrorAction SilentlyContinue | Select-Object -First 1

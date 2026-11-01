@@ -915,7 +915,7 @@ runs Swap.Restore, Hold.Release and, when no game is running, Keep.Unpark.
 
 ## 4. The six shared files
 
-Developer-Guide.md asks for a line in #staff-updates before any of these is edited, because both
+docs/guide/how-work-moves.md asks for a line in #staff-updates before any of these is edited, because both
 machines work in them.
 
 | File | What it is | Why both machines are in it |

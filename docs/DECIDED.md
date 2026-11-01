@@ -1,7 +1,7 @@
 # Decided
 
 What Patrick decided against, and the settled rules of the game, in one
-place. Read it before filing a new idea or feature (Developer-Guide.md, the
+place. Read it before filing a new idea or feature (the Developer Guide, the
 board). Each line links where the decision was made. An idea that goes
 against one of these says so in its issue and asks for the decision to be
 changed; it is not filed as if the question were open.

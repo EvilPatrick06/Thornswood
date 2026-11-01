@@ -23,8 +23,10 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
-# The guide names the safe command, whatever machine this runs on.
-$guide = [IO.File]::ReadAllText((Join-Path (Split-Path -Parent $PSScriptRoot) 'Developer-Guide.md'))
+# The guide names the safe command, whatever machine this runs on. Its text is
+# the index and its pages (tests/Guide-Text.ps1).
+. (Join-Path $PSScriptRoot 'Guide-Text.ps1')
+$guide = Get-GuideText
 Yes 'the Developer Guide says to start a harness with pwsh -NoProfile -File' ($guide.Contains('pwsh -NoProfile -File .\tests\'))
 Yes 'and names the Git Bash failure (#2460)' ($guide.Contains('#2460') -and $guide.Contains('Get-FileHash'))
 Yes 'and how to clear the path for 5.1 from Git Bash' ($guide.Contains('env -u PSModulePath powershell.exe'))

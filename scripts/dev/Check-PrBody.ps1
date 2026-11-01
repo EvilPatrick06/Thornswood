@@ -33,7 +33,7 @@ $body = [IO.File]::ReadAllText($BodyFile)
 $problems = @(Get-PrReleaseNoteProblems $body $Author)
 if ($problems.Count) {
     foreach ($p in $problems) { Write-Host "STOP  release note: $p" }
-    Write-Host 'Edit the pull request body and this check runs again by itself. Developer-Guide.md, "Say so, then write the note", has the shape.'
+    Write-Host 'Edit the pull request body and this check runs again by itself. docs/guide/release-to-dev.md, "Say so, then write the note", has the shape.'
     exit 1
 }
 $n = Get-PrReleaseNote $body

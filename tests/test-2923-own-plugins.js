@@ -342,7 +342,7 @@ if (!listed3105 || !refused3105) {
 
 // ---------------------------------------------------------------- N
 const naming = ['tests/test-2468-last-plugin.js', 'tests/test-2551-building-holds.js', 'tests/test-516-woodworking-benches.js',
-  'tests/test-asset-provenance.js', 'docs/systems/station-placement.md', 'Developer-Guide.md'];
+  'tests/test-asset-provenance.js', 'docs/systems/station-placement.md', 'docs/guide/make-a-change.md'];
 const silent = naming.filter((f) => read(f).indexOf('Rebuild-ContentTables.ps1') < 0);
 yes('N1 the harnesses that hold a table to the plugin\'s bytes, and the docs, name the script' + (silent.length ? ' (not: ' + silent.join(', ') + ')' : ''),
     silent.length === 0);

@@ -6206,7 +6206,7 @@ function accountOfProfile(linked, pid) {
   sets the Discord role, so the role stays the one truth.
 
   The site asks Discord with the bot's own token (discord.botToken is the
-  same token as the bot's, Developer-Guide.md, the secrets table), so the
+  same token as the bot's, docs/guide/secrets.md, the secrets table), so the
   role is set by the bot's account, with the bot's Manage Roles, and Discord's
   audit log names the bot and the reason. Nothing in the game or here keeps a
   copy: the next /api/allowed reads the role back, and the game asks for that

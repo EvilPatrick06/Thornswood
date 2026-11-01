@@ -128,7 +128,8 @@ try {
     Yes 'the workflow runs on an edited body' ($wf -match 'types: \[[^\]]*\bedited\b')
     Yes 'the workflow passes the body through the environment, not into the script' ($wf -match 'PR_BODY: \$\{\{ github\.event\.pull_request\.body \}\}' -and $wf -notmatch 'run:[^\n]*github\.event\.pull_request\.body')
     Yes 'the workflow runs Check-PrBody.ps1 with a read-only token' ($wf -match 'Check-PrBody\.ps1' -and $wf -match 'contents: read' -and $wf -notmatch '(?m)^\s+[a-z-]+: write\s*$')
-    $guide = [IO.File]::ReadAllText((Join-Path $Repo 'Developer-Guide.md'))
+    . (Join-Path $PSScriptRoot 'Guide-Text.ps1')
+    $guide = Get-GuideText
     Yes 'the guide says how to write the line and how a release gathers it' ($guide -match 'Release note: none' -and $guide -match 'Collect-ReleaseNotes\.ps1')
 } finally {
     Remove-Item -Recurse -Force $temp -ErrorAction SilentlyContinue
