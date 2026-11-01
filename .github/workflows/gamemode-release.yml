@@ -1,0 +1,126 @@
+# A signed gamemode Release and a Deployment to "Dev server" for every merge
+# that changes game/gamemode.js (#5180). The box deploy agent sees the
+# Deployment within a minute, holds the Release to its signature and
+# manifest, reloads the dev server's gamemode with nobody dropped, and says
+# how it went on the Deployment. docs/DEPLOY-AGENT.md says how.
+#
+# This is the first piece of the release workflow (#5179): one Release built
+# once on GitHub from one commit, signed there, applied by the box. It carries
+# the gamemode part only, which is all the agent applies so far; #5179 adds
+# the launcher, game files and server payload to the same Release, and then
+# one Deployment says what dev should run and Record-Deployment.ps1's after
+# the fact records to Dev and Main go. Until then the agent's Deployments use
+# their own environment, "Dev server", so the two never mix.
+#
+# HOW IT IS SIGNED. In the "release" environment, main only (#3930): the
+# manifest lists gamemode.js and thornswood-build.json with their sha256, a
+# catalog over the manifest is signed with ThornswoodRelease
+# (Sign-OnRunner.ps1), and the run holds the catalog to the manifest before
+# anything is published. Releases here are immutable once published, so the
+# files are put on a draft that is published only when whole.
+#
+# Any of these Releases can also be put on dev by its tag, which is how dev
+# is rolled back: pwsh scripts/vps/Box-Run.ps1 -Line 'Deploy-Release -Tag <tag>'.
+#
+# The old way, Deploy-DevGamemode through the gate, keeps working beside this
+# until the agent has proved itself on dev. Both take the server folders'
+# turn (#3247), so they never put files in at the same time.
+name: Gamemode release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'game/gamemode.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gamemode-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Sign the gamemode and ask dev for it
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: windows-latest
+    environment: release
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      deployments: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Stamp the gamemode and write the manifest
+        id: files
+        shell: pwsh
+        run: |
+          . .\scripts\release\BuildStamp.ps1
+          $out = Join-Path $env:RUNNER_TEMP 'gamemode'
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $gm = Join-Path $out 'gamemode.js'
+          Copy-Item -LiteralPath 'game\gamemode.js' -Destination $gm
+          $stamp = Join-Path $out 'thornswood-build.json'
+          $s = Save-ThornswoodBuildStamp -Gamemode $gm -Channel dev -RepoDir . -Path $stamp
+          Write-Host (Format-ThornswoodBuildStamp $s)
+          $tag = 'build-' + (Get-Date).ToUniversalTime().ToString('yyyyMMdd') + '.' + $env:GITHUB_RUN_NUMBER
+          $rel = Join-Path $env:RUNNER_TEMP 'gamemode-release'
+          ./scripts/release/New-SignedManifest.ps1 -Out $rel -Tag $tag -Commit $env:GITHUB_SHA -Part gamemode -Files $gm, $stamp
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("tag=" + $tag)
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("dir=" + $rel)
+      - name: Sign the catalog
+        shell: pwsh
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_SIGNING_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_SIGNING_TENANT_ID }}
+          DIR: ${{ steps.files.outputs.dir }}
+        run: |
+          ./scripts/release/Sign-OnRunner.ps1 -Path (Join-Path $env:DIR 'manifest.cat')
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $st = [string](Test-FileCatalog -CatalogFilePath (Join-Path $env:DIR 'manifest.cat') -Path (Join-Path $env:DIR 'files'))
+          if ($st -ne 'Valid') { Write-Host "::error::the signed catalog does not hold manifest.json (Test-FileCatalog said $st)"; exit 1 }
+          Copy-Item -LiteralPath (Join-Path $env:DIR 'manifest.cat') -Destination (Join-Path $env:DIR 'assets\manifest.cat')
+      - name: Publish the Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.files.outputs.tag }}
+          DIR: ${{ steps.files.outputs.dir }}
+        run: |
+          $assets = Get-ChildItem -LiteralPath (Join-Path $env:DIR 'assets') -File | ForEach-Object { $_.FullName }
+          $notes = "The gamemode at $($env:GITHUB_SHA), signed with ThornswoodRelease, for the box deploy agent to put on the dev server. Not a release people install: the launcher and game files still go out with a Ship."
+          gh release create $env:TAG --draft --prerelease --target $env:GITHUB_SHA --title "Gamemode $($env:TAG)" --notes $notes --latest=false
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::the draft $($env:TAG) could not be made"; exit 1 }
+          gh release upload $env:TAG @assets
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::the files could not go on the draft $($env:TAG)"; exit 1 }
+          gh release edit $env:TAG --draft=false --prerelease --latest=false
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::the draft $($env:TAG) could not be published"; exit 1 }
+      - name: Ask the dev server for it (a Deployment to Dev server)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.files.outputs.tag }}
+        run: |
+          # required_contexts empty: this commit is on main already, past its
+          # checks, and the Deployment must not wait on whatever else runs.
+          $body = [ordered]@{
+            ref = $env:GITHUB_SHA
+            task = 'deploy'
+            environment = 'Dev server'
+            auto_merge = $false
+            required_contexts = @()
+            production_environment = $false
+            transient_environment = $false
+            payload = [ordered]@{ release = $env:TAG }
+            description = "Gamemode $($env:TAG) to the dev server"
+          }
+          $file = Join-Path $env:RUNNER_TEMP 'deployment.json'
+          [IO.File]::WriteAllText($file, ($body | ConvertTo-Json -Depth 4 -Compress))
+          $id = gh api --method POST "repos/$($env:GITHUB_REPOSITORY)/deployments" --input $file --jq .id
+          if ($LASTEXITCODE -ne 0 -or -not $id) { Write-Host '::error::GitHub made no Deployment'; exit 1 }
+          Write-Host "Deployment $id asks Dev server for $($env:TAG); the box deploy agent applies it and says how it went on it"
+          Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value "Deployment $id asks **Dev server** for **$($env:TAG)**: https://github.com/$($env:GITHUB_REPOSITORY)/deployments"
