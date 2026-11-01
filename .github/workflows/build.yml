@@ -109,6 +109,17 @@ jobs:
   # commit came from among them (pull-requests: read), so it asks on GitHub's
   # hosted Linux runner (#3551). tests\test-3182-tested-tree.js holds what
   # it accepts, and why a tree is enough is in the script's header.
+  #
+  # THE MERGE QUEUE (#5182, the redesign's part 5, decided 31 Oct 2026). A
+  # pull request's own run checks only what its change can reach, against
+  # the main it was opened on (#5183), so until the queue main built the
+  # whole gate again after every merge: 4 to 5 minutes of six Windows
+  # runners each time (run 41337524625, 1 Nov 2026). In the queue,
+  # build-pr.yml runs again on GitHub's merge of the pull request onto the
+  # newest main (the merge_group event) and runs the whole gate there,
+  # because the pick narrows only a pull_request run. That merge is what
+  # lands on main, so this job finds that run by HEAD's commit and tree and
+  # main builds nothing again.
   tested:
     name: Already tested in its pull request
     if: ${{ github.event_name == 'push' }}
@@ -715,15 +726,16 @@ jobs:
         # PSScriptAnalyzer into RUNNER_TEMP on every job and linted every
         # file, 35 s a build on average. Lint.ps1 keeps each pinned tool in
         # the runner account's own folder, named by its version, and a pull
-        # request lints only the files it changed against its base; main
-        # and a manual run lint everything, and so does the nightly. The
+        # request lints only the files it changed against its base, and so
+        # does its run in the merge queue, against the queue's base (#5182);
+        # main and a manual run lint everything, and so does the nightly. The
         # last step before the note below, because it fetches the base
         # commit: no check after it reads git history.
         continue-on-error: true
         timeout-minutes: 8
         shell: pwsh
         env:
-          BASE: ${{ github.event.pull_request.base.sha }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: |
           if ($env:BASE -match '^[0-9a-f]{40}$') {
             git fetch -q --depth=1 --no-tags origin $env:BASE
@@ -750,8 +762,10 @@ jobs:
       # October's whole allowance by 23 Oct 2026, and from then the note's
       # upload failed and took every pull request's build red. A log costs no
       # storage and is kept 90 days; scripts\dev\Tested-Tree.js reads it.
+      # In the merge queue (#5182) the checkout is the queue's own merge, the
+      # very commit that lands on main, so the note is written there too.
       - name: Write down the tree these checks passed on
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         shell: pwsh
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
