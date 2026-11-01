@@ -67,9 +67,9 @@ The launcher's code is Thornswood's own but for one file: `FromGameDeflate.cs`
 is zlib's compressor translated into C#, under zlib's licence ("zlib 1.3,
 translated into C# inside the launcher", below, which also says why the other
 launcher files that name outside work are not taken from it). Of the resources
-Build-Launcher.ps1 compiles into the launcher, everything but the WebView2 files
-and `NLayer.dll` is Thornswood's own: `ui.xaml`, `logo.png`, `logo-dev.png`, `launcher-header.jpg`,
-`launcher-header.mp4`, `app.ico`, `app-dev.ico`, `voice-host.html`,
+Build-Launcher.ps1 compiles into the launcher, everything but `NLayer.dll` is
+Thornswood's own: `ui.xaml`, `logo.png`, `logo-dev.png`, `launcher-header.jpg`,
+`launcher-header.mp4`, `app.ico`, `app-dev.ico`,
 `Thornswood.ini`, `client-build.json`, `skyrim-files.json`, the list of
 the pinned Skyrim build's own file names, sizes and SHA-1s read out of Steam's
 depot manifests (no Bethesda file is in it), `ui-gone.json`, the Daedric
@@ -86,32 +86,56 @@ pictures, the main menu backdrop's picture, the start screen's scrolls and
 the Discord pictures), under the contributor terms in `LICENSE` (Patrick,
 15 Oct 2026, #2177). `records\asset-provenance.json` has each file.
 
-## Microsoft WebView2 SDK, inside the launcher
+## Concentus, SharpSRTP and BouncyCastle, inside the launcher
 
-Three files from `launcher\lib\webview2`. Build-Launcher.ps1 references them for
-the compile and embeds them as resources. Voice.cs hands the two managed ones to
-the runtime from memory and writes `WebView2Loader.dll` beside the exe on start.
-They give the launcher the browser that voice runs in.
+Proximity voice runs in the launcher's own code since #4823 (`Voice*.cs`),
+with three libraries from nuget.org. `launcher\app\Thornswood.csproj` names
+them as package references, and Native AOT compiles their code into
+`Thornswood.exe`, so none of them is a file of its own in the install folder.
+Before #4823 voice ran in a hidden WebView2 page and the launcher carried
+three files of Microsoft's WebView2 SDK; it carries none of them now, and
+needs no WebView2 Runtime on the machine.
+
+| Package | Version | What voice uses it for | Licence | sha256 of the .nupkg |
+|---|---|---|---|---|
+| Concentus | 2.2.2 | Opus, the voice codec, written in C# | Opus's three-clause BSD licence, the package's `LICENSE` file | `f487f890bef65757af1cecf420e357f00488cbfac0b409ba461ccbceef81481f` |
+| SharpSRTP | 0.5.8 | DTLS-SRTP: the handshake that keys each call, and the SRTP that encrypts each packet | MIT | `260adb230cb403fac9b7d0aa2e68058916d709522b7690e1b655a016c6833697` |
+| BouncyCastle.Cryptography | 2.7.0 | The DTLS and cipher code SharpSRTP is built on | MIT | `f091ffccab4d03993e660bace277659a79dee0972f54d7f1f4bd46d680966241` |
+
+The build takes these assemblies out of them:
 
 | File | Where it sits in the package | sha256 |
 |---|---|---|
-| `Microsoft.Web.WebView2.Core.dll` | `lib\net462` | `88a3b62f45225a811cdb85df6dfd95c2bff9a0e43e3b04f813b125eaca56cc9f` |
-| `Microsoft.Web.WebView2.Wpf.dll` | `lib\net462` | `1c5b6c792916d168093ef9b836f33e818d2d15d0c81f0864b5cddff97d913319` |
-| `WebView2Loader.dll` | `runtimes\win-x64\native` | `462b36fd1be6ca9f7563466a89e57c41ef4a4def3e0a84fa885d203aea4a3aaf` |
+| `Concentus.dll` | `lib\net8.0` | `3a1dcfcfaf86b90fc2fb6fd0baacdf0be70efef1c9fbb59683d3bf48949de1c9` |
+| `SharpSRTP.dll` | `lib\net10.0` | `98d093b597776ab3ac0c7a78bdf2dc41a855aa2c7a96ac6c162855153b00aa21` |
+| `BouncyCastle.Cryptography.dll` | `lib\net6.0` | `ef92fc661e8d7ba8ec4d39a7cdfcdba41f14cb327f0d24fe79d0b5bb428899b5` |
 
-Version 1.0.2903.40, the file version all three carry. All three are byte for
-byte the same files as in Microsoft.Web.WebView2 1.0.2903.40 as nuget.org
-serves it, downloaded and compared on 24 September.
+Downloaded from nuget.org and read on 1 November 2026. Their sources, as each
+nuspec names them:
 
-Licence: the package's own `LICENSE.txt`, which its nuspec names as the licence
-(`<license type="file">LICENSE.txt</license>`). It is a three-clause BSD-style
-licence from Microsoft, and the package gives no SPDX identifier for it. Its
-second clause asks for the notice to go with every binary copy, so it is
-reproduced in full at the end of this file and on the public credits page.
+- Concentus, by Logan Stromberg, a C# translation of the Opus reference
+  library by Xiph.Org and the Opus contributors:
+  https://github.com/lostromb/concentus at commit `6c2328dc` (in full,
+  `6c2328dc19044601e33a9c11628b8d60e1f3011c`). The package carries only the
+  C# code; the native Opus builds its repository mentions are not in it, and
+  `VoicePeer.cs` and `VoiceSession.cs` turn off Concentus's search for a
+  native Opus on the machine, so the launcher runs no Opus but this one.
+- SharpSRTP, by Lukas Volf: https://github.com/jimm98y/SharpSRTP at commit
+  `ede1d045` (in full, `ede1d04552d4069ad3d28ac2e22b3c224ded97f8`).
+- BouncyCastle.Cryptography, by the Legion of the Bouncy Castle:
+  https://github.com/bcgit/bc-csharp at commit `4007498b` (in full,
+  `4007498b13582d90ee1eda5d9920c324428b98b3`). SharpSRTP asks for 2.6.2 or
+  later; the launcher names 2.7.0, the newest, itself.
 
-Not shipped by Thornswood: the WebView2 Runtime itself. When a machine has
-none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
-(Voice.cs) and runs it, under Microsoft's terms.
+Concentus also names `System.Memory` and `System.Numerics.Vectors` from
+nuget.org; both are part of .NET 10 itself, so nothing from those packages
+goes into the launcher.
+
+Licences: Concentus's `LICENSE` is the Opus licence, three-clause BSD, and
+its second clause asks for the notice to go with every binary copy.
+SharpSRTP and BouncyCastle are MIT, which asks for the notice in all copies.
+So all three are reproduced in full at the end of this file and on the public
+credits page, and the installer puts each beside `SOURCE CODE.txt`.
 
 ## NLayer, inside the launcher
 
@@ -119,8 +143,7 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 its menu theme with (MenuMusic.cs, since #3207, so the theme plays from the
 launcher's own process and the Windows Volume Mixer lists it as the launcher).
 Build-Launcher.ps1 references it for the compile and embeds it as a resource,
-and MenuMusic.cs hands it to the runtime from memory, the same way as the two
-managed WebView2 files.
+and MenuMusic.cs hands it to the runtime from memory.
 
 | File | Where it sits in the package | sha256 |
 |---|---|---|
@@ -1154,7 +1177,6 @@ the copy the project's own Google Fonts folder keeps with its copyright line:
   whose page says no (#3649).
 - SKSE, which is in the collection, and Skyrim Special Edition, which each
   person owns.
-- The WebView2 Runtime, which comes from Microsoft.
 - texconv, the tool the main menu picture is built with (next section).
 - Bethesda's five master files, which the fork's build downloads to run its
   unit tests (the section after texconv's).
@@ -1377,9 +1399,12 @@ and since 1.0.1 it needs none: nothing in that version is built from the
 fork.
 
 The GPL and AGPL texts go with the files they cover. The installer hands
-`GPL-3.0.txt`, `AGPL-3.0.txt` and `WebView2-LICENSE.txt` into the install
-folder beside `SOURCE CODE.txt` (Package-Thornswood.ps1 stages them from
-`installer\licences`, Setup copies them, Uninstall removes them). The update
+`GPL-3.0.txt` and `AGPL-3.0.txt` into the install folder beside
+`SOURCE CODE.txt`, and with them `Concentus-LICENSE.txt`,
+`SharpSRTP-LICENSE.txt` and `BouncyCastle-LICENSE.txt`, the notices of the
+three voice libraries compiled into the launcher (Package-Thornswood.ps1
+stages them from `installer\licences`, Setup copies them, Uninstall removes
+them). The update
 feed's client runtime zip and every pack that carries a SkyMP file hand the
 GPL and AGPL texts with a note naming the recorded commit (Source-Notice.ps1).
 Updates stopped going to GitHub release pages on 28 September (#907); the
@@ -1426,39 +1451,101 @@ beside its `___systemPolyfill.js`.
   and grant no right to hand any of the three on, so since #2827 none ships:
   the launcher makes them from each person's own game.
 
-## Microsoft WebView2 SDK licence
+## Concentus licence
 
-The text of `LICENSE.txt` in Microsoft.Web.WebView2 1.0.2903.40, as the package
+The text of `LICENSE` in Concentus 2.2.2, as the package carries it (the same
+file as in https://github.com/lostromb/concentus at commit `6c2328dc`).
+
+```
+Copyright (c) by various holding parties, including (but not limited to): 
+Skype Limited, Xiph.Org Foundation, CSIRO, Microsoft Corporation,
+Jean-Marc Valin, Gregory Maxwell, Mark Borgerding, Timothy B. Terriberry,
+Logan Stromberg. All rights are reserved by their respective holders.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+* Neither the name of Internet Society, IETF or IETF Trust, nor the
+   names of specific contributors, may be used to endorse or promote
+   products derived from this software without specific prior written
+   permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+This repository and its redistributable packages contain independently compiled
+versions of the Opus C reference library, which is maintained by Xiph.org and the
+Opus open-source contributors. The source code for these libraries is freely available
+at https://gitlab.xiph.org/xiph/opus/-/tags/v1.5.2, and all binaries are being
+redistributed to you under the same terms of the general Opus license dictated above.
+```
+
+## SharpSRTP licence
+
+The text of `LICENSE` in https://github.com/jimm98y/SharpSRTP at commit
+`ede1d045`, the commit SharpSRTP 0.5.8's nuspec names.
+
+```
+MIT License
+
+Copyright (c) 2025 Lukas Volf
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## BouncyCastle licence
+
+The text of `LICENSE.md` in BouncyCastle.Cryptography 2.7.0, as the package
 carries it.
 
 ```
-Copyright (C) Microsoft Corporation. All rights reserved.
+MIT License (https://opensource.org/licenses/MIT)
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are
-met:
+Copyright (c) 2000-2026 The Legion of the Bouncy Castle Inc. (https://www.bouncycastle.org).
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction,
+including without limitation the rights to use, copy, modify, merge, publish, distribute,
+sub license, and/or sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions: The above copyright notice and this
+permission notice shall be included in all copies or substantial portions of the Software.
 
-   * Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-   * Redistributions in binary form must reproduce the above
-copyright notice, this list of conditions and the following disclaimer
-in the documentation and/or other materials provided with the
-distribution.
-   * The name of Microsoft Corporation, or the names of its contributors
-may not be used to endorse or promote products derived from this
-software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+**THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
+OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.**
 ```
 
 ## NLayer licence

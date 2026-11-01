@@ -729,8 +729,9 @@ if ((Test-Path $appliedSrc) -and -not (Test-Path $appliedDst)) {
 $srcNote = Join-Path $Here 'SOURCE CODE.txt'
 if (Test-Path -LiteralPath $srcNote) { Copy-Item -LiteralPath $srcNote -Destination $Root -Force }
 
-# Full GPL / AGPL / WebView2 texts Package staged beside SOURCE CODE.txt (#421).
-foreach ($lic in @('GPL-3.0.txt', 'AGPL-3.0.txt', 'WebView2-LICENSE.txt')) {
+# Full GPL / AGPL texts and the voice libraries' notices Package staged beside
+# SOURCE CODE.txt (#421, #4823).
+foreach ($lic in @('GPL-3.0.txt', 'AGPL-3.0.txt', 'Concentus-LICENSE.txt', 'SharpSRTP-LICENSE.txt', 'BouncyCastle-LICENSE.txt')) {
     $from = Join-Path $Here $lic
     if (Test-Path -LiteralPath $from) { Copy-Item -LiteralPath $from -Destination $Root -Force }
 }

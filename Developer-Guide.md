@@ -2875,7 +2875,6 @@ Open these in Visual Studio Code. `Ctrl+P`, then the file name.
 | [site/public/home.html](site/public/home.html) | The public page at https://thornswood.net |
 | [site/public/index.html](site/public/index.html) | The staff hub at https://thornswood.net/hub |
 | [game/ui/index.html](game/ui/index.html) | The page Skyrim Platform opens over the game |
-| [launcher/voice-host.html](launcher/voice-host.html) | The voice page, which the launcher hosts |
 
 In `home.html`, the `<title>` is the tab name. Two `<link>` tags pull in the stylesheets, `fonts.css` and `home.css`. The page loads nothing from another site. Keep it that way: a test fails if a `src`, a `url()`, or a stylesheet link points anywhere else.
 

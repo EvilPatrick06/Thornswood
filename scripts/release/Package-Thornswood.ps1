@@ -964,9 +964,11 @@ function Get-SourceNotice([string]$ClientRecord, [string]$ServerRecord, [string]
     $lines += @(
         '',
         'The full licence texts sit beside this note in the install folder:',
-        '  GPL-3.0.txt             GNU GPL version 3 (skymp5-client, skyrim-platform, skymp5-front)',
-        '  AGPL-3.0.txt            GNU AGPL version 3 (MpClientPlugin.dll, the server)',
-        '  WebView2-LICENSE.txt    Microsoft WebView2 SDK (inside the launcher)',
+        '  GPL-3.0.txt               GNU GPL version 3 (skymp5-client, skyrim-platform, skymp5-front)',
+        '  AGPL-3.0.txt              GNU AGPL version 3 (MpClientPlugin.dll, the server)',
+        '  Concentus-LICENSE.txt     Concentus, the Opus codec (inside the launcher, for voice)',
+        '  SharpSRTP-LICENSE.txt     SharpSRTP, which encrypts voice (inside the launcher)',
+        '  BouncyCastle-LICENSE.txt  BouncyCastle, the cryptography under SharpSRTP (inside the launcher)',
         ''
     ) + (Get-ClientLicenceLines $Licences) + @(
         'The launcher''s updates can bring newer builds of these files, so this note',
@@ -1010,18 +1012,19 @@ try {
     Die ("SOURCE CODE.txt could not be written: " + $_.Exception.Message + ". This installer carries SkyMP's GPL and AGPL files and has to say where their source is.")
 }
 
-# Full GPL / AGPL / WebView2 texts next to SOURCE CODE.txt (issue #421). Vendored
-# under installer\licences from the recorded fork commit and THIRD-PARTY.md, so a
-# machine without the engine submodule still ships the same bytes.
+# Full GPL / AGPL texts next to SOURCE CODE.txt (issue #421), and the notices of
+# the three voice libraries compiled into the launcher (#4823). Vendored under
+# installer\licences from the recorded fork commit and the libraries' packages, so
+# a machine without the engine submodule still ships the same bytes.
 $licenceSrc = Join-Path $PSScriptRoot '..\..\installer\licences'
-foreach ($lic in @('GPL-3.0.txt', 'AGPL-3.0.txt', 'WebView2-LICENSE.txt')) {
+foreach ($lic in @('GPL-3.0.txt', 'AGPL-3.0.txt', 'Concentus-LICENSE.txt', 'SharpSRTP-LICENSE.txt', 'BouncyCastle-LICENSE.txt')) {
     $from = Join-Path $licenceSrc $lic
     if (-not (Test-Path -LiteralPath $from)) {
-        Die ("installer\licences\$lic is missing. The installer has to hand the GPL, AGPL and WebView2 texts with the files (#421).")
+        Die ("installer\licences\$lic is missing. The installer has to hand the GPL and AGPL texts and the voice libraries' notices with the files (#421, #4823).")
     }
     Copy-ThornswoodShippedFile $from (Join-Path $stage $lic)
 }
-Say '  GPL-3.0.txt, AGPL-3.0.txt and WebView2-LICENSE.txt staged beside SOURCE CODE.txt' 'Green'
+Say '  GPL-3.0.txt, AGPL-3.0.txt and the Concentus, SharpSRTP and BouncyCastle licences staged beside SOURCE CODE.txt' 'Green'
 
 $cfgSrc = Join-Path $Root 'config.json'
 if (Test-Path $cfgSrc) { Copy-Item $cfgSrc $stage -Force }

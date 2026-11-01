@@ -78,15 +78,7 @@
     <Reference Include="System.Xaml" />
     <Reference Include="System.Windows.Forms" />
     <!-- Compiled against, never loaded: nothing this program runs reaches the
-         window, its browser or its menu music. -->
-    <Reference Include="Microsoft.Web.WebView2.Core">
-      <HintPath>$(ThornswoodRepo)launcher\lib\webview2\Microsoft.Web.WebView2.Core.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="Microsoft.Web.WebView2.Wpf">
-      <HintPath>$(ThornswoodRepo)launcher\lib\webview2\Microsoft.Web.WebView2.Wpf.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
+         window or its menu music. -->
     <Reference Include="NLayer">
       <HintPath>$(ThornswoodRepo)launcher\lib\nlayer\NLayer.dll</HintPath>
       <Private>false</Private>
