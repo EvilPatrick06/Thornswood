@@ -119,6 +119,13 @@ function github(o) {
       return answer(200, [{ id: 201, name: 'Status', data_type: 'single_select', options: ['Todo', 'In Progress', 'Done'].map((n, i) => OPT('o' + i, n)) }].concat(o.oldOrder === false ? [] : [{ id: 202, name: 'Order', data_type: 'number' }]));
     }
     if (/^users\/EvilPatrick06\/projectsV2\/1\/items\?fields=202&per_page=100$/.test(p)) { return answer(200, o.oldItems || []); }
+    // This board's cards, two a page, the way GitHub pages them.
+    if ((m = /^orgs\/ThornswoodRP\/projectsV2\/7\/items\?fields=102&per_page=100(&page=(\d+))?$/.exec(p))) {
+      const page = Number(m[2] || 1);
+      const all = o.newItems || [];
+      const next = page * 2 < all.length ? '<https://api.github.com/orgs/ThornswoodRP/projectsV2/7/items?fields=102&per_page=100&page=' + (page + 1) + '>; rel="next"' : '';
+      return answer(200, all.slice((page - 1) * 2, page * 2), next);
+    }
     if (p === 'orgs/ThornswoodRP/projectsV2/7') { return answer(200, { id: 7, number: 7, node_id: 'PVT_7' }); }
     if (p === 'users/EvilPatrick06/projectsV2/1') { return answer(200, { id: 1, number: 1, node_id: 'PVT_old' }); }
     // GitHub's REST add refuses an issue already on the board (422) and
@@ -242,16 +249,29 @@ const cardAdd = (w, n) => w.find(x => x.method === 'POST' && x.path === 'graphql
   const oldItems = [oldItem(10, 52.5), oldItem(11, null), oldItem(12, 7, 'https://api.github.com/repos/ThornswoodRP/Thornswood-Ops'), oldItem(13, 8, null, 'PullRequest'), oldItem(14, 3)];
   r = await go(['--copy-order', 'EvilPatrick06/1'], { oldItems: oldItems });
   yes('copy-order: each issue of this repository with an Order on the old board gets it here: ' + r.lines[0], r.code === 0 &&
-      /5 cards on EvilPatrick06\/1, 2 issues/.test(r.lines[0]) &&
+      /^2 issues of ThornswoodRP\/Thornswood with an Order on EvilPatrick06\/1; 0 already hold it here, 0 have a card here to set, 2 have no card here yet$/.test(r.lines[0]) &&
       JSON.stringify(fieldWrite(r.writes, 10).body.fields) === JSON.stringify([{ id: 102, value: 52.5 }]) &&
       JSON.stringify(fieldWrite(r.writes, 14).body.fields) === JSON.stringify([{ id: 102, value: 3 }]) &&
-      ![11, 12, 13].some(n => fieldWrite(r.writes, n)));
-  yes('  through the add that gives back a card already there', !restAdd(r.writes) && cardAdd(r.writes, 10) && cardAdd(r.writes, 14));
-  r = await go(['--copy-order', 'EvilPatrick06/1'], { oldItems: oldItems, onBoard: [10, 14], issues: { 14: issue(14) } });
-  yes('  cards already on this board get their Order, nothing added and no failure', r.code === 0 && r.added.length === 0 &&
-      fieldWrite(r.writes, 10).body.fields[0].value === 52.5 && fieldWrite(r.writes, 14).body.fields[0].value === 3);
-  r = await go(['--copy-order', 'EvilPatrick06/1', '--dry-run'], { oldItems: oldItems });
-  yes('  a dry run says each and writes nothing', r.code === 0 && r.writes.length === 0 && /#10: Order 52\.5; nothing written/.test(r.out));
+      ![11, 12, 13].some(n => fieldWrite(r.writes, n)) && /^2 Orders written/.test(r.lines[r.lines.length - 1]));
+  yes('  a card it has to add goes through the add that gives back one already there, never REST\'s add', !restAdd(r.writes) && cardAdd(r.writes, 10) && cardAdd(r.writes, 14));
+  // The board as the first copy left it (1 Nov): #10 already right, #14 on
+  // the board with no Order, #15 with another Order, #16 not on it yet, and
+  // an Ops issue with the same number that is not this repository's.
+  const old2 = oldItems.concat([oldItem(15, 9), oldItem(16, 4)]);
+  const newItem = (n, order, repoUrl) => ({ id: 9000 + n, content_type: 'Issue', content: { number: n, node_id: 'I_' + n, repository_url: repoUrl || 'https://api.github.com/repos/ThornswoodRP/Thornswood' }, fields: [{ id: 102, name: 'Order', value: order }] });
+  const partly = [newItem(10, 52.5), newItem(14, null), newItem(15, 10015), newItem(16, 1, 'https://api.github.com/repos/ThornswoodRP/Thornswood-Ops')];
+  r = await go(['--copy-order', 'EvilPatrick06/1'], { oldItems: old2, newItems: partly, onBoard: [10, 14, 15] });
+  yes('a rerun after a partial copy: cards already here keep their id and get the Order, only a missing one is added: ' + r.lines[0], r.code === 0 &&
+      /4 issues .*; 1 already hold it here, 2 have a card here to set, 1 have no card here yet$/.test(r.lines[0]) &&
+      !restAdd(r.writes) && !cardAdd(r.writes, 14) && !cardAdd(r.writes, 15) && cardAdd(r.writes, 16) && same(r.added, [16]) &&
+      fieldWrite(r.writes, 14).body.fields[0].value === 3 && fieldWrite(r.writes, 15).body.fields[0].value === 9 && fieldWrite(r.writes, 16).body.fields[0].value === 4);
+  yes('  an Order already the same is not written again, and each line says what it was', !fieldWrite(r.writes, 10) &&
+      /#14: Order 3 \(it had none\)/.test(r.out) && /#15: Order 9 \(it had 10015\)/.test(r.out) && /#16: Order 4 \(card added\)/.test(r.out) && /^3 Orders written/.test(r.lines[r.lines.length - 1]));
+  r = await go(['--copy-order', 'EvilPatrick06/1'], { oldItems: old2, newItems: [newItem(10, 52.5), newItem(14, 3), newItem(15, 9), newItem(16, 4)] });
+  yes('  run again once all is copied: nothing written, exit 0', r.code === 0 && r.writes.length === 0 && /4 already hold it here/.test(r.lines[0]));
+  r = await go(['--copy-order', 'EvilPatrick06/1', '--dry-run'], { oldItems: old2, newItems: partly });
+  yes('  a dry run says each it would write and writes nothing', r.code === 0 && r.writes.length === 0 &&
+      /#14: Order 3 \(it had none\); nothing written/.test(r.out) && /#16: Order 4 \(card added\); nothing written/.test(r.out) && !/#10:/.test(r.out));
   r = await go(['--copy-order', 'EvilPatrick06/1'], { oldItems: oldItems, order: false });
   yes('  no Order field here yet: stopped, nothing written', r.code === 1 && r.writes.length === 0 && /no Order field yet/.test(r.out));
   r = await go(['--copy-order', 'EvilPatrick06/1'], { oldItems: oldItems, oldOrder: false });
