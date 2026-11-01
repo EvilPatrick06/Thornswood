@@ -30,6 +30,7 @@ It looks after the **dev server only** and applies **the gamemode only**.
 | Main | Not yet. Main waits on a Main environment that only Patrick can approve (#5181). The agent refuses any environment but dev. |
 | Bot, site | Not yet. Their own slices. |
 | Launcher and game files | Not the agent's job: they reach people through the launcher's feed and a Ship. The release workflow (#5179) moves them onto Releases. |
+| Bot pass before each dev Deployment | Once `Install-DeployAgent` has set up its task, every Deployment waits on a bot pass on a throwaway copy of dev with the new gamemode (#5196, below). A FAIL fails the Deployment and dev keeps what it runs. A deploy by tag (the gate's `Deploy-Release`, a rollback) does not wait on one. |
 | Parity check after a deploy | Not yet. The agent is to run `Check-ProdParity.ps1` after each deploy and file what differs as an issue, never putting it back by itself. That needs the parity scripts on the box from a signed Release, and the App to hold Issues write; until then the `Check-ProdParity` gate verb runs it. |
 
 The old way keeps working beside the agent until the agent has proved itself
@@ -100,6 +101,67 @@ When several Deployments are waiting, only the newest is applied, and the
 older ones are marked inactive. The newest is the state dev should be in, and
 putting in the ones before it first would only put in what is about to be
 replaced.
+
+## The bot pass before each dev Deployment
+
+Issue #5196. Between holding the Release to its signature (step 3 above)
+and putting the gamemode in (step 4), the agent checks the new gamemode on
+a copy of dev that nobody plays on:
+
+1. It takes the server folders' turn and makes the copy in
+   `C:\Thornswood-BotPass\run\server`: dev's engine (`dist_back`,
+   `scam_native.node`, `package.json`, any DLL beside it), the Release's
+   `gamemode.js` and stamp, and dev's data folder without its plugins and
+   archives. Those are read where the bot pass keeps them,
+   `C:\Thornswood-BotPass\plugins`, copied from dev's only when one
+   changes, by their full paths. Dev's world, its `private` folder (the
+   door and the join pass key), its logs and deploy records never go in. The
+   world starts empty.
+2. The copy's settings are dev's with what reaches outside taken out
+   (`discordAuth`, `metricsAuth`, `masterKey`, `additionalServerSettings`):
+   no master server, offline login, no join pass hold, a password of its
+   own, the name with " (bot pass)" on the end, and a game port from 7900
+   that no server's settings name and nothing holds now, with its
+   resources port beside it and a voice port above.
+3. It starts the task **Thornswood Bot Pass**, which runs
+   [Bot-Pass.js](../scripts/bot/Bot-Pass.js) from the same Release. The
+   task runs as LOCAL SERVICE, Limited, with a SID of its own and rights in
+   `C:\Thornswood-BotPass` only, at below normal priority, the way the game
+   servers run (ServiceAccount.ps1). The agent never runs node or loads the
+   engine itself; it reads the result the task writes.
+4. Bot-Pass.js starts the copy, waits for it to say this gamemode loaded,
+   and has a bot log in the way the game does as a profile nobody has. It
+   checks, a line each: **loads**, **login**, **new** (the race menu is
+   open), **face** (a face is sent, the race menu closes and the plain
+   clothes arrive), **saved** (the world on disk holds the character by
+   name), **restart** (the copy is stopped and started again and loads
+   again) and **loads back** (a second bot logs in as the same profile and
+   gets the same character, where it was saved, with no race menu).
+5. Every line goes in the Deployment's log. All PASS and the gamemode goes
+   in as below. One FAIL, a pass that does not end within 30 minutes
+   (`botPassSeconds`), or no result, and the Deployment says **failure**
+   with the step and why, and dev is not touched. The copy is left until the
+   next pass, with its own server log at
+   `C:\Thornswood-BotPass\run\server\bot-pass-server.log`;
+   `Install-DeployAgent -Status` prints the last pass.
+
+The bot pass rides in the gamemode Release as a part of its own, `bot`
+(gamemode-release.yml, `New-SignedManifest.ps1 -BotFiles`), so the bot that
+checks a gamemode comes from the same commit and is signed with it. A change
+to the bot alone makes a Release too.
+
+Setting it up is part of `Install-DeployAgent`: the fail-safe on what no
+service may read comes first, the task is registered on LOCAL SERVICE and
+given its folder, and only then does `agent.json` name the folder
+(`botPassRoot`). It is never put on SYSTEM: when any of that cannot be
+done, the install says `BOT PASS NOT SET UP` and why, and Deployments go in
+without a pass, each log saying so.
+`pwsh scripts/vps/Box-Run.ps1 -Line 'Install-DeployAgent -NoBotPass'` takes
+it off.
+
+What the bot cannot reach yet: stations, claims and keys, needs, merchants
+and jail go over the voice relay, which the copy does not start, so they
+wait on a relay client for the bot (#5196).
 
 ## Why "Dev server" and not "Dev"
 

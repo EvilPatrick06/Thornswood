@@ -575,6 +575,231 @@ public sealed class AgentTests : IDisposable
         var d = JsonNode.Parse(bodies[0])!["description"]!.GetValue<string>();
         Assert.Equal(140, d.Length);
     }
+    // ---- the bot pass (#5196) --------------------------------------------------
+
+    static readonly Dictionary<string, byte[]> BotPart = new()
+    {
+        ["Bot-Pass.js"] = B("// the pass"), ["bot.js"] = B("// the bot"), ["character.js"] = B("// the character"),
+    };
+
+    static void BotRelease(FakeGitHub gh, string tag, string body, bool withBot = true)
+    {
+        var parts = new Dictionary<string, Dictionary<string, byte[]>>
+        {
+            ["gamemode"] = new() { ["gamemode.js"] = B(body), ["thornswood-build.json"] = B("{\"commit\":\"new\"}") },
+        };
+        if (withBot) parts["bot"] = BotPart;
+        gh.AddRelease(tag, ReleaseFiles(tag, Commit, "", parts));
+    }
+
+    /// <summary>A dev folder the way the box has one: an engine, settings
+    /// with a load order, secrets and ports, a data folder with plugins and an
+    /// archive, a world and a private folder that must never be copied.</summary>
+    (Agent a, FakeGitHub gh, FakeServer s, BotPass bp) MakeWithPass(Func<BotPass, string?> work)
+    {
+        var (a, gh, s, server, cfg) = Make();
+        var env = cfg.Environments["dev"];
+        env.BotPassRoot = Temp();
+        env.BotPassSeconds = 5;
+        Directory.CreateDirectory(Path.Combine(env.BotPassRoot, "run"));
+        File.WriteAllText(Path.Combine(s.Root, "scam_native.node"), "the engine");
+        File.WriteAllText(Path.Combine(s.Root, "server-settings.json"), """
+            {"port":7787,"thornswoodVoicePort":7789,"dataDir":"data","name":"Thornswood Dev","password":"dev-secret-pw",
+             "loadOrder":["Skyrim.esm","Thornswood.esp"],"archives":["Thornswood.bsa"],
+             "discordAuth":{"botToken":"SECRET-TOKEN"},"masterKey":"SECRET-KEY","metricsAuth":{"user":"u","password":"SECRET-METRICS"},
+             "additionalServerSettings":[{"type":"github","repo":"x"}],"thornswoodRequirePass":true,"offlineMode":false,
+             "startPoints":[{"pos":[1,2,3],"worldOrCell":"0x3c","angleZ":0}]}
+            """);
+        foreach (var n in new[] { "Skyrim.esm", "Thornswood.esp", "Thornswood.bsa", "Unused.esp" })
+            File.WriteAllText(Path.Combine(s.Root, "data", n), "plugin " + n);
+        Directory.CreateDirectory(Path.Combine(s.Root, "data", "scripts"));
+        File.WriteAllText(Path.Combine(s.Root, "data", "scripts", "ActiveMagicEffect.pex"), "pex");
+        File.WriteAllText(Path.Combine(s.Root, "data", "manifest.json"), "{}");
+        File.WriteAllText(Path.Combine(s.Root, "data", "thornswood-deploy.json"), "{}");
+        Directory.CreateDirectory(Path.Combine(s.Root, "private"));
+        File.WriteAllText(Path.Combine(s.Root, "private", "door.json"), "{\"passKey\":\"SECRET-DOOR\"}");
+        Directory.CreateDirectory(Path.Combine(s.Root, "world", "changeForms"));
+        File.WriteAllText(Path.Combine(s.Root, "world", "changeForms", "1.json"), "{\"profileId\":5}");
+        BotPass? made = null;
+        var tasks = new FakeTasks(() => work(made!));
+        var bp = made = new BotPass(env, tasks) { Tick = TimeSpan.FromMilliseconds(20), InUse = () => (new() { 7900 }, new() { 7904 }) };
+        a.Tasks = tasks;
+        a.MakeBotPass = _ => bp;
+        return (a, gh, s, bp);
+    }
+
+    static string? WriteResult(BotPass bp, bool ok, string failAt = "")
+    {
+        var lines = new[] { "loads", "login", "new", "face", "saved", "restart", "loads back" }
+            .Select(st => new JsonObject { ["step"] = st, ["ok"] = st != failAt, ["detail"] = st == failAt ? "it went wrong at 10.0.0.5:7901" : "fine" });
+        var doc = new JsonObject { ["schema"] = 1, ["ok"] = ok, ["lines"] = new JsonArray(lines.ToArray<JsonNode>()), ["tail"] = new JsonArray("the server said 10.0.0.5") };
+        File.WriteAllText(bp.ResultPath, doc.ToJsonString());
+        return null;
+    }
+
+    [Fact]
+    public async Task ADeploymentWaitsOnTheBotPassAndGoesInWhenItPasses()
+    {
+        JsonObject? seen = null;
+        string? copyTree = null;
+        var (a, gh, s, bp) = MakeWithPass(bp =>
+        {
+            seen = JsonNode.Parse(File.ReadAllText(Path.Combine(bp.ServerDir, "server-settings.json")))!.AsObject();
+            copyTree = string.Join("\n", Directory.GetFiles(bp.RunDir, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(bp.RunDir, f).Replace('\\', '/')).Order(StringComparer.Ordinal));
+            return WriteResult(bp, true);
+        });
+        BotRelease(gh, "build-1", "// new gamemode\n");
+        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        Assert.Equal("in_progress,success", string.Join(",", gh.States(id)));
+        Assert.Equal("// new gamemode\n", s.Read("gamemode.js"));
+        Assert.Contains("bot pass: 7 of 7 passed", s.Read(Path.Combine("data", $"deploy-{id}.log")));
+
+        // The copy: the new gamemode and the engine, the bot, dev's data
+        // without its game files, nothing private, no world.
+        Assert.NotNull(copyTree);
+        Assert.Equal(string.Join("\n", new[] {
+            "bot/Bot-Pass.js", "bot/bot.js", "bot/character.js",
+            "server/data/scripts/ActiveMagicEffect.pex", "server/dist_back/skymp5-server.js",
+            "server/gamemode.js", "server/scam_native.node", "server/server-settings.json", "server/thornswood-build.json",
+        }.Order(StringComparer.Ordinal)), copyTree);
+        Assert.Equal("// new gamemode\n", File.ReadAllText(Path.Combine(bp.ServerDir, "gamemode.js")));
+
+        // Its settings: its own ports, offline, no hold, no secrets, game files by full path.
+        var st = seen!;
+        Assert.Equal(7901, st["port"]!.GetValue<int>());
+        Assert.Equal(7903, st["thornswoodVoicePort"]!.GetValue<int>());
+        Assert.False(st["thornswoodRequirePass"]!.GetValue<bool>());
+        Assert.True(st["offlineMode"]!.GetValue<bool>());
+        Assert.Equal("", st["master"]!.GetValue<string>());
+        Assert.Equal("Thornswood Dev (bot pass)", st["name"]!.GetValue<string>());
+        Assert.NotEqual("dev-secret-pw", st["password"]!.GetValue<string>());
+        Assert.Equal(("data", "private", "file", "world"), (st["dataDir"]!.GetValue<string>(), st["privDir"]!.GetValue<string>(), st["databaseDriver"]!.GetValue<string>(), st["databaseName"]!.GetValue<string>()));
+        foreach (var k in BotPass.Dropped) Assert.False(st.ContainsKey(k), k + " was copied");
+        Assert.DoesNotContain("SECRET", st.ToJsonString());
+        Assert.Equal(new[] { Path.Combine(bp.PluginDir, "Skyrim.esm"), Path.Combine(bp.PluginDir, "Thornswood.esp") }, st["loadOrder"]!.AsArray().Select(x => x!.GetValue<string>()));
+        Assert.Equal(Path.Combine(bp.PluginDir, "Thornswood.bsa"), st["archives"]![0]!.GetValue<string>());
+        Assert.False(File.Exists(Path.Combine(bp.PluginDir, "Unused.esp")), "a plugin dev does not load was copied");
+        // Dev's own folder is as it was.
+        Assert.Contains("SECRET-DOOR", s.Read(Path.Combine("private", "door.json")));
+        Assert.Contains("dev-secret-pw", s.Read("server-settings.json"));
+    }
+
+    [Theory]
+    [InlineData("face", "the bot pass failed at face: it went wrong at")]
+    [InlineData("hang", "the bot pass did not end within 5 s")]
+    [InlineData("nothing", "it wrote no result.json")]
+    [InlineData("nobot", "carries no bot")]
+    public async Task AFailedBotPassLeavesDevAsItWas(string how, string want)
+    {
+        var (a, gh, s, bp) = MakeWithPass(bp => how switch
+        {
+            "hang" => "hang",
+            "nothing" => null,
+            _ => WriteResult(bp, false, how),
+        });
+        BotRelease(gh, "build-1", "// new gamemode\n", withBot: how != "nobot");
+        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        var last = gh.Last(id)!;
+        Assert.Equal("failure", (string)last["state"]!);
+        Assert.Contains(want, (string)last["description"]!);
+        Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
+        Assert.Empty(Directory.GetDirectories(s.Root, ".prev-*"));
+        var log = s.Read(Path.Combine("data", $"deploy-{id}.log"));
+        Assert.DoesNotContain("10.0.0.5", log);
+        if (how == "hang") Assert.Equal(1, ((FakeTasks)a.Tasks).Ends);
+        if (how == "face") Assert.Contains("FAIL  face", log);
+    }
+
+    [Fact]
+    public async Task TheGateVerbDoesNotWaitOnABotPass()
+    {
+        var (a, gh, s, _) = MakeWithPass(bp => throw new InvalidOperationException("a rollback started a bot pass"));
+        BotRelease(gh, "build-1", "// rolled back\n", withBot: false);
+        Assert.Equal("success", (await a.DeployTag("dev", "build-1", default)).State);
+        Assert.Equal("// rolled back\n", s.Read("gamemode.js"));
+        Assert.Equal(0, ((FakeTasks)a.Tasks).Starts);
+    }
+
+    [Fact]
+    public async Task WithNoBotPassSetUpADeploymentGoesInAndSaysSo()
+    {
+        var (a, gh, s, _, _) = Make();
+        GamemodeRelease(gh, "build-1", "// new gamemode\n");
+        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        Assert.Equal("success", (string)gh.Last(id)!["state"]!);
+        Assert.Contains("no bot pass: it is not set up on this box yet", s.Read(Path.Combine("data", $"deploy-{id}.log")));
+    }
+
+    [Fact]
+    public void ThePluginsAreCopiedOnlyWhenTheyChange()
+    {
+        var (_, _, s, bp) = MakeWithPass(_ => null);
+        var files = new Dictionary<string, string>();
+        var dir = Temp();
+        foreach (var (n, b) in BotPart.Concat(new Dictionary<string, byte[]> { ["gamemode.js"] = B("// g"), ["thornswood-build.json"] = B("{}") }))
+        {
+            files[n] = Path.Combine(dir, n);
+            File.WriteAllBytes(files[n], b);
+        }
+        var said = new List<string>();
+        Assert.Equal("", bp.Prepare(files, said.Add));
+        Assert.Contains(said, l => l.Contains("3 were new or changed on dev"));
+        said.Clear();
+        Assert.Equal("", bp.Prepare(files, said.Add));
+        Assert.Contains(said, l => l.Contains("0 were new or changed on dev"));
+        File.WriteAllText(Path.Combine(s.Root, "data", "Thornswood.esp"), "plugin Thornswood.esp, changed");
+        said.Clear();
+        Assert.Equal("", bp.Prepare(files, said.Add));
+        Assert.Contains(said, l => l.Contains("1 were new or changed on dev"));
+        Assert.Equal("plugin Thornswood.esp, changed", File.ReadAllText(Path.Combine(bp.PluginDir, "Thornswood.esp")));
+        // A load order naming a file that is not there stops the copy.
+        File.Delete(Path.Combine(s.Root, "data", "Skyrim.esm"));
+        Assert.Throws<InvalidDataException>(() => bp.Prepare(files, said.Add));
+    }
+
+    [Fact]
+    public void ABotPassFolderMustBeAFullPathAndNotTheServers()
+    {
+        var p = Path.Combine(Temp(), "agent.json");
+        foreach (var bad in new[]
+        {
+            "{\"repo\":\"O/R\",\"environments\":{\"dev\":{\"botPassRoot\":\"relative\"}}}",
+            "{\"repo\":\"O/R\",\"environments\":{\"dev\":{\"botPassRoot\":\"C:\\\\Thornswood-Server-Dev\"}}}",
+            "{\"repo\":\"O/R\",\"environments\":{\"dev\":{\"botPassRoot\":\"C:\\\\Thornswood-BotPass\",\"botPassSeconds\":5}}}",
+        })
+        {
+            File.WriteAllText(p, bad);
+            Assert.Throws<ConfigException>(() => Config.Load(p));
+        }
+        File.WriteAllText(p, "{\"repo\":\"O/R\",\"environments\":{\"dev\":{\"botPassRoot\":\"C:\\\\Thornswood-BotPass\"}}}");
+        var c = Config.Load(p).Environments["dev"];
+        Assert.Equal((@"C:\Thornswood-BotPass", "Thornswood Bot Pass", 1800), (c.BotPassRoot, c.BotPassTask, c.BotPassSeconds));
+    }
+}
+
+
+/// <summary>Task Scheduler with one task: Start runs what the test gives it
+/// (Bot-Pass.js's part, writing result.json) on a task of its own, and Info
+/// says Running until that has finished.</summary>
+sealed class FakeTasks(Func<string?> work) : ITasks
+{
+    public int Starts, Ends;
+    public string? LastName;
+    volatile bool running;
+    DateTime last = DateTime.MinValue;
+    public void Start(string name)
+    {
+        Starts++;
+        LastName = name;
+        running = true;
+        last = DateTime.UtcNow;
+        Task.Run(() => { var w = work(); if (w != "hang") running = false; });
+    }
+    public TaskInfo Info(string name) => new(running ? "Running" : "Ready", last, 0);
+    public void End(string name) { Ends++; running = false; }
 }
 
 sealed class Stub(Func<HttpRequestMessage, Task<HttpResponseMessage>> f) : HttpMessageHandler

@@ -102,6 +102,14 @@ public sealed class Config
             if (e.Root == "" || !(Path.IsPathRooted(e.Root) || e.Root.Contains(@":\"))) throw new ConfigException($"environment {name}: root \"{e.Root}\" is not a full path");
             if (e.Health == "") throw new ConfigException($"environment {name}: no health address");
             if (e.LoadSeconds < 10 || e.TurnSeconds < 10) throw new ConfigException($"environment {name}: loadSeconds and turnSeconds must be 10 or more");
+            if (e.BotPassRoot != "")
+            {
+                if (!(Path.IsPathRooted(e.BotPassRoot) || e.BotPassRoot.Contains(@":\"))) throw new ConfigException($"environment {name}: botPassRoot \"{e.BotPassRoot}\" is not a full path");
+                if (string.Equals(e.BotPassRoot.TrimEnd('\\', '/'), e.Root.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase))
+                    throw new ConfigException($"environment {name}: botPassRoot is the server's own folder, and the bot pass is a throwaway copy");
+                if (e.BotPassTask == "") throw new ConfigException($"environment {name}: a bot pass needs botPassTask");
+                if (e.BotPassSeconds < 60) throw new ConfigException($"environment {name}: botPassSeconds must be 60 or more");
+            }
         }
     }
 }
@@ -130,6 +138,14 @@ public sealed class EnvConfig
     public int TurnSeconds { get; set; }
     /// <summary>The live server's port: a root whose settings name it is refused.</summary>
     public int LivePort { get; set; }
+    /// <summary>The bot pass's folder (#5196, BotPass.cs). "" until
+    /// Install-DeployAgent.ps1 has registered its task and made the folder;
+    /// from then on every Deployment waits on a bot pass.</summary>
+    public string BotPassRoot { get; set; } = "";
+    /// <summary>The scheduled task that runs the bot pass in that folder.</summary>
+    public string BotPassTask { get; set; } = "Thornswood Bot Pass";
+    /// <summary>How long a bot pass may run before it is stopped and fails.</summary>
+    public int BotPassSeconds { get; set; } = 1800;
 
     internal EnvConfig Overlay(JsonElement e)
     {
@@ -144,6 +160,9 @@ public sealed class EnvConfig
         LoadSeconds = I("loadSeconds", LoadSeconds);
         TurnSeconds = I("turnSeconds", TurnSeconds);
         LivePort = I("livePort", LivePort);
+        BotPassRoot = S("botPassRoot", BotPassRoot);
+        BotPassTask = S("botPassTask", BotPassTask);
+        BotPassSeconds = I("botPassSeconds", BotPassSeconds);
         return this;
     }
 }

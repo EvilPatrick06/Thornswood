@@ -4,6 +4,12 @@
 # manifest, reloads the dev server's gamemode with nobody dropped, and says
 # how it went on the Deployment. docs/DEPLOY-AGENT.md says how.
 #
+# The Release also carries the bot pass (#5196): scripts/bot/Bot-Pass.js and
+# what it needs, as a part of its own. Once the box has the bot pass set up,
+# the agent runs it on a throwaway copy of dev with this gamemode before it
+# puts the gamemode on dev, and a FAIL fails the Deployment. A change to the
+# bot alone makes a Release too, so the newest bot checks dev's next deploy.
+#
 # This is the first piece of the release workflow (#5179): one Release built
 # once on GitHub from one commit, signed there, applied by the box. It carries
 # the gamemode part only, which is all the agent applies so far; #5179 adds
@@ -13,7 +19,7 @@
 # their own environment, "Dev server", so the two never mix.
 #
 # HOW IT IS SIGNED. In the "release" environment, main only (#3930): the
-# manifest lists gamemode.js and thornswood-build.json with their sha256, a
+# manifest lists gamemode.js, thornswood-build.json and the bot's files with their sha256, a
 # catalog over the manifest is signed with ThornswoodRelease
 # (Sign-OnRunner.ps1), and the run holds the catalog to the manifest before
 # anything is published. Releases here are immutable once published, so the
@@ -32,6 +38,9 @@ on:
     branches: [main]
     paths:
       - 'game/gamemode.js'
+      - 'scripts/bot/Bot-Pass.js'
+      - 'scripts/bot/bot.js'
+      - 'scripts/bot/character.js'
   workflow_dispatch:
 
 permissions:
@@ -68,7 +77,10 @@ jobs:
           Write-Host (Format-ThornswoodBuildStamp $s)
           $tag = 'build-' + (Get-Date).ToUniversalTime().ToString('yyyyMMdd') + '.' + $env:GITHUB_RUN_NUMBER
           $rel = Join-Path $env:RUNNER_TEMP 'gamemode-release'
-          ./scripts/release/New-SignedManifest.ps1 -Out $rel -Tag $tag -Commit $env:GITHUB_SHA -Part gamemode -Files $gm, $stamp
+          # The bot pass the Deployment waits on (#5196) rides in the same
+          # signed Release, so dev is checked by the bot of the same commit.
+          $bot = @('Bot-Pass.js', 'bot.js', 'character.js') | ForEach-Object { Join-Path 'scripts\bot' $_ }
+          ./scripts/release/New-SignedManifest.ps1 -Out $rel -Tag $tag -Commit $env:GITHUB_SHA -Part gamemode -Files $gm, $stamp -BotFiles $bot
           if ($LASTEXITCODE -ne 0) { exit 1 }
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("tag=" + $tag)
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("dir=" + $rel)

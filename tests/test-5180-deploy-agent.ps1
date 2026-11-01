@@ -22,6 +22,12 @@
     - Both workflows sign through Sign-OnRunner.ps1 in the release
       environment and publish from a draft (releases are immutable).
     - runner-isolation.json keeps runner accounts out of the agent's folder.
+    - The bot pass (#5196): the install script registers its task as LOCAL
+      SERVICE with a SID of its own, never SYSTEM, below normal priority, on
+      demand, after the fail-safe, and names its folder in agent.json only
+      then; -NoBotPass leaves it off; New-SignedManifest.ps1 -BotFiles adds
+      the bot part gamemode-release.yml puts in every gamemode Release, with
+      the same files the agent asks for.
     - dotnet test on tools/DeployAgent.Tests, from the locked packages, when
       dotnet is on PATH; SKIP otherwise (the Deploy agent workflow runs them
       on every pull request that touches it).
@@ -74,7 +80,7 @@ try {
     Yes '  -Tag takes build-<...> and nothing else' (('build-20261101.12' -match $d.params.Tag) -and -not ('build-1; rm' -match $d.params.Tag) -and -not ('agent-v1.0.1' -match $d.params.Tag))
     $v = $verbs.verbs.'Install-DeployAgent'
     Yes 'the gate has Install-DeployAgent' ($null -ne $v -and $v.script -eq 'scripts/deploy/Install-DeployAgent.ps1')
-    Yes '  with -Status and -Tag only, and -NoPause fixed' ((@($v.params.PSObject.Properties.Name) -join ',') -eq 'Status,Tag' -and (@($v.fixed) -join ',') -eq '-NoPause')
+    Yes '  with -Status, -Tag and -NoBotPass only, and -NoPause fixed' ((@($v.params.PSObject.Properties.Name) -join ',') -eq 'Status,Tag,NoBotPass' -and (@($v.fixed) -join ',') -eq '-NoPause' -and $v.params.NoBotPass -eq 'switch')
     Yes '  -Tag takes agent-v<a.b.c> and nothing else' (('agent-v1.0.12' -match $v.params.Tag) -and -not ('agent-v1.0.12; rm' -match $v.params.Tag) -and -not ('build-1' -match $v.params.Tag))
 
     # ---- the scripts they send the box ---------------------------------------------
@@ -111,8 +117,35 @@ try {
             Yes '  and the launcher''s own Signature.cs' ($r.Text.Contains($b64))
             Yes '  and writes the repository it was given into agent.json' ($r.Text.Contains("-NotePropertyName repo -NotePropertyValue 'O/R'"))
             Yes '  and runs the service as LocalSystem with restart on an error exit' ($r.Text.Contains('obj= LocalSystem') -and $r.Text.Contains('failureflag'))
+            # The bot pass (#5196): its own task, never SYSTEM.
+            $t = $r.Text
+            Yes '  and registers the bot pass task as LOCAL SERVICE with its own SID, never SYSTEM' (
+                $t.Contains('Register-ScheduledTask -TaskName $passTask -Action $action -Settings $settings -Principal (New-ThornswoodServicePrincipal) |') -and
+                -not ($t -match 'TaskName \$passTask[^\r\n]*-AsSystem') -and $t.Contains('function New-ThornswoodServicePrincipal') -and
+                $t.Contains('Set-ThornswoodTaskOwner -TaskName $passTask'))
+            Yes '  at below normal priority, on demand, with a time limit' ($t.Contains('-Priority 7') -and $t.Contains('-ExecutionTimeLimit (New-TimeSpan -Minutes 40)') -and -not ($t -match 'TaskName \$passTask[^\r\n]*-Trigger'))
+            $safe = $t.IndexOf('Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach -Own $passRoot')
+            Yes '  and the fail-safe on what no service may read comes first' ($safe -gt 0 -and $safe -lt $t.IndexOf('Register-ScheduledTask -TaskName $passTask'))
+            Yes '  and names the folder in agent.json only once the task is set up' ($t.Contains('-NotePropertyName botPassRoot') -and $t.Contains('$noPass = [bool]0'))
+            $off = Probe 'Install-DeployAgent.ps1' 'INSTALLED: probe' @('-Repo', 'O/R', '-NoBotPass')
+            Yes '  -NoBotPass sends a script that parses and leaves the bot pass off' ($null -ne $off -and $off.Parses -and $off.Text.Contains('$noPass = [bool]1'))
         }
     }
+
+    # ---- the bot pass part of a gamemode Release (#5196) -------------------------
+    $gmf = Join-Path $tmp 'gamemode.js'; [IO.File]::WriteAllText($gmf, '// g')
+    $bpf = Join-Path $tmp 'Bot-Pass.js'; [IO.File]::WriteAllText($bpf, '// p')
+    $bjf = Join-Path $tmp 'bot.js'; [IO.File]::WriteAllText($bjf, '// b')
+    $out2 = Join-Path $tmp 'rel2'
+    & pwsh -NoProfile -Command "& '$(Join-Path $Repo 'scripts\release\New-SignedManifest.ps1')' -Out '$out2' -Tag build-1.2 -Commit $commit -Part gamemode -Files '$gmf' -BotFiles '$bpf','$bjf' -Repo O/R -NoCatalog" | Out-Null
+    $m2 = [IO.File]::ReadAllText((Join-Path $out2 'files\manifest.json')) | ConvertFrom-Json
+    Yes 'New-SignedManifest.ps1 -BotFiles adds a bot part beside the gamemode' ($LASTEXITCODE -eq 0 -and @($m2.parts.gamemode).Count -eq 1 -and (@($m2.parts.bot | ForEach-Object { $_.name }) -join ',') -eq 'Bot-Pass.js,bot.js')
+    $null = & pwsh -NoProfile -Command "& '$(Join-Path $Repo 'scripts\release\New-SignedManifest.ps1')' -Out '$out2' -Tag build-1.3 -Commit $commit -Part gamemode -Files '$gmf' -BotFiles '$gmf' -Repo O/R -NoCatalog" 2>&1
+    Yes '  and refuses two files of one name, which the agent puts in one folder' ($LASTEXITCODE -ne 0)
+    $wf = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\gamemode-release.yml'))
+    Yes 'gamemode-release.yml puts the bot pass in every gamemode Release' ($wf.Contains('-BotFiles $bot') -and $wf.Contains("@('Bot-Pass.js', 'bot.js', 'character.js')") -and $wf.Contains("- 'scripts/bot/Bot-Pass.js'"))
+    $cs = [IO.File]::ReadAllText((Join-Path $Repo 'tools\DeployAgent\BotPass.cs'))
+    Yes '  the same three files the agent asks the bot part for' ($cs.Contains('BotFiles = ["Bot-Pass.js", "bot.js", "character.js"]'))
     $r = Probe 'Deploy-Release.ps1' 'DEPLOYED: probe' @('-Tag', 'build-20261101.3')
     Yes 'Deploy-Release.ps1: the script it sends the box parses and runs the agent''s deploy for dev' ($null -ne $r -and $r.Parses -and $r.Code -eq 0 -and $r.Text.Contains("deploy --environment 'dev' --tag 'build-20261101.3'"))
     $r = Probe 'Deploy-Release.ps1' 'DEPLOYED: probe' @('-Tag', 'v1.2.3')
