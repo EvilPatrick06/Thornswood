@@ -84,8 +84,8 @@ if ($NoClose) {
 }
 
 # Copied rather than compiled in place, so csc never has to write over a
-# launcher that is still running. Copy-Item keeps the file's own write time,
-# which is what Ship's "is the exe newer than before" check reads.
+# launcher that is still running. Ship reads back that the exe in place is
+# this one by its sha256 (until #5156 by its write time, which Copy-Item keeps).
 $same = (Resolve-Path -LiteralPath $From).ProviderPath.TrimEnd('\') -ieq (Resolve-Path -LiteralPath $outDir).ProviderPath.TrimEnd('\')
 if (-not $same) {
     try { Copy-Item -LiteralPath $built -Destination $exe -Force }

@@ -35,9 +35,11 @@ const path = require('node:path');
 const ROOT = path.join(__dirname, '..', '..');
 const GAMEMODE = path.join(ROOT, 'game', 'gamemode.js');
 // Every game/data file a gamemode reader opens at run time with no copy of
-// its own inside gamemode.js. guild-sites.json and merchant-traders.json are
-// not here: Build-MerchantGamemode.js already carries both.
-const FILES = ['furniture.json', 'property-word.json', 'thalmor-patrols.json'];
+// its own inside gamemode.js. guild-sites.json is not here: Build-MerchantGamemode.js
+// carries it. merchant-traders.json is (#5137): that bundle carries the traders
+// only inside MERCHANT_TRADING, for its own install, and first steps reads them
+// at load to find the start town's Cook, so on a server it found nothing.
+const FILES = ['furniture.json', 'merchant-traders.json', 'property-word.json', 'thalmor-patrols.json'];
 const LINE = /^const STAFF_DATA = .*;$/m;
 
 function read(name) {

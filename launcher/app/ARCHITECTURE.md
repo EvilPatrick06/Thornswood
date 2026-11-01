@@ -123,7 +123,7 @@ it says a pool thread.
 | 21 | `Shell.cs:490 HealClientBackground` | Pool thread, only when the six client runtime files are not the recorded build: `ClientRuntime.cs:206 Heal()` fetches them. Then `Shell.cs:491 AutoDisplayOnce` marks `config.json` so it never runs again and, on an install that has never played, matches the game's resolution to the screen; `Shell.cs:492 StartPing` asks whether the server is up. |
 | 22 | `Shell.cs:496 CheckUpdatesBackground` | Pool thread: the update check (see Updater in section 2). Always: config.json cannot switch it off, and Play stays shut until it answers (#937). |
 | 23 | `Shell.cs:512 Voice.Prepare` | Installs the resolver that loads WebView2 out of the exe. `Shell.cs:520 Voice.Start` is queued until the window is idle on screen. |
-| 24 | `Shell.cs:557 win.ContentRendered` | Once the window has drawn, LogStartTime (declared above Run) writes one line to `Profile\launcher.log`, `Launcher start: the window was on screen <s> s after the launcher started, <s> s of it the mod check, on launcher <version>.`, timed from the process's own start and the Stopwatch around RunScan (#3534); the weekly review totals them with `scripts\vps\Read-LauncherStarts.ps1`. Then, on a pool thread, `SelfSwap.cs:192 Settle()` deletes `Launcher\Thornswood.exe.old`, the copy of the previous launcher a self update keeps; that is how the update script knows this one started (see SelfSwap in section 2). A `Thornswood.exe.bad` left by a way back is deleted too, and the log says which version failed. Every start but the first after an update finds neither. |
+| 24 | `Shell.cs:557 win.ContentRendered` | Once the window has drawn, LogStartTime (declared above Run) writes one line to `Profile\launcher.log`, `Launcher start: the window was on screen <s> s after the launcher started, <s> s of it the mod check, on launcher <version>.`, timed from the process's own start and the Stopwatch around RunScan (#3534); the weekly review totals them with `scripts\vps\Read-LauncherStarts.ps1`. Then, on a pool thread, `SelfSwap.cs:192 Settle()` deletes `Launcher\Thornswood.exe.old`, the copy of the previous launcher a self update keeps; that is how the update script knows this one started (see SelfSwap in section 2). A `Thornswood.exe.bad` left by a way back is deleted too, and the log says which version failed. Every start but the first after an update finds neither. On that first start the shortcut icons are brought up to date and then, in Thornswood's own folder, Fix runs as it does after any update (`RunFix(true)`, #3201), so the update that restarted the launcher ends the way Install now does. |
 | 25 | `Shell.cs:571 Application` | A new WPF Application with `ShutdownMode.OnMainWindowClose`, because the hidden voice window would otherwise keep the process alive. `Shell.cs:573 app.Exit` stops voice and presence and releases Hold. `Shell.cs:580 DispatcherUnhandledException` logs a fault and keeps the launcher up. `Shell.cs:618 StartStallWatch` logs when the window stops answering. |
 | 26 | `Shell.cs:643 app.Run` | The message loop. Run does not return until the window closes. |
 | 27 | `ShellOwnGame.cs:46 ContentRendered` | Once the window is on screen: `ShellOwnGame.cs:65 OwnGameAtStart()` refreshes the game folder by itself when Vortex has deployed since it was made (`OwnGame.cs:662 NeedsRefresh()`), or offers to make it in the shared shape. When Vortex deploys into a Thornswood game folder it logs why nothing is refreshed and what to do (`OwnGame.RefusedSource`). Play also asks that same test now, through `OwnGameRefreshIfDue`. |
@@ -162,12 +162,17 @@ One paragraph per class, naming the files it writes. Profile is
 `<Root>\Profile`; Game is `<Root>\Game`.
 
 **Shell** (Shell.cs, Pages.cs, ShellOwnGame.cs, ShellSteamUpdates.cs,
-ShellUninstall.cs, ShellProgress.cs, ShellNews.cs, ShellPacks.cs, ShellScanFix.cs, Waiting.cs, Stall.cs). The window and every flag that
+ShellUninstall.cs, ShellProgress.cs, ShellNews.cs, ShellPacks.cs, ShellScanFix.cs, ShellVortexWatch.cs, Waiting.cs, Stall.cs). The window and every flag that
 decides the Play button: `playing`, `updatePending`, `updateAnswered`, `checkFailed`,
 `collectionBarUp`, `ownGameBusy`, `doorCheckOut`, `feedNotice` (the last
 answer FeedNotice gave), and `chosenId`, the character picked at the game's
 menu this session. Writes `Profile\launcher.log` through Log and
 `Profile\played.flag` at each Play.
+While the collection card or the not-confirmed note is up, the two second
+tick lists Vortex's state.v2 files and the plugin list (ShellVortexWatch.cs,
+#5136); when they change it reads the revision again off the UI thread,
+draws the card again, and asks the feed again once the card comes down, so
+an update finished in Vortex is picked up with nothing pressed.
 
 **Paths** (Paths.cs). Every path the launcher uses, worked out once in
 `Paths.cs:71 Init()` from where the exe is. `Collection` says which shape the
@@ -250,7 +255,21 @@ packs and the new launcher and writes nothing into Game or the records a
 refresh reads, so it runs while the game folder is being prepared;
 `WriteUpdate` then puts them in under `OwnGame.Alone`, after any refresh
 under way, and checks again any file a refresh changed in between; the new
-launcher goes in last (`SwapIn`). `ShellUpdate.cs:51 CheckFailed()` keeps
+launcher goes in last (`SwapIn`). Install now, on the card above Play and in
+Settings, and the automatic update, go
+through `ShellUpdate.cs UpdateNow` (#3201): the update, then Fix's whole
+path on the folder the update left (`ShellScanFix.cs FixAfterUpdate`), which
+scans everything again, puts right what the scan finds and never takes the
+update it just tried a second time. A new launcher's first start runs the
+same Fix (row 24 of the startup order). The automatic update is
+`ShellUpdate.cs UpdateBySelf` (#3202), run after every update check's
+answer when `Config.AutoUpdate` is on (the default; only an explicit false
+in `config.json` turns it off): the start's check, the feed watch, Check
+now, the retry after a failed check and the check after the game closed
+for an update. It leaves the update to the in-play clock while a game the
+launcher started runs, to the card while a Skyrim it did not start is open,
+and never takes the update `RunUpdate` tried last a second time by itself.
+`RunUpdate` runs one update at a time (`updating`). `ShellUpdate.cs:51 CheckFailed()` keeps
 Play shut and asks again every thirty seconds when the source does not answer.
 Every document that was read also goes to `ShellUpdate.cs:80 ShowNotice()`, which
 asks FeedNotice what the bar above Play says and whether Play is held.
@@ -400,7 +419,7 @@ or starts the Downgrade, each of which asks first or restarts the launcher.
 
 **MadeFromGame and FromGame** (MadeFromGame.cs, FromGame.cs,
 FromGameArchive.cs, FromGameDeflate.cs, FromGameMath.cs, and the recipes
-FromGameMenu.cs, FromGameBoard.cs and FromGameModMenus.cs, #2827, #3113). The main menu with no Bethesda
+FromGameMenu.cs, FromGameBoard.cs and FromGameModMenus.cs, #2827, #3113, #3127). The main menu with no Bethesda
 logo (`Data\Interface\startmenu.swf`) and the notice board and drop box
 meshes (`Data\meshes\thornswood\noticeboard01.nif`, `dropbox01.nif`) are
 Bethesda's files edited or put together, so Thornswood ships none of them:
@@ -428,7 +447,14 @@ own archives (`SkyUI_SE.bsa`, `SkyHUD.bsa`, `AHZmoreHUD.bsa`) with the edits
 `scripts\mods\Build-ModMenus.py` wrote into FromGameModMenus.cs, each pinned
 to the sha256 of the collection's version. `Ship-Rules.ps1
 $ShipMadeFromMods` keeps them out of every pack. QuickLoot IE's columns are
-set by its own settings file instead, which ships from `game\ours`.
+set by its own settings file instead, which ships from `game\ours`. SkyUI's
+journal (`Data\Interface\quest_journal.swf`, from `SkyUI_SE.bsa`) is made the
+same way with Quick Save, Save, Load, Help and the Creation Club entries taken
+off its System page (#3127), since a character lives on the server and the
+help panel replaced Skyrim's help. The game still writes "disabled" into each
+of those entries every time the journal opens (SetSaveDisabled), so the edit
+hands it an empty object of its own in each one's place; handing it the
+missing entry crashed the game on Escape (31 Oct 2026).
 
 **GeneratedHere and GeneratedBuild** (GeneratedHere.cs, GeneratedBuild.cs,
 Generated.cs, CoveredBodies.cs, #1247, #3715). The behavior files Pandora
@@ -786,7 +812,7 @@ configured at all, which is a developer's own build and never a tester's.
 | 17 | `ShellPlay.cs:297 ThornIni.Ensure` | The template, if the file is missing. | `Game\Data\SKSE\Plugins\Thornswood.ini` |
 | 18 | `ShellPlay.cs:300 Mics.Apply` | This machine's microphone name, the voice port and the voice address. | `Thornswood.ini` |
 | 18a | `ShellPlay.cs:315 GeneratedHere.Ensure` | Under Waiting. The behavior files and the covered bodies (#3715), built with the collection's own Pandora and BodySlide only when `generated.txt` is missing or stale: the mod list, the files the tools read, the build list compiled into the launcher, or a built file changed. A build that stops, or any body in the folder that is nude, stops Play with a message box saying why (#405). | when it builds: `Game\Data\meshes\actors\*\behaviors`, `characters`, `animationdatasinglefile.txt` and `animationsetdatasinglefile.txt`, the six bodies in `character assets`, BodySlide's own copies of its settings, presets and groups, and `Profile\OwnGame\generated.txt`; `Profile\OwnGame\build-generated` while it runs |
-| 18b | `ShellPlay.cs:338 MadeFromGame.Ensure` | The main menu, the notice board's two meshes and the collection's menus with no gold values (#3113) made from this machine's game and mod archives, only those missing or changed. A game that cannot make them still plays, and the log line says which file differs. | `Game\Data\Interface\startmenu.swf`, `Game\Data\meshes\thornswood\noticeboard01.nif` and `dropbox01.nif`; `Game\Data\Interface\skyui\config.txt` and `itemcard.swf`, `Game\Data\Interface\hudmenu.swf`, `AHZHudInfo.swf` and `exported\AHZHudInfo.swf`; `Game\Data\Thornswood-Last.esp` from the release's recipe and the person's own plugins (#2791) |
+| 18b | `ShellPlay.cs:338 MadeFromGame.Ensure` | The main menu, the notice board's two meshes and the collection's menus with no gold values (#3113) made from this machine's game and mod archives, only those missing or changed. A game that cannot make them still plays, and the log line says which file differs. | `Game\Data\Interface\startmenu.swf`, `Game\Data\meshes\thornswood\noticeboard01.nif` and `dropbox01.nif`; `Game\Data\Interface\skyui\config.txt` and `itemcard.swf`, `Game\Data\Interface\hudmenu.swf`, `AHZHudInfo.swf` and `exported\AHZHudInfo.swf`; `Game\Data\Interface\quest_journal.swf` (#3127); `Game\Data\Thornswood-Last.esp` from the release's recipe and the person's own plugins (#2791) |
 | 19 | `ShellPlay.cs:345 EnsureServer` | `ShellPlay.cs:114 EnsureServer()`: `SkyMp.Up` connects to the resources port. A server elsewhere that does not answer is asked about; one on this machine is started. | `Profile\server.pid` and `server.log`, local server only |
 | 20 | `ShellPlay.cs:352 Keep.Restore` | Last thing before the game that can still say no, so nothing is left parked by a refusal. Our Data\Platform files back from `Profile\Keep`; other servers' plugins parked. | changed files in `Game\Data\Platform`; `Profile\Parked\*` and `parked.txt` |
 | 21 | `ShellPlay.cs:354 Keep.LeaveNote` | The note that says this session is ours. The plugins idle without it. | `Game\Data\Platform\thornswood-session.txt` |

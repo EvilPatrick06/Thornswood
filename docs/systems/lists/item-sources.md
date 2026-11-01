@@ -1,13 +1,13 @@
 # Where every item comes from
 
-Generated from `game/data/item-sources.json` by `scripts/dev/Write-SystemLists.js`. 1058 items: everything somebody can come to hold, and every input a live recipe asks for. Each is marked with every way it comes into the world. `scripts/dev/Build-ItemSources.js` builds the table; run it, then this script, after a recipe, work, quest or dungeon table changes. Balance is what a thing takes to make or get plus its stats, never gold.
+Generated from `game/data/item-sources.json` by `scripts/dev/Write-SystemLists.js`. 1158 items: everything somebody can come to hold, and every input a live recipe asks for. Each is marked with every way it comes into the world. `scripts/dev/Build-ItemSources.js` builds the table; run it, then this script, after a recipe, work, quest or dungeon table changes. Balance is what a thing takes to make or get plus its stats, never gold.
 
 | Kind | What it means | Items | Only this |
 | --- | --- | --- | --- |
-| crafted | made at a bench by a profession, by anybody where no profession owns the recipe, or made by the server in place of a recipe's output (fine and burnt dishes, hair dye) | 731 | 673 |
-| race | a recipe only the named race may make | 38 | 25 |
+| crafted | made at a bench by a profession, by anybody where no profession owns the recipe, or made by the server in place of a recipe's output (fine and burnt dishes, hair dye) | 821 | 763 |
+| race | a recipe only the named race may make | 42 | 29 |
 | company | a Free Skyrim Trading Company ware (cut-items.json rieklingKept) | 13 | 0 |
-| faction | a recipe only the embassy roll or the remnant roll may make | 24 | 24 |
+| faction | a recipe only the embassy roll or the remnant roll may make | 29 | 29 |
 | quest | drawn only while a merchant's scarce work is open, a rare seam its quest opens, or a retrieval token | 21 | 10 |
 | gathered | a class's work: picked, grown, fished, hunted, mined or pressed | 138 | 106 |
 | found | created by a dungeon chest or a body | 177 | 100 |
@@ -17,7 +17,7 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 
 ## Nothing hands these out
 
-17 items a live recipe asks for, or a hair dye or a bottle of water needs, that no recipe, class, quest, dungeon or starting kit hands out. Every recipe that asks for one of them cannot be made.
+18 items a live recipe asks for, or a hair dye or a bottle of water needs, that no recipe, class, quest, dungeon or starting kit hands out. Every recipe that asks for one of them cannot be made.
 
 | Item | Asked for by | Id |
 | --- | --- | --- |
@@ -37,6 +37,7 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 | Unenchanted Conjuration Staff | Staff of Soul Trapping | `7e647:Skyrim.esm` |
 | Unenchanted Destruction Staff | Staff of Firebolts, Staff of Flames, Staff of Frostbite, Staff of Ice Spikes, Staff of Ice Storms, Staff of Icy Spear and 4 more | `be11f:Skyrim.esm` |
 | Unenchanted Restoration Staff | Grand Staff of Turning, Staff of Turning | `51b0c:Skyrim.esm` |
+| Werewolf Pelt | Werewolf's Bane | `fe6a9:Skyrim.esm` |
 | White Wine | Eidar Cheese Fondue, Goat Cheese Fondue, Mammoth Cheese Fondue | `3133c:Skyrim.esm` |
 
 ## Only from a quest
@@ -165,13 +166,16 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 
 ## Faction work
 
-24 items. Only the embassy roll or the remnant roll may make these.
+29 items. Only the embassy roll or the remnant roll may make these.
 
 | Item | Sources | Id |
 | --- | --- | --- |
 | Hooded Thalmor Robes | faction Tailor/Liverywright remnant novice | `820:MoreCraftableEquipment.esp` |
+| Imperial Armor | faction Smith/Platewright embassy advanced | `14b:cheddars_mashups.esl` |
+| Imperial Battlelord Hood | faction Smith/Platewright embassy advanced | `14d:cheddars_mashups.esl` |
 | Imperial Boots | faction Smith/Platewright embassy advanced | `136d6:Skyrim.esm` |
 | Imperial Bracers | faction Smith/Platewright embassy advanced | `136d4:Skyrim.esm` |
+| Imperial Cleric Armor | faction Smith/Platewright embassy advanced | `6:cheddars_mashups.esl` |
 | Imperial Heavy Shield | faction Smith/Platewright embassy advanced | `135ba:Skyrim.esm` |
 | Imperial Helmet | faction Smith/Platewright embassy advanced | `13edc:Skyrim.esm` |
 | Imperial Knight Cape | faction Tailor/Liverywright embassy expert | `6aa04:Hothtrooper44_ArmorCompilation.esp` |
@@ -180,6 +184,7 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 | Imperial Light Bracers | faction Smith/Platewright embassy advanced | `13eda:Skyrim.esm` |
 | Imperial Light Helmet | faction Smith/Platewright embassy advanced | `13edb:Skyrim.esm` |
 | Imperial Light Shield | faction Smith/Platewright embassy advanced | `13ab2:Skyrim.esm` |
+| Imperial Priest Armor | faction Smith/Platewright embassy advanced | `61:cheddars_mashups.esl` |
 | Imperial Soldier's Armor | faction Smith/Platewright embassy advanced | `136d5:Skyrim.esm` |
 | Justiciar Arrow | faction Woodworker/Woodwright remnant advanced | `4d72:Immersive Weapons.esp` |
 | Justiciar Changdao | faction Smith/Edgewright remnant expert | `1dc3:Immersive Weapons.esp` |
@@ -192,15 +197,19 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 | Thalmor Boots | faction Tailor/Haberdasher remnant novice | `65bac:Skyrim.esm` |
 | Thalmor Gloves | faction Tailor/Haberdasher remnant novice | `65bb3:Skyrim.esm` |
 | Thalmor Hood | faction Tailor/Haberdasher remnant novice | `821:MoreCraftableEquipment.esp` |
+| Thalmor Plate | faction Tailor/Haberdasher remnant master | `ad:cheddars_mashups.esl` |
 | Thalmor Robes | faction Tailor/Liverywright remnant novice | `81f:MoreCraftableEquipment.esp` |
 
 ## Race work
 
-38 items. Only the named race may make these. An item also made by another source shows it.
+42 items. Only the named race may make these. An item also made by another source shows it.
 
 | Item | Sources | Id |
 | --- | --- | --- |
 | Alik'r Hood | race Tailor/Haberdasher redguard novice | `7bc1a:Skyrim.esm` |
+| Alik'r Knight | race Smith/Platewright redguard advanced | `9b:cheddars_mashups.esl` |
+| Alik'r Warrior Garb | race Tailor/Haberdasher redguard novice | `52:cheddars_mashups.esl` |
+| Armored Telvanni Robes | race Smith/Platewright darkelf advanced | `199:cheddars_mashups.esl` |
 | Bosmer Boots | race Smith/Platewright woodelf expert | `238e0:Hothtrooper44_ArmorCompilation.esp` |
 | Bosmer Bracers | race Smith/Platewright woodelf expert | `238eb:Hothtrooper44_ArmorCompilation.esp` |
 | Bosmer Cuirass | race Smith/Platewright woodelf expert | `238e2:Hothtrooper44_ArmorCompilation.esp` |
@@ -212,6 +221,7 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 | Dark Alik'r Hood | race Tailor/Haberdasher redguard novice | `e0dd2:Skyrim.esm` |
 | Dark Hammerfell Garb | race Tailor/Haberdasher redguard novice | `e0dd0:Skyrim.esm` |
 | Dark Redguard Boots | race Tailor/Haberdasher redguard novice | `e0dd4:Skyrim.esm` |
+| Dawnguard Alik'r Armor | race Smith/Platewright redguard advanced | `43:cheddars_mashups.esl` |
 | Dunmer Hooded Outfit | race Tailor/Haberdasher darkelf novice | `82c:MoreCraftableEquipment.esp` |
 | Dunmer Hooded Outfit | race Tailor/Haberdasher darkelf novice | `82d:MoreCraftableEquipment.esp` |
 | Dunmer Hooded Outfit | race Tailor/Haberdasher darkelf novice | `831:MoreCraftableEquipment.esp` |

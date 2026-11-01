@@ -320,11 +320,13 @@ KIT_RECIPES.forEach(function (k) {
       JSON.stringify(ins) === JSON.stringify(k.inputs) && page.indexOf(k.words) !== -1);
 });
 {
-  const rt = fs.readFileSync(path.join(REPO_DIR, 'scripts', 'dev', 'Build-RecipeTable.ps1'), 'utf8');
-  yes('the three recipes are named to their halves in $RECIPE_OWNER, so the rebuilt table gates them',
-      /'ThornswoodRecipeWeaponKit'\s*=\s*@\{ Owner = 'Smith'; Half = 'Edgewright'/.test(rt) &&
-      /'ThornswoodRecipeArmorKit'\s*=\s*@\{ Owner = 'Smith'; Half = 'Platewright'/.test(rt) &&
-      /'ThornswoodRecipeSewingKit'\s*=\s*@\{ Owner = 'Tailor'; Half = 'Haberdasher'/.test(rt));
+  // RECIPE_OWNER's entries, which Build-RecipeTable.ps1 reads from records/recipe-owners.json.
+  const named = JSON.parse(fs.readFileSync(path.join(REPO_DIR, 'records', 'recipe-owners.json'), 'utf8')).owner;
+  const is = (edid, owner, half) => !!named[edid] && named[edid].Owner === owner && named[edid].Half === half;
+  yes('the three recipes are named to their halves in records/recipe-owners.json, so the rebuilt table gates them',
+      is('ThornswoodRecipeWeaponKit', 'Smith', 'Edgewright') &&
+      is('ThornswoodRecipeArmorKit', 'Smith', 'Platewright') &&
+      is('ThornswoodRecipeSewingKit', 'Tailor', 'Haberdasher'));
   const add = fs.readFileSync(path.join(REPO_DIR, 'scripts', 'mods', 'Add-ContentRecords.py'), 'utf8');
   yes('and Add-ContentRecords.py is what adds the six records',
       ['ThornswoodMiscWeaponKit', 'ThornswoodMiscArmorKit', 'ThornswoodMiscSewingKit',
@@ -828,6 +830,10 @@ vm.runInContext(require('./fixtures/ordinary-quest-items') + onDrop, dropContext
 yes('ordinary drops return no override and never reach the durability block',
     onDrop !== '' && !/wear\.dropped\(/.test(onDrop) &&
     dropContext.mp.onDropItem(101, IRON_SWORD, 1) === undefined);
+yes('the drop watcher refuses nothing else but the locked pair of Prisoner\'s Cuffs (#2573)',
+    (onDrop.replace(/if\(questItemBlocked\(baseId\)\)return false;/, '')
+      .replace(/if \(cuffsDrop && !cuffsDrop\.mayLetGo\(actorId, baseId, count\)\) \{ return false; \}/, '')
+      .match(/\breturn\b/g) || []).length === 0);
 const onHitLines = gm.split('\n').filter(function (l) { return /^mp\['onPapyrusEvent:OnHit'\] = guard\('onPapyrusEvent:OnHit', function/.test(l); });
 yes('a hit reaches it through the one OnHit handler, under guard(), beside the warrior maneuvers, with the blocked flag',
     onHitLines.length === 1 &&

@@ -36,12 +36,25 @@ read it (issue #440, phase 8):
   because a pin move is one release. `tests\test-skyrim-pin.ps1` fails while
   they disagree.
 - `ui-gone.json`: the 37 Daedric Online menu files (name and sha256) and the
-  42 unused skymp5-front svgs plus bg.png that must never ship and that every
-  pack deletes (issue #1318). `Ship-Rules.ps1` loads it; Build-Launcher puts
+  41 unused skymp5-front svgs, bg.png, and the four Futura PT and DIN Pro
+  faces main's older front build named (#1317), that must never ship and that
+  every pack deletes (issue #1318). `Ship-Rules.ps1` loads it; Build-Launcher puts
   it inside the launcher; OwnGame.Foreign reads that copy so a refresh cannot
   copy those files back. No script writes this one: it is changed by hand, in
   a pull request. `tests\test-ship-rules.ps1` fails while Ship-Rules and
   OwnGame disagree with it.
+- `shipped-not-ours.json`: 165 of the 166 loose files of other authors
+  (67.6 MB) that our packs shipped as ours until the scrub of 29 September,
+  each with the bytes and sha256 it had, measured on 12 October 2026 on the
+  shipping machine's main install (#1178). The 166th, the other server's
+  haybale, would name that server, which no tracked file may (#400), so the
+  launcher's `Leaks.cs` takes it out of Thornswood's own folder by its shape
+  and bytes instead. `Ship-Rules.ps1` reads it and stops on any
+  path it does not call another author's; Publish-Update puts every one in
+  each release record as gone at its sha256, and the launcher deletes one only
+  while it still has those bytes and Vortex does not deploy the path. No
+  script writes this one: it is changed by hand, in a pull request.
+  `tests\test-shipped-not-ours.ps1` holds it.
 - `skyrim-files.json`: every file of the pinned build, 46 on 1.6.1170, with
   its bytes, SHA-1 and depot, read out of Steam's own manifests of the three
   depots `skyrim-pin.json` names by `scripts\release\New-SkyrimFilesRecord.ps1`
@@ -50,6 +63,15 @@ read it (issue #440, phase 8):
   on this list, so a mod put into the Steam copy by hand never gets in. Run
   the script again in the same pull request as a pin move;
   `tests\test-skyrim-pin.ps1` fails while the two disagree.
+- `recipe-owners.json`: the recipes whose owner or rank is a decision rather
+  than a reading, each with the measured reason it cannot be derived:
+  `"owner"` is RECIPE_OWNER and `"rank"` is RECIPE_RANK in
+  `scripts\dev\Build-RecipeTable.ps1`, which reads them from here. No script
+  writes this one: it is changed by hand, in the pull request that adds the
+  recipe it names. It is data so that a recipe change is this file and
+  `game\content\Thornswood-Content.esp` and nothing else, the two files the
+  box's Rebuild-ContentTables takes from a pull request to rebuild its tables
+  with main's own builders (Patrick, 30 Oct 2026, B on the report page, #3470).
 - `game-strings.json`: the loose string tables of the localized masters the
   content tools read whose names are in no Skyrim archive, by size and
   sha256 (#2899): RaceCompatibility.esm's three, measured 20 Oct 2026.
@@ -159,6 +181,14 @@ names. No script reads them. `THIRD-PARTY.md` and
   and `tests\test-collection-permissions.js` fails on a page not read or a
   plugin from a mod the record does not list. The pages answer a cloud
   session with a 403, so they are read in a browser on One.
+- `collection-dropped.json`: the plugins a server may stop loading when it
+  moves to the revision `collection-plugins.json` names, because that
+  revision takes them out, each with why every form it added can go from a
+  running world (issue #4069). `Deploy-DevGamemode.ps1 -LoadOrder
+  -FromRecord` lets its order leave out these and no other plugin the
+  running server loads, and only while the two name the same revision.
+  Changed by hand in the pull request that moves the records to a new
+  revision.
 - `asset-provenance.json`: the asset provenance register (issue #2177). Every picture, video, sound, font, mesh, texture, interface file and plugin Thornswood hands to people or shows them: where it came from, who made it, its licence or permission, the credit it asks for, who approved it and when, where it is published and its sha256, or which of those is not recorded and who can answer. Files that ship from the game folder but are not in the repository are in it by name, and gallery uploads and the collection's mods are dispositioned. Operator only: nothing that builds a pack, the installer, the launcher or the site reads it. A permission itself is never written in it; an entry says where it is kept. No script writes it: it is changed by hand in the pull request that adds or changes an asset, and `tests	est-asset-provenance.js` fails on a tracked asset with no entry or a changed hash.
 - `merchant-runtime-provenance.md`: the server module built for merchant
   settlement, and why the six client files kept their 0dd0590b bytes (fork

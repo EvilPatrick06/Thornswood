@@ -4,8 +4,11 @@
   Puts the box's GitHub admin service on the VPS (#3107, Patrick's A of 22 Oct
   2026): scripts\vps\admin\admin.js, as the task "Thornswood Admin",
   listening on 127.0.0.1:7791. It holds the key of a GitHub App made for
-  Thornswood, and makes the runners' labels on GitHub match main's runner
-  records when a run of the ops repository's github-admin.yml on main asks
+  Thornswood, and makes the runners' labels, and the rulesets, private
+  vulnerability reporting, immutable releases and secret scanning of
+  Thornswood and the engine fork, on GitHub match main's records (records\*-runners.json, and since #3683
+  records\github-repo-settings.json) when a run of the ops repository's
+  github-admin.yml on main asks
   with its OIDC token (admin.js says how it checks that, and why nothing else
   may ask). That is how Set-BuildRunners.ps1 works from anywhere, a cloud
   thread included. Run it from a machine whose way in already works; it does
@@ -19,6 +22,15 @@
       .\scripts\deploy\Install-AdminService.ps1 -Status   what is there and its log
       .\scripts\deploy\Install-AdminService.ps1 -Forget   drop the App's key, for a new App
       .\scripts\deploy\Install-AdminService.ps1 -Remove   take it off again
+
+  From a cloud thread, which has no ssh, the deploy gate runs the first and
+  -Status with main's script (scripts\vps\gate\verbs.json):
+
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Install-AdminService'
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Install-AdminService -Status'
+
+  -Setup, -Forget and -Remove are not gate verbs: they change who holds the
+  App, which stays with a person at One.
 
   THE APP (once, by whoever owns the repository). -Setup writes
   state\setup.json, a state nobody can guess that lives an hour, and prints
@@ -133,6 +145,8 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here 'ServiceAccount.ps1')
+# The hold the install writes while it has the admin service stopped (#5155).
+. (Join-Path $Here '..\vps\ServerHold.ps1')
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 
@@ -278,6 +292,8 @@ function StopIt {
     }
 }
 "@
+# The hold goes in front too (#5155), so StopIt's callers can hold and release the task.
+$stopIt = (Get-ThornswoodHoldScript -Script 'Install-AdminService.ps1') + $stopIt
 
 # ------------------------------------------------------------------ remove --
 if ($Remove) {
@@ -448,8 +464,11 @@ function Answers([string[]]`$Lines) {
     return `$false
 }
 
+# Held while it is stopped (#5155, ServerHold.ps1), so the watchdog leaves
+# it; every way out below takes the hold away.
+Set-ThornswoodHold -Target '$TaskName' -Why 'installing new admin service files' -By `$HoldBy
 StopIt
-if (-not `$stopOk) { 'ADMIN REFUSED'; exit 1 }
+if (-not `$stopOk) { Clear-ThornswoodHold -Target '$TaskName'; 'ADMIN REFUSED'; exit 1 }
 New-Item -ItemType Directory -Force -Path '$Root\$prev' | Out-Null
 foreach (`$f in `$want.Keys) {
     `$live = Join-Path '$Root' `$f
@@ -486,6 +505,7 @@ foreach (`$i in `$inState) {
 if (`$open.Count) {
     'ANOTHER SERVICE COULD READ THE APP''S KEY, so the admin service is left stopped and disabled:'
     `$open
+    Clear-ThornswoodHold -Target '$TaskName'
     Disable-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue | Out-Null
     'ADMIN REFUSED'; exit 1
 }
@@ -495,6 +515,7 @@ Start-ScheduledTask -TaskName '$TaskName'
 if (Answers @('$Plain')) {
     'the admin service answers on 127.0.0.1:$Port'
     if (-not (Test-Path -LiteralPath '$state\app.json')) { 'it holds no App yet, so it refuses every ask until -Setup makes one' }
+    Clear-ThornswoodHold -Target '$TaskName'
     'ADMIN OK'; exit 0
 }
 'it did not answer on 127.0.0.1:$Port within $Wait seconds. admin.log says:'
@@ -511,6 +532,7 @@ if (`$oldXml) {
     Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false -EA SilentlyContinue
     'there was no admin service before this, so none is left registered'
 }
+Clear-ThornswoodHold -Target '$TaskName'
 'ADMIN ROLLED BACK'; exit 1
 "@ | ForEach-Object { Say "  $_"; "$_".Trim() })
 if ($out -notcontains 'ADMIN OK') { Die 'the admin service was not installed. The lines above say why and what is running.' }

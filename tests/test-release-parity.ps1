@@ -170,27 +170,30 @@ $squashDoc = [pscustomobject]@{ release=[pscustomobject]@{commit=$branch;uncommi
 # Two releases a minute apart from one commit, as on 2 Oct at 2:35 and 2:36 PM.
 Tag-DevRelease $branch '20261002-143545-dev' '2026-10-02T14:37:15-06:00'
 Tag-DevRelease $branch '20261002-143641-dev' '2026-10-02T14:37:57-06:00'
-$squashNotes = @([pscustomobject]@{title='Branch work';channel='dev';sourceCommit=$branch},
-    [pscustomobject]@{date='10-2-2026 2:37 PM';title='Older legacy note';channel='dev'},
+# Newest first, as a feed keeps them (Publish-Update puts each new note on
+# top): the later branch commit's note above the squashed one's, and a note
+# below a clean release main has is settled by it (Update-DevNewsChannels).
+$squashNotes = @([pscustomobject]@{title='Unfinished Dev work';channel='dev';sourceCommit=$unfinished},
     [pscustomobject]@{title='Branch work main never took';channel='dev';sourceCommit=$branchMore},
-    [pscustomobject]@{title='Unfinished Dev work';channel='dev';sourceCommit=$unfinished})
+    [pscustomobject]@{title='Branch work';channel='dev';sourceCommit=$branch},
+    [pscustomobject]@{date='10-2-2026 2:37 PM';title='Older legacy note';channel='dev'})
 $null = Update-DevNewsChannels $squashDoc $squashNotes $squashMain $gitDir
-Assert ($squashNotes[0].channel -eq '') 'A Dev source squash merged onto Main is promoted though it is not an ancestor'
-Assert ($squashNotes[1].channel -eq '') 'Legacy notes clear when the preceding Dev release was squash merged onto Main'
-Assert ($squashNotes[2].channel -eq 'dev') 'A branch commit with a change Main never took stays marked Dev'
-Assert ($squashNotes[3].channel -eq 'dev') 'Work on no branch Main took stays marked Dev'
-$squashNotes[0].channel = 'dev'
+Assert ($squashNotes[2].channel -eq '') 'A Dev source squash merged onto Main is promoted though it is not an ancestor'
+Assert ($squashNotes[3].channel -eq '') 'Legacy notes clear when the preceding Dev release was squash merged onto Main'
+Assert ($squashNotes[1].channel -eq 'dev') 'A branch commit with a change Main never took stays marked Dev'
+Assert ($squashNotes[0].channel -eq 'dev') 'Work on no branch Main took stays marked Dev'
+$squashNotes[2].channel = 'dev'
 $null = Update-DevNewsChannels $squashDoc @([pscustomobject]@{title='Gone';channel='dev';sourceCommit=('0' * 40)}) $squashMain $gitDir
-Assert ($squashNotes[0].channel -eq 'dev') 'Only the notes passed in are touched'
+Assert ($squashNotes[2].channel -eq 'dev') 'Only the notes passed in are touched'
 $gone = @([pscustomobject]@{title='Gone';channel='dev';sourceCommit=('f' * 40)})
 $null = Update-DevNewsChannels $squashDoc $gone $squashMain $gitDir
 Assert ($gone[0].channel -eq 'dev') 'A Dev source this clone does not have proves nothing and stays marked'
 $laterMain = [pscustomobject]@{ launcherVersion='1.1.107'; release=[pscustomobject]@{commit=$movedOn;uncommitted=0}; news=@() }
-$later = @([pscustomobject]@{title='Branch work';channel='dev';sourceCommit=$branch},
-    [pscustomobject]@{title='Branch work main never took';channel='dev';sourceCommit=$branchMore})
+$later = @([pscustomobject]@{title='Branch work main never took';channel='dev';sourceCommit=$branchMore},
+    [pscustomobject]@{title='Branch work';channel='dev';sourceCommit=$branch})
 $null = Update-DevNewsChannels $squashDoc $later $laterMain $gitDir
-Assert ($later[0].channel -eq '') 'Squash merged work stays promoted after Main changes the same lines again'
-Assert ($later[1].channel -eq 'dev') 'and work Main never took is still marked once Main has moved on'
+Assert ($later[1].channel -eq '') 'Squash merged work stays promoted after Main changes the same lines again'
+Assert ($later[0].channel -eq 'dev') 'and work Main never took is still marked once Main has moved on'
 [IO.Directory]::CreateDirectory((Join-Path $gitDir 'game')) | Out-Null
 [IO.File]::WriteAllText((Join-Path $gitDir 'game\untracked-plugin.js'), 'new work')
 Assert ((Get-ReleaseSource $gitDir).Uncommitted -eq 1) 'Untracked shipping inputs prevent source parity claims'

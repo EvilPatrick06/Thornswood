@@ -363,6 +363,24 @@ jobs:
           }
           Set-Content -LiteralPath (Join-Path $out 'SHA256SUMS') -Value $lines -Encoding ascii
 
+      # THE SAME THREE FILES AS THIS RUN'S ARTIFACT (#2841). GitHub lists a
+      # draft release only to an account that can push, and the box's Ship
+      # token reads Thornswood's contents and nothing more (ship-access.js,
+      # Patrick's pick of 30 Oct). So a Ship from the deploy gate never saw
+      # the v1.2.12 draft this workflow made (31 Oct, run 41196215137) and
+      # stopped on "no verified launcher". An artifact is read with Actions
+      # read, which that token has: Ship (Get-ReleaseFiles) takes the files
+      # from the newest green run of this workflow for the tag, and the draft
+      # only when no such run still holds them. Same folder, same bytes as the
+      # draft; Ship checks them against SHA256SUMS and the signature as before.
+      - name: Keep the exe, the setup program and SHA256SUMS as the run's files
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-files
+          path: ${{ runner.temp }}/release/
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Draft a release with the exe, the setup program and their checksums
         id: draft
         shell: pwsh
@@ -421,8 +439,13 @@ jobs:
             # Its notes were written by the run that made it, and this run's
             # files replace that run's: a draft built unsigned and rebuilt
             # signed kept saying UNSIGNED. The notes say how THESE files were
-            # built, so they are written again with them.
-            $patch = @{ body = $notes } | ConvertTo-Json
+            # built, so they are written again with them. The tag and commit
+            # go with them: since immutable releases (31 Oct 2026), GitHub
+            # drops a draft's tag when an edit does not name it, and the
+            # v1.2.13 draft read untagged-<hex> after a second run wrote its
+            # notes alone, so Ship and installer.yml could not find it by its
+            # tag (scripts\ops\Set-Ref.ps1 -RetagLauncher puts one back).
+            $patch = @{ body = $notes; tag_name = $tag; target_commitish = $env:RELEASE_COMMIT } | ConvertTo-Json
             $release = Invoke-RestMethod -Method Patch -Uri "$api/releases/$($release.id)" -Headers $headers -ContentType 'application/json' -Body $patch -ErrorAction Stop
           }
           if (-not $release) {
@@ -465,11 +488,10 @@ jobs:
   # a signed launcher. A job of its own gets a fresh GitHub runner, so the
   # machine that checks holds no signing client, no signing.json and no
   # Azure token and is not the one that signed: what it accepts it accepts
-  # on the files alone, the way an installed launcher does. No runner of the
-  # box checks it any more, so records\check-runners.json (#3956) names a
-  # label no job asks for, and #4033 takes it off with the sign record.
-  # contents: write only because a draft release is visible to nobody
-  # without push access.
+  # on the files alone, the way an installed launcher does. No VPS runner
+  # checks it any more (#4013), and #4033 took the signing and check
+  # runners' labels off. contents: write only because a draft release is
+  # visible to nobody without push access.
   verify:
     name: Check the signed draft on a second machine
     needs: launcher

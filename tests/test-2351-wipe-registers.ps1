@@ -62,8 +62,8 @@ $Moves = @()
 if ($assign.Count -eq 1) { $Moves = @(& ([scriptblock]::Create($assign[0].Right.Extent.Text))) }
 foreach ($n in 'world', 'private\characters.json', 'private\property.json', 'private\farm-claims.json',
                'private\law.json', 'private\beds.json', 'private\embassy.json', 'private\books.json',
-               'private\last-left.json', 'private\take-limit.json', 'private\trade-cargo.json', 'private\trade-carts.json', 'private\dungeon-rewards-ledger.json',
-               'private\dungeon-rewards-ledger.initialized', 'private\deleted-characters.json') {
+               'private\last-left.json', 'private\take-limit.json', 'private\trade-cargo.json', 'private\market-stalls.json', 'private\trade-carts.json',
+               'private\dungeon-rewards-ledger.json', 'private\dungeon-rewards-ledger.initialized', 'private\deleted-characters.json') {
     Yes "  it moves $n" ($Moves -contains $n)
 }
 Yes '  and leaves the mod menu choices and the merchant ledger' (-not ($Moves -contains 'private\mod-settings.json') -and -not ($Moves -contains 'private\merchant-ledger.json'))
@@ -104,6 +104,10 @@ function Lit($a) { return (($a | ForEach-Object { "'" + ($_ -replace "'", "''") 
 # The move sends the release list's writer too (#2668), so it is loaded here
 # as the script loads it, with the parts a wipe marks done.
 . (Join-Path $Repo 'scripts\ops\Release-List.ps1')
+# The stop and the start send the watchdog's hold too (#5155), loaded the
+# same way, its folder a scratch one that is never made, so no hold is written.
+. (Join-Path $Repo 'scripts\vps\ServerHold.ps1')
+$ThornswoodHoldRoot = Join-Path $T 'no-watchdog-here'
 $wd = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and "$($n.Left)" -eq '$WipeDone' }, $true))
 $WipeDone = @()
 if ($wd.Count -eq 1) { $WipeDone = @(& ([scriptblock]::Create($wd[0].Right.Extent.Text))) }
@@ -125,12 +129,12 @@ function RunBox([string]$body) {
 
 try {
     Put (Join-Path $Root 'server-settings.json') '{}'
-    Put (Join-Path $Root 'world\changeForms\ff000a01.json') '{"formDesc":"ff000a01","profileId":5001}'
+    Put (Join-Path $Root 'world\changeForms\ff000a01.json') '{"formDesc":"a01","profileId":5001}'
     # A character's change form is named by its slot number (0.json); the new release list names it (#2668).
-    Put (Join-Path $Root 'world\changeForms\0.json') '{"formDesc":"ff000a01","profileId":5001}'
+    Put (Join-Path $Root 'world\changeForms\0.json') '{"formDesc":"a01","profileId":5001}'
     Put (Join-Path $Root 'private\characters.json') '{"who":{"5001":{"name":"A"},"6001":{"name":"B"},"7001":{"name":"C"}}}'
     foreach ($f in 'property.json', 'farm-claims.json', 'law.json', 'beds.json', 'embassy.json', 'books.json', 'last-left.json',
-                   'take-limit.json', 'trade-cargo.json', 'trade-carts.json', 'dungeon-rewards-ledger.json', 'deleted-characters.json', 'mod-settings.json', 'merchant-ledger.json',
+                   'take-limit.json', 'trade-cargo.json', 'market-stalls.json', 'trade-carts.json', 'dungeon-rewards-ledger.json', 'deleted-characters.json', 'mod-settings.json', 'merchant-ledger.json',
                    'season.json', 'benches.json', 'door.json', 'war.json', 'company-terms.json') {
         Put (Join-Path $Root "private\$f") ('{"file":"' + $f + '"}')
     }
@@ -144,7 +148,7 @@ try {
     $chars = @($out | Where-Object { $_ -like 'CHARS|*' })
     Yes ('the survey counts the 3 characters in characters.json, and only there (' + ($chars -join ' ') + ')') ($chars.Count -eq 1 -and $chars[0] -eq 'CHARS|3')
     $items = @($out | Where-Object { $_ -like 'ITEM|*' })
-    Yes ('the survey lists the 15 things there that would go (' + $items.Count + ')') ($items.Count -eq 15 -and @($out | Where-Object { $_ -like '*|data\*' }).Count -eq 0)
+    Yes ('the survey lists the 16 things there that would go (' + $items.Count + ')') ($items.Count -eq 16 -and @($out | Where-Object { $_ -like '*|data\*' }).Count -eq 0)
 
     # ---- the stop, with a process running from the folder
     $node = (Get-Command node -ErrorAction SilentlyContinue)
@@ -163,19 +167,19 @@ try {
             @($out | Where-Object { $_ -eq ('ended process ' + $waiter.Id) }).Count -eq 1 -and ($out -contains 'stopped'))
         Yes '  and that process is gone' ($null -eq (Get-Process -Id $waiter.Id -ErrorAction SilentlyContinue))
     } else { Write-Host 'SKIP  the stop needs node to stand in for the server' }
-    Yes 'the script stops with nothing moved while a server is still running' (
-        $text -match "if \(\`$running\) \{ Die 'A server is still running, so nothing was moved\." -and
-        $text.IndexOf("if (`$running) { Die") -lt $text.IndexOf("Head 'Moving the old storage aside'"))
+    Yes 'the script stops with nothing moved while a server is still running, and takes its holds away first (#5155)' (
+        $text -match "(?s)if \(\`$running\) \{.{0,400}?Clear-ThornswoodHold.{0,300}?Die 'A server is still running, so nothing was moved\." -and
+        $text.IndexOf("if (`$running) {") -lt $text.IndexOf("Head 'Moving the old storage aside'"))
     Yes 'and no longer sleeps and looks for the server by the program''s path' ($text -notmatch "Start-Sleep -Seconds 3" -and $text -notmatch "Path\)`" -like '\*Thornswood-Server\*'")
 
     # ---- the move
     $stamp = '20261017-0100'
     $out = RunBox (Fill $move $stamp)
-    Yes 'the move says nothing failed' (@($out | Where-Object { $_ -like 'FAILED*' }).Count -eq 0 -and @($out | Where-Object { $_ -like 'moved*' }).Count -eq 15)
+    Yes 'the move says nothing failed' (@($out | Where-Object { $_ -like 'FAILED*' }).Count -eq 0 -and @($out | Where-Object { $_ -like 'moved*' }).Count -eq 16)
     $P = Join-Path $Root 'private'
     Yes 'the world goes aside as world-before-<date>' ((Test-Path (Join-Path $Root "world-before-$stamp\changeForms\ff000a01.json")) -and -not (Test-Path (Join-Path $Root 'world')))
     $ok = $true
-    foreach ($f in 'characters', 'property', 'farm-claims', 'law', 'beds', 'embassy', 'books', 'last-left', 'take-limit', 'trade-cargo', 'trade-carts', 'dungeon-rewards-ledger') {
+    foreach ($f in 'characters', 'property', 'farm-claims', 'law', 'beds', 'embassy', 'books', 'last-left', 'take-limit', 'trade-cargo', 'market-stalls', 'trade-carts', 'dungeon-rewards-ledger') {
         if (-not (Test-Path (Join-Path $P "$f-before-$stamp.json")) -or (Test-Path (Join-Path $P "$f.json"))) { $ok = $false; Write-Host "      not moved: $f.json" }
     }
     Yes 'every register naming a character goes aside under its own name with the date' $ok

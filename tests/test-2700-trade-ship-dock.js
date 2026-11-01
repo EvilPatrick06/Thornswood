@@ -10,13 +10,19 @@
 
     P  the module: the panel's words, a voyage as long as its route says, the
        next arrival, coin, the one charter call, a staff draft and what it
-       proposes, what a person sees at a dock
+       proposes, what a person sees at a dock, take and the days (#511)
     W  the block, started as the server starts it with a fake world: E on a
        crate opens the dock and never the container; a staff draft at a crate
        confirmed against the list it was proposed on; a load refused for no
        charter, for coin and for a full hold before the pack is touched; a
        load, a voyage and an arrival on their own; a collect and a take back,
        each through a receipt; an overdue ship docked at start
+    X  #511, Patrick's answers of 22 Oct 2026: anyone at a docked hold takes
+       from it, written as taken with their character and shown to staff;
+       a hold at sea opens for nobody; what nobody collects goes into the
+       port's hold drop box under the recipient's name after the staff
+       list's days, and the hold is free again; a box that will not take it
+       leaves it aboard and the clock waits an hour, not a spin
     R  the routes in: mp.onActivate asks the block first, /ship is a word and
        never one a player is told to type, the Office page offers staff the
        panel
@@ -143,13 +149,35 @@ try {
   const dv = D.dockView({ reg: reg, port: 'solitude', viewer: A, charter: { may: true, why: '' }, pack: pack, people: [A, Object.assign({ name: 'Onund' }, B)],
                           nameOf: function () { return 'Onund'; }, now: 0 });
   const h = dv.holds[0];
-  yes('P21 at a dock: the ship, lines used of 24, a loader sees their own line and not another\'s', dv.mode === 'dock' && h.used === 2 && h.max === 24 &&
-      h.lines.length === 1 && h.lines[0].forName === 'Onund' && h.others === 1);
-  yes('P22 the loader may take it back where it was loaded, nobody collects at the port it left', h.lines[0].canReturn && !h.lines[0].canCollect);
+  yes('P21 at a dock: the ship, lines used of 24, every line aboard shown, whose it is only to whom it concerns (#511)', dv.mode === 'dock' && h.used === 2 && h.max === 24 &&
+      h.lines.length === 2 && h.lines[0].forName === 'Onund' && h.lines[1].forName === 'someone else' && !('others' in h));
+  yes('P22 the loader may take it back where it was loaded, nobody collects at the port it left', h.lines[0].canReturn && !h.lines[0].canCollect && !h.lines[0].canTake);
+  yes('P22b and anybody else\'s line, they may take (Patrick, 22 Oct: A)', h.lines[1].canTake && !h.lines[1].canCollect && !h.lines[1].canReturn);
   yes('P23 gold is never offered as cargo', dv.pack.length === 1 && dv.pack[0].base === '5ace4');
   yes('P24 a charterer may load and sail where staff wrote a route', h.canLoad && h.sail.length === 1 && h.sail[0].to === 'windhelm' && h.sail[0].minutes === 90);
   const nv = D.dockView({ reg: reg, port: 'solitude', viewer: B, charter: { may: false, why: 'no' }, pack: pack, people: [B], now: 0 });
   yes('P25 without a charter: no load, no sail, no pack, and the why', !nv.holds[0].canLoad && !nv.holds[0].sail.length && !nv.pack.length && nv.charter.why === 'no');
+  const stranger = D.dockView({ reg: reg, port: 'solitude', viewer: { actor: 0xff000a09, profile: 5009 }, charter: { may: false, why: 'no' }, pack: [], people: [],
+                                nameOf: function () { return 'Onund'; }, now: 0 });
+  yes('P26 a stranger sees every line aboard, may take each, and never whose it is (#511)', stranger.holds[0].lines.length === 2 &&
+      stranger.holds[0].lines.every(function (l) { return l.canTake && !l.canCollect && !l.canReturn && l.forName === 'someone else'; }));
+  const asStaff = D.dockView({ reg: reg, port: 'solitude', viewer: { actor: 0xff000a09, profile: 5009 }, staff: true, charter: { may: true, why: '' }, pack: [], people: [],
+                               nameOf: function () { return 'Onund'; }, now: 0 });
+  yes('P27 staff at a dock see whose each line is', asStaff.holds[0].lines.every(function (l) { return l.forName === 'Onund'; }));
+  yes('P28 take is a panel word, like collect', JSON.stringify(D.parse(['/ship', 'take', 'ship-1', '2', '1'])) === '{"verb":"take","hold":"ship-1","line":2,"count":1}' &&
+      !!D.parse(['/ship', 'take', 'ship-1', 'x', '1']).why);
+  const dd = D.editDraft(T, routes, null, ['days', '3'], null);
+  yes('P29 staff set the days cargo waits in the draft only', dd.uncollectedDays === 3 && routes.uncollectedDays === 7 &&
+      D.waitOf(dd) === 3 * 86400000 && D.waitOf(routes) === 7 * 86400000);
+  throws('P30 days that are not whole days from 1 to 60 are refused', function () { D.editDraft(T, routes, null, ['days', '90'], null); }, /1 to 60/);
+  const tb = ships.begin(reg.state, 'ship-1', 2, 1, 'taken', A, 77);
+  ships.finish(reg.state, 'ship-1', tb.out, 'pc1');
+  const tl0 = D.takenOf(reg, { nameOf: function (pty) { return pty.actor === A.actor ? 'Brynja' : ''; }, itemName: function () { return 'Salt Pile'; } });
+  yes('P31 what was taken, for staff: the ship, the piece, how many, by which character, when', tl0.length === 1 && tl0[0].hold === 'ship-1' &&
+      tl0[0].item === 'Salt Pile' && tl0[0].count === 1 && tl0[0].by === 'Brynja' && tl0[0].at === 77);
+  const sv5 = D.staffView(T, reg, dd, null, { nameOf: function () { return 'Brynja'; } });
+  yes('P32 and staff see it with the days in force and drafted', sv5.taken.length === 1 && sv5.inForce.days === 7 && sv5.draft.days === 3 &&
+      sv5.changes.some(function (c) { return /after 3 days, not 7/.test(c); }));
 
   // ================================================================== W
   const gm = fs.readFileSync(path.join(REPO, 'game', 'gamemode.js'), 'utf8').split(String.fromCharCode(13)).join('');
@@ -199,6 +227,7 @@ try {
       }
     };
     if (opt.company !== false) { box.__thornswoodCompany = companyRule(opt.calls); }
+    if (opt.property) { box.__thornswoodProperty = opt.property; }
     box.globalThis = box;
     vm.createContext(box);
     const back = process.cwd();
@@ -249,7 +278,9 @@ try {
   const bBefore = JSON.stringify(w.pack(ACT.b));
   w.say(ACT.b, '/ship sail ship-1 windhelm');
   yes('W7 without the Trading Company\'s charter nobody sails, and is told why', /Only those the Trading Company charters/.test(w.view(ACT.b).note) && !w.disk().cargo.holds['ship-1'].sailing);
-  yes('W8 and sees no line that is not theirs, nor a pack to load', w.view(ACT.b).holds[0].lines.length === 1 && w.view(ACT.b).pack.length === 0 && JSON.stringify(w.pack(ACT.b)) === bBefore);
+  yes('W8 and sees what is aboard, who it is for only where it concerns them, and no pack to load', w.view(ACT.b).holds[0].lines.length === 2 &&
+      w.view(ACT.b).holds[0].lines[0].forName === 'you' && w.view(ACT.b).holds[0].lines[1].forName === 'someone else' &&
+      w.view(ACT.b).pack.length === 0 && JSON.stringify(w.pack(ACT.b)) === bBefore);
 
   for (let i = 0; i < 22; i++) { w.say(ACT.a, '/ship load ship-1 5ace4 0 1 ' + ACT.a.toString(16)); }
   yes('W9 one hold carries 24 lines', Object.keys(w.disk().cargo.holds['ship-1'].lines).length === 24 && w.view(ACT.a).holds[0].used === 24 && !w.view(ACT.a).holds[0].canLoad);
@@ -338,6 +369,100 @@ try {
   const all = w.logged.concat(w2.logged, w3.logged, w4.logged).join('\n');
   yes('W29 the log never says a form id or a profile id', [ACT.a, ACT.b, ACT.staff].every(function (n) { return all.indexOf(n.toString(16)) < 0 && all.indexOf(String(n)) < 0; }) &&
       ['5001', '5002', '5005'].every(function (p) { return all.indexOf(p) < 0; }));
+
+  // ================================================================== X
+  const DAY = 24 * 60 * 60 * 1000;
+  const PA = { actor: ACT.a, profile: 5001 }, PB = { actor: ACT.b, profile: 5002 };
+  function shipped(answer) {
+    const calls = [];
+    return { calls: calls, boxShipped: function (hold, entry, forName, from) { calls.push({ hold: hold, entry: entry, forName: forName, from: from }); return answer; } };
+  }
+  const rx = T.adoptRoutes(T.openRegister(null), ROUTES);
+  rx.ships.open(rx.state, 'ship-1', 'solitude');
+  rx.ships.load(rx.state, 'ship-1', { by: PA, for: PB, receipt: 'x1', entry: { baseId: IRON, count: 5 } });
+  rx.ships.load(rx.state, 'ship-1', { by: PA, for: PA, receipt: 'x2', entry: { baseId: SALT, count: 3 } });
+  rx.ships.depart(rx.state, 'ship-1', 'windhelm', 10, 20);
+  rx.ships.open(rx.state, 'ship-2', 'windhelm');
+  rx.ships.load(rx.state, 'ship-2', { by: PB, for: PA, receipt: 'x3', entry: { baseId: IRON, count: 2 } });
+  rx.ships.depart(rx.state, 'ship-2', 'solitude', 10, 10 + 365 * DAY);
+  const xtext = T.saveRegister(rx);
+
+  const bx = shipped(7);
+  const wx = start(server('take', xtext), { clock: { now: 1000 }, property: bx });
+  yes('X1 the ship docks as the server starts, landed then', wx.disk().cargo.holds['ship-1'].landed === 1000 && wx.disk().cargo.holds['ship-2'].landed === null);
+  wx.store[ACT.b].pos = [5010, 0, 0];
+  wx.press(ACT.b, CRATE.windhelm);
+  const seen = wx.view(ACT.b).holds[0].lines.filter(function (l) { return l.line === 2; })[0];
+  yes('X2 Onund sees Brynja\'s salt aboard, not whose it is, and may take it', !!seen && seen.canTake && seen.forName === 'someone else' && seen.count === 3);
+  wx.say(ACT.b, '/ship take ship-1 2 2');
+  const tk = wx.disk().cargo.holds['ship-1'].outs.filter(function (o) { return o.how === 'taken'; })[0];
+  yes('X3 he takes two: in his pack, and the manifest says taken, by his character, through a receipt', wx.view(ACT.b).note === 'Taken.' && count(wx.pack(ACT.b), SALT) === 2 &&
+      !!tk && tk.count === 2 && tk.who.actor === ACT.b && tk.who.profile === 5002 && /^credit:/.test(tk.receipt));
+  wx.say(ACT.b, '/ship take ship-2 3 1');
+  yes('X4 a hold at sea is at no dock, so nobody opens it', /not at this dock/.test(wx.view(ACT.b).note) && count(wx.pack(ACT.b), IRON) === 0 &&
+      wx.disk().cargo.holds['ship-2'].lines['3'].aboard === 2);
+  wx.say(ACT.staff, '/ship staff');
+  const tl = wx.view(ACT.staff).taken;
+  yes('X5 staff see what was taken, from which ship, by which character', tl.length === 1 && tl[0].hold === 'ship-1' && tl[0].by === 'Onund' && tl[0].count === 2 && tl[0].at === 1000);
+  yes('X6 and the days cargo waits, 7 by default', wx.view(ACT.staff).inForce.days === 7);
+  const lx = wx.timers.filter(function (t) { return t.live; });
+  yes('X7 the clock waits an hour at most for the seventh day', lx.length === 1 && lx[0].ms === 60 * 60 * 1000);
+  wx.clock.now = 1000 + 7 * DAY - 1;
+  wx.fire();
+  yes('X8 a moment short of seven days nothing moves', bx.calls.length === 0 && wx.disk().cargo.holds['ship-1'].lines['1'].aboard === 5);
+  wx.clock.now = 1000 + 7 * DAY;
+  wx.fire();
+  const outs = wx.disk().cargo.holds['ship-1'].outs.filter(function (o) { return o.how === 'left'; });
+  yes('X9 at seven days both lines go into Windhelm\'s drop box, each under its recipient\'s name', bx.calls.length === 2 &&
+      bx.calls.every(function (c) { return c.hold === 'windhelm'; }) &&
+      bx.calls.some(function (c) { return c.forName === 'Onund' && c.entry.baseId === IRON && c.entry.count === 5; }) &&
+      bx.calls.some(function (c) { return c.forName === 'Brynja' && c.entry.baseId === SALT && c.entry.count === 1; }));
+  yes('X10 the manifest says left, through a box receipt, and nothing is aboard or pending', outs.length === 2 && outs.every(function (o) { return /^box:/.test(o.receipt); }) &&
+      T.countsOf(T.openRegister(JSON.stringify(wx.disk()))).pending === 0 &&
+      wx.disk().cargo.holds['ship-1'].lines['1'].aboard === 0 && wx.disk().cargo.holds['ship-1'].lines['2'].aboard === 0);
+  wx.press(ACT.b, CRATE.windhelm);
+  yes('X11 and the ship is free again: no line used', wx.view(ACT.b).holds[0].used === 0 && wx.view(ACT.b).holds[0].lines.length === 0);
+  yes('X12 the log says how many, never who', wx.logged.some(function (l) { return /2 line\(s\) nobody collected went into the drop box/.test(l); }) &&
+      wx.logged.every(function (l) { return l.indexOf('Onund') < 0 && l.indexOf('Brynja') < 0; }));
+  wx.say(ACT.staff, '/ship draft days 0');
+  yes('X13 staff set the days: none is refused', /whole number from 1 to 60/.test(wx.view(ACT.staff).note));
+  wx.say(ACT.staff, '/ship draft days 3');
+  const sv4 = wx.view(ACT.staff);
+  yes('X14 three is a draft, and the proposal says so', sv4.draft.days === 3 && sv4.changes.some(function (c) { return /after 3 days, not 7/.test(c); }) && sv4.canConfirm);
+  wx.say(ACT.staff, '/ship confirm ' + sv4.base);
+  yes('X15 confirmed, it is in force on disk', wx.disk().routes.uncollectedDays === 3);
+
+  const bad = shipped(0);
+  const wy = start(server('box-refused', xtext), { clock: { now: 1000 }, property: bad });
+  wy.clock.now = 1000 + 7 * DAY;
+  wy.fire();
+  yes('X16 a drop box that will not take it leaves every piece aboard, nothing pending', bad.calls.length === 2 &&
+      wy.disk().cargo.holds['ship-1'].lines['1'].aboard === 5 && T.countsOf(T.openRegister(JSON.stringify(wy.disk()))).pending === 0);
+  wy.clock.now = 1000 + 7 * DAY + 2 * 60 * 60 * 1000;
+  for (let i = 0; i < 5; i++) { wy.fire(); }
+  yes('X17 and is not tried again on a clock: hours on, the box was asked nothing more', bad.calls.length === 2 &&
+      wy.disk().cargo.holds['ship-1'].lines['1'].aboard === 5);
+  wy.say(ACT.staff, '/ship add windhelm');
+  for (let i = 0; i < 5 && bad.calls.length === 2; i++) { wy.fire(); }
+  yes('X17b the next change to the register that goes through looks at it again', bad.calls.length === 4 &&
+      wy.disk().cargo.holds['ship-1'].lines['1'].aboard === 5);
+  const wz = start(server('no-boxes', xtext), { clock: { now: 1000 } });
+  wz.clock.now = 1000 + 7 * DAY;
+  wz.fire();
+  yes('X18 with no drop boxes running, it waits aboard and the log says so', wz.disk().cargo.holds['ship-1'].lines['1'].aboard === 5 &&
+      wz.logged.some(function (l) { return /drop boxes are not running/.test(l); }));
+
+  const old = JSON.parse(xtext);
+  old.cargo.holds['ship-2'].sailing = null; old.cargo.holds['ship-2'].port = 'windhelm';
+  delete old.cargo.holds['ship-2'].landed;
+  const oldText = JSON.stringify(old);
+  const wo = start(server('before-landed', oldText), { clock: { now: 4000 } });
+  yes('X19 a register whose ship does not say when it landed is refused whole, not carried over (alpha), and left as it was',
+      wo.logged.some(function (l) { return /could not be read \(Hold ship-2's landing cannot be verified/.test(l); }) &&
+      JSON.stringify(wo.disk()) === JSON.stringify(old));
+  const allx = wx.logged.concat(wy.logged, wz.logged, wo.logged).join('\n');
+  yes('X20 the log never says a form id or a profile id', [ACT.a, ACT.b, ACT.staff].every(function (n) { return allx.indexOf(n.toString(16)) < 0 && allx.indexOf(String(n)) < 0; }) &&
+      ['5001', '5002', '5005'].every(function (p) { return allx.indexOf(p) < 0; }));
 
   // ================================================================== R
   const onAct = gm.slice(gm.indexOf("mp.onActivate = guard('onActivate'"), gm.indexOf('const shut = benchGate(casterRefrId, baseDesc);'));

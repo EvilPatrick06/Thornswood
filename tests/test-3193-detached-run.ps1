@@ -108,7 +108,11 @@ function Invoke-51([string]$text) {
 # done, so the first read finds it still going however slowly this machine
 # starts a Windows PowerShell (a fixed three seconds was not enough on One,
 # where the start and the first read took longer, #3861).
-function Invoke-Run([string]$script, [string]$Go = '', [int]$SessionPid = 0, [int]$SessionWait = 120) {
+#
+# With -GoOnceRead too, the go file is made only once the run has read its
+# session file too, which it deletes as it reads it, so a stand-in session
+# that -Go lets go is still open when the run looks for it (#5159).
+function Invoke-Run([string]$script, [string]$Go = '', [int]$SessionPid = 0, [int]$SessionWait = 120, [switch]$GoOnceRead) {
     $run = Get-ThornswoodDetachedRun -Script $script -Folder $scratch -SessionWait $SessionWait
     # A harness has no ssh session above it, so the start names none; this
     # names a process of the harness's in its place.
@@ -122,13 +126,13 @@ function Invoke-Run([string]$script, [string]$Go = '', [int]$SessionPid = 0, [in
         $p = Get-CimInstance Win32_Process -Filter ("ProcessId=" + $runPid) -ErrorAction SilentlyContinue
         if ($p) { $q = Get-CimInstance Win32_Process -Filter ("ProcessId=" + $p.ParentProcessId) -ErrorAction SilentlyContinue; if ($q) { $parent = $q.Name } }
     }
-    $lines = @(); $first = $null
+    $lines = @(); $first = $null; $went = $false
     $until = (Get-Date).AddMinutes(1)
     while ((Get-Date) -lt $until) {
         $rd = Invoke-51 $run.Read
-        if ($null -eq $first) {
-            $first = ($rd.Out -join '|')
-            if ($Go) { [IO.File]::WriteAllText($Go, 'go') }
+        if ($null -eq $first) { $first = ($rd.Out -join '|') }
+        if ($Go -and -not $went -and -not ($GoOnceRead -and (Test-Path -LiteralPath ($run.File + '.session')))) {
+            [IO.File]::WriteAllText($Go, 'go'); $went = $true
         }
         if ($rd.Out.Count -and $rd.Out[0] -match '^REPORT \d+$') {
             $lines = @($rd.Out | Select-Object -Skip 1)
@@ -174,9 +178,19 @@ try {
         ($b.Lines -join '|') -eq 'before|ERROR stops here|END 1')
 
     Write-Host ''
-    Write-Host 'A run whose starting session is still open for a few seconds:'
-    $sleeper = Start-Process -FilePath $ps51 -ArgumentList '-NoProfile', '-Command', 'Start-Sleep -Seconds 6' -PassThru -WindowStyle Hidden
-    $d = Invoke-Run ("if (Get-Process -Id " + $sleeper.Id + " -ErrorAction SilentlyContinue) { 'session still open' } else { 'session gone' }") -SessionPid $sleeper.Id
+    Write-Host 'A run whose starting session is still open until it is let go:'
+    # #5159: the stand-in session slept a fixed 6 s, which a loaded machine
+    # spent before the run looked for it, and the script asked for it by its
+    # id alone, which Windows had by then given to another process, so the
+    # script said "session still open" after the session had ended. Now it
+    # stays until it is let go, once the run has read the session file, and
+    # the script asks for that id and that start time both.
+    $let = Join-Path $scratch 'session-let-go'
+    $sleeper = Start-Process -FilePath $ps51 -ArgumentList '-NoProfile', '-Command', ("`$t = (Get-Date).AddMinutes(1); while (-not (Test-Path -LiteralPath '" + $let + "') -and (Get-Date) -lt `$t) { Start-Sleep -Milliseconds 100 }") -PassThru -WindowStyle Hidden
+    try {
+        $born = $sleeper.StartTime.Ticks
+        $d = Invoke-Run ("`$q = Get-Process -Id " + $sleeper.Id + " -ErrorAction SilentlyContinue`r`nif (`$q -and `$q.StartTime.Ticks -eq " + $born + ") { 'session still open' } else { 'session gone' }") -SessionPid $sleeper.Id -Go $let -GoOnceRead
+    } finally { Stop-Process -Id $sleeper.Id -Force -ErrorAction SilentlyContinue }
     Yes '  none of its script runs until that session has ended (#3214)' (($d.Lines -join '|') -eq 'session gone|END 0')
     Yes '  and the session file is gone' (-not (Test-Path -LiteralPath ($d.Run.File + '.session')))
 

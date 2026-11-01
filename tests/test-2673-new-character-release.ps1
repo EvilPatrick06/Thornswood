@@ -112,8 +112,8 @@ function Forms([string]$root) { return @(Get-ChildItem -LiteralPath (Join-Path $
 function Server([string]$name, [string]$settings) {
     $root = Join-Path $T $name
     Put (Join-Path $root 'server-settings.json') $settings
-    Put (Join-Path $root 'world\changeForms\0.json') ('{"formDesc":"ff000a01","profileId":5001,"appearanceDump":{"name":"A"}}')
-    Put (Join-Path $root 'world\changeForms\1.json') ('{"formDesc":"ff000a02","profileId":5002}')
+    Put (Join-Path $root 'world\changeForms\0.json') ('{"formDesc":"a01","profileId":5001,"appearanceDump":{"name":"A"}}')
+    Put (Join-Path $root 'world\changeForms\1.json') ('{"formDesc":"a02","profileId":5002}')
     # Not a character made in the world (a plugin in its desc), and a world object: neither is named.
     Put (Join-Path $root 'world\changeForms\2.json') ('{"formDesc":"a01:Skyrim.esm","profileId":5003}')
     Put (Join-Path $root 'world\changeForms\13164_JKs Whiterun.esp.json') ('{"formDesc":"13164:JKs Whiterun.esp"}')
@@ -174,7 +174,7 @@ try {
     Yes 'N13 with nobody to throw away, no list is written' ($x.code -eq 0 -and -not (Test-Path -LiteralPath (Join-Path $n6 'private\deleted-characters.json')))
 
     $n7 = Join-Path $T 'loose\forms'
-    Put (Join-Path $n7 '0.json') ('{"formDesc":"ff000a01","profileId":5001}')
+    Put (Join-Path $n7 '0.json') ('{"formDesc":"a01","profileId":5001}')
     $x = RunNew $ps51 @('-World', $n7)
     Yes ('N14 a -World that is not a server''s world\changeForms stops it with nothing moved (' + (@($x.out | Where-Object { $_ -like 'STOP*' }) -join ' / ') + ')') (
         $x.code -eq 1 -and (Test-Path -LiteralPath (Join-Path $n7 '0.json')) -and

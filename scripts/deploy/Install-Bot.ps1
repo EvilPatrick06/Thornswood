@@ -209,7 +209,7 @@ if ($SetPing) {
   $writer = Join-Path $Here '..\vps\Write-BotToken.ps1'
   if (-not (Test-Path -LiteralPath $writer)) { Die "missing: $writer" }
   Head 'Into bot.env.json, then the bot restarted by name'
-  $out = Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $pingUrl -Script ((Get-Content -LiteralPath $writer -Raw) + "`n" + @"
+  $out = Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $pingUrl -Script ((Get-ThornswoodHoldScript -Script 'Install-Bot.ps1') + (Get-Content -LiteralPath $writer -Raw) + "`n" + @"
 `$ErrorActionPreference = 'Continue'
 `$u = `$ThornswoodSecret; `$ThornswoodSecret = `$null
 `$f = '$rootWin\bot.env.json'
@@ -653,7 +653,7 @@ function Invoke-BotSwap([bool]$noServiceOk) {
   if ($PutBack) { $pick = $putBackPick }
   $svcLib = Join-Path $Here '..\vps\Bot-Service.ps1'
   if (-not (Test-Path -LiteralPath $svcLib)) { Die "missing: $svcLib" }
-  $vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @()) + ('$NoServiceOk = $' + $noServiceOk + "`r`n") + ('$Dirs = @(''py-libs'')' + "`r`n")
+  $vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @() $Service) + ('$NoServiceOk = $' + $noServiceOk + "`r`n") + ('$Dirs = @(''py-libs'')' + "`r`n")
   # The bot's folder holds what this run sends and what is the bot's own
   # (Get-ThornswoodBotOwned, issue #1184), so the swap moves anything else
   # there aside with what the new code replaces. After Bot-Service.ps1, which
@@ -661,7 +661,7 @@ function Invoke-BotSwap([bool]$noServiceOk) {
   # looks at nothing.
   $owns = ''
   if (-not $PutBack) { $owns = '$Owns = @(Get-ThornswoodBotOwned)' + "`r`n" }
-  $out = @(Remote ($vars + $ThornswoodStopAndMoveText + (Get-Content -LiteralPath $svcLib -Raw) + "`n" + $owns + $botHooks + $pick + $serviceSwapBlock) |
+  $out = @(Remote ($vars + (Get-ThornswoodHoldScript -Script 'Install-Bot.ps1') + $ThornswoodStopAndMoveText + (Get-Content -LiteralPath $svcLib -Raw) + "`n" + $owns + $botHooks + $pick + $serviceSwapBlock) |
            ForEach-Object { Say "  $_"; "$_".Trim() })
   if (-not (Show-SwapResult $out "$rootWin\.prev-<stamp>")) { Die 'the bot was not swapped in. The lines above say what is running.' }
   return $out
@@ -747,7 +747,7 @@ function Confirm-BotFiles([string[]]$must) {
   $svcLib = Join-Path $Here '..\vps\Bot-Service.ps1'
   if (-not (Test-Path -LiteralPath $svcLib)) { Die "missing: $svcLib" }
   Head 'What the box has, at the folder the swap moved them to'
-  $out = @(Remote ((BotThereVars $Root $Service $must) + $ThornswoodStopAndMoveText + (Get-Content -LiteralPath $svcLib -Raw) + "`n" + $botThereBlock) |
+  $out = @(Remote ((BotThereVars $Root $Service $must) + (Get-ThornswoodHoldScript -Script 'Install-Bot.ps1') + $ThornswoodStopAndMoveText + (Get-Content -LiteralPath $svcLib -Raw) + "`n" + $botThereBlock) |
            ForEach-Object {
              $s = "$_".Trim()
              $c = 'Gray'
@@ -912,7 +912,7 @@ $writer = Join-Path $Here '..\vps\Write-BotToken.ps1'
 if (-not (Test-Path -LiteralPath $writer)) { Die "missing: $writer" }
 
 Head 'Settings, and the key the site will check'
-$settings = Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $payload -Script ((Get-Content -LiteralPath $writer -Raw) + "`n" + @"
+$settings = Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $payload -Script ((Get-ThornswoodHoldScript -Script 'Install-Bot.ps1') + (Get-Content -LiteralPath $writer -Raw) + "`n" + @"
 `$ErrorActionPreference = 'Stop'
 `$env:PATH = [Environment]::GetEnvironmentVariable('PATH','Machine') + ';' + [Environment]::GetEnvironmentVariable('PATH','User')
 `$p = `$null
@@ -1056,7 +1056,7 @@ $null = Remote "New-Item -ItemType Directory -Force -Path '$rootWin\service' | O
 Invoke-ThornswoodNative { & scp @ssh $svcSrc "${User}@${Vps}:$Root/service/BotService.cs" } | Out-Null
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE for BotService.cs. The bot was not touched." }
 Say '  service\BotService.cs' 'Green'
-$running = @(Remote ($ThornswoodStopAndMoveText + (Get-Content -LiteralPath $svcLib -Raw) + "`n" + @"
+$running = @(Remote ((Get-ThornswoodHoldScript -Script 'Install-Bot.ps1') + $ThornswoodStopAndMoveText + (Get-Content -LiteralPath $svcLib -Raw) + "`n" + @"
 `$ErrorActionPreference = 'Continue'
 # Remember how long the log is, and read back only what is written past that.
 # Waiting for the words 'watching 1 server' to appear is no good on its own:

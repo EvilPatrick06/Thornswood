@@ -127,9 +127,11 @@ Press **Confirm** on the Review page and you are sent to a quiet spot in or
 near the town you chose, not its inn.
 
 You start with forty gold, once, and nothing else is handed out, except a tool
-to the four picks whose work needs one: a Miner is handed a pickaxe, a
-Woodworker a woodcutter's axe, a Farmer a shovel and seed to sow, and a Fisher
-a crude fishing pole. Each tool is handed over at the moment its pick is made.
+to the nine picks whose work needs one: a Miner is handed a pickaxe, a
+Woodworker a woodcutter's axe, a Farmer a shovel and seed to sow, a Fisher a
+crude fishing pole, a Smith a hammer, a Tailor a pair of shears, a Cook a
+wooden ladle, an Alchemist an alembic and an Enchanter a rune knife. Each tool
+is handed over at the moment its pick is made.
 
 ## Keys
 
@@ -236,8 +238,9 @@ using it to get out of a fight or to travel can mean a warning or a ban.
    Discord, or say in the report that you have one. Where the logs are is below.
 
 A launcher last opened before 26 September says it cannot read the update
-source, or never offers an update. Updates come only from thornswood.net now,
-and a launcher that old still looks for them where they used to be, so it
+source, or never offers an update. Updates are asked for at thornswood.net now
+(the site may send the launcher on to GitHub for the files themselves), and a
+launcher that old still looks for them where they used to be, so it
 cannot find the new place by itself. Take the installer again from the
 [Downloads](/downloads) page and run it over your install. Your characters live
 on the server and nothing is lost.
@@ -292,6 +295,10 @@ The easy way to send them: in the launcher open **Diagnostics** and press
 extender log, your plugin list and the launcher log, and opens the folder it
 is in. Drag that zip into your ticket in the Discord. **Settings**, **Open log**
 opens the launcher log on its own.
+
+You often do not need to: when the game closes, the launcher sends the site
+that session's logs on its own, so staff may already see what went wrong.
+The [privacy](/privacy) page says which files go and what is in them.
 
 ## When you die
 

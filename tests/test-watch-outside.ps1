@@ -60,7 +60,7 @@ $ipLike = $null
 Yes 'the game''s name comes from scripts\vps\vps.json, a name and not the box''s address (#3690)' ($S.GameHost -and -not [Net.IPAddress]::TryParse($S.GameHost, [ref]$ipLike))
 Yes 'the certificate line is 14 days' ($S.CertDays -eq 14)
 Yes 'the webhook''s channel is #staff-updates, bot\staff-channel.txt''s id (#2501)' ($S.StaffChannel -eq '1549254991082946570')
-Yes 'the runners are the repository''s, from thornswood-vps' ($S.Repo -eq 'EvilPatrick06/Thornswood' -and $S.RunnerName -eq 'thornswood-vps')
+Yes 'the runners are Thornswood-Ops''s, where the box''s runners are registered since the flip (#4013), from thornswood-vps' ($S.Repo -eq 'EvilPatrick06/Thornswood-Ops' -and $S.RunnerName -eq 'thornswood-vps')
 Yes 'signing and the off-box copy are not asked from outside any more (#2755)' (-not $S.ContainsKey('SignAccount') -and -not $S.ContainsKey('BackupsFolder'))
 
 $dir = Join-Path $Temp ('thornswood-watchoutside-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -110,7 +110,8 @@ try {
   Yes '  it runs this script from where it is, with the two secrets by name' (
     $here -match '\./scripts/vps/Watch-Outside\.ps1 -Run -Folder state' -and $here -match 'WATCH_WEBHOOK: \$\{\{ secrets\.STAFF_WEBHOOK \}\}' -and $here -match 'WATCH_RUNNER_TOKEN: \$\{\{ secrets\.RUNNER_TOKEN \}\}')
   Yes '  on GitHub''s runners, off the box' ($here -match 'runs-on: ubuntu-latest' -and $here -notmatch 'self-hosted')
-  Yes '  only once the variable WATCH_OUTSIDE says here, so a private repository is never billed for it' ($here -match "if: \$\{\{ vars\.WATCH_OUTSIDE == 'here' \}\}")
+  Yes '  only once the variable WATCH_OUTSIDE says here, so it and the old repository''s watcher never both post' ($here -match "if: \$\{\{ vars\.WATCH_OUTSIDE == 'here' \}\}")
+  Yes '  its two secrets come from the watch environment, which only main may use' ($here -match '(?m)^\s+environment: watch\s*$')
   Yes '  it keeps its memory the way the public one does' ($here -match 'restore-keys: watch-outside-' -and $here -match 'key: watch-outside-\$\{\{ github\.run_id \}\}-')
   Yes '  it reads the repository and writes nothing to it' ($here -match "permissions:\s+contents: read" -and $here -notmatch 'contents: write')
 
@@ -286,7 +287,7 @@ try {
   Yes 'runner offline for two runs: nothing yet, it restarts itself on updates' ((Posted '*build runner*') -eq 0)
   $null = Pass-Once
   Yes 'runner offline for three runs: one message' ((Posted '*build runners, thornswood-vps and the numbered ones, are not all online on GitHub*') -eq 1)
-  Yes 'it says what that stops' ((Posted '*Launcher builds*') -eq 1)
+  Yes 'it says what that stops: the box''s jobs on Thornswood-Ops (#4013)' ((Posted '*Thornswood-Ops*deploys through the gate*') -eq 1)
   $null = Pass-Once
   $script:runner = 'online'
   $null = Pass-Once; $null = Pass-Once

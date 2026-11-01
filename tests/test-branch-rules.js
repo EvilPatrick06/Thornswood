@@ -84,13 +84,15 @@ yml.forEach(function (l) {
 });
 // No check is required since 25 September (the build check on GitHub is off),
 // but the job keeps its name, so turning the requirement back on is one setting.
-// #1306: the hosted job is the build; launcher-vps is only its fallback, run
-// when the hosted one is skipped or fails, and never on a pull request.
-// #3182: "tested" builds nothing either; it only asks whether a pull request
-// build already passed main's tree, and both build jobs wait for its answer.
-// #3551: so does its VPS fallback, tested-vps.
-const main = jobs.filter(function (j) { return j.id !== 'launcher-vps' && j.id !== 'tested' && j.id !== 'tested-vps'; });
-yes('build.yml has exactly one build job besides the VPS fallback, so one required check covers it (found ' + main.length + ')', main.length === 1);
+// #1306: the hosted job is the build, the only one since #4983.
+// #3182: "tested" builds nothing; it only asks whether a pull request build
+// already passed main's tree, and the build job waits for its answer.
+// 31 Oct 2026: "gate" runs the gate harnesses in shares beside the build;
+// the required "Build check result" (#3683, build-pr.yml) needs both.
+const main = jobs.filter(function (j) { return j.id !== 'tested' && j.id !== 'gate'; });
+yes('build.yml has exactly one build job beside its gate (found ' + main.length + ')', main.length === 1);
+const prYml = read('.github/workflows/build-pr.yml');
+yes('  and the required check of a pull request needs the build and the gate both', /\n    name: Build check result\n    needs: \[launcher, gate\]\n/.test(prYml));
 const CHECK = main.length ? main[0].name : null;
 yes('that job is named "Launcher builds" (found "' + CHECK + '")', CHECK === 'Launcher builds');
 
@@ -237,13 +239,20 @@ docs.forEach(function (d) {
   yes(d.name + ' gives the command that reads the live settings', t.indexOf(PROTECTION) !== -1);
 
   // What stopped being true. Ship writes nothing to the source repository,
-  // nobody pushes straight to main, and nothing merges by itself because
-  // auto-merge is off on the repository.
+  // and nobody pushes straight to main.
   yes(d.name + ' does not say a Ship commits and pushes the source',
       !/commits and pushes the source|commits the source and push/i.test(t));
   yes(d.name + ' does not describe work going straight to main', !/(goes|going) straight to main/i.test(t));
-  yes(d.name + ' does not say a pull request merges itself', !/merges itself/i.test(t));
 });
+
+// #5182 (Patrick's A, 31 Oct 2026): auto-merge is on, and a pull request
+// merges once main's ruleset's required check is green. The guide says so,
+// gives the command, and no longer says auto-merge is off.
+const guideText = docs[0].text;
+yes('Developer-Guide.md says auto-merge is on (#5182)', /auto-merge is on/i.test(guideText));
+yes('Developer-Guide.md gives gh pr merge --auto --squash', guideText.indexOf('gh pr merge --auto --squash') !== -1);
+yes('Developer-Guide.md does not say auto-merge is off', !/auto-merge is off/i.test(guideText));
+yes('Developer-Guide.md says main\'s ruleset requires Build check result', /ruleset[^.]*requires[^.]*Build check result/.test(guideText));
 
 const sd = docs[0].text;
 // #3617. While enforce_admins is off, "GitHub refuses it" is true only for
@@ -313,14 +322,18 @@ if (!LIVE) {
   }
   yes('gh read the ruleset rules on main', Array.isArray(rs));
   if (Array.isArray(rs)) {
-    yes('live: no ruleset reaches main, so the admin account is held to nothing, as the documents say (GitHub says ' +
-        JSON.stringify(rs.map(function (r) { return r.type; })) + ')', rs.length === 0);
+    // Since 31 Oct 2026 (#3683) main's ruleset requires Build check result
+    // and holds the admin too; auto-merge (#5182) leans on it.
+    const required = rs.filter(function (r) { return r.type === 'required_status_checks'; })
+      .some(function (r) { return ((r.parameters && r.parameters.required_status_checks) || []).some(function (c) { return c.context === 'Build check result'; }); });
+    yes('live: main\'s ruleset requires Build check result (GitHub says ' +
+        JSON.stringify(rs.map(function (r) { return r.type; })) + ')', required);
   }
   let auto = null;
   try {
     auto = execSync('gh api repos/EvilPatrick06/Thornswood --jq .allow_auto_merge', { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] }).toString('utf8').trim();
   } catch (e) { }
-  yes('live: auto-merge is off, so nothing merges by itself (GitHub says ' + auto + ')', auto === 'false');
+  yes('live: auto-merge is on, as the guide says (#5182; GitHub says ' + auto + ')', auto === 'true');
 }
 
 console.log('');

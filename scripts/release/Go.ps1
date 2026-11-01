@@ -76,6 +76,8 @@ $ProgressPreference    = 'SilentlyContinue'
 
 $Here    = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $Here '..\vps\Vps.ps1')
+# The hold the voice restart writes while voice is stopped (#5155).
+. (Join-Path $Here '..\vps\ServerHold.ps1')
 # Text from the repo goes in with CRLF line endings on every machine, as every
 # release has carried it (ShippedBytes.ps1, #2903).
 . (Join-Path $Here 'ShippedBytes.ps1')
@@ -383,8 +385,10 @@ foreach ($pair in $menuPairs) {
 # ------------------------------------------------ our own menu files --
 # The empty loading spinner, the silent stand-in for the game's theme,
 # SkyHUD's settings as Thornswood set them, QuickLoot IE's with no gold
-# value column (#3113), and the crafting menu's groups, item type first with
-# material groups inside, and their English names (#3133). From game\ours, beside
+# value column (#3113), the crafting menu's groups, item type first with
+# material groups inside, and their English names (#3133), and the Barlow
+# SemiBold sprite font the voice mark draws its dot in, with its licence
+# (#1317). From game\ours, beside
 # game\menu. Each path is
 # the path in the game folder, so the destination is the name itself
 # (Ship-Rules $ShipOursFiles; change the two together). The destination
@@ -399,7 +403,9 @@ $oursMenuFiles = @(
   'Data\Interface\skyhud\skyhud.txt',
   'Data\SKSE\Plugins\QuickLootIE.json',
   'Data\SKSE\Plugins\CraftingCategories\Thornswood-Content.json',
-  'Data\Interface\Translations\Thornswood-Content_ENGLISH.txt'
+  'Data\Interface\Translations\Thornswood-Content_ENGLISH.txt',
+  'Data\Platform\Fonts\Barlow-SemiBold.spritefont',
+  'Data\Platform\Fonts\Barlow-SemiBold-OFL.txt'
 )
 foreach ($rel in $oursMenuFiles) {
   $src = Join-Path $oursSrc $rel
@@ -424,7 +430,8 @@ foreach ($rel in $oursMenuFiles) {
 # The collection's item menus and HUD with no gold values are made the same
 # way from the mods' own archives in this game (#3113, Ship-Rules
 # $ShipMadeFromMods): SkyUI's config.txt and itemcard.swf, SkyHUD's
-# hudmenu.swf and moreHUD's AHZHudInfo.swf, two copies.
+# hudmenu.swf and moreHUD's AHZHudInfo.swf, two copies. And SkyUI's
+# quest_journal.swf with no saving, loading, help or Creation Club (#3127).
 Head 'Made from the game'
 if (-not ('Thornswood.FromGame' -as [type])) {
   $fromGameCs = @(Get-ChildItem -LiteralPath (Join-Path $Here '..\..\launcher\app') -Filter 'FromGame*.cs' -File |
@@ -651,8 +658,10 @@ if (-not $SkipServer) {
   if (Test-Path -LiteralPath $vsrc) {
     Invoke-ThornswoodNative { & scp -o BatchMode=yes -o StrictHostKeyChecking=yes $vsrc "$User@${Vps}:C:/Thornswood-Voice/voice-server.js" } 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0) {
-      $restart = @'
+      $restart = (Get-ThornswoodHoldScript -Script 'Go.ps1') + @'
 $ProgressPreference = 'SilentlyContinue'
+# Held from the stop until it is started again (#5155, ServerHold.ps1).
+Set-ThornswoodHold -Target 'Thornswood Voice' -Why 'restarting voice on the new voice-server.js' -By $HoldBy
 Stop-ScheduledTask -TaskName 'Thornswood Voice' -EA SilentlyContinue
 Get-CimInstance Win32_Process |
   Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like '*voice-server*' } |
@@ -664,12 +673,13 @@ for ($i = 0; $i -lt 20; $i++) {
   # empty answer. A list that cannot be read stops this run, said, before
   # the task is started into a port that may still be taken.
   try { $busy = @(Get-NetTCPConnection -State Listen -ErrorAction Stop | Where-Object { $_.LocalPort -eq 7778 }).Count -gt 0 }
-  catch { 'could not list the ports in use, so the voice task was not started again: ' + $_.Exception.Message; exit 1 }
+  catch { Clear-ThornswoodHold -Target 'Thornswood Voice'; 'could not list the ports in use, so the voice task was not started again: ' + $_.Exception.Message; exit 1 }
   if (-not $busy) { break }
   Start-Sleep -Milliseconds 500
 }
 Start-ScheduledTask -TaskName 'Thornswood Voice' -EA SilentlyContinue
 Start-Sleep -Seconds 2
+Clear-ThornswoodHold -Target 'Thornswood Voice'
 try { (Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:7778/health' -TimeoutSec 5).Content }
 catch { 'voice did not answer its own health check' }
 '@

@@ -209,6 +209,24 @@
   dist\server> is the way to send only its order and plugins: then the order
   is read from that build and written over the dev one, as -LoadOrder did
   before. Nothing names a build folder by default any more.
+
+  FROM THE RECORD (#4069). A new collection revision moves the order and
+  brings plugins no machine but One had, so until 31 Oct 2026 a server could
+  only move to one from One's Vortex game. -LoadOrder -FromRecord is the move
+  from the box, through the deploy gate:
+
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Deploy-DevGamemode -LoadOrder -FromRecord -ShipFollows'
+
+  The order is game\data\last-plugin.json's loadOrder, the one every table
+  and the Last plugin of this commit were built against, with
+  Thornswood-Last.esp on the end. The collection's plugins come from the
+  box's store of the revision records\collection-plugins.json names
+  (CollectionStore.ps1), which this fills from Nexus through Nexus-Run when
+  it is not whole, each held to the record's sha256 before it goes in and
+  again before it is sent. An order that drops a plugin the dev server loads
+  is refused as -Dist's is, unless records\collection-dropped.json names it
+  for that revision, with why its forms can go: the repository says what a
+  move may take out, never the line that runs it.
 #>
 [CmdletBinding()]
 param(
@@ -248,9 +266,19 @@ param(
   # the dev server already has and reads it off the box (WHERE THE ORDER COMES
   # FROM in the header, #2309); no build folder is assumed.
   [string]$Dist = '',
+  # The order collection revision the repository records, from the box
+  # (#4069): with -LoadOrder, the order game\data\last-plugin.json was built
+  # against is written over the dev one, and the collection's plugins come
+  # from the box's own store of that revision (CollectionStore.ps1), which
+  # this fills from Nexus through Nexus-Run when it is not whole. For the
+  # deploy gate, on the box; in place of -Dist and -Data. FROM THE RECORD in
+  # the header.
+  [switch]$FromRecord,
   # The plugins the dev server loads that the -Dist build's order may leave
   # out, each by its file name (#2320). Left off, an order from -Dist that
   # drops any plugin the dev server loads is refused before anything is sent.
+  # A comma list is split. Not a gate parameter: through the gate, what a
+  # move may drop is records\collection-dropped.json's (-FromRecord).
   [string[]]$DropPlugins = @(),
   # Where the other plugins live on this machine. Ours is taken from the repo
   # instead; see the header.
@@ -306,7 +334,9 @@ if (-not $PSBoundParameters.ContainsKey('Wait')) {
   $Wait = Get-ThornswoodServerReadyWait
 }
 if ($PutBack -and $LoadOrder) { throw '-PutBack puts the last files back and sends nothing, so it does not take -LoadOrder.' }
-if (@($DropPlugins).Count -and -not $LoadOrder) { throw '-DropPlugins goes with -LoadOrder -Dist, the one run here that writes a load order over the dev server''s. Nothing was sent.' }
+$DropPlugins = @(@($DropPlugins) | ForEach-Object { ([string]$_) -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+if (@($DropPlugins).Count -and -not $LoadOrder) { throw '-DropPlugins goes with -LoadOrder -Dist or -LoadOrder -FromRecord, the runs here that write a load order over the dev server''s. Nothing was sent.' }
+if ($FromRecord -and -not $LoadOrder) { throw '-FromRecord says where -LoadOrder takes the order and the plugins from, so it goes with -LoadOrder. Nothing was sent.' }
 if ($ShipFollows -and $Note.Trim()) { throw '-ShipFollows posts nothing, so it takes no -Note: give the note to the Ship that follows. Nothing was sent.' }
 if ($ShipFollows -and $PutBack) { throw '-PutBack posts nothing already, so it does not take -ShipFollows. Nothing was sent.' }
 if (-not $PutBack -and -not $ShipFollows) {
@@ -372,7 +402,9 @@ if (-not $PutBack) {
 $alsoSends = @('records/most-online.json', 'records/server-build.json')
 # Every plugin of ours, held to the commit like the gamemode: the names in
 # RepoPlugins.ps1 (#2486), written out so tests\test-deploy-artifact.ps1 can read them.
-if ($LoadOrder) { $alsoSends += 'game/content/Thornswood-Content.esp', 'game/content/Thornswood-Last.esp' }
+# Thornswood-Last.esp is made on the box from the recipe (#2791,
+# LastPluginOnBox.ps1), which goes up with the make's own tools.
+if ($LoadOrder) { $alsoSends += 'game/content/Thornswood-Content.esp', 'game/data/last-plugin.recipe', 'game/data/last-plugin.json' }
 $artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here '..\..') -Paths 'game/gamemode.js' -AlsoSends $alsoSends
 Write-Host ('  artifact ' + (Format-ThornswoodArtifact $artifact))
 $Gamemode = Join-Path $artifact.Folder 'game\gamemode.js'
@@ -485,10 +517,51 @@ if ($LoadOrder) {
     throw ("the dev server did not say what it holds (it answered: " + ((@($boxContent.Said | Where-Object { $_ }) | Select-Object -Last 3) -join ' | ') +
            "), so there is no telling which plugins it needs. Nothing was sent and the dev server was not touched.")
   }
-  if (@($DropPlugins).Count -and -not $Dist) {
-    throw '-DropPlugins goes with -Dist: without it the dev server keeps its own load order, so nothing is dropped. Nothing was sent.'
+  if (@($DropPlugins).Count -and -not $Dist -and -not $FromRecord) {
+    throw '-DropPlugins goes with -Dist or -FromRecord: without either the dev server keeps its own load order, so nothing is dropped. Nothing was sent.'
   }
-  if ($Dist) {
+  if ($FromRecord) {
+    if ($Dist) { throw '-FromRecord takes the order from the repository''s record and the plugins from the box''s store, so it does not go with -Dist. Nothing was sent.' }
+    # FROM THE RECORD (#4069): the order last-plugin.json was built against,
+    # which is the order every table and the Last plugin of this commit read,
+    # and the collection's plugins from the box's store of the record's
+    # revision. Thornswood-Last.esp goes on the end below, as always.
+    . (Join-Path $Here 'CollectionStore.ps1')
+    $repoRoot = (Resolve-Path -LiteralPath (Join-Path $Here '..\..')).ProviderPath
+    $recordPath = Join-Path $repoRoot 'records\collection-plugins.json'
+    $store = Get-ThornswoodCollectionStore -RecordPath $recordPath -Fetch { param($w, $h) Invoke-ThornswoodCollectionFetch -Work $w -Head $h -Repo $repoRoot } -Say { param($m) Write-Host $m -ForegroundColor DarkGray }
+    $Data = $store.Dir
+    $lastDoc = Join-Path $repoRoot 'game\data\last-plugin.json'
+    $built = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($lastDoc)) $lastDoc
+    # Thornswood-Last.esp on the end here, before the order is held to the
+    # running one: last-plugin.json's order never names the Last plugin, and
+    # the dev server loads it, so held without it the move read as dropping
+    # it (31 Oct 2026, gate run at d88ab73e: "leaves out 1 of the 103 the
+    # running server loads: Thornswood-Last.esp"). The same order the live
+    # move writes (Deploy-Server.ps1 -FromRecord, $recordOrder).
+    . (Join-Path $Here 'LastPluginRecipe.ps1')
+    $pluginNames = @(@(@($built.loadOrder) | ForEach-Object { [string]$_ } | Where-Object { $_ -and $_ -ine $ThornswoodLastPlugin }) + $ThornswoodLastPlugin)
+    if ($pluginNames.Count -lt 2) { throw "$lastDoc has no loadOrder, so there is no order to write. Nothing was sent and the dev server was not touched." }
+    Write-Host ('  load order from {0} ({1} plugins, collection revision {2}), written over the dev server''s' -f 'game\data\last-plugin.json', $pluginNames.Count, $store.Revision) -ForegroundColor DarkGray
+    # What the move may drop is the repository's word, not the caller's:
+    # records\collection-dropped.json, for the revision the record names.
+    $dropDoc = Join-Path $repoRoot 'records\collection-dropped.json'
+    $mayDrop = @($DropPlugins)
+    if (Test-Path -LiteralPath $dropDoc -PathType Leaf) {
+      $dd = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($dropDoc)) $dropDoc
+      if ([string]$dd.collection -eq $store.Slug -and [string]$dd.revision -eq [string]$store.Revision) {
+        $mayDrop += @(@($dd.dropped) | ForEach-Object { [string]$_.name } | Where-Object { $_ })
+      } else {
+        Write-Host ('  records\collection-dropped.json is for revision {0}, not {1}, so it lets nothing go' -f [string]$dd.revision, $store.Revision) -ForegroundColor DarkGray
+      }
+    }
+    if ($boxContent.OrderRead) {
+      . (Join-Path $Here 'ServerSettings.ps1')
+      $drop = Test-ThornswoodLoadOrderDrop ([pscustomobject]@{ loadOrder = @($boxContent.Order) }) ([pscustomobject]@{ loadOrder = $pluginNames }) $mayDrop
+      foreach ($l in $drop.Said) { Write-Host ('  ' + $l) -ForegroundColor Yellow }
+      if ($drop.Problem) { throw ($drop.Problem + ' A plugin a new revision takes out goes in records\collection-dropped.json, with why its forms can go. Nothing was sent and the dev server was not touched.') }
+    }
+  } elseif ($Dist) {
     $settingsSrc = Join-Path $Dist 'server-settings.json'
     if (-not (Test-Path -LiteralPath $settingsSrc)) {
       throw "-Dist names no built server: there is no $settingsSrc. Leave -Dist out to keep the dev server's own load order. Nothing was sent."
@@ -515,16 +588,20 @@ if ($LoadOrder) {
   }
   # ==== end thornswood dev load order source ====
 
-  # THE PLUGIN THAT LOADS LAST (#2468). Sent from the repository like the
-  # content plugin (RepoPlugins.ps1, #2486), and the dev server's last plugin
-  # whatever order it had: every cut actor it switches off and every quest it
-  # stops is only right with nothing after it. When this moves the order, the
-  # order goes up the way a build's does (-Dist), so a plain -LoadOrder puts
-  # it there.
-  $lastName = 'Thornswood-Last.esp'
-  $lastRepo = Join-Path $Here ('..\..\game\content\' + $lastName)
+  # THE PLUGIN THAT LOADS LAST (#2468). Made on the box from this commit's
+  # recipe (#2791, LastPluginOnBox.ps1), never sent, and the dev server's last
+  # plugin whatever order it had: every cut actor it switches off and every
+  # quest it stops is only right with nothing after it. When this moves the
+  # order, the order goes up the way a build's does (-Dist), so a plain
+  # -LoadOrder puts it there. It is made when the dev server does not hold
+  # the bytes game\data\last-plugin.json names (#2308, by sha256), into the
+  # stage below, after the plugins this sends are in it.
+  . (Join-Path $Here 'LastPluginOnBox.ps1')
+  $lastName = $ThornswoodLastPlugin
+  $lastWant = Get-ThornswoodLastPluginWant (Join-Path $Here '..\..')
+  $makeLast = $false
   $orderMoved = $false
-  if (Test-Path -LiteralPath $lastRepo) {
+  if ($lastWant) {
     $wantNames = @(@($pluginNames | Where-Object { $_ -ine $lastName }) + $lastName)
     if ((@($pluginNames) -join '|') -ne ($wantNames -join '|')) {
       $orderMoved = $true
@@ -556,6 +633,15 @@ if ($LoadOrder) {
   }
 
   foreach ($n in $pluginNames) {
+    if ($lastWant -and $n -ieq $lastName) {
+      $boxLast = Get-ThornswoodServerPlugin $boxContent $n
+      if (-not (Test-ThornswoodContentSame $boxLast $lastWant.Bytes $lastWant.Sha)) {
+        $makeLast = $true
+        $changed += ('{0}  {1:N0} -> {2:N0} bytes, sha256 {3} -> {4}, made on the box from the recipe' -f $n, $boxLast.Bytes, $lastWant.Bytes,
+                     $(if ($boxLast.Sha) { $boxLast.Sha.Substring(0, 12) } else { 'none' }), $lastWant.Sha.Substring(0, 12))
+      }
+      continue
+    }
     # Combine, not Join-Path: a machine with no game folder (a cloud one, #2903)
     # has no C: drive, and Join-Path refuses a path on a drive that is not
     # there. The path then just is not there, which is the case handled below.
@@ -606,9 +692,10 @@ if ($LoadOrder) {
   Assert-ThornswoodCollectionPlugins -RecordPath (Join-Path $Here '..\..\records\collection-plugins.json') -Files $sendPlugins -Exempt $ThornswoodRepoPlugins -What 'this deploy'
   Write-Host ''
   Write-Host ('  load order: {0} plugins, paths rewritten to {1}' -f $pluginNames.Count, $remotePlugins) -ForegroundColor DarkGray
-  if ($sendPlugins.Count) {
+  if ($sendPlugins.Count -or $makeLast) {
     Write-Host ('  {0} plugin(s) will go up before the restart:' -f $sendPlugins.Count) -ForegroundColor Yellow
     foreach ($p in $sendPlugins) { Write-Host ('    ' + (Split-Path $p -Leaf)) -ForegroundColor Yellow }
+    if ($makeLast) { Write-Host ('  and {0} will be made on the box from the recipe' -f $lastName) -ForegroundColor Yellow }
     foreach ($c in $changed) { Write-Host ('    changed: ' + $c) -ForegroundColor Yellow }
   } else {
     Write-Host '  every plugin the load order names is on the dev server at the same bytes' -ForegroundColor DarkGray
@@ -625,7 +712,7 @@ if ($LoadOrder) {
   # copy and the block that removed it left the file there for good. Nothing
   # of it stays on the box now: the dev settings file is edited in place here rather than
   # written from a local build, which is the rule this script is built on.
-  if ($Dist -or $orderMoved) {
+  if ($Dist -or $FromRecord -or $orderMoved) {
     $orderWire = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($pluginNames -join "`n"))
   }
 }
@@ -888,6 +975,15 @@ Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\s
     Write-Host "  $rel"
   }
   $hashes = Get-SwapHashes $send
+  # Thornswood-Last.esp, made into the stage from the plugins just sent and
+  # then the dev server's own (#2791); the stage check holds it to the
+  # manifest's sha256 like a file that was sent.
+  if ($LoadOrder -and $makeLast) {
+    $lastMade = Invoke-ThornswoodLastPluginMake -Target "$User@$Vps" -SshArgs $ssh -RepoDir (Join-Path $Here '..\..') `
+      -Reads @("$stageWin\plugins", "$rootWin\plugins") -Into "$stageWin\plugins" -Want $lastWant
+    Write-Host ('  plugins/{0}, made on the box: {1:N0} bytes, sha256 {2}' -f $lastName, $lastMade.Bytes, $lastMade.Sha.Substring(0, 12))
+    $hashes['plugins/' + $lastName] = $lastMade.Sha
+  }
 
   Write-Host ''
   Write-Host 'Pointing the dev server at the dev voice service...'

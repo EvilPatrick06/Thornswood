@@ -4,7 +4,10 @@
   The one writer of the Discord bot token. Dot-sourced on the VPS by
   Rotate-BotToken.ps1, Install-Bot.ps1 and Set-DiscordLogin.ps1, which send
   it up with the script that calls it. It only defines functions, so
-  dot-sourcing it does nothing by itself.
+  dot-sourcing it does nothing by itself. Each sender puts ServerHold.ps1 in
+  front of it (Get-ThornswoodHoldScript), because both restarts below stop a
+  server on purpose and hold it while they do, so the watchdog does not start
+  it in the middle (#5155).
 
       . .\Write-BotToken.ps1
       Write-ThornswoodBotToken -Token $t -BotEnv C:\Thornswood-Bot\bot.env.json -SiteConfig C:\Thornswood-Docs\config.json
@@ -303,8 +306,12 @@ function Restart-ThornswoodBot([string]$Root, [string]$Service = 'ThornswoodBot'
   }
   $before = Get-ThornswoodLogLength $log
   $out = @()
+  $null = Set-ThornswoodHold -Target $Service -Why 'restarting the bot on its new settings' -By $HoldBy
+  $why = ''
   try { Restart-Service -Name $Service -Force -ErrorAction Stop }
-  catch { return @('BOT NOT RESTARTED: the service ' + $Service + ' would not restart (' + $_.Exception.Message + '). Install-Bot.ps1 puts it on the box.') }
+  catch { $why = $_.Exception.Message }
+  $null = Clear-ThornswoodHold -Target $Service
+  if ($why) { return @('BOT NOT RESTARTED: the service ' + $Service + ' would not restart (' + $why + '). Install-Bot.ps1 puts it on the box.') }
   $up = $false
   for ($i = 0; $i -lt $WaitSeconds; $i += 2) {
     Start-Sleep -Seconds 2
@@ -326,11 +333,13 @@ function Restart-ThornswoodSite([string]$Root, [string]$Task, [int]$Port = 3001,
   $log = Join-Path $Root 'site.log'
   $before = Get-ThornswoodLogLength $log
   $out = @()
+  $null = Set-ThornswoodHold -Target $Task -Why 'restarting the site on its new settings' -By $HoldBy
   Get-CimInstance Win32_Process |
     Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like ('*' + $leaf + '*') } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -EA SilentlyContinue }
   Start-Sleep -Seconds 1
   Start-ScheduledTask -TaskName $Task -EA SilentlyContinue
+  $null = Clear-ThornswoodHold -Target $Task
   $said = @()
   for ($i = 0; $i -lt $WaitSeconds; $i += 2) {
     Start-Sleep -Seconds 2

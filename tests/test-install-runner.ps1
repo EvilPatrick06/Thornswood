@@ -3,13 +3,15 @@
 
       pwsh -NoProfile -File .\tests\test-install-runner.ps1
 
-  The build check's runner on the VPS, and build.yml, agree and stay safe.
+  The box's runners stay safe, and no workflow of this repository asks for
+  one.
 
-  WHY. The build check runs on the same box as the live game server, the site,
-  voice and the bot (issue #437). What keeps that safe is in two files that
-  have to agree: build.yml asks for the runner by a label Install-Runner.ps1
-  gives it, and Install-Runner.ps1 makes the account the jobs run as. This
-  holds the parts that matter: the label, an account with no admin rights that
+  WHY. The box's runners run on the same box as the live game server, the
+  site, voice and the bot (issue #437). Since the flip they are registered
+  to Thornswood-Ops alone (#4013), and this repository's workflows run on
+  GitHub's runners (#4983). Install-Runner.ps1 makes the account the jobs
+  run as. This holds the parts that matter: the label, an account with no
+  admin rights that
   is shut out of the live folders, a download checked against GitHub's own
   SHA-256, a registration token that is never printed, no priority set above
   the normal a service starts at (tests\test-runner-priority.ps1 holds the
@@ -40,8 +42,6 @@ $text = [IO.File]::ReadAllText($path)
 $yml = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\build.yml'))
 # The bot harnesses run in the nightly checks since 25 September.
 $night = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\nightly.yml'))
-# A list, or the list a job picks while the repository is private (#3685).
-$nightRunsOn = [regex]::Match($night, 'runs-on:\s*(?:\$\{\{[^\n]*?fromJSON\(.)?(\[[^\]]+\])').Groups[1].Value
 
 $t = $null; $e = $null
 [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$t, [ref]$e)
@@ -50,11 +50,12 @@ Yes 'Install-Runner.ps1 parses' (-not $e -or $e.Count -eq 0)
 # ---- the label ------------------------------------------------------------------
 $label = [regex]::Match($text, "\[string\]\`$Label\s*=\s*'([^']+)'").Groups[1].Value
 Yes "Install-Runner gives the runner a label ($label)" ($label.Length -gt 0)
-# Any job of build.yml: its first job asks GitHub's hosted runner since #3551.
-$runsOn = @([regex]::Matches($yml, '(?m)^\s*runs-on:\s*(.+)$') | ForEach-Object { $_.Groups[1].Value.Trim() } | Where-Object { $_ -match 'self-hosted' -and $_ -match 'Windows' -and $_ -match [regex]::Escape($label) }) | Select-Object -First 1
-Yes "build.yml asks for a self-hosted Windows runner with that label ($runsOn)" ([bool]$runsOn -and [bool]$label)
-Yes "nightly.yml runs on the same runner ($nightRunsOn)" ($nightRunsOn -match 'self-hosted' -and $nightRunsOn -match 'Windows' -and $nightRunsOn -match [regex]::Escape($label) -and $label)
-Yes '  as the fallback: GitHub''s hosted runner is the default since #1306' ($yml -match '(?m)^\s+runs-on: windows-latest\s*$')
+# The box's runners serve Thornswood-Ops alone since the flip (#4013), so
+# no workflow here asks for one (#4983).
+$wfDir = Join-Path $Repo '.github\workflows'
+$asks = @(Get-ChildItem -LiteralPath $wfDir -Filter '*.yml' | Where-Object { [IO.File]::ReadAllText($_.FullName) -match '(?m)^[^#\n]*(self-hosted|' + [regex]::Escape($label) + ')' } | ForEach-Object { $_.Name })
+Yes ("no workflow here asks for a runner of the box or its label (" + ($asks -join ', ') + ")") ([bool]$label -and $asks.Count -eq 0)
+Yes '  build.yml and nightly.yml run on GitHub''s hosted runner (#1306, #4983)' ($yml -match '(?m)^\s+runs-on: windows-latest\s*$' -and $night -match '(?m)^\s+runs-on: windows-latest\s*$')
 Yes '  while a pull request builds on GitHub''s hosted runner in build-pr.yml, never the VPS (#1306)' ([IO.File]::ReadAllText((Join-Path (Split-Path $PSScriptRoot) '.github\workflows\build-pr.yml')) -match '(?m)^\s+runs-on: windows-latest\s*$')
 Yes '  with a timeout' ($yml -match '(?m)^\s*timeout-minutes:\s*\d+')
 Yes '  one run per branch at a time, main''s newer push waiting for the one in progress (#3874)' ($yml -match '(?m)^  group: build-\$\{\{ github\.ref \}\}\s*$' -and $yml -match '(?m)^  cancel-in-progress: false\s*$')

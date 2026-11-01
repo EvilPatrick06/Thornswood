@@ -6,7 +6,7 @@ Everything in the world has a recipe except named uniques and quest items (Patri
 
 What the world hands out and who makes it both come from [Where every item comes from](item-sources.md) (`game/data/item-sources.json`). A maker is a recipe in the open book (not cut and not tempering), a class that gathers the item, or the scarce work or rare seam a class works. A bottle the alchemy lab brews is a new form, not a record, so the lab is the maker of no record. The build fails when the world hands out something with no maker that `scripts/dev/Check-Makers.waiting.json` does not name with the issue that will give it one.
 
-276 items handed out. 158 have a maker. 118 have none yet.
+288 items handed out. 169 have a maker. 119 have none yet.
 
 ## Nobody makes these yet
 
@@ -128,7 +128,8 @@ What the world hands out and who makes it both come from [Where every item comes
 | Flawless Garnet | Dungeon and body loot | 0 | #3521 | Patrick, 26 Oct, A: from the master Miner's gem geodes; no garnet or diamond vein exists yet. |
 | Garnet | Dungeon and body loot | 0 | #3521 | Patrick, 26 Oct, A: from the master Miner's gem geodes; no garnet or diamond vein exists yet. |
 | Dwarven Oil | Asked for by a recipe | 1 | #3523 | Patrick, 26 Oct, A: bone meal ground by a Hunter at the grain mill, dwarven oil drawn by a Smith at the smelter. |
-| Bone Meal | Dungeon and body loot, Asked for by a recipe | 7 | #3523 | Patrick, 26 Oct, A: bone meal ground by a Hunter at the grain mill, dwarven oil drawn by a Smith at the smelter. |
+| Bone Meal | Dungeon and body loot, Asked for by a recipe | 8 | #3523 | Patrick, 26 Oct, A: bone meal ground by a Hunter at the grain mill, dwarven oil drawn by a Smith at the smelter. |
+| Werewolf Pelt | Asked for by a recipe | 1 | #4649 | an animal part no hunt gives yet; Werewolf's Bane, from Cheddar's Mashups in collection revision 5, asks for it |
 | Empty Wine Bottle | Filled into a bottle of water | 0 | #4652 | water is carried in it (NEEDS.waterItems), and nothing hands one out. |
 
 ## What each trade makes or gathers
@@ -141,17 +142,17 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Warrior/Berserker | 0 | warriors do not craft. classes.md gives Bulwark and Berserker combat maneuvers rather than recipes, so there is nothing in the records to find and nothing for a crafting gate to refuse. The profession is offered like any other. |
 | Mage | 0 | a mage has no halves. classes.md gives the Mage two schools and two starting spells, and none of it is a crafting recipe. What a mage knows is written by `scripts\dev\Build-SpellTable.ps1`. |
 | Alchemist/Blightbrewer | 0 | brews poisons in the alchemy lab's menu, which has no recipe rows |
-| Alchemist/Physicker | 2 | also brews medicine in the alchemy lab's menu, which has no recipe rows |
+| Alchemist/Physicker | 12 | also brews medicine in the alchemy lab's menu, which has no recipe rows |
 | Cook/Hearthcook | 64 |  |
 | Cook/Confectioner | 12 |  |
-| Smith/Platewright | 171 |  |
-| Smith/Edgewright | 82 |  |
+| Smith/Platewright | 252 |  |
+| Smith/Edgewright | 86 |  |
 | Enchanter/Bladebinder | 13 | also enchants in the arcane enchanter's menu |
 | Enchanter/Wardweaver | 0 | enchants armour and clothing in the arcane enchanter's menu, which has no recipe rows |
-| Tailor/Liverywright | 84 |  |
-| Tailor/Haberdasher | 169 |  |
+| Tailor/Liverywright | 85 |  |
+| Tailor/Haberdasher | 171 |  |
 | Woodworker/Charburner | 5 |  |
-| Woodworker/Woodwright | 45 |  |
+| Woodworker/Woodwright | 46 |  |
 | Farmer | 14 |  |
 | Fisher | 12 |  |
 | Gatherer | 48 |  |
@@ -162,10 +163,15 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 
 | Item | Where the world has it | Who makes or gathers it | Id |
 | --- | --- | --- | --- |
+| Alembic | A class pick's tool | Smith/Edgewright, novice | `1b001:Thornswood-Content.esp` |
 | Crude Fishing Pole | A class pick's tool | Woodworker/Woodwright, novice | `15498:Thornswood-Content.esp` |
+| Hammer | A class pick's tool | Smith/Edgewright, novice | `5cae1:Skyrim.esm` |
 | Pickaxe | A class pick's tool | Smith/Edgewright, novice | `e3c16:Skyrim.esm` |
+| Rune Knife | A class pick's tool | Smith/Edgewright, novice | `1b002:Thornswood-Content.esp` |
+| Shears | A class pick's tool | Smith/Edgewright, novice | `1b000:Thornswood-Content.esp` |
 | Shovel | A class pick's tool | Smith/Edgewright, novice | `f5d05:Skyrim.esm` |
 | Woodcutter's Axe | A class pick's tool | Smith/Edgewright, novice | `2f2f4:Skyrim.esm` |
+| Wooden Ladle | A class pick's tool | Woodworker/Woodwright, novice | `319e5:Skyrim.esm` |
 | Belted Tunic | A new character's clothes | Tailor/Haberdasher, novice | `1be1a:Skyrim.esm` |
 | Boots | A new character's clothes | Tailor/Haberdasher, novice | `1be1b:Skyrim.esm` |
 | Riekling Belted Tunic | A new character's clothes | Tailor/Haberdasher, novice, Riekling only | `bfd98:Playable Rieklings.esp` |
@@ -177,6 +183,7 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Bear Claws | Asked for by a recipe | Hunter, expert; Hunter, master | `6bc02:Skyrim.esm` |
 | Bear Pelt | Asked for by a recipe | Hunter, expert | `3ad52:Skyrim.esm` |
 | Bleeding Crown | Asked for by a recipe | Gatherer, expert | `4da20:Skyrim.esm` |
+| Blisterwort | Asked for by a recipe | Gatherer, expert | `4da25:Skyrim.esm` |
 | Butter | Asked for by a recipe | Farmer, novice | `353c:HearthFires.esm` |
 | Carrot | Asked for by a recipe | Farmer, novice | `64b40:Skyrim.esm` |
 | Charcoal | Asked for by a recipe | Woodworker/Charburner, advanced | `15482:Thornswood-Content.esp` |
@@ -185,6 +192,7 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Chicken's Egg | Asked for by a recipe | Farmer, novice | `23d77:Skyrim.esm` |
 | Chitin Plate | Asked for by a recipe | Hunter, advanced | `2b04e:Dragonborn.esm` |
 | Clam Meat | Asked for by a recipe | Fisher, novice | `eba03:Skyrim.esm` |
+| Creep Cluster | Asked for by a recipe | Gatherer, novice | `b2183:Skyrim.esm` |
 | Crimson Nirnroot | Asked for by a recipe | Gatherer, novice, only while the crimson work is open | `b701a:Skyrim.esm` |
 | Deer Hide | Asked for by a recipe | Hunter, novice | `3ad90:Skyrim.esm` |
 | Deer Hide | Asked for by a recipe | Hunter, novice | `d284d:Skyrim.esm` |
@@ -195,6 +203,7 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Firewood | Asked for by a recipe | Anybody | `6f993:Skyrim.esm` |
 | Frost Mirriam | Asked for by a recipe | Gatherer, novice | `34d32:Skyrim.esm` |
 | Fur Plate | Asked for by a recipe | Anybody | `da0bf1:Update.esm` |
+| Giant Lichen | Asked for by a recipe | Gatherer, advanced | `7e8c1:Skyrim.esm` |
 | Glacier Water | Asked for by a recipe | Anybody | `13f598:WindhelmSSE.esp` |
 | Goat Meat | Asked for by a recipe | Hunter, novice | `65c9a:Skyrim.esm` |
 | Gourd | Asked for by a recipe | Farmer, novice | `10d666:Skyrim.esm` |
@@ -232,6 +241,7 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Scaly Pholiota | Asked for by a recipe | Gatherer, advanced | `6f950:Skyrim.esm` |
 | Scathecraw | Asked for by a recipe | Gatherer, novice | `17e97:Dragonborn.esm` |
 | Skeever Meat | Asked for by a recipe | Hunter, novice | `8ac:Gourmet.esp` |
+| Skull | Asked for by a recipe | Hunter, master | `af5fd:Skyrim.esm` |
 | Slaughterfish Meat | Asked for by a recipe | Hunter, novice | `8ae:Gourmet.esp` |
 | Snow Bear Pelt | Asked for by a recipe | Hunter, expert | `3ad54:Skyrim.esm` |
 | Stalhrim | Asked for by a recipe | Miner, master, only while the stalhrim work is open | `2b06b:Dragonborn.esm` |
@@ -242,11 +252,13 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Troll Fat | Asked for by a recipe | Hunter, advanced | `3ad72:Skyrim.esm` |
 | Tundra Cotton | Asked for by a recipe | Gatherer, novice | `3f7f8:Skyrim.esm` |
 | Vale Sabre Cat Hide | Asked for by a recipe | Hunter, novice | `1199a:Dawnguard.esm` |
+| White Cap | Asked for by a recipe | Gatherer, novice | `4da22:Skyrim.esm` |
+| Wolf Pelt | Asked for by a recipe | Hunter, novice | `3ad74:Skyrim.esm` |
 | Yellow Mountain Flower | Asked for by a recipe | Gatherer, advanced | `2a78:Dawnguard.esm` |
 | Amethyst | Dungeon and body loot | Miner, master, only while the gem work is open | `63b46:Skyrim.esm` |
 | Baked Potatoes | Dungeon and body loot | Cook/Hearthcook, novice | `64b3a:Skyrim.esm` |
 | Blue Mountain Flower | Dungeon and body loot, Asked for by a recipe | Gatherer, advanced | `77e1c:Skyrim.esm` |
-| Boiled Creme Treat | Dungeon and body loot | Cook/Confectioner, novice | `64b30:Skyrim.esm` |
+| Boiled Creme Treat | Dungeon and body loot | Cook/Confectioner, advanced | `64b30:Skyrim.esm` |
 | Cabbage | Dungeon and body loot, A farmer's first seeds, Asked for by a recipe | Farmer, novice | `64b3f:Skyrim.esm` |
 | Corundum Ingot | Dungeon and body loot, Asked for by a recipe | Smith/Platewright, novice | `5ad93:Skyrim.esm` |
 | Corundum Ore | Dungeon and body loot, Asked for by a recipe | Miner, advanced | `5acdb:Skyrim.esm` |
@@ -258,7 +270,7 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Ebony Sword | Dungeon and body loot | Smith/Edgewright, master | `139b1:Skyrim.esm` |
 | Elven Sword | Dungeon and body loot | Smith/Edgewright, expert | `139a1:Skyrim.esm` |
 | Emerald | Dungeon and body loot | Anybody; Miner, master, only while the gem work is open | `63b43:Skyrim.esm` |
-| Eye of Sabre Cat | Dungeon and body loot | Hunter, advanced; Hunter, expert; Hunter, novice | `6bc07:Skyrim.esm` |
+| Eye of Sabre Cat | Dungeon and body loot, Asked for by a recipe | Hunter, advanced; Hunter, expert; Hunter, novice | `6bc07:Skyrim.esm` |
 | Fire Salts | Dungeon and body loot, Asked for by a recipe | Miner, expert | `3ad5e:Skyrim.esm` |
 | Frost Salts | Dungeon and body loot, Asked for by a recipe | Miner, expert | `3ad5f:Skyrim.esm` |
 | Garlic | Dungeon and body loot, Asked for by a recipe | Gatherer, novice | `34d22:Skyrim.esm` |
@@ -270,8 +282,8 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Grilled Leeks | Dungeon and body loot | Cook/Hearthcook, novice | `64b3e:Skyrim.esm` |
 | Hide Armor | Dungeon and body loot | Smith/Platewright, novice | `13911:Skyrim.esm` |
 | Hide Helmet | Dungeon and body loot | Smith/Platewright, novice | `13913:Skyrim.esm` |
-| Honey Nut Treat | Dungeon and body loot | Cook/Confectioner, novice | `64b38:Skyrim.esm` |
-| Imp Stool | Dungeon and body loot | Gatherer, novice | `4da23:Skyrim.esm` |
+| Honey Nut Treat | Dungeon and body loot | Cook/Confectioner, advanced | `64b38:Skyrim.esm` |
+| Imp Stool | Dungeon and body loot, Asked for by a recipe | Gatherer, novice | `4da23:Skyrim.esm` |
 | Iron Armor | Dungeon and body loot | Smith/Platewright, novice | `12e49:Skyrim.esm` |
 | Iron Arrow | Dungeon and body loot | Woodworker/Woodwright, novice | `1397d:Skyrim.esm` |
 | Iron Boots | Dungeon and body loot | Smith/Platewright, novice | `12e4b:Skyrim.esm` |
@@ -311,8 +323,8 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Steel Shield | Dungeon and body loot | Smith/Platewright, advanced | `13955:Skyrim.esm` |
 | Steel Sword | Dungeon and body loot | Smith/Edgewright, advanced | `13989:Skyrim.esm` |
 | Steel War Axe | Dungeon and body loot | Smith/Edgewright, advanced | `13983:Skyrim.esm` |
-| Swamp Fungal Pod | Dungeon and body loot | Gatherer, advanced | `7e8b7:Skyrim.esm` |
-| Sweet Roll | Dungeon and body loot | Cook/Confectioner, novice | `64b3d:Skyrim.esm` |
+| Swamp Fungal Pod | Dungeon and body loot, Asked for by a recipe | Gatherer, advanced | `7e8b7:Skyrim.esm` |
+| Sweet Roll | Dungeon and body loot | Cook/Confectioner, advanced | `64b3d:Skyrim.esm` |
 | Venison | Dungeon and body loot, Asked for by a recipe | Hunter, novice | `669a2:Skyrim.esm` |
 | Void Salts | Dungeon and body loot | Miner, expert | `3ad60:Skyrim.esm` |
 | Wheat | Dungeon and body loot, Asked for by a recipe | Farmer, advanced; Gatherer, advanced | `4b0ba:Skyrim.esm` |

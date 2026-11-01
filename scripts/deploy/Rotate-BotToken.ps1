@@ -75,7 +75,9 @@ if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $writer = Join-Path $Here '..\vps\Write-BotToken.ps1'
 . $writer
-$writerText = [IO.File]::ReadAllText($writer)
+# The hold the restarts write (#5155), sent in front of Write-BotToken.ps1.
+. (Join-Path $Here '..\vps\ServerHold.ps1')
+$writerText = (Get-ThornswoodHoldScript -Script 'Rotate-BotToken.ps1') + [IO.File]::ReadAllText($writer)
 
 $botWin  = $BotRoot.Replace('/','\')
 $docsWin = $DocsRoot.Replace('/','\')

@@ -118,7 +118,10 @@ if ($bad) { exit 1 }
 # last line says whether it answered, for this machine to read.
 $stopAndMove = Join-Path $Here '..\deploy\StopAndMove.ps1'
 $readyWait = Join-Path $Here '..\deploy\ServerReadyWait.ps1'
-$run = "param([string]`$Root, [string]`$Task)`r`n" + [IO.File]::ReadAllText($stopAndMove) + "`r`n" + [IO.File]::ReadAllText($readyWait) + "`r`n" + @'
+# The hold it writes while the server is stopped (#5155, ServerHold.ps1), so
+# the watchdog does not start it while its characters are moved.
+. (Join-Path $Here '..\vps\ServerHold.ps1')
+$run = "param([string]`$Root, [string]`$Task)`r`n" + (Get-ThornswoodHoldScript -Script 'Reset-Character.ps1') + [IO.File]::ReadAllText($stopAndMove) + "`r`n" + [IO.File]::ReadAllText($readyWait) + "`r`n" + @'
 $settings = Join-Path $Root 'server-settings.json'
 $port = 0
 try { $port = [int](([IO.File]::ReadAllText($settings) | ConvertFrom-Json).port) }
@@ -135,18 +138,24 @@ if ($ThornswoodNotHeld.Count) {
     Write-Host 'STOP. The server could not be opened to wait for it. Nothing was stopped or thrown away.'
     exit 1
 }
+# Held from here until it is started again, or this gives up and leaves it
+# to the watchdog: every way out below takes the hold away.
+Write-Host (Set-ThornswoodHold -Target $Task -Why 'throwing away a character' -By $HoldBy)
 Stop-ScheduledTask -TaskName $Task -EA SilentlyContinue
 foreach ($p in $held) { Write-Host ('stopped pid ' + $p.Id + ', on UDP ' + $port) }
 $still = @(Stop-ThornswoodProcessHeld $held)
 if ($still.Count) {
     foreach ($l in $still) { Write-Host $l }
+    Write-Host (Clear-ThornswoodHold -Target $Task)
     Write-Host 'STOP. The server has not exited, so nothing was thrown away and it was not started again.'
     exit 1
 }
 & powershell -NoProfile -ExecutionPolicy Bypass -File C:\thornswood-reset.ps1 -Root $Root
 $resetCode = $LASTEXITCODE
+$startWhy = ''
 try { Start-ScheduledTask -TaskName $Task -EA Stop }
-catch { Write-Host ('STOP. The task ' + $Task + ' would not start: ' + $_.Exception.Message); exit 1 }
+catch { $startWhy = $_.Exception.Message }
+if ($startWhy) { Write-Host (Clear-ThornswoodHold -Target $Task); Write-Host ('STOP. The task ' + $Task + ' would not start: ' + $startWhy); exit 1 }
 $Wait = Get-ThornswoodServerReadyWait
 $until = (Get-Date).AddSeconds($Wait)
 $why = ''
@@ -164,6 +173,8 @@ while (-not $up) {
     if ($up -or (Get-Date) -gt $until) { break }
     Start-Sleep -Milliseconds 700
 }
+# Answering, or past the wait: from here the watchdog watches it as before.
+Write-Host (Clear-ThornswoodHold -Target $Task)
 if ($up) { Write-Host ('the server answers on UDP ' + $port + ' and TCP ' + $resPort + ' on the box'); Write-Host ('ANSWERED|' + $port + '|' + $resPort) }
 else {
     $line = 'the server did not answer on UDP ' + $port + ' and TCP ' + $resPort + ' on the box within ' + $Wait + ' s'

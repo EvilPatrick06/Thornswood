@@ -18,10 +18,10 @@ one of them wants a sack of flour and butter. Flour is the Hearthcook
 mill recipe, and wheat is advanced farm work. A novice confectioner
 is buying flour, not growing it.
 
-All 28 also want two vanilla food perks. The crafting menu enforces
-those perks even though the server would allow the row. A character
-with cooking perks switched off can be told no by the menu and yes
-by the rule. The plan is the server's answer. The menu is the gap.
+All 28 used to want two vanilla food perks as well, which nobody here
+can hold, so the crafting menu hid every row the server allowed. The
+perks come off every recipe in Thornswood-Last.esp (#4826), so the
+server's answer is the only one.
 
 ## The novice eight
 
@@ -62,27 +62,27 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 
 ### Names that reach the server
 
-**Novice** (7 names). Boiled Creme Treat. Honey Nut Treat. Jazbay Dumpling. Jelly Dumpling. Juniper Berry Dumpling. Snowberry Dumpling. Sweet Roll.
+**Novice** (1 name). Apple Dumpling.
 
-**Advanced** (3 names). Jazbay Crostata. Juniper Berry Crostata. Snowberry Crostata.
+**Advanced** (10 names). Boiled Creme Treat. Honey Nut Treat. Jazbay Crostata. Jazbay Dumpling. Jelly Dumpling. Juniper Berry Crostata. Juniper Berry Dumpling. Snowberry Crostata. Snowberry Dumpling. Sweet Roll.
 
-**Expert** (2 names). Apple Dumpling. Apple Pie.
+**Expert** (1 name). Apple Pie.
 
 **Master.** None.
 
 | Item | Makes | Rank | Kind | Bench | Asks for | Race | Server asked | Id |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Boiled Creme Treat | 1 | novice | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 1 Sack of Flour, 1 Butter |  | yes | `8a4:Gourmet.esp` |
-| Honey Nut Treat | 1 | novice | Desserts | BYOHCraftingOven | 1 Honey, 1 Sack of Flour, 1 Butter |  | yes | `8a6:Gourmet.esp` |
-| Jazbay Dumpling | 1 | novice | Desserts | BYOHCraftingOven | 1 Jazbay Grapes, 1 Sack of Flour, 1 Butter |  | yes | `11800:HearthFires.esm` |
-| Jelly Dumpling | 1 | novice | Desserts | BYOHCraftingOven | 1 Sack of Flour, 1 Butter, 1 Netch Jelly |  | yes | `98b:Gourmet.esp` |
-| Juniper Berry Dumpling | 1 | novice | Desserts | BYOHCraftingOven | 1 Juniper Berries, 1 Sack of Flour, 1 Butter |  | yes | `80f:Gourmet.esp` |
-| Snowberry Dumpling | 1 | novice | Desserts | BYOHCraftingOven | 1 Snowberries, 1 Sack of Flour, 1 Butter |  | yes | `11802:HearthFires.esm` |
-| Sweet Roll | 1 | novice | Desserts | BYOHCraftingOven | 1 Sack of Flour, 1 Butter, 1 Jug of Milk |  | yes | `117fb:HearthFires.esm` |
+| Apple Dumpling | 1 | novice | Desserts | BYOHCraftingOven | 1 Red Apple, 1 Sack of Flour, 1 Butter |  | yes | `117f9:HearthFires.esm` |
+| Boiled Creme Treat | 1 | advanced | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 1 Sack of Flour, 1 Butter |  | yes | `8a4:Gourmet.esp` |
+| Honey Nut Treat | 1 | advanced | Desserts | BYOHCraftingOven | 1 Honey, 1 Sack of Flour, 1 Butter |  | yes | `8a6:Gourmet.esp` |
 | Jazbay Crostata | 1 | advanced | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 2 Jazbay Grapes, 1 Sack of Flour, 1 Butter |  | yes | `117fa:HearthFires.esm` |
+| Jazbay Dumpling | 1 | advanced | Desserts | BYOHCraftingOven | 1 Jazbay Grapes, 1 Sack of Flour, 1 Butter |  | yes | `11800:HearthFires.esm` |
+| Jelly Dumpling | 1 | advanced | Desserts | BYOHCraftingOven | 1 Sack of Flour, 1 Butter, 1 Netch Jelly |  | yes | `98b:Gourmet.esp` |
 | Juniper Berry Crostata | 1 | advanced | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 2 Juniper Berries, 1 Sack of Flour, 1 Butter |  | yes | `117fc:HearthFires.esm` |
+| Juniper Berry Dumpling | 1 | advanced | Desserts | BYOHCraftingOven | 1 Juniper Berries, 1 Sack of Flour, 1 Butter |  | yes | `80f:Gourmet.esp` |
 | Snowberry Crostata | 1 | advanced | Desserts | BYOHCraftingOven | 2 Snowberries, 1 Chicken's Egg, 1 Sack of Flour, 1 Butter |  | yes | `117fd:HearthFires.esm` |
-| Apple Dumpling | 1 | expert | Desserts | BYOHCraftingOven | 1 Red Apple, 1 Sack of Flour, 1 Butter |  | yes | `117f9:HearthFires.esm` |
+| Snowberry Dumpling | 1 | advanced | Desserts | BYOHCraftingOven | 1 Snowberries, 1 Sack of Flour, 1 Butter |  | yes | `11802:HearthFires.esm` |
+| Sweet Roll | 1 | advanced | Desserts | BYOHCraftingOven | 1 Sack of Flour, 1 Butter, 1 Jug of Milk |  | yes | `117fb:HearthFires.esm` |
 | Apple Pie | 1 | expert | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 2 Red Apple, 1 Sack of Flour, 1 Butter |  | yes | `117fe:HearthFires.esm` |
 
 <!-- detail:end -->
@@ -90,5 +90,5 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 ## Where this is
 
 The 28 rows and the oven gate are in the server. The vanilla perk
-lines on the menu are still there. Grand Chef's second portion is in
+lines come off the menu with the first release built after #4826. Grand Chef's second portion is in
 the server.

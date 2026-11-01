@@ -114,7 +114,20 @@ function validate(catalogue, source = {recipes, tables, harvests}) {
         assert.equal(recipe.rank, row.tier);
         if (gate.classKey === undefined) assert.equal(gate.half, recipe.half.toLowerCase());
         assert.equal(good.item, recipe.out);
-        for (const field of proofFields) assert.deepEqual(good.recipe[field], recipe[field], 'Recipe evidence/' + field);
+        for (const field of proofFields) {
+          // A published definition is immutable (its hash is in accepted
+          // promises), so its evidence is the recipe as it was published.
+          // Since #4826 the last plugin takes Skyrim's perk tests (HasPerk,
+          // function 448) off every recipe, and nothing else of the recipe
+          // changed: a published row's needs may still name those tests.
+          if (field === 'needs' && enabled.has(row.id) &&
+              Array.isArray(good.recipe.needs) && good.recipe.needs.some(n => n && n.function === 448)) {
+            assert.deepEqual(good.recipe.needs.filter(n => !(n && n.function === 448)), recipe.needs,
+              'Recipe evidence/needs, less the perk tests #4826 took off');
+            continue;
+          }
+          assert.deepEqual(good.recipe[field], recipe[field], 'Recipe evidence/' + field);
+        }
         assert.ok(recipe.inputItems.length > 0 && recipe.inputItems.every(input =>
           input.suppliedAt === 'novice' && (Object.keys(P.TABLE.classes).includes(input.suppliedBy) ||
             Object.keys(P.TABLE.professions).includes(input.suppliedBy))), 'Novice supply provenance');

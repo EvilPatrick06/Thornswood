@@ -64,6 +64,12 @@
                              The pieces are references in the world, so the
                              register goes aside with it, or a fresh world
                              would stand last world's furniture again.
+    private\market-stalls.json the market stalls (#3160): who keeps each
+                             stall and what is laid out on it. The goods came
+                             out of packs in the world set aside, so they go
+                             aside with it, every piece kept; left, the
+                             release list would end those stalls and put last
+                             world's goods in the fresh world's drop boxes.
 
   The first two were here from the start. property.json and farm-claims.json
   were added on 21 September: without them a fresh world would have come up
@@ -86,7 +92,7 @@
   writes) naming every character in the world it set aside, by form id only,
   since a profile keeps its id through a wipe and is never named. The parts
   whose registers were just set aside ($WipeDone: farms, property, embassy,
-  dungeon, cargo, carts, books) are marked done in it. 'saves', server-log.js's
+  dungeon, cargo, stalls, carts, books) are marked done in it. 'saves', server-log.js's
   part, is not among them, because mod-settings.json stays; it takes only
   what a profile holds, so Release-List marks it done when the list names
   no profile, which is so unless a deletion still waiting was carried over.
@@ -129,6 +135,12 @@
 
     .\Wipe-Saves.ps1 -Server dev
 
+  The deploy gate runs that one as its Wipe-Dev verb (#3649), with -Yes and
+  -NoPause and nothing a caller can add, so a cloud session starts dev over
+  for a load order change without a key to the box:
+
+    pwsh scripts/vps/Box-Run.ps1 -Line 'Wipe-Dev'
+
   Read-Host reads the console rather than standard input, so a wipe run from a
   script or from an agent cannot answer the question however it is fed: it comes
   back empty and the script stops with "Left alone.". That is the whole reason
@@ -160,6 +172,9 @@ $ErrorActionPreference = 'Stop'   # before any file loads, so one that is missin
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here 'Release-List.ps1')
+# The hold it writes while the servers are stopped (#5155), so the watchdog
+# does not start them while their saves are moved.
+. (Join-Path $Here '..\vps\ServerHold.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
@@ -182,7 +197,8 @@ $stamp = (Get-Date).ToString('yyyyMMdd-HHmm')
 # What a wipe moves aside, in each server folder: the header says why each one.
 $Moves = @('world', 'private\characters.json', 'private\property.json', 'private\furniture.json', 'private\farm-claims.json',
            'private\law.json', 'private\beds.json', 'private\embassy.json', 'private\books.json',
-           'private\last-left.json', 'private\take-limit.json', 'private\trade-cargo.json', 'private\trade-carts.json',
+           'private\last-left.json', 'private\take-limit.json', 'private\trade-cargo.json', 'private\market-stalls.json',
+           'private\trade-carts.json',
            'private\dungeon-rewards-ledger.json', 'private\dungeon-rewards-ledger.initialized',
            'private\deleted-characters.json')
 # The release parts (game\gamemode.js PARTS) whose registers are all in
@@ -190,7 +206,7 @@ $Moves = @('world', 'private\characters.json', 'private\property.json', 'private
 # list marks them done and only 'merchants', the ledger a wipe keeps, waits.
 # Not 'saves': mod-settings.json stays (Release-List.ps1 marks it done for a
 # list that names no profile, the only thing that part acts on).
-$WipeDone = @('farms', 'property', 'embassy', 'dungeon', 'cargo', 'carts', 'books')
+$WipeDone = @('farms', 'property', 'embassy', 'dungeon', 'cargo', 'stalls', 'carts', 'books')
 # Both lists go across as literals. A single quote inside either would end the
 # string early on the far side, so it is doubled first.
 function Lit($a) { return (($a | ForEach-Object { "'" + ($_ -replace "'", "''") + "'" }) -join ',') }
@@ -338,7 +354,10 @@ Head 'Stopping the servers'
 #>
 $out = Remote @"
 `$ErrorActionPreference = 'Continue'
+$(Get-ThornswoodHoldScript -Script 'Wipe-Saves.ps1')
 foreach (`$t in @($tasksLit)) {
+  # Held until "Starting them again" below takes it away (#5155).
+  Set-ThornswoodHold -Target `$t -Why 'wiping the saves' -By `$HoldBy
   `$null = & schtasks /end /tn `$t 2>&1
   'ended ' + `$t
 }
@@ -364,7 +383,14 @@ foreach ($l in $out) {
   if ("$l" -like 'STILLRUNNING|*') { $running = $true; Say ("  still running from a server folder after being stopped: process " + "$l".Substring(13)) 'Red' }
   else { Say "  $l" }
 }
-if ($running) { Die 'A server is still running, so nothing was moved. Find what holds the folder (the process above) and run this again.' }
+if ($running) {
+  # Nothing was moved and nothing will start them from here, so the watchdog
+  # watches them again at once (#5155).
+  Remote @"
+$(Get-ThornswoodHoldScript)
+foreach (`$t in @($tasksLit)) { Clear-ThornswoodHold -Target `$t }
+"@ | ForEach-Object { Say "  $_" }
+  Die 'A server is still running, so nothing was moved. Find what holds the folder (the process above) and run this again.' }
 
 Head 'Moving the old storage aside'
 $moved = Remote @"
@@ -425,8 +451,11 @@ if ($bad) {
 Head 'Starting them again'
 $out = Remote @"
 `$ErrorActionPreference = 'Continue'
+$(Get-ThornswoodHoldScript)
 foreach (`$t in @($tasksLit)) { `$null = & schtasks /run /tn `$t 2>&1 }
 Start-Sleep -Seconds 12
+# Started: the watchdog watches them again (#5155).
+foreach (`$t in @($tasksLit)) { Clear-ThornswoodHold -Target `$t }
 foreach (`$r in @($rootsLit)) {
   `$r
   `$cf = Join-Path `$r 'private\characters.json'

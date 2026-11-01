@@ -276,6 +276,13 @@ link, and the old line goes.
   [#2578](https://github.com/EvilPatrick06/Thornswood/issues/2578#issuecomment-6335268289),
   the backup
   [#2578](https://github.com/EvilPatrick06/Thornswood/issues/2578#issuecomment-6342972359).
+- **A server stopped on purpose is held, and the watchdog leaves it alone
+  until the hold ends:** whoever stops it leaves a hold saying who, why and
+  until when (30 minutes unless they say, 2 hours at most); when it runs out
+  the watchdog tells staff once and starts it; a crash is still restarted
+  straight away. The scripts that stop a server write and remove their own
+  hold, and a stop by hand uses `scripts\vps\Hold-Server.ps1`. 31 Oct 2026,
+  [#5155](https://github.com/EvilPatrick06/Thornswood/issues/5155#issuecomment-6549948368).
 - **The Gamemasters category goes on the live Discord** with
   Setup-Discord.ps1 (no posts, no pruning), and GM Rules v1.0 is pinned in
   #gm-rules. 22 Oct 2026,

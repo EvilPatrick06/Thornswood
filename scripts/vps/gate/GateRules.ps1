@@ -66,9 +66,14 @@ function Read-ThornswoodGateVerbs([string]$Path = '') {
 #            then each given parameter and its value, in the order given
 #   Out      the parameter the broker fills with the run's out folder, or ''
 #   Minutes  how long the run may take before the broker ends it
+#   Build    for a verb verbs.json marks "build" (the live ones), the full
+#            commit of main the line names with -Build. The broker runs it
+#            only when main is at exactly that commit once it has fetched
+#            it, so a live run is held to the build Patrick gave his word
+#            for, and -Build never reaches the script. '' for any other verb.
 function Test-ThornswoodGateRequest {
     param([string]$Line, $Verbs)
-    $r = [pscustomobject]@{ Ok = $false; Why = ''; Verb = ''; Script = ''; Args = @(); Out = ''; Minutes = 0 }
+    $r = [pscustomobject]@{ Ok = $false; Why = ''; Verb = ''; Script = ''; Args = @(); Out = ''; Minutes = 0; Build = '' }
     try { $words = Split-ThornswoodGateLine $Line }
     catch { $r.Why = $_.Exception.Message; return $r }
     if ($words.Count -eq 0) { $r.Why = 'the line is empty: it names no verb. Nothing was run.'; return $r }
@@ -86,17 +91,27 @@ function Test-ThornswoodGateRequest {
     $v = $Verbs.verbs.$name
     $rules = @{}
     foreach ($p in @($v.params.PSObject.Properties)) { $rules[[string]$p.Name] = [string]$p.Value }
+    $held = ($v.PSObject.Properties['build'] -and $v.build -eq $true)
     $given = New-Object System.Collections.Generic.List[string]
     $seen = @{}
     $i = 1
     while ($i -lt $words.Count) {
         $w = $words[$i]
-        if ($w -notmatch '^-([A-Za-z]{1,40})$') { $r.Why = ($w + ' is not a parameter name: ' + $name + ' takes only -Name or -Name value. Nothing was run.'); return $r }
+        # A name may end in digits, as Ship's -Detail2 and -Detail3 do (#5144).
+        if ($w -notmatch '^-([A-Za-z][A-Za-z0-9]{0,39})$') { $r.Why = ($w + ' is not a parameter name: ' + $name + ' takes only -Name or -Name value. Nothing was run.'); return $r }
         $p = $Matches[1]
+        # The build a live verb is held to: the gate's own, never the script's.
+        if ($held -and $p -ceq 'Build') {
+            if ($r.Build) { $r.Why = '-Build is given twice. Nothing was run.'; return $r }
+            if ($i + 1 -ge $words.Count -or $words[$i + 1] -cnotmatch '^[0-9a-f]{40}$') { $r.Why = ('-Build takes the full 40 character commit of main that ' + $name + ' is to run. Nothing was run.'); return $r }
+            $r.Build = $words[$i + 1]
+            $i += 2
+            continue
+        }
         # Case sensitive here too, so -putback is not a second way to say -PutBack.
         $ruleName = @($rules.Keys | Where-Object { $_ -ceq $p })
         if (-not $ruleName.Count) {
-            $r.Why = ($name + ' through the gate takes ' + ((@($rules.Keys | Sort-Object) | ForEach-Object { '-' + $_ }) -join ', ') + ', and not -' + $p + '. Nothing was run.')
+            $r.Why = ($name + ' through the gate takes ' + ((@(@($rules.Keys) + @($(if ($held) { 'Build' })) | Where-Object { $_ } | Sort-Object) | ForEach-Object { '-' + $_ }) -join ', ') + ', and not -' + $p + '. Nothing was run.')
             return $r
         }
         if ($seen.ContainsKey($p)) { $r.Why = ('-' + $p + ' is given twice. Nothing was run.'); return $r }
@@ -114,6 +129,10 @@ function Test-ThornswoodGateRequest {
         }
         $given.Add('-' + $p); $given.Add($val)
         $i += 2
+    }
+    if ($held -and -not $r.Build) {
+        $r.Why = ($name + ' changes what people play on, so it runs only for the exact build Patrick gave his word for: add -Build and main''s full commit. Nothing was run.')
+        return $r
     }
     $r.Ok = $true
     $r.Verb = $name
@@ -137,4 +156,27 @@ function Join-ThornswoodGateArgs([string[]]$Words) {
         if ($w -eq '' -or $w.Contains(' ')) { $out += ('"' + $w + '"') } else { $out += $w }
     }
     return ($out -join ' ')
+}
+
+# The gate's own three files in one line, "Gate.ps1=<sha256> GateBroker.ps1=
+# <sha256> GateRules.ps1=<sha256>", each hashed with its carriage returns
+# taken out, so a checkout that writes CRLF and one that writes LF give the
+# same line. The broker's ping prints it for the copies it runs from, and
+# Box-Run.ps1 -OnTheBox compares it with main's before every verb, so a
+# merged change to the gate reaches the box with the next run (Update-Gate)
+# and never waits for a person on One. A file that is not there is "none".
+$ThornswoodGateFiles = @('Gate.ps1', 'GateBroker.ps1', 'GateRules.ps1')
+function Get-ThornswoodGateFileLine([string]$Dir) {
+    $parts = @()
+    foreach ($n in $ThornswoodGateFiles) {
+        $p = Join-Path $Dir $n
+        $sha = 'none'
+        if (Test-Path -LiteralPath $p) {
+            $text = [IO.File]::ReadAllText($p).Replace("`r", '')
+            $h = (New-Object Security.Cryptography.SHA256Managed).ComputeHash((New-Object Text.UTF8Encoding($false)).GetBytes($text))
+            $sha = [BitConverter]::ToString($h).Replace('-', '').ToLowerInvariant()
+        }
+        $parts += ($n + '=' + $sha)
+    }
+    return ($parts -join ' ')
 }

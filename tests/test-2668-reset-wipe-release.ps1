@@ -102,7 +102,7 @@ $expect = @($parts | Where-Object { $_ -ne 'merchants' -and $_ -ne 'saves' })
 Yes ('S5 the wipe marks done every part but the merchants'' and the saves (' + ($WipeDone -join ', ') + ')') (
     $WipeDone.Count -eq $expect.Count -and @($expect | Where-Object { $WipeDone -notcontains $_ }).Count -eq 0)
 $registers = @{ farms = @('farm-claims.json'); property = @('property.json', 'law.json', 'beds.json'); embassy = @('embassy.json')
-                dungeon = @('dungeon-rewards-ledger.json'); cargo = @('trade-cargo.json'); carts = @('trade-carts.json')
+                dungeon = @('dungeon-rewards-ledger.json'); cargo = @('trade-cargo.json'); stalls = @('market-stalls.json'); carts = @('trade-carts.json')
                 books = @('books.json', 'last-left.json') }
 $all = $true
 foreach ($p in $WipeDone) {
@@ -146,6 +146,7 @@ $rights = @((RightOf 'stopAndMove'), (RightOf 'readyWait'), (RightOf 'run'))
 if (@($rights | Where-Object { $_ }).Count -eq 3) {
     $resetRun = & {
         $Here = Join-Path $Repo 'scripts\ops'
+        . (Join-Path $Repo 'scripts\vps\ServerHold.ps1')   # its hold goes in front (#5155)
         $stopAndMove = & ([scriptblock]::Create($rights[0]))
         $readyWait = & ([scriptblock]::Create($rights[1]))
         & ([scriptblock]::Create($rights[2]))
@@ -164,6 +165,9 @@ Yes ('B2 it opens the server on the root''s own port, then stops the task, waits
 Yes 'B3 a server still there, or one that could not be opened, moves nothing' (
     $resetRun -and $resetRun.Contains('STOP. The server has not exited, so nothing was thrown away') -and
     $resetRun.Contains('STOP. The server could not be opened to wait for it. Nothing was stopped or thrown away.'))
+Yes 'B3a it holds the server before it stops it, so the watchdog leaves it stopped (#5155)' (
+    (At 'Set-ThornswoodHold -Target $Task') -ge 0 -and (At 'Set-ThornswoodHold -Target $Task') -lt (At 'Stop-ScheduledTask -TaskName $Task') -and
+    $resetRun.LastIndexOf('Clear-ThornswoodHold -Target $Task') -gt (At 'Start-ScheduledTask -TaskName $Task'))
 Yes 'B4 nothing in the reset sleeps a fixed time or knocks on a fixed port from here' (
     $R.text -notmatch 'Start-Sleep -Seconds' -and $R.text -notmatch 'BeginConnect\(\$VpsHost' -and $R.text -notmatch 'Stop-Process')
 Yes 'B5 -UseLocal opens and waits on what it stops' (
@@ -205,8 +209,8 @@ function Ids($a) { return ((@($a) | ForEach-Object { [long]$_ }) -join ',') }
 function Server([string]$name, [string]$settings) {
     $root = Join-Path $T $name
     Put (Join-Path $root 'server-settings.json') $settings
-    Put (Join-Path $root 'world\changeForms\0.json') ('{"formDesc":"ff000a01","profileId":5001,"appearanceDump":{"name":"A"}}')
-    Put (Join-Path $root 'world\changeForms\1.json') ('{"formDesc":"ff000a02","profileId":5002}')
+    Put (Join-Path $root 'world\changeForms\0.json') ('{"formDesc":"a01","profileId":5001,"appearanceDump":{"name":"A"}}')
+    Put (Join-Path $root 'world\changeForms\1.json') ('{"formDesc":"a02","profileId":5002}')
     # Not a character made in the world (a plugin in its desc), and a world object: neither is named.
     Put (Join-Path $root 'world\changeForms\2.json') ('{"formDesc":"a01:Skyrim.esm","profileId":5003}')
     Put (Join-Path $root 'world\changeForms\13164_JKs Whiterun.esp.json') ('{"formDesc":"13164:JKs Whiterun.esp"}')

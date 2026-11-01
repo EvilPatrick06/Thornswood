@@ -126,7 +126,7 @@ yes('and it keeps refusing once the answer is stale, rather than trusting an old
     /keysSaidAt\) < 5000/.test(keysCount));
 yes('the front is the one that answers, through the page\'s own handle',
     /keys: keysSay,/.test(page) &&
-    /function keysSay\(on, ask\) \{\s*keysHere = !!on;\s*keysSaidAt = Date\.now\(\);/.test(page));
+    /function keysSay\(on, ask\) \{\s*frontHere\(\);\s*keysHere = !!on;\s*keysSaidAt = Date\.now\(\);/.test(page));
 yes('a client that never answers leaves the keys as they were, from the first mouse move',
     /if \(!keysSaidAt\) return moved;/.test(keysCount));
 const onKey = between(page, '  function onKey(ev) {', '\n  }\n') || '';
@@ -163,7 +163,7 @@ if (KEYS) {
   const keyRig = function () {
     const st = { now: 10000, told: [], played: 0, timers: [], drawn: 0, forgot: 0, moved: false };
     const clock = { now: function () { return st.now; } };
-    const make = new Function('root', 'introKey', 'slots', 'draw', 'play', 'forget', 'tell', 'Date', 'setTimeout', 'clearTimeout', 'st',
+    const make = new Function('root', 'introKey', 'slots', 'draw', 'play', 'forget', 'tell', 'Date', 'setTimeout', 'clearTimeout', 'st', 'frontHere',
       'var moved = false, asking = 0, at = 0;\n' + KEYS + '\n' +
       'return { onKey: onKey, keys: keysSay, at: function () { return at; }, asking: function () { return asking; } };');
     const api = make({ className: '' }, function () { return false; },
@@ -171,7 +171,8 @@ if (KEYS) {
       function () { st.drawn++; }, function () { st.played++; }, function () { st.forgot++; },
       function (s) { st.told.push(s); }, clock,
       function (fn, ms) { const t = { fn: fn, at: st.now + ms, live: true }; st.timers.push(t); return t; },
-      function (t) { if (t) t.live = false; }, st);
+      function (t) { if (t) t.live = false; }, st,
+      function () { }); // #5140: the front is in; test-5140-start-focus.js holds that half
     const run = function (ms) {
       st.now += ms;
       st.timers.forEach(function (t) { if (t.live && t.at <= st.now) { t.live = false; t.fn(); } });

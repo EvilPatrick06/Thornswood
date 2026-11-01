@@ -1,6 +1,6 @@
 {
-  "_note": "The vcpkg libraries whose code is in each native client file, read from its program database by the fork's build, and each one's licence text in client-licences\\<port>.txt. Written by scripts\\release\\New-ClientLicenceRecord.ps1 (#3099).",
-  "forkCommit": "20bb0b88",
+  "_note": "The vcpkg libraries whose code is in each native client file, read from its program database by the fork's build, the fork's own folders under a notice of their own and the npm packages in skymp5-client.js (libraries), and each one's licence text in client-licences\\<name>.txt. Written by scripts\\release\\New-ClientLicenceRecord.ps1 (#3099, #3751).",
+  "forkCommit": "50736fe6",
   "readWith": "LLVM version 20.1.8",
   "files": {
     "Data\\SKSE\\Plugins\\MpClientPlugin.dll": [
@@ -275,6 +275,54 @@
       ],
       "sha256": "845efc77857d485d91fb3e0b884aaa929368c717ae8186b66fe1ed2495753243",
       "bytes": 1002
+    }
+  },
+  "libraries": {
+    "npm-eventemitter3-5.0.1": {
+      "kind": "npm",
+      "version": "5.0.1",
+      "licence": "MIT",
+      "from": "skymp5-client/node_modules/eventemitter3",
+      "in": [
+        "Data\\Platform\\Plugins\\skymp5-client.js"
+      ],
+      "sha256": "3aecc12b1cb28832b5f65ab64291de96568c3f236a74d646281b4491f7bcadbf",
+      "bytes": 1082
+    },
+    "papyrus-vm": {
+      "kind": "fork",
+      "version": null,
+      "licence": "MIT",
+      "from": "papyrus-vm/LICENSE",
+      "in": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll"
+      ],
+      "sha256": "a84ad3fca175101a31bc979fd051d056f2bbc594aefb9501e584666256957ce1",
+      "bytes": 1080
+    },
+    "tilted": {
+      "kind": "fork",
+      "version": null,
+      "licence": null,
+      "from": "THIRD_PARTY_LICENSES",
+      "in": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformCEF.exe.hidden",
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll"
+      ],
+      "sha256": "31328baac756d31df93257b583595ebde727af0b9e058e5bf98007c7459097fc",
+      "bytes": 1267
+    },
+    "viet": {
+      "kind": "fork",
+      "version": null,
+      "licence": "MIT",
+      "from": "viet/LICENSE",
+      "in": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+        "Data\\SKSE\\Plugins\\MpClientPlugin.dll"
+      ],
+      "sha256": "02ef7b344dbfef444a997ff2377bfb9a9a772c6706da7baf4dcae65ba6042dc7",
+      "bytes": 1062
     }
   }
 }

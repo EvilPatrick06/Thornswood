@@ -35,6 +35,8 @@
       from Nexus, which is the archive that was uploaded as that file. Its
       -Add names a JSON file of main under records\, and each mod's archive
       is downloaded by its fileId the same way.
+      Its -Rule names a JSON file of main under docs\ (plugin rules, such
+      as docs\COLLECTION-REVISION-6-RULE.json), read as main holds it.
     - Install-NexusRevision always runs with -Record, into a folder of the
       run's own, which comes back with the output.
   Anything else that reads a file of the machine it runs on (-From, -Layout,
@@ -235,6 +237,11 @@ if ($OnTheRunner) {
                 $addFile = Join-Path $work 'add.json'
                 [IO.File]::WriteAllText($addFile, (ConvertTo-Json -InputObject @($mods) -Depth 10), $utf8)
                 $p['Add'] = $addFile
+            }
+            if ($req.Verb -eq 'New-NexusRevision' -and $p.Contains('Rule')) {
+                $rel = [string]$p['Rule']
+                if (-not (Test-NexusRunPath $rel) -or -not @(Get-NexusRunTracked $Repo $rel).Count) { throw ('-Rule ' + $rel + ' is no file of main. Nothing was run.') }
+                $p['Rule'] = Join-Path $Repo $rel
             }
             if ($req.Out) { $p[$req.Out.TrimStart('-')] = (Join-Path $filesDir ($req.Out.TrimStart('-').ToLowerInvariant())) }
         }

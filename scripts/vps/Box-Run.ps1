@@ -7,13 +7,20 @@
       pwsh scripts/vps/Box-Run.ps1 -Line 'Deploy-DevGamemode -Restart'
       pwsh scripts/vps/Box-Run.ps1 -Line 'Deploy-Docs -Site'
       pwsh scripts/vps/Box-Run.ps1 -Line 'Get-Logs -Dev -Lines 2000'
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Rebuild-ContentTables -Server dev'
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Deploy-Server -GamemodeOnly -Build <main's full commit>'
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Watch-Services -Install'
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Hold-Server -Service dev -Why "swapping the ledger" -Minutes 45'
       pwsh scripts/vps/Box-Run.ps1 -Line 'ping'
       pwsh scripts/vps/Box-Run.ps1 -Run 1234567890     read an earlier run again
 
   scripts\vps\gate\verbs.json is the whole list of verbs and the switches
   each takes; a line outside it is refused here before anything starts, and
   again on the box. What runs is always that script of main as main is on
-  GitHub when the box reads it, never this checkout.
+  GitHub when the box reads it, never this checkout. A live verb
+  (Deploy-Server, Publish-Server-Main) names the commit of main Patrick gave
+  his word for with -Build, and the box refuses it once main is anywhere
+  else.
 
   HOW. It starts box-run.yml on main of the private ops repository,
   EvilPatrick06/Thornswood-Ops, where the VPS runners are registered since
@@ -29,8 +36,9 @@
   everyone who can read the repository it runs in. So the run's log carries only the
   verb, main's commit and the exit code. Everything the verb printed and
   every file it wrote is sealed on the runner to a key made here for this
-  run alone (RSA-OAEP over an AES-GCM key) and uploaded as the run's
-  artifact. Only the private half, kept in this machine's scratch folder
+  run alone (RSA-OAEP over an AES-GCM key) and written into the run's log
+  as TWSEAL-LOG lines (scripts\ops\Sealed.ps1 says why the log and not an
+  artifact). Only the private half, kept in this machine's scratch folder
   (box-run\<run>.key, readable by this account only), opens it, and this
   prints the output and puts the files in box-run\<run>\.
 
@@ -104,34 +112,86 @@ if ($OnTheBox) {
         $out = Join-Path $work 'out\output.txt'
         $parts = @{}
         $utf8 = New-Object Text.UTF8Encoding($false)
-        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-        & $sshExe @sshArgs ($GateUser + '@127.0.0.1') $Line 2>&1 | ForEach-Object {
-            $l = "$_"
-            if ($l -match '^\| (.*)$') {
-                [IO.File]::AppendAllText($out, $Matches[1] + "`n", $utf8); $lines++
-                if ($Matches[1] -match '^main at ([0-9a-f]{40})$') { $main = $Matches[1] }
-            }
-            elseif ($l -match '^@FILE (\S+) ([A-Za-z0-9+/=]+)$') { if (-not $parts.ContainsKey($Matches[1])) { $parts[$Matches[1]] = New-Object Text.StringBuilder }; [void]$parts[$Matches[1]].Append($Matches[2]) }
-            elseif ($l -match '^@FILEEND (\S+) ([0-9a-f]{64})$') {
-                $name = $Matches[1]; $sha = $Matches[2]
-                $rel = $name -replace '\.\.', '_'
-                $bytes = [Convert]::FromBase64String($(if ($parts.ContainsKey($name)) { $parts[$name].ToString() } else { '' }))
-                $got = ([BitConverter]::ToString([Security.Cryptography.SHA256]::HashData($bytes))).Replace('-', '').ToLowerInvariant()
-                if ($got -ne $sha) { [IO.File]::AppendAllText($out, "box-run: $name arrived broken (sha256 $got, the box said $sha) and was left out`n", $utf8) }
-                else {
-                    $dest = Join-Path (Join-Path $work 'out\files') $rel
-                    New-Item -ItemType Directory -Path (Split-Path -Parent $dest) -Force | Out-Null
-                    [IO.File]::WriteAllBytes($dest, $bytes)
+        # One line to the gate. What the verb prints goes into the sealed
+        # output as it comes; its "| " lines also come back, for the gate's
+        # own check below.
+        function Invoke-GateLine([string]$GateLine) {
+            $r = [pscustomobject]@{ Code = 1; Refused = ''; Main = ''; Said = (New-Object System.Collections.Generic.List[string]) }
+            $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+            & $sshExe @sshArgs ($GateUser + '@127.0.0.1') $GateLine 2>&1 | ForEach-Object {
+                $l = "$_"
+                if ($l -match '^\| (.*)$') {
+                    [IO.File]::AppendAllText($out, $Matches[1] + "`n", $utf8); $script:lines++; $r.Said.Add($Matches[1])
+                    if ($Matches[1] -match '^main at ([0-9a-f]{40})$') { $r.Main = $Matches[1] }
                 }
-                $parts.Remove($name)
+                elseif ($l -match '^@FILE (\S+) ([A-Za-z0-9+/=]+)$') { if (-not $parts.ContainsKey($Matches[1])) { $parts[$Matches[1]] = New-Object Text.StringBuilder }; [void]$parts[$Matches[1]].Append($Matches[2]) }
+                elseif ($l -match '^@FILEEND (\S+) ([0-9a-f]{64})$') {
+                    $name = $Matches[1]; $sha = $Matches[2]
+                    $rel = $name -replace '\.\.', '_'
+                    $bytes = [Convert]::FromBase64String($(if ($parts.ContainsKey($name)) { $parts[$name].ToString() } else { '' }))
+                    $got = ([BitConverter]::ToString([Security.Cryptography.SHA256]::HashData($bytes))).Replace('-', '').ToLowerInvariant()
+                    if ($got -ne $sha) { [IO.File]::AppendAllText($out, "box-run: $name arrived broken (sha256 $got, the box said $sha) and was left out`n", $utf8) }
+                    else {
+                        $dest = Join-Path (Join-Path $work 'out\files') $rel
+                        New-Item -ItemType Directory -Path (Split-Path -Parent $dest) -Force | Out-Null
+                        [IO.File]::WriteAllBytes($dest, $bytes)
+                    }
+                    $parts.Remove($name)
+                }
+                elseif ($l -match '^@REFUSED (.*)$') { $r.Refused = $Matches[1] }
+                elseif ($l -match '^@END (-?[0-9]+)$') { $r.Code = [int]$Matches[1] }
+                elseif ($l -and $l -notmatch 'post-quantum|store now, decrypt later|openssh\.com/pq\.html') { [IO.File]::AppendAllText($out, 'ssh: ' + $l + "`n", $utf8) }
             }
-            elseif ($l -match '^@REFUSED (.*)$') { $refused = $Matches[1] }
-            elseif ($l -match '^@END (-?[0-9]+)$') { $code = [int]$Matches[1] }
-            elseif ($l -and $l -notmatch 'post-quantum|store now, decrypt later|openssh\.com/pq\.html') { [IO.File]::AppendAllText($out, 'ssh: ' + $l + "`n", $utf8) }
+            $sshCode = $LASTEXITCODE
+            $ErrorActionPreference = $old
+            if ($sshCode -eq 255) { $r.Code = 1; if (-not $r.Refused) { $r.Refused = 'ssh could not log in to the gate as ' + $GateUser + ' (exit 255); the sealed output has its words' } }
+            return $r
         }
-        $sshCode = $LASTEXITCODE
-        $ErrorActionPreference = $old
-        if ($sshCode -eq 255) { $code = 1; if (-not $refused) { $refused = 'ssh could not log in to the gate as ' + $GateUser + ' (exit 255); the sealed output has its words' } }
+
+        # THE GATE FOLLOWS MAIN. The broker runs its own installed copies of
+        # Gate.ps1, GateBroker.ps1 and GateRules.ps1, and everything else from
+        # main. So before any verb, its ping says which copies it runs, and when
+        # they are not main's (this checkout is main's), Update-Gate puts main's
+        # in first. A merged gate fix then reaches the box with the next run,
+        # and nobody installs it on One (31 Oct 2026: the #5166 fix sat merged
+        # while every verb refused, until Install-Gate ran by hand on One).
+        $verbsHere = Read-ThornswoodGateVerbs (Join-Path $Here 'gate\verbs.json')
+        if ($req.Verb -cne 'ping' -and $req.Verb -cne 'Update-Gate') {
+            $want = Get-ThornswoodGateFileLine (Join-Path $Here 'gate')
+            $p = Invoke-GateLine 'ping'
+            if ($p.Code -ne 0) { $refused = 'the gate did not answer its ping (' + $p.Refused + '), so ' + $req.Verb + ' was not sent'; $code = 1 }
+            else {
+                $have = (@($p.Said | Where-Object { $_ -like 'GATE FILES *' }) | Select-Object -First 1)
+                $have = if ($have) { $have.Substring(11) } else { 'unknown (a broker from before #5178 prints no GATE FILES line)' }
+                if ($have -ne $want) {
+                    [IO.File]::AppendAllText($out, "box-run: the gate runs $have, and main has $want, so Update-Gate goes first`n", $utf8)
+                    if (-not $verbsHere.verbs.PSObject.Properties['Update-Gate']) { $refused = 'the gate runs older copies of its files than main''s, and main''s verbs.json has no Update-Gate verb to bring them up, so ' + $req.Verb + ' was not sent'; $code = 1 }
+                    else {
+                        $u = Invoke-GateLine 'Update-Gate'
+                        if ($u.Code -ne 0) { $refused = 'Update-Gate ended ' + $u.Code + $(if ($u.Refused) { ' (' + $u.Refused + ')' } else { '' }) + ', so ' + $req.Verb + ' was not sent'; $code = 1 }
+                        else {
+                            # Update-Gate answers, then the broker that ran it ends without
+                            # opening the pipe again (GateBroker.ps1, "handing over") and
+                            # Update-Gate's task starts the new one, while Gate.ps1 waits
+                            # 20 seconds for the pipe; so this ping reaches the new broker.
+                            # If it still reports other copies, nothing else is sent: that
+                            # is a fault to fix in Update-Gate, never something to ask
+                            # again. (The one broker that cannot hand over is the one
+                            # installed before #5178; the first Update-Gate after it is
+                            # sent alone, and a ping after update\restart.log says it
+                            # started.)
+                            $p = Invoke-GateLine 'ping'
+                            $now = (@($p.Said | Where-Object { $_ -like 'GATE FILES *' }) | Select-Object -First 1)
+                            if ($p.Code -ne 0 -or -not $now -or $now.Substring(11) -ne $want) { $refused = 'after Update-Gate the gate reports ' + $(if ($now) { $now.Substring(11) } else { 'no GATE FILES line' }) + ', not main''s ' + $want + ', so ' + $req.Verb + ' was not sent'; $code = 1 }
+                        }
+                    }
+                }
+            }
+        }
+        if (-not $refused) {
+            $r = Invoke-GateLine $Line
+            $code = $r.Code; $refused = $r.Refused; $main = $r.Main
+        }
 
         # The seal, to the session that asked, or nothing leaves the runner.
         if ($recipient) {
@@ -179,7 +239,7 @@ if ($a.State -eq 'waiting' -or $a.State -eq 'unread') { Die ("run $Run has no an
 $keyPath = Join-Path $scratch "$Run.key"
 $dir = Join-Path $scratch "$Run"
 if (Test-Path -LiteralPath $keyPath) {
-    $o = Open-ThornswoodSealedRun -Repo $GitHubRepo -Run $Run -Artifact 'box-run-sealed' -File 'box-run.sealed' -KeyPath $keyPath -Into $dir
+    $o = Open-ThornswoodSealedRun -Repo $GitHubRepo -Run $Run -Artifact 'box-run-sealed' -File 'box-run.sealed' -KeyPath $keyPath -Into $dir -FromLog
     if ($o.Ok) {
         $txt = Join-Path $dir 'output.txt'
         if (Test-Path -LiteralPath $txt) { Get-Content -LiteralPath $txt | ForEach-Object { Write-Host $_ } }

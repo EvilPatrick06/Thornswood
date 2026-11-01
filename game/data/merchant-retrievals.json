@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "loadOrderSha256": "9c4e3d7191783dc8a79f2c1affde95427c4bf24c68b4a1ff93d03451fbd4baf5",
-  "contentSha256": "e4ff8d591a3e7c9d2e2de4213e443a76eb6e3bf8badca2b91c8ff18b0287fdb3",
+  "loadOrderSha256": "17597555b8c439898714ebf725435a36a7102aa84d9ccbfba7a1796b6f6148b5",
+  "contentSha256": "5f9dc1a9badc23fcb169ce03815f9d2f29775a0ad243757d0bd4110b67ac4323",
   "sources": [
     {
       "quest": "satchel",
@@ -56,9 +56,9 @@
       "gold": 30,
       "hours": 6,
       "provenance": {
-        "fileIndex": 51,
+        "fileIndex": 52,
         "plugin": "Thornswood-Content.esp",
-        "pluginSha256": "e4ff8d591a3e7c9d2e2de4213e443a76eb6e3bf8badca2b91c8ff18b0287fdb3",
+        "pluginSha256": "5f9dc1a9badc23fcb169ce03815f9d2f29775a0ad243757d0bd4110b67ac4323",
         "recordSha256": "c5ac0bc9fba89a9ac07e7c2622993cc6e105658e82544f201268c56c2fa0870a",
         "rawId": 83980808
       }

@@ -66,7 +66,8 @@
     window.thornswoodSkills = { open, close, toggle, isOpen, setData, takeOn, setKey }
     setKey(name)    SkillsKey's name, K unless it is bound elsewhere (#1919)
     page -> plugin  'skills:ready' | 'skills:opened' | 'skills:closed' |
-                    'skills:refresh' | 'skills:pick <words>'
+                    'skills:refresh' | 'skills:pick <words>' |
+                    'skills:switch' (Change character, #3128)
     the plugin turns 'skills:pick X' into the chat line '/pick X'
 
   THE CONTRACT with the server, agreed 20 September, written down here
@@ -126,6 +127,15 @@
       { id, name }, and Offer to dye sends '/hairdye offer <id> <dye>': they
       answer on their own prompt. The server answers in the chat and by
       rewriting this.
+
+    alchemy: { eaten: [ { name, effects: [ '<effect>' ] | null, other, known, of } ],
+               recipes: [ { with: [ '<ingredient>' ], makes: [ '<effect>' ], times } ] }
+      The Alchemy journal (#3142), sent only once the character has eaten an
+      ingredient or brewed a mix. eaten is every ingredient tasted, with the
+      effects of it the character knows: known of of are known, effects
+      names the ones a brew here can make and other counts the rest. effects
+      is null when the server cannot find the ingredient's record. recipes
+      is every mix brewed, and how many times. Nothing on it is sent.
 
     staff: { points: <number>, rank: '<Bladebinder rank>',
              mine: [ '<spell desc>' ], spells: [ [ desc, name, rank ] ] }
@@ -297,7 +307,8 @@
         { key: 'health', name: 'Health', subs: [
             { key: 'vitality', name: 'Vitality', desc: 'Most health', perk: 'Cheat Death: once a day, the blow that would kill you leaves you at 1 health.' },
             { key: 'fortitude', name: 'Fortitude', desc: 'Regeneration', perk: 'Troll’s Blood: during a fight, health returns at 2 a second.' },
-            { key: 'might', name: 'Might', desc: 'Melee damage', perk: 'Devastating Blow: a power attack deals 25% more.' },
+            { key: 'might', name: 'Might', desc: 'Melee damage', perk: 'Devastating Blow: a power attack deals 25% more.',
+              gate: [{ weight: 45, might: 5 }, { weight: 30, might: 3 }] },
             { key: 'resilience', name: 'Resilience', desc: 'Armour', perk: 'Unshakeable: nothing staggers you while you block.' },
             { key: 'toughness', name: 'Toughness', desc: 'Poison and disease', perk: 'Purified Blood: disease does not take, and poison deals 25%.' }] },
         { key: 'magicka', name: 'Magicka', subs: [
@@ -426,6 +437,15 @@
       rows: []
     },
     /*
+      The Alchemy journal (#3142). What was eaten and brewed is the server's,
+      under mine.alchemy; this is the title and the sentence over the page.
+    */
+    alchemy: {
+      title: 'Alchemy journal',
+      lead: 'Every ingredient you have eaten and what you know of it, and every mix you have brewed. Your character remembers all of it at any alchemy lab. An ingredient goes in a brew only once you have eaten it, and eating teaches its first effect; a brew teaches the effects its ingredients share.',
+      rows: []
+    },
+    /*
       The property page (#1637, #1603). What you hold and carry a key to is
       the server's, under mine.property; this is the title and nothing else,
       because the page draws its own line over the cards.
@@ -506,7 +526,7 @@
   */
   // ==== PROFESSION_GUIDES ====
   /* Built by scripts/dev/Build-ProfessionGuides.js out of game/data and game/gamemode.js. Do not hand edit. */
-  var GUIDES = {"ladder":{"per":{"advanced":100,"expert":250,"master":600},"rest":{"novice":1.5,"advanced":1.2,"expert":0.9,"master":0.6},"craftRest":15,"party":15,"perSpell":5,"perRank":10,"toolUses":50},"professions":{"warrior":{"halves":{"bulwark":{"count":0,"families":[],"first":[],"race":0,"benches":[],"maneuvers":[["Set","novice",15,45],["Plant","advanced",20,60],["Cover","expert",25,90],["Wall","master",40,180]]},"berserker":{"count":0,"families":[],"first":[],"race":0,"benches":[],"maneuvers":[["Rush","novice",15,30],["Heavy","advanced",20,45],["Break","expert",25,60],["Wreck","master",40,120]]}},"materials":[]},"mage":{"halves":{},"materials":[]},"alchemist":{"halves":{"blightbrewer":{"count":0,"families":[],"first":[],"race":0,"benches":[["Alchemy lab","novice"]]},"physicker":{"count":2,"families":[["Other goods",1,1,0,0]],"first":["Poultice"],"race":0,"benches":[["Alchemy lab","novice"]]}},"materials":[["Blue Mountain Flower",1,"gatherer","advanced","",[],[],0],["Garlic",1,"gatherer","novice","",[],[],0],["Mudcrab Chitin",1,"hunter","novice","",[],["Mudcrab"],0],["Tundra Cotton",1,"gatherer","novice","",[],[],0]]},"cook":{"halves":{"hearthcook":{"count":64,"families":[["Other food and drink",7,9,0,0],["Stews",5,2,4,1],["Meat dishes",7,3,0,1],["Soups",4,2,3,0],["Bread",0,4,0,0],["Vegetable dishes",3,1,0,0],["Cheese",0,3,0,0],["Fish dishes",2,0,0,0],["Chowders",1,0,0,0],["Crab dishes",1,0,0,0],["Ingredients",0,0,0,1]],"first":["First Planting Mead"],"race":0,"benches":[["Cookpot","novice"],["Grain mill","novice"],["Oven","novice"]]},"confectioner":{"count":12,"families":[["Desserts",7,3,2,0]],"first":[],"race":0,"benches":[["Oven","novice"]]}},"materials":[["Salt Pile",46,"miner","novice","",[],[],0],["Butter",23,"farmer","novice","",[],[],0],["Sack of Flour",19,"farmer","advanced","Grain mill",["Wheat"],[],0],["Garlic",16,"gatherer","novice","",[],[],0],["Frost Mirriam",12,"gatherer","novice","",[],[],0],["Lavender",8,"gatherer","novice","",[],[],0],["Chicken's Egg",7,"farmer","novice","",[],[],0],["Juniper Berries",7,"gatherer","novice","",[],[],0],["Snowberries",7,"gatherer","advanced","",[],[],0],["Elves Ear",6,"gatherer","expert","",[],[],0]]},"smith":{"halves":{"platewright":{"count":157,"families":[["Body armour",8,11,8,6],["Helmets",8,11,8,5],["Armoured boots",7,13,6,5],["Gauntlets",7,12,6,5],["Shields",2,9,3,2],["Ingots",11,0,0,0],["Leather",2,0,0,0],["Other armour and clothing",0,1,0,0],["Other goods",1,0,0,0]],"first":["Corundum Ingot","Fur Armor","Fur Bracers","Fur Helmet"],"race":10,"benches":[["Forge","novice"],["Smelter","novice"],["Tanning rack","novice"],["Skyforge","advanced"]]},"edgewright":{"count":79,"families":[["Swords",1,7,3,2],["War axes",2,6,3,2],["Battleaxes",1,5,2,2],["Greatswords",1,5,2,2],["Maces",2,4,2,2],["Daggers",1,4,2,2],["Warhammers",1,4,2,2],["Other goods",4,0,0,0],["Other weapons",1,0,0,0]],"first":["Key Mold","Iron War Axe","Iron Battleaxe","Iron Dagger"],"race":1,"benches":[["Forge","novice"],["Skyforge","advanced"]]}},"materials":[["Leather Strips",198,"hunter","novice","Tanning rack",["Leather"],[],0],["Iron Ingot",103,"miner","novice","Smelter",["Iron Ore"],["Raven Rock Mine","Halted Stream Camp","Fort Fellhammer Mines"],43],["Steel Ingot",78,"miner","advanced","Smelter",["Corundum Ore","Iron Ore"],["Knifepoint Mine","Dead Drop Mine","Goldenrock Mine"],18],["Leather",58,"hunter","novice","Tanning rack",[],[],0],["Refined Moonstone",29,"miner","expert","Smelter",["Moonstone Ore"],["Soljund's Sinkhole","Mzulft","Mzulft Boilery"],11],["Quicksilver Ingot",24,"miner","advanced","Smelter",["Quicksilver Ore"],["Quicksilver Mine","Blind Cliff Bastion","Altar of Thrond Cave"],10],["Corundum Ingot",20,"miner","advanced","Smelter",["Corundum Ore"],["Knifepoint Mine","Dead Drop Mine","Goldenrock Mine"],18],["Ebony Ingot",20,"miner","master","Smelter",["Ebony Ore"],["Gloombound Mine","Raven Rock Mine","Redbelly Mine"],1],["Refined Malachite",16,"miner","expert","Smelter",["Malachite Ore"],["Dimhollow Cavern","Steamscorch Mine","Nchardak Great Chamber"],2],["Stalhrim",16,"miner","master","",[],["Kolbjorn Barrow","Gyldenhul Barrow","Benkongerike Great Hall"],2]]},"enchanter":{"halves":{"bladebinder":{"count":13,"families":[["Staves",3,6,4,0]],"first":["Staff of Flames"],"race":0,"benches":[["Arcane enchanter","novice"],["Staff enchanter","novice"]]},"wardweaver":{"count":0,"families":[],"first":[],"race":0,"benches":[["Arcane enchanter","novice"]]}},"materials":[["Heart Stone",13,"miner","master","",[],["Coldcinder Cave","Broken Tusk Mine","Fort Frostmoth"],1],["Unenchanted Destruction Staff",10,"","","",[],[],0],["Unenchanted Restoration Staff",2,"","","",[],[],0],["Unenchanted Conjuration Staff",1,"","","",[],[],0]]},"tailor":{"halves":{"liverywright":{"count":81,"families":[["Robes and body wear",38,0,5,3],["Hats and hoods",15,0,0,0],["Other armour and clothing",0,10,0,0],["Shoes and light boots",7,0,0,0],["Gloves",3,0,0,0]],"first":["Black Robes","Black Cowl","Boots"],"race":2,"benches":[["Forge","novice"],["Loom","novice"],["Tanning rack","advanced"]]},"haberdasher":{"count":170,"families":[["Robes and body wear",42,2,0,3],["Shoes and light boots",31,1,1,6],["Hats and hoods",23,6,1,2],["Other armour and clothing",2,12,6,0],["Other goods",13,4,0,0],["Gloves",6,1,2,6]],"first":["Belted Tunic","Chef's Hat","Boots","Bandage"],"race":22,"benches":[["Forge","novice"],["Loom","novice"],["Tanning rack","novice"]]}},"materials":[["Thread",164,"gatherer","novice","Loom",["Tundra Cotton"],[],0],["Leather",101,"hunter","novice","Tanning rack",[],[],0],["Leather Strips",58,"hunter","novice","Tanning rack",["Leather"],[],0],["Linen Wrap",39,"","","",[],[],0],["Troll Fat",32,"hunter","advanced","",[],["Frost Troll","Troll","Snow Troll"],2],["Fur Plate",19,"hunter","novice","Tanning rack",[],[],0],["Gold Ingot",7,"miner","expert","Smelter",["Gold Ore"],["Kolskeggr Mine","Frossel","Darkshade"],14],["Common Soul Gem",5,"","","",[],[],0],["Dwarven Metal Ingot",4,"","","",[],[],0],["Ebony Ingot",4,"miner","master","Smelter",["Ebony Ore"],["Gloombound Mine","Raven Rock Mine","Redbelly Mine"],1]]},"woodworker":{"halves":{"charburner":{"count":5,"families":[["Other goods",2,1,1,1]],"first":["Poor Charcoal"],"race":0,"benches":[["Charcoal kiln","novice"]]},"woodwright":{"count":44,"families":[["Other goods",14,0,1,1],["Arrows and bolts",3,5,3,2],["Bows",0,4,4,2],["Other weapons",3,0,0,0],["Greatswords",0,2,0,0]],"first":["Bar Stool","Drum","Iron Arrow"],"race":3,"benches":[["Charcoal kiln","novice"],["Forge","novice"],["Woodworking bench","novice"],["Dawnguard bench","advanced"],["Skyforge","advanced"]]}},"materials":[["Firewood",36,"woodworker","novice","",[],[],0],["Leather Strips",13,"hunter","novice","Tanning rack",["Leather"],[],0],["Iron Ingot",10,"miner","novice","Smelter",["Iron Ore"],["Raven Rock Mine","Halted Stream Camp","Fort Fellhammer Mines"],43],["Steel Ingot",10,"miner","advanced","Smelter",["Corundum Ore","Iron Ore"],["Knifepoint Mine","Dead Drop Mine","Goldenrock Mine"],18],["Tundra Cotton",6,"gatherer","novice","",[],[],0],["Dwarven Metal Ingot",4,"","","",[],[],0],["Refined Moonstone",4,"miner","expert","Smelter",["Moonstone Ore"],["Soljund's Sinkhole","Mzulft","Mzulft Boilery"],11],["Quicksilver Ingot",3,"miner","advanced","Smelter",["Quicksilver Ore"],["Quicksilver Mine","Blind Cliff Bastion","Altar of Thrond Cave"],10],["Chaurus Chitin",2,"hunter","expert","",[],["Chaurus","Frozen Chaurus","Chaurus Hunter"],3],["Ebony Ingot",2,"miner","master","Smelter",["Ebony Ore"],["Gloombound Mine","Raven Rock Mine","Redbelly Mine"],1]]}}};
+  var GUIDES = {"ladder":{"per":{"advanced":100,"expert":250,"master":600},"rest":{"novice":1.5,"advanced":1.2,"expert":0.9,"master":0.6},"craftRest":15,"party":15,"perSpell":5,"perRank":10,"toolUses":50},"professions":{"warrior":{"halves":{"bulwark":{"count":0,"families":[],"first":[],"race":0,"benches":[],"maneuvers":[["Set","novice",15,45],["Plant","advanced",20,60],["Cover","expert",25,90],["Wall","master",40,180]]},"berserker":{"count":0,"families":[],"first":[],"race":0,"benches":[],"maneuvers":[["Rush","novice",15,30],["Heavy","advanced",20,45],["Break","expert",25,60],["Wreck","master",40,120]]}},"materials":[]},"mage":{"halves":{},"materials":[]},"alchemist":{"halves":{"blightbrewer":{"count":0,"families":[],"first":[],"race":0,"benches":[["Alchemy lab","novice"]]},"physicker":{"count":12,"families":[["Other food and drink",3,3,3,1],["Other goods",1,1,0,0]],"first":["Potion of Minor Healing","Poultice"],"race":0,"benches":[["Alchemy lab","novice"]]}},"materials":[["Blue Mountain Flower",4,"gatherer","advanced","",[],[],0],["Eye of Sabre Cat",3,"hunter","novice","",[],["Sabre Cat","Vale Sabre Cat","Animal Gladiator"],1],["Mudcrab Chitin",3,"hunter","novice","",[],["Mudcrab"],0],["Swamp Fungal Pod",3,"gatherer","advanced","",[],[],0],["Wheat",3,"farmer","advanced","",[],[],0],["Blisterwort",2,"gatherer","expert","",[],[],0],["Snowberries",2,"gatherer","advanced","",[],[],0],["White Cap",2,"gatherer","novice","",[],[],0],["Creep Cluster",1,"gatherer","novice","",[],[],0],["Fire Salts",1,"miner","expert","",[],[],0]]},"cook":{"halves":{"hearthcook":{"count":64,"families":[["Other food and drink",7,9,0,0],["Stews",5,2,4,1],["Meat dishes",7,3,0,1],["Soups",4,2,3,0],["Bread",0,4,0,0],["Vegetable dishes",3,1,0,0],["Cheese",0,3,0,0],["Fish dishes",2,0,0,0],["Chowders",1,0,0,0],["Crab dishes",1,0,0,0],["Ingredients",0,0,0,1]],"first":["First Planting Mead","Beef Stew","Cabbage Soup","Cooked Beef"],"race":0,"benches":[["Cookpot","novice"],["Grain mill","novice"],["Oven","novice"]]},"confectioner":{"count":12,"families":[["Desserts",1,10,1,0]],"first":["Apple Dumpling"],"race":0,"benches":[["Oven","novice"]]}},"materials":[["Salt Pile",46,"miner","novice","",[],[],0],["Butter",23,"farmer","novice","",[],[],0],["Sack of Flour",19,"farmer","advanced","Grain mill",["Wheat"],[],0],["Garlic",16,"gatherer","novice","",[],[],0],["Frost Mirriam",12,"gatherer","novice","",[],[],0],["Lavender",8,"gatherer","novice","",[],[],0],["Chicken's Egg",7,"farmer","novice","",[],[],0],["Juniper Berries",7,"gatherer","novice","",[],[],0],["Snowberries",7,"gatherer","advanced","",[],[],0],["Elves Ear",6,"gatherer","expert","",[],[],0]]},"smith":{"halves":{"platewright":{"count":244,"families":[["Body armour",21,51,11,7],["Helmets",9,21,8,5],["Gauntlets",12,18,6,5],["Armoured boots",8,16,6,5],["Shields",2,9,3,2],["Ingots",11,0,0,0],["Other armour and clothing",2,1,0,0],["Leather",2,0,0,0],["Hats and hoods",0,1,0,0],["Other goods",1,0,0,0],["Robes and body wear",0,1,0,0]],"first":["Fur Armor","Corundum Ingot","Ancient Nord Gauntlets","Fur Helmet"],"race":13,"benches":[["Forge","novice"],["Smelter","novice"],["Tanning rack","novice"],["Skyforge","advanced"]]},"edgewright":{"count":83,"families":[["Swords",1,7,3,2],["War axes",2,6,3,2],["Battleaxes",1,5,2,2],["Greatswords",1,5,2,2],["Maces",2,4,2,2],["Daggers",1,4,2,2],["Warhammers",1,4,2,2],["Other goods",8,0,0,0],["Other weapons",1,0,0,0]],"first":["Alembic","Iron War Axe","Iron Battleaxe","Iron Dagger"],"race":1,"benches":[["Forge","novice"],["Skyforge","advanced"]]}},"materials":[["Leather Strips",284,"hunter","novice","Tanning rack",["Leather"],[],0],["Iron Ingot",174,"miner","novice","Smelter",["Iron Ore"],["Raven Rock Mine","Halted Stream Camp","Fort Fellhammer Mines"],43],["Steel Ingot",134,"miner","advanced","Smelter",["Corundum Ore","Iron Ore"],["Knifepoint Mine","Dead Drop Mine","Goldenrock Mine"],18],["Leather",80,"hunter","novice","Tanning rack",[],[],0],["Corundum Ingot",41,"miner","advanced","Smelter",["Corundum Ore"],["Knifepoint Mine","Dead Drop Mine","Goldenrock Mine"],18],["Refined Moonstone",30,"miner","expert","Smelter",["Moonstone Ore"],["Soljund's Sinkhole","Mzulft","Mzulft Boilery"],11],["Quicksilver Ingot",25,"miner","advanced","Smelter",["Quicksilver Ore"],["Quicksilver Mine","Blind Cliff Bastion","Altar of Thrond Cave"],10],["Ebony Ingot",21,"miner","master","Smelter",["Ebony Ore"],["Gloombound Mine","Raven Rock Mine","Redbelly Mine"],1],["Orichalcum Ingot",17,"miner","advanced","Smelter",["Orichalcum Ore"],["Bilegulch Mine","Dushnikh Mine","Mor Khazgur Mine"],5],["Netch Leather",16,"hunter","advanced","",[],["Betty Netch","Bull Netch"],0]]},"enchanter":{"halves":{"bladebinder":{"count":13,"families":[["Staves",3,6,4,0]],"first":["Staff of Flames"],"race":0,"benches":[["Arcane enchanter","novice"],["Staff enchanter","novice"]]},"wardweaver":{"count":0,"families":[],"first":[],"race":0,"benches":[["Arcane enchanter","novice"]]}},"materials":[["Heart Stone",13,"miner","master","",[],["Coldcinder Cave","Broken Tusk Mine","Fort Frostmoth"],1],["Unenchanted Destruction Staff",10,"","","",[],[],0],["Unenchanted Restoration Staff",2,"","","",[],[],0],["Unenchanted Conjuration Staff",1,"","","",[],[],0]]},"tailor":{"halves":{"liverywright":{"count":82,"families":[["Robes and body wear",38,0,5,3],["Hats and hoods",15,0,0,1],["Other armour and clothing",0,10,0,0],["Shoes and light boots",7,0,0,0],["Gloves",3,0,0,0]],"first":["Black Robes","Black Cowl","Boots"],"race":2,"benches":[["Forge","novice"],["Loom","novice"],["Tanning rack","advanced"]]},"haberdasher":{"count":171,"families":[["Robes and body wear",43,2,0,3],["Shoes and light boots",31,1,1,6],["Hats and hoods",23,6,1,2],["Other armour and clothing",2,12,6,0],["Other goods",13,4,0,0],["Gloves",6,1,2,6]],"first":["Belted Tunic","Chef's Hat","Boots","Bandage"],"race":23,"benches":[["Forge","novice"],["Loom","novice"],["Tanning rack","novice"]]}},"materials":[["Thread",164,"gatherer","novice","Loom",["Tundra Cotton"],[],0],["Leather",104,"hunter","novice","Tanning rack",[],[],0],["Leather Strips",60,"hunter","novice","Tanning rack",["Leather"],[],0],["Linen Wrap",39,"","","",[],[],0],["Troll Fat",32,"hunter","advanced","",[],["Frost Troll","Troll","Snow Troll"],2],["Fur Plate",19,"hunter","novice","Tanning rack",[],[],0],["Gold Ingot",7,"miner","expert","Smelter",["Gold Ore"],["Kolskeggr Mine","Frossel","Darkshade"],14],["Common Soul Gem",5,"","","",[],[],0],["Dwarven Metal Ingot",4,"","","",[],[],0],["Ebony Ingot",4,"miner","master","Smelter",["Ebony Ore"],["Gloombound Mine","Raven Rock Mine","Redbelly Mine"],1]]},"woodworker":{"halves":{"charburner":{"count":5,"families":[["Other goods",2,1,1,1]],"first":["Poor Charcoal"],"race":0,"benches":[["Charcoal kiln","novice"]]},"woodwright":{"count":45,"families":[["Other goods",15,0,1,1],["Arrows and bolts",3,5,3,2],["Bows",0,3,5,2],["Other weapons",3,0,0,0],["Greatswords",0,2,0,0]],"first":["Bar Stool","Drum","Dwarven Arrow"],"race":3,"benches":[["Charcoal kiln","novice"],["Forge","novice"],["Woodworking bench","novice"],["Dawnguard bench","advanced"],["Skyforge","advanced"]]}},"materials":[["Firewood",37,"woodworker","novice","",[],[],0],["Leather Strips",13,"hunter","novice","Tanning rack",["Leather"],[],0],["Iron Ingot",10,"miner","novice","Smelter",["Iron Ore"],["Raven Rock Mine","Halted Stream Camp","Fort Fellhammer Mines"],43],["Steel Ingot",10,"miner","advanced","Smelter",["Corundum Ore","Iron Ore"],["Knifepoint Mine","Dead Drop Mine","Goldenrock Mine"],18],["Tundra Cotton",6,"gatherer","novice","",[],[],0],["Dwarven Metal Ingot",4,"","","",[],[],0],["Refined Moonstone",4,"miner","expert","Smelter",["Moonstone Ore"],["Soljund's Sinkhole","Mzulft","Mzulft Boilery"],11],["Quicksilver Ingot",3,"miner","advanced","Smelter",["Quicksilver Ore"],["Quicksilver Mine","Blind Cliff Bastion","Altar of Thrond Cave"],10],["Chaurus Chitin",2,"hunter","expert","",[],["Chaurus","Frozen Chaurus","Chaurus Hunter"],3],["Ebony Ingot",2,"miner","master","Smelter",["Ebony Ore"],["Gloombound Mine","Raven Rock Mine","Redbelly Mine"],1]]}}};
   // ==== end PROFESSION_GUIDES ====
 
   /*
@@ -839,6 +859,7 @@
       '<div class="nav"></div>' +
       '<div class="body"></div>' +
       '<div class="foot"><div class="status"></div><div class="btns">' +
+        '<div class="tsbtn ghost" data-act="switch">Change character</div>' +
         '<div class="tsbtn ghost" data-act="help">Help</div>' +
         '<div class="tsbtn ghost" data-act="settings">Settings</div>' +
         '<div class="tsbtn ghost" data-act="close"><span>Close</span><span class="key">K</span></div>' +
@@ -857,6 +878,11 @@
   // Help (#1633), beside Close: the help panel, and this one put down. Never
   // while creating, where this panel is the whole of what there is to do.
   var elHelp = root.querySelector('[data-act="help"]');
+  // Change character (#3128), beside Help and never while creating: the
+  // front waits ten seconds with the character out of combat and standing
+  // still, then takes the game to the character choice. Pressed again, it
+  // stops the wait.
+  var elSwitch = root.querySelector('[data-act="switch"]');
   // Settings beside it (#3126), and never while creating either.
   var elSettings = root.querySelector('[data-act="settings"]');
   // The word inside the Close button, so drawFoot can say Close Skyrim while
@@ -1222,6 +1248,16 @@
     if (!got || typeof got !== 'object' || Array.isArray(got)) return null;
     return got;
   }
+  /* The Alchemy journal (#3142): the server's, under mine.alchemy, or null with nothing on it. */
+  function alchemyView() {
+    var got = mine && mine.alchemy;
+    if (!got || typeof got !== 'object' || Array.isArray(got)) return null;
+    return got;
+  }
+  function alchemyList(field) {
+    var v = alchemyView();
+    return (v && Array.isArray(v[field])) ? v[field].filter(function (r) { return r && typeof r === 'object'; }) : [];
+  }
   /* The Body page (#1631): the server's, under mine.body, or null while creating. */
   function bodyView() {
     var got = mine && mine.body;
@@ -1324,6 +1360,18 @@
     if (!book || book.points === undefined || book.points === null) return null;
     return Number(book.points) || 0;
   }
+  /* The weapon line on the Might row: what each weight needs, and what you hold. */
+  function gateLine(gate, have) {
+    var bits = [];
+    for (var i = gate.length - 1; i >= 0; i--) {
+      bits.push('weapons weighing ' + gate[i].weight + (i > 0 ? ' to ' + (gate[i - 1].weight - 1) : ' or more') + ' need Might ' + gate[i].might);
+    }
+    var ok = 0;
+    for (var j = 0; j < gate.length; j++) { if (have >= gate[j].might) { ok = gate[j].might; break; } }
+    var holds = !ok ? 'You can wield neither yet.' : (ok >= gate[0].might ? 'You can wield any of them.' : 'You can wield the first, not the second.');
+    return 'Strength: ' + bits.join(', and ') + '. ' + holds;
+  }
+
   /* The marked staff spells, in the order the page draws them, which is the order they are sent in. */
   function markedStaffDescs() {
     var out = [];
@@ -1546,6 +1594,8 @@
     if (section === 'office') return 0;
     // The Body page is what is true, and one button to read it again.
     if (section === 'body') return 0;
+    // The Alchemy journal is what is true, and nothing on it is sent.
+    if (section === 'alchemy') return 0;
     return rows().length + (laterOffered(section) ? 1 : 0);
   }
   /* Another section: the top row, and the status line back to the hint. */
@@ -1615,6 +1665,8 @@
     if (creating()) sections.splice(sections.indexOf('home') < 0 ? sections.length : sections.indexOf('home'), 0, 'guides');
     else sections.push('guides');
     if (!creating() && bodyView()) sections.push('body');
+    // The Alchemy journal (#3142), after Body: only once something was eaten or brewed.
+    if (!creating() && alchemyView()) sections.push('alchemy');
     if (!creating() && officePage()) sections.push('office');
     /*
       Property, last, and only once there is something on it. Patrick,
@@ -1743,6 +1795,11 @@
       if (hdV && hdV.steeping && !hdN) return { t: 'steeping', c: '' };
       return { t: hdN + (hdN === 1 ? ' dye' : ' dyes'), c: 'set' };
     }
+    if (sec === 'alchemy') {
+      var alE = alchemyList('eaten').length, alR = alchemyList('recipes').length;
+      if (alR) return { t: alR + (alR === 1 ? ' mix' : ' mixes') + ', ' + alE + ' eaten', c: 'set' };
+      return { t: alE + ' eaten', c: alE ? 'set' : '' };
+    }
     if (sec === 'body') {
       var bv = bodyView();
       var bw = bodyWorries(bv);
@@ -1850,6 +1907,7 @@
     else if (section === 'property') drawProperty();
     else if (section === 'office') drawOffice();
     else if (section === 'body') drawNeeds();
+    else if (section === 'alchemy') drawAlchemy();
     else if (section === 'review') drawReview();
     else drawTree();
   }
@@ -2101,6 +2159,61 @@
     again.appendChild(line);
     wrap.appendChild(again);
     elBody.appendChild(wrap);
+  }
+
+  /*
+    THE ALCHEMY JOURNAL (#3142). Two lists of what is already true, both the
+    server's: the mixes brewed, first, because they are what somebody comes
+    here to brew again, and every ingredient eaten with what is known of it.
+    Nothing on it is picked or sent, so Confirm stays hidden and the keyboard
+    has no rows to walk.
+  */
+  function drawAlchemy() {
+    var recipes = alchemyList('recipes');
+    var eaten = alchemyList('eaten');
+    var bar = el('div', 'spellbar');
+    bar.appendChild(el('div', 'spellpts',
+      (recipes.length ? recipes.length + (recipes.length === 1 ? ' mix brewed' : ' mixes brewed') : 'No mix brewed yet') +
+      ', ' + eaten.length + (eaten.length === 1 ? ' ingredient eaten' : ' ingredients eaten')));
+    bar.appendChild(el('div', 'spellnote',
+      'Two ingredients that share an effect make it at a lab. The alchemy menu shows the effects you know too.'));
+    elBody.appendChild(bar);
+
+    var wrap = el('div', 'cards');
+    recipes.forEach(function (r) {
+      var card = el('div', 'card mine');
+      var makes = Array.isArray(r.makes) ? r.makes.map(String) : [];
+      var nm = el('div', 'name', makes.length ? listWords(makes) : 'A mix');
+      var times = Number(r.times) || 0;
+      nm.appendChild(el('span', 'tag', times === 1 ? 'brewed once' : 'brewed ' + times + ' times'));
+      card.appendChild(nm);
+      card.appendChild(el('div', 'desc', listWords((Array.isArray(r.with) ? r.with : []).map(String)) + '.'));
+      wrap.appendChild(card);
+    });
+    eaten.forEach(function (r) {
+      var card = el('div', 'card');
+      var nm = el('div', 'name', String(r.name || 'something'));
+      var of = Number(r.of) || 0, known = Number(r.known) || 0;
+      if (Array.isArray(r.effects) && of) nm.appendChild(el('span', 'tag', known + ' of ' + of + ' known'));
+      card.appendChild(nm);
+      if (!Array.isArray(r.effects)) {
+        card.appendChild(el('div', 'desc', 'Eaten. The server cannot find this ingredient in the game now, so what it does is not known.'));
+      } else {
+        var named = r.effects.map(String);
+        var other = Number(r.other) || 0;
+        var line = named.length ? 'Known: ' + listWords(named) + '.' : 'Eaten.';
+        if (other) line += ' ' + (other === 1 ? 'One more known effect is' : other + ' more known effects are') + ' not one a brew here makes.';
+        if (of && known < of) line += ' Brewing it with another ingredient that shares an effect teaches that effect.';
+        card.appendChild(el('div', 'desc', line));
+      }
+      wrap.appendChild(card);
+    });
+    elBody.appendChild(wrap);
+  }
+  /* Words joined the way a sentence lists them: a, b and c. */
+  function listWords(words) {
+    if (words.length < 2) return words.join('');
+    return words.slice(0, -1).join(', ') + ' and ' + words[words.length - 1];
   }
 
   /*
@@ -3373,6 +3486,14 @@
           use.onclick = function (ev) { ev.stopPropagation(); usePerk('fontofmagic'); };
           row.appendChild(use);
         }
+        /*
+          Strength (#2262): Might is what a heavy weapon needs. The server
+          refuses the equip (the strength weapons block in game/gamemode.js);
+          this line says so first, so nobody finds out by trying. The two
+          rows are the server's STRENGTH.tiers, kept equal by
+          tests/test-2262-strength-weapons.js.
+        */
+        if (s.gate) row.appendChild(el('div', 'sd gate', gateLine(s.gate, have)));
         row.onclick = function () { rowAt = idx; draw(); };
         col.appendChild(row);
       });
@@ -3412,7 +3533,7 @@
     // the tree's own sending, so neither carries a Confirm.
     var showConfirm = cr ? section === 'review'
       : (section !== 'start' && section !== 'tree' && section !== 'recipes' && section !== 'guides' && section !== 'property' && section !== 'office' &&
-         section !== 'apprentice' && section !== 'hairdye' && section !== 'body' && section !== 'college');
+         section !== 'apprentice' && section !== 'hairdye' && section !== 'body' && section !== 'alchemy' && section !== 'college');
     var shut = closeWord();
     var key = JSON.stringify([line, statusKind, can, label, showConfirm, cr, shut, keyName]);
     if (key === footKey) return;
@@ -3431,6 +3552,7 @@
     elCloseKey.textContent = keyName;
     elCloseKey.style.display = (cr || !keyName) ? 'none' : '';
     elHelp.style.display = cr ? 'none' : '';
+    elSwitch.style.display = cr ? 'none' : '';
     elSettings.style.display = cr ? 'none' : '';
   }
 
@@ -3469,6 +3591,7 @@
     if (section === 'college') return 'Press E at a study desk in one of the College\'s halls. The College answers in the chat.';
     if (section === 'office') return 'Each button is checked again by the server, and it answers in the chat.';
     if (section === 'body') return 'As the server counted it when K opened. Read again asks it now.';
+    if (section === 'alchemy') return 'What your character knows, as K opened. Nothing here is picked or sent.';
     if (section === 'staff') {
       if (staffWaiting()) return 'Sent. The server is checking.';
       if (markedStaffDescs().length) return 'Unlock sends the staff spells you marked, one staff spell point each.';
@@ -4123,6 +4246,12 @@
   elHelp.onclick = function () {
     if (creating()) return;
     try { if (window.thornswoodHelp) { window.thornswoodHelp.open('work'); } } catch (e) { }
+    api.close();
+  };
+  // The panel goes down so the wait's lines are seen; nothing is decided here.
+  elSwitch.onclick = function () {
+    if (creating()) return;
+    tell('switch');
     api.close();
   };
   elSettings.onclick = function () {

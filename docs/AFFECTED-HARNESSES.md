@@ -1,5 +1,12 @@
 # Affected harnesses on pull requests (#3114): design and measurements
 
+**Not in use since 31 Oct 2026.** No build runs on the box since #5119, so
+no main build is traced and no map is handed on, and every pull request ran
+the whole gate on one hosted runner (18 to 20 minutes). The gate now runs in
+five shares on five hosted runners at once, each a share of the whole gate
+that reads no map (build.yml, the job "gate"; `Run-Gate.ps1 -Shard -Of`).
+What follows is how the map worked while the box built.
+
 The study below was measured in a 4-core Linux container on 22 Oct 2026,
 with a Linux tracer. On 22 Oct Patrick chose option C on his page
 (q-3114-affected): trace the gate where it really runs, on the VPS, and

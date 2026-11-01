@@ -140,7 +140,8 @@ Yes 'it never looks a draft up by /releases/tags/ (that endpoint never returns a
 Yes '  it reads the releases list page by page instead' ($draft.Contains('releases?per_page=100&page=$page') -and $draft.Contains('$_.tag_name -eq $tag'))
 Yes '  and stops when the tag has more than one release, naming them' ($draft.Contains('if ($same.Count -gt 1)') -and $draft.Contains('gh api -X DELETE repos/$repo/releases/<id>'))
 Yes '  and never replaces the files of a published release' ($draft.Contains('if (-not $release.draft)'))
-Yes '  and rewrites an existing draft''s notes with the files it uploads (a signed rebuild kept saying UNSIGNED)' ($draft.Contains('-Method Patch -Uri "$api/releases/$($release.id)"') -and $draft.Contains('@{ body = $notes }'))
+Yes '  and rewrites an existing draft''s notes with the files it uploads (a signed rebuild kept saying UNSIGNED)' ($draft.Contains('-Method Patch -Uri "$api/releases/$($release.id)"') -and $draft.Contains('@{ body = $notes; tag_name = $tag; target_commitish = $env:RELEASE_COMMIT }'))
+Yes '  naming the tag and commit in that edit, since an edit that does not name the tag drops it from a draft (v1.2.13, 31 Oct)' (@([regex]::Matches($draft, '-Method Patch')).Count -eq 1 -and $draft -match 'tag_name = \$tag; target_commitish = \$env:RELEASE_COMMIT \}')
 Yes '  and the notes name MSBuild on GitHub''s runner, not the csc #498 retired' ($draft.Contains("'built on GitHub''s runner with MSBuild (#498)'") -and -not $draft.Contains('csc') -and -not $draft.Contains('VPS'))
 Yes '  and an unsigned draft says UNSIGNED' ($draft.Contains("else { `$how += ', UNSIGNED (not a run of main''s workflow, #3930)"))
 Yes '  and writes release_id and signed for the verify job' ($draft.Contains('"release_id=" + $release.id') -and $draft.Contains('("signed=" +'))
@@ -157,27 +158,14 @@ Yes '  and runs Test-ReleaseFiles.ps1 -RequireSigned, failing on a refusal' ($ve
 $repoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $WorkflowPath))
 Yes '  and that script is in the repository' (Test-Path -LiteralPath (Join-Path $repoRoot 'scripts/release/Test-ReleaseFiles.ps1'))
 
-# ---- the signing runner's record (#3312) ---------------------------------------
-# No job here asks for its label since #4013; the record, the label and its
-# firewall openings go in their own change (the board has it).
-$recDir = Join-Path $repoRoot 'records'
-$signRec = Join-Path $recDir 'sign-runners.json'
-$buildRec = Join-Path $recDir 'build-runners.json'
-$checkRec = Join-Path $recDir 'check-runners.json'
-Yes 'records/sign-runners.json names the signing label' ((Test-Path -LiteralPath $signRec) -and ((Get-Content -LiteralPath $signRec -Raw | ConvertFrom-Json).label -eq 'thornswood-sign'))
-if ((Test-Path -LiteralPath $signRec) -and (Test-Path -LiteralPath $buildRec)) {
-    $signers = @((Get-Content -LiteralPath $signRec -Raw | ConvertFrom-Json).runners | ForEach-Object { [int]$_ })
-    $builders = @((Get-Content -LiteralPath $buildRec -Raw | ConvertFrom-Json).runners | ForEach-Object { [int]$_ })
-    Yes ("  it lists runner(s) {0}, and the build runners {1} are none of them" -f ($signers -join ', '), ($builders -join ', ')) ($signers.Count -gt 0 -and -not @($signers | Where-Object { $builders -contains $_ }).Count)
-}
-Yes 'records/check-runners.json names the check label (#3956), which no job here asks for since #4013' ((Test-Path -LiteralPath $checkRec) -and ((Get-Content -LiteralPath $checkRec -Raw | ConvertFrom-Json).label -eq 'thornswood-check'))
-if ((Test-Path -LiteralPath $signRec) -and (Test-Path -LiteralPath $checkRec) -and (Test-Path -LiteralPath $buildRec)) {
-    $signers = @((Get-Content -LiteralPath $signRec -Raw | ConvertFrom-Json).runners | ForEach-Object { [int]$_ })
-    $builders = @((Get-Content -LiteralPath $buildRec -Raw | ConvertFrom-Json).runners | ForEach-Object { [int]$_ })
-    $checkers = @((Get-Content -LiteralPath $checkRec -Raw | ConvertFrom-Json).runners | ForEach-Object { [int]$_ })
-    Yes ("  it lists runner(s) {0}, and the signing runner(s) {1} are none of them" -f ($checkers -join ', '), ($signers -join ', ')) ($checkers.Count -gt 0 -and -not @($checkers | Where-Object { $signers -contains $_ }).Count)
-    Yes '  and at least one of them is no build runner, so a pull request build cannot hold every one' (@($checkers | Where-Object { $builders -notcontains $_ }).Count -gt 0)
-}
+# ---- no signing or check runner (#4033) ---------------------------------------
+# No job asks for a runner's signing label since #4013, so the record that
+# gave runner 3 it, and runner 3's firewall openings, went too. The check
+# label went once the repository was public: the nightly's bot harnesses,
+# its last user (#4914), run on GitHub's runner.
+Yes "no records/sign-runners.json: no runner of the box signs a release" (-not (Test-Path -LiteralPath (Join-Path (Join-Path $repoRoot 'records') 'sign-runners.json')))
+Yes 'no records/check-runners.json: no runner of the box checks a release or runs the bot harnesses' (-not (Test-Path -LiteralPath (Join-Path (Join-Path $repoRoot 'records') 'check-runners.json')))
+Yes 'and no job here asks for the check label (#3956)' ($code -notmatch 'thornswood-check')
 
 # ---- release-tag.yml makes the tag a cloud Ship cannot push (#3312) ------------
 $tpath = Join-Path (Split-Path -Parent $WorkflowPath) 'release-tag.yml'
@@ -200,8 +188,8 @@ if (Test-Path -LiteralPath $tpath) {
 $bpath = Join-Path (Split-Path -Parent $WorkflowPath) 'build.yml'
 if (Test-Path -LiteralPath $bpath) {
     $b = [IO.File]::ReadAllText($bpath).Replace("`r`n", "`n")
-    Yes 'build.yml uses BUILD_RUNNER for its fallback, the switch release.yml takes at the switch-over' ($b.Contains("vars.BUILD_RUNNER != 'vps'"))
-    Yes 'build.yml''s fallback runs on the same label, on a build runner (#2994)' ($b -match 'runs-on: \[self-hosted, Windows, (X64, )?thornswood-vps, thornswood-build\]')
+    # Like release.yml, it runs on GitHub's runners alone since the flip (#4983).
+    Yes 'build.yml has no BUILD_RUNNER switch and no runner of the box, as release.yml has none' (-not $b.Contains('BUILD_RUNNER') -and $b -notmatch '(?m)^\s+runs-on: \[self-hosted')
 }
 
 Write-Host ''

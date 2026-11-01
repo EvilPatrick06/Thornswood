@@ -158,7 +158,7 @@ Nothing is placed where the measure refuses every spot. Measured over the same l
   - the river at Windhelm: 98048 not by river or lake water.
 - Lod's house in Falkreath, which Skyrim marks as a farm, has 3 crop plots near its door: a smith's yard, not a field, so no hive.
 
-To change one: edit the kind's rule or a site in `SITES` in `scripts/dev/Build-StationSites.py`, run it with `--data <the game's Data>`, then `python scripts/mods/Add-ContentRecords.py --masters <the game's Data>`, then `pwsh scripts/mods/Rebuild-ContentTables.ps1`, which rebuilds every table read out of the load order, in the order `scripts/mods/content-tables.json` gives, and the plugin's hash in `records/asset-provenance.json`.
+To change one: edit the kind's rule or a site in `SITES` in `scripts/dev/Build-StationSites.py`, run it with `--data <the game's Data>`, then `python scripts/mods/Add-ContentRecords.py --masters <the game's Data>`, then `pwsh scripts/mods/Rebuild-ContentTables.ps1`, which rebuilds every table read out of the load order, in the order `scripts/mods/content-tables.json` gives, and the plugin's hash in `records/asset-provenance.json`. From a cloud thread all three run on the box with main's scripts: `pwsh scripts/vps/Box-Run.ps1 -Line 'Rebuild-ContentTables -Stations -Pull <number> -Head <its full head commit>'`.
 
 ## Woodworking benches (#516)
 
@@ -205,5 +205,4 @@ To move one: `python scripts/dev/Build-WoodworkingBenches.py --search <town>` li
 
 ### Still to do
 
-1. Ship `Thornswood-WoodworkerTrail.esp` in the next collection revision (see `scripts/mods/woodworker-trail-recipes.json` and `Build-WoodworkerTrailOverrides.py`).
-2. Pin the trail plugin last among Thornswood plugins in the collection load order.
+Nothing for the woodworking recipes. The Woodwright's recipes that sat at the forge in plugins loading after Thornswood-Content.esp are moved to the woodworking bench by Thornswood-Last.esp (#3120); the trailing plugin once planned for them never shipped and is gone.

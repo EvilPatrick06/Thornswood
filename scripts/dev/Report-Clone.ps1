@@ -73,6 +73,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '..\ops\WorkflowRun.ps1')
+. (Join-Path $PSScriptRoot '..\release\LogHandBack.ps1')   # Get-GhLogFlags (#5202)
 
 $workflow = 'clone-report.yml'
 $taskName = 'Thornswood Clone Report'
@@ -288,10 +289,13 @@ if ($Read) {
     $j = @($jobs.Body.jobs)
     if ($j.Count -ne 1) { Die ("run $id has $($j.Count) jobs, not the one $workflow runs.") }
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $log = @(& gh api "repos/$GitHubRepo/actions/jobs/$($j[0].id)/logs" 2>&1 | ForEach-Object { "$_" })
+    # The log keeps the runner's colours, which a newer gh hands over only
+    # when told (Get-GhLogFlags, #5202).
+    $flags = Get-GhLogFlags
+    $log = @(& gh api "repos/$GitHubRepo/actions/jobs/$($j[0].id)/logs" @flags 2>&1 | ForEach-Object { "$_" })
     $c = $LASTEXITCODE
     $ErrorActionPreference = $old
-    if ($c -ne 0) { Die ("GitHub did not hand over run $id's log: " + (($log | Select-Object -Last 2) -join ' ')) }
+    if ($c -ne 0) { Die ("GitHub did not hand over run $id's log: " + ((($log | Select-Object -Last 2) -join ' ') -replace "`e", '')) }
     try { $report = Read-ReportFromLog $log } catch { Die ("run $id's log does not hold a report whole: " + $_.Exception.Message) }
     if ($report.kind -ne 'thornswood-clone-report') { Die "run $id's log holds something that is not a clone report." }
     foreach ($l in (Format-CloneReport $report)) { Say $l }

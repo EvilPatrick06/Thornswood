@@ -8,7 +8,6 @@
 
       pwsh scripts/mods/Run-OnBox.ps1 scripts/mods/Add-ContentRecords.py --check --masters '{data}'
       pwsh scripts/mods/Run-OnBox.ps1 scripts/mods/Add-ContentRecords.py --masters '{data}'
-      pwsh scripts/mods/Run-OnBox.ps1 scripts/mods/Build-WoodworkerTrailOverrides.py --check --masters '{data}' -Server main
       pwsh scripts/mods/Run-OnBox.ps1 scripts/mods/Build-LastPlugin.py --data '{data}'
       pwsh scripts/mods/Run-OnBox.ps1 scripts/mods/Rebuild-ContentTables.ps1 -Data '{data}' -PluginsTxt '{plugins}'
 
@@ -54,9 +53,11 @@
   own. So nothing stays on the box past the next run, however a run ended:
     repo\         the artifact, laid out like the repository; the tool runs here
     data\         a copy of the server's plugins folder, with this commit's own
-                  Thornswood plugins in place of the ones the server runs. A
-                  copy, not links, so a tool given --data {data} that writes
-                  can never reach the server's own files
+                  Thornswood plugins in place of the ones the server runs:
+                  game\content's, and Thornswood-Last.esp made there from
+                  this commit's recipe (#2791, Make-LastPlugin.py). A copy,
+                  not links, so a tool given --data {data} that writes can
+                  never reach the server's own files
     plugins.txt   the server's load order as the game's plugin list: a '*'
                   line for each plugin of its server-settings.json loadOrder
                   after Skyrim's five masters, which the game loads first and
@@ -95,7 +96,13 @@ param(
     [string]$Server = 'dev',
 
     [string]$VpsHost = '',
-    [string]$VpsUser = ''
+    [string]$VpsUser = '',
+
+    # A folder that gets a copy of every file the tool wrote, at its
+    # repository path, as well as this checkout. The deploy gate's
+    # Rebuild-ContentTables verb sets it to the run's out folder, so what the
+    # box wrote goes back to the session that asked (Rebuild-OnBox.ps1).
+    [string]$Out = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -237,9 +244,11 @@ try {
             Say ''
             Say ('the tool wrote ' + $changed.Count + ' file(s), now in this checkout:') 'Green'
             foreach ($e in $zip.Entries) {
-                $dest = Join-Path $repo $e.FullName
-                New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dest) | Out-Null
-                [IO.Compression.ZipFileExtensions]::ExtractToFile($e, $dest, $true)
+                foreach ($into in @($repo, $Out | Where-Object { $_ })) {
+                    $dest = Join-Path $into $e.FullName
+                    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dest) | Out-Null
+                    [IO.Compression.ZipFileExtensions]::ExtractToFile($e, $dest, $true)
+                }
                 Say ('  ' + $e.FullName)
             }
         } finally { $zip.Dispose() }

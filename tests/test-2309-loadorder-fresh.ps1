@@ -104,6 +104,7 @@ try {
         $Here = Join-Path $fresh 'scripts\deploy'
         $LoadOrder = $loadOrder
         $Dist = $distArg
+        $FromRecord = $false
         $DropPlugins = $dropArg
         $Root = $box
         $User = 'Administrator'

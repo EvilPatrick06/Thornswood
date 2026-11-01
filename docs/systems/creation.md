@@ -27,7 +27,10 @@ panel behind K opens on its own. On it:
 They are handed 40 gold once, and nothing else, except a tool at the
 moment a pick that needs one is made: a pickaxe for a Miner, a
 woodcutter's axe for a Woodworker, a shovel and seed for a Farmer, a
-crude fishing pole for a Fisher. The tool has 50 uses.
+crude fishing pole for a Fisher, and for the bench trades (#3162) a
+hammer for a Smith, a pair of shears for a Tailor, a wooden ladle for a
+Cook, an alembic for an Alchemist and a rune knife for an Enchanter. The
+tool has 50 uses.
 
 The towns are Whiterun, Riften, Solitude, Windhelm, Markarth, Falkreath,
 Morthal, Dawnstar and Winterhold (`game\data\chargen.json`). The arrival
@@ -87,13 +90,32 @@ is finished, and **Put this away** on it takes it off at any time.
 Only a character who arrives from the hall has first steps. A character
 made before them is shown nothing.
 
+## Changing character in the game
+
+Change character, at the foot of the K panel, goes back to the same
+choice without closing the game (#3128). Patrick settled it on 22 October
+2026: any time out of combat, after ten seconds in place. A line a second
+counts down; moving, a fight, getting hurt or dying stops it, and so does
+pressing it again. At the end the world closes as it does when somebody
+quits, the game goes to its main menu and the slots come back with the
+character just left lit. A slot plays that character, an empty one makes a
+new one in the hall, and the bin forgets one, as at the start of a game.
+The button is not there while a character is being made.
+
+A pick there moves the chat, voice and the join pass to the character
+picked, and the launcher writes the list again after each pick and each
+forget, checks in the id New character uses next, and counts the time
+played against each character in turn.
+
 ## Where this is
 
 The hall, the face, the K panel, the town, the waiting class and
-profession, the 40 gold, the first steps and the four tools are in the server: the
-pickaxe, the woodcutter's axe, the shovel, and the crude fishing pole
-a new fisher is handed, without which the water turns them away. The
-farmer's seed is handed with the shovel. The public
+profession, the 40 gold, the first steps and the nine tools are in the server: the
+pickaxe, the woodcutter's axe, the shovel, the crude fishing pole
+a new fisher is handed, without which the water turns them away, and
+the bench trades' hammer, pair of shears, wooden ladle, alembic and rune
+knife, without which their bench turns them away. The farmer's seed is
+handed with the shovel. The public
 steps are on the site's help page.
 
 The first steps are kept on the character (`thornswoodFirstSteps`), so a

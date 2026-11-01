@@ -53,7 +53,7 @@ const TOOL = path.join(ROOT, 'scripts', 'dev', 'Build-WoodworkingBenches.py');
 const gm = read(path.join(ROOT, 'game', 'gamemode.js'));
 const BENCH = '154e2:Thornswood-Content.esp';
 const KEYWORD = '154e1:Thornswood-Content.esp';
-const OURS = ['Thornswood-Content.esp', 'Thornswood-Last.esp', 'Thornswood-WoodworkerTrail.esp'];
+const OURS = ['Thornswood-Content.esp', 'Thornswood-Last.esp'];
 
 let pass = 0, fail = 0;
 function yes(w, c) { if (c) { pass++; console.log('PASS  ' + w); } else { fail++; console.log('FAIL  ' + w); } }
@@ -180,12 +180,16 @@ const other = built.filter((r) => OURS.indexOf(r.name) < 0 &&
   !(rec[r.name.toLowerCase()] && rec[r.name.toLowerCase()].sha256.toLowerCase() === r.sha256 && rec[r.name.toLowerCase()].size === r.size));
 yes('B2 every plugin but ours is the collection\'s own bytes, revision ' + record.revision +
     (other.length ? ' (not: ' + other.slice(0, 4).map((r) => r.name).join(', ') + '; rebuild the table)' : ''), other.length === 0);
+// Thornswood-Last.esp is in no repository since #2791 step 3: its bytes are
+// the ones its manifest names, which its recipe makes.
+const lastNamed = JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 'last-plugin.json'), 'utf8')).plugin;
 const stale = OURS.filter((n) => {
   const row = built.find((r) => r.name === n);
+  if (n === lastNamed.name) { return !row || row.sha256 !== lastNamed.sha256 || row.size !== lastNamed.size; }
   const p = path.join(ROOT, 'game', 'content', n);
   return !row || !fs.existsSync(p) || row.sha256 !== crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
 });
-yes('B3 and ours are the repository\'s (after a content change, run scripts/mods/Rebuild-ContentTables.ps1)' +
+yes('B3 and ours are the repository\'s, Thornswood-Last.esp the one its manifest names (after a content change, run scripts/mods/Rebuild-ContentTables.ps1)' +
     (stale.length ? ' (not: ' + stale.join(', ') + ')' : ''), stale.length === 0);
 
 // ---------------------------------------------------------------- G
@@ -212,10 +216,17 @@ const atBench = Object.keys(recipes.recipes || {}).concat(Object.keys(recipes.un
 const furnitureDoc = JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 'furniture.json'), 'utf8').replace(/^\uFEFF/, ''));
 const furnitureOuts = furnitureDoc.pieces.filter((p) => furnitureDoc.limits.types[p.type])
   .map((p) => p.item + ':Thornswood-Content.esp');
-const movedAt = atBench.length - furnitureOuts.length;
-yes('R1 game/data/recipes.json has the 26 rows #2529 moved at the woodworking bench, and one for each piece of furniture (' +
-    atBench.length + ', ' + furnitureOuts.length + ' of them furniture)',
-    movedAt === 26 && furnitureOuts.every((o) => atBench.some((r) => r.out === o)) &&
+// And the Woodwright's forge rows #3120 moved to its home bench (movedFrom
+// keeps the forge their mod put them at), and the cook's wooden ladle
+// (#3162), a woodwright's, written by Add-ContentRecords.py at the same bench.
+const benchMoved = atBench.filter((r) => r.movedFrom).length;
+const ladles = atBench.filter((r) => r.editorId === 'ThornswoodRecipeToolLadle');
+const movedAt = atBench.length - furnitureOuts.length - benchMoved - ladles.length;
+yes('R1 game/data/recipes.json has the 26 rows #2529 moved at the woodworking bench, the 9 #3120 moved off the forge, one for each piece of furniture and the ladle (' +
+    atBench.length + ', ' + benchMoved + ' moved off the forge, ' + furnitureOuts.length + ' of them furniture, ' + ladles.length + ' ladle)',
+    movedAt === 26 && benchMoved === 9 && ladles.length === 1 &&
+    atBench.filter((r) => r.movedFrom).every((r) => r.movedFromName === 'CraftingSmithingForge') &&
+    furnitureOuts.every((o) => atBench.some((r) => r.out === o)) &&
     atBench.every((r) => r.benchName === 'ThornswoodCraftingWoodworking'));
 const bbb = /const BENCH_BY_BASE = (\{.*\});/.exec(gm);
 const bac = /const BENCH_ACCESS = (\{.*\});/.exec(gm);

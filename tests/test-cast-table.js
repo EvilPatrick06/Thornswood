@@ -418,6 +418,22 @@ const patch = Buffer.concat([
   ]),
 ]);
 
+// Thornswood-Last.esp, which the gamemode's load order ends in (#2468). It is
+// built from the catalogue and switches off the actors the catalogue cuts:
+// here Belethor's standing placement and Nazeem at home. Read as an input it
+// would list them as off at the start; the cast is written before anything
+// is deleted, so its actors are not read and every count stays as it was.
+const last = Buffer.concat([
+  tes4(['Skyrim.esm']),
+  top('CELL', [grup(u32(0), 2, [grup(u32(0), 3, [
+    rec('CELL', C.shop, [edid('WhiterunBelethorsGeneralGoods'), full("Belethor's General Goods"),
+      sub('DATA', Buffer.from([1, 0])), sub('XLCN', u32(L.belethors))]),
+    children(C.shop, [achr(0x800, N.belethor, [], DISABLED)]),
+    rec('CELL', C.house, [sub('DATA', Buffer.from([1, 0]))]),
+    children(C.house, [achr(0x805, N.nazeem, [], DISABLED)]),
+  ])])]),
+]);
+
 function findPython() {
   const tries = [['python', []], ['py', ['-3']], ['python3', []]];
   for (let i = 0; i < tries.length; i++) {
@@ -438,11 +454,12 @@ try {
       fs.writeFileSync(path.join(dir, m), tes4([]));
     });
     fs.writeFileSync(path.join(dir, 'Patch.esp'), patch);
+    fs.writeFileSync(path.join(dir, 'Thornswood-Last.esp'), last);
     // One patch, and Skyrim.esm listed again in another spelling. Windows
     // opens skyrim.esm as Skyrim.esm, so read twice every placement in it
     // would stand twice.
     fs.writeFileSync(path.join(dir, 'plugins.txt'),
-      '# a load order of one patch\r\n*skyrim.esm\r\n*Patch.esp\r\n');
+      '# a load order of one patch\r\n*skyrim.esm\r\n*Patch.esp\r\n*Thornswood-Last.esp\r\n');
     const out = path.join(dir, 'cast.json');
     const run = spawnSync(py[0], py[1].concat([TOOL, '--data', dir, '--plugins',
       path.join(dir, 'plugins.txt'), '--out', out]), { encoding: 'utf8' });
@@ -470,8 +487,8 @@ try {
     };
 
     yes('nothing was lost to a record that would not inflate', j.counts.failedToInflate === 0);
-    yes('six plugins read, though plugins.txt lists Skyrim.esm again as skyrim.esm',
-      /^6 plugins in load order \(names sha256 [0-9a-f]{12}\)$/.test(j.readFrom || ''));
+    yes('seven plugins in the load order, though plugins.txt lists Skyrim.esm again as skyrim.esm, Thornswood-Last.esp among them',
+      /^7 plugins in load order \(names sha256 [0-9a-f]{12}\)$/.test(j.readFrom || ''));
     yes('32 placements read, 2 of them deleted, one by a patch that kept only the flag',
       j.counts.placed === 32 && j.counts.deleted === 2);
     yes('a wolf and a mannequin are counted, not listed as people', j.counts.notPeople === 2);

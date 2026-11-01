@@ -30,6 +30,14 @@ A master and a novice both take 1 blue mountain flower off a plant
 the novice is allowed to touch. The extra yield pairs on a carcass,
 a seam, a fish and a plot are not this verb.
 
+The season moves the one by a quarter, on average (#3144). In summer
+a pick gives 2 a quarter of the time, and the line says "Summer gives
+more." In winter a plant is bare a quarter of the time: nothing is
+picked, it is no piece of work, and the plant still waits its ten
+minutes, so pressing it again does not take the quarter back. The
+line says it has nothing to pick, and "Winter gives less." Spring and
+autumn give the one.
+
 One successful pick is one piece of work. There is no deposit of 20
 the way a seam has, so a hillside of flowers is more pieces per hour
 than one iron vein. The ladder is still 100, then 250, then 600. If
@@ -97,6 +105,30 @@ village is the hunter's. A coin purse and an estate key are not a
 harvest. A bowl of mammoth cheese is anybody's. A mead barrel and
 Bashir's clam at Oar's Rest are nobody's: nothing comes away.
 
+## Plants that grow only in their own hold
+
+Each hold has plants of its own (Patrick, 22 Oct 2026, #3150). They
+grow only in that hold. Pick them there, or trade for them anywhere
+else. Outside their hold they are not in the world at all: nobody
+sees them and nothing is refused.
+
+| Hold | Its own plants |
+| --- | --- |
+| Whiterun | Tundra cotton, lavender |
+| Haafingar | Grass pod, garlic |
+| The Rift | Scaly pholiota, canis root, pine thrush egg |
+| The Reach | Juniper berries, rock warbler egg |
+| Eastmarch | Dragon's tongue, jazbay grapes, creep cluster |
+| Falkreath | Thistle branch, mora tapinella |
+| Hjaalmarch | Swamp fungal pod, giant lichen, deathbell |
+| Winterhold | Chaurus eggs, Nordic barnacle |
+
+The Pale's are ores (see [Miner](miner.md)). Each one is the plant
+whose placements already stood mostly in that hold, so the fewest
+were taken out. The list and what was measured for each are
+`holdOnly` in `game/data/last-plugin-policy.json`, and
+`scripts/mods/Build-LastPlugin.py` switches the rest off.
+
 <!-- detail:begin -->
 
 ## Every record
@@ -157,7 +189,8 @@ Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same r
 
 ## Where this is
 
-The verb, the ranks, the ten minutes, the four herbs' seasons, and the
+The verb, the ranks, the ten minutes, the four herbs' seasons, the
+season's quarter, and the
 list are in the server.
 The wait is the plant, for everybody: the next person cannot take it
 early. A press from someone who is not a gatherer is refused before

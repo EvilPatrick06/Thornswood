@@ -17,7 +17,8 @@
     X  DATA.cellToHold agrees with the table on every building it names, or
        the table says which is right and why
     B  the table was built against the collection's own bytes and the
-       repository's own plugins, so a new revision or a content change
+       repository's own plugins (Thornswood-Last.esp as its manifest names
+       it, #2791), so a new revision or a content change
        without a rebuild turns this red
     S  the real eviction and rent over every building in the table: whoever
        keeps its hold (its Steward or its Jarl, isStewardOf, which
@@ -54,8 +55,8 @@ const COLLECTION = path.join(ROOT, 'records', 'collection-plugins.json');
 const LAST = path.join(ROOT, 'game', 'data', 'last-plugin.json');
 const TOOL = path.join(ROOT, 'scripts', 'dev', 'Build-BuildingHolds.py');
 const gm = read(path.join(ROOT, 'game', 'gamemode.js'));
-const OURS = ['Thornswood-Content.esp', 'Thornswood-Last.esp', 'Thornswood-WoodworkerTrail.esp'];
-const AFTER = ['Thornswood-Last.esp', 'Thornswood-WoodworkerTrail.esp'];
+const OURS = ['Thornswood-Content.esp', 'Thornswood-Last.esp'];
+const AFTER = ['Thornswood-Last.esp'];
 const HOLDS = ['whiterun', 'solitude', 'riften', 'markarth', 'windhelm',
                'falkreath', 'morthal', 'dawnstar', 'winterhold', 'ravenrock'];
 const TOWN_OF_HOLD = {
@@ -175,12 +176,16 @@ const other = built.filter((r) => OURS.indexOf(r.name) < 0 &&
   !(rec[r.name.toLowerCase()] && rec[r.name.toLowerCase()].sha256.toLowerCase() === r.sha256 && rec[r.name.toLowerCase()].size === r.size));
 yes('B2 every plugin but ours is the collection\'s own bytes, revision ' + record.revision +
     (other.length ? ' (not: ' + other.slice(0, 4).map((r) => r.name).join(', ') + '; rebuild the table)' : ''), other.length === 0);
+// Thornswood-Last.esp is in no repository since #2791 step 3: its bytes are
+// the ones its manifest names, which its recipe makes.
+const lastNamed = JSON.parse(read(LAST)).plugin;
 const stale = OURS.filter((n) => {
   const row = built.find((r) => r.name === n);
+  if (n === lastNamed.name) { return !row || row.sha256 !== lastNamed.sha256 || row.size !== lastNamed.size; }
   const p = path.join(ROOT, 'game', 'content', n);
   return !row || !fs.existsSync(p) || row.sha256 !== crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
 });
-yes('B3 and ours are the repository\'s (after a content change, run scripts/mods/Rebuild-ContentTables.ps1)' +
+yes('B3 and ours are the repository\'s, Thornswood-Last.esp the one its manifest names (after a content change, run scripts/mods/Rebuild-ContentTables.ps1)' +
     (stale.length ? ' (not: ' + stale.join(', ') + ')' : ''), stale.length === 0);
 
 // ---------------------------------------------------------------- S

@@ -617,10 +617,12 @@ elseif (-not `$fwHas) {
 # THE GRANTS NAME THE TASK, NOT LOCAL SERVICE (#4077). Until 27 Oct 2026 the
 # rules below went to LOCAL SERVICE, which every service on the box runs as,
 # so the dev server's gamemode could change the site's code and read what
-# the site reads. They go to NT TASK\<the site's task> now, worked out from
-# the task's name so a first install can grant it before the task exists,
-# and each run takes the LOCAL SERVICE rules it made before off, on every
-# copy of those folders on the box. The task starts through the launcher
+# the site reads. They go to NT TASK\<the site's task> now, its SID worked
+# out from the task's name, and each run takes the LOCAL SERVICE rules it
+# made before off, on every copy of those folders on the box. Windows maps
+# that SID only once the task is registered, so the grants are made after
+# the task is registered or updated, in the site grants block below (#4973),
+# and a grant still refused there stops the deploy. The task starts through the launcher
 # (ServiceAccount.ps1), so what the site writes is owned by that SID and not
 # by LOCAL SERVICE, and once the site is stopped, the files LOCAL SERVICE
 # owns in its folder are given to it (StartIt below).
@@ -673,90 +675,6 @@ if (`$principal) {
   }
   `$principal = New-ThornswoodServicePrincipal
   `$own = Get-ThornswoodTaskSidFromName '$Task'
-  foreach (`$g in @(
-      @('$rootWin', '(OI)(CI)M'),
-      @('$boxWin\Thornswood-Server\data', '(OI)(NP)R'),
-      @('$boxWin\Thornswood-Server', '(OI)(NP)R'),
-      @('$boxWin\Thornswood-Server-Dev', '(OI)(NP)R'),
-      @('$boxWin\Thornswood-Voice\chat', '(OI)(NP)R'),
-      @('$boxWin\Thornswood-Voice-Dev\chat', '(OI)(NP)R'),
-      @('$boxWin\Thornswood-Deploys\current', '(OI)(NP)R'))) {
-    if (-not (Test-Path -LiteralPath `$g[0])) { 'not here, nothing granted: ' + `$g[0]; continue }
-    `$said = & icacls `$g[0] /grant ('*' + `$own + ':' + `$g[1]) 2>&1
-    if (`$LASTEXITCODE -eq 0) { 'granted NT TASK\$Task ' + `$g[1] + ' on ' + `$g[0] }
-    else { 'COULD NOT GRANT NT TASK\$Task ' + `$g[1] + ' on ' + `$g[0] + ': ' + ((`$said | Out-String).Trim()) }
-  }
-  # The rules these grants gave LOCAL SERVICE before #4077, off every copy of
-  # those folders on the box: the ones an install moved aside keep them
-  # otherwise. The bot's and the runners' rules, and every other, stay.
-  `$was = @('$rootWin')
-  `$was += '$boxWin\Thornswood-Deploys\current'
-  foreach (`$d in @(Get-ChildItem -LiteralPath '$boxWin\' -Directory -Force -EA SilentlyContinue | Where-Object { `$_.Name -like 'Thornswood-Server*' })) {
-    `$was += `$d.FullName
-    `$was += (Join-Path `$d.FullName 'data')
-  }
-  foreach (`$d in @(Get-ChildItem -LiteralPath '$boxWin\' -Directory -Force -EA SilentlyContinue | Where-Object { `$_.Name -like 'Thornswood-Voice*' })) {
-    `$was += (Join-Path `$d.FullName 'chat')
-  }
-  foreach (`$p in `$was) {
-    if (-not (Test-Path -LiteralPath `$p)) { continue }
-    `$named = @((Get-Acl -LiteralPath `$p).GetAccessRules(`$true, `$false, [Security.Principal.SecurityIdentifier]) | Where-Object { `$_.IdentityReference.Value -eq 'S-1-5-19' })
-    if (-not `$named.Count) { continue }
-    `$said = & icacls `$p /remove:g '*S-1-5-19' 2>&1
-    if (`$LASTEXITCODE -eq 0) { 'LOCAL SERVICE no longer has a rule on ' + `$p }
-    else { 'COULD NOT TAKE LOCAL SERVICE OFF ' + `$p + ': ' + ((`$said | Out-String).Trim()) }
-  }
-
-  # #913, approved by Patrick on 28 Sep. The site reads the update feed and
-  # never writes it: only Remirror-Site-Feed and Publish-Update do, over scp
-  # as Administrator. So the site account is denied writing and deleting in
-  # feed and feed-dev, and keeps the read it inherits from the Modify above.
-  # The deny names the write rights one by one and is built in .NET, NOT with
-  # icacls (W,D,DC): icacls' W is FILE_GENERIC_WRITE, which carries
-  # SYNCHRONIZE, node opens every file asking for SYNCHRONIZE, and that deny
-  # took both feeds off the site for about four minutes on 28 Sep. A Deny rule
-  # built here leaves SYNCHRONIZE out, and adding the same rule twice keeps one.
-  `$fsr = [Security.AccessControl.FileSystemRights]
-  `$noWrite = `$fsr::WriteData -bor `$fsr::AppendData -bor `$fsr::WriteExtendedAttributes -bor ``
-    `$fsr::WriteAttributes -bor `$fsr::Delete -bor `$fsr::DeleteSubdirectoriesAndFiles
-  `$who = New-Object Security.Principal.SecurityIdentifier(`$own)
-  foreach (`$n in 'feed', 'feed-dev') {
-    `$f = Join-Path '$rootWin' `$n
-    if (-not (Test-Path -LiteralPath `$f)) { 'not here, nothing denied: ' + `$f; continue }
-    try {
-      `$acl = Get-Acl -LiteralPath `$f
-      `$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(`$who, `$noWrite,
-        [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
-        [Security.AccessControl.PropagationFlags]::None, [Security.AccessControl.AccessControlType]::Deny)))
-      # The deny that named LOCAL SERVICE before #4077 goes with its grant.
-      foreach (`$r in @(`$acl.GetAccessRules(`$true, `$false, [Security.Principal.SecurityIdentifier]) | Where-Object { `$_.IdentityReference.Value -eq 'S-1-5-19' })) { [void]`$acl.RemoveAccessRuleSpecific(`$r) }
-      Set-Acl -LiteralPath `$f -AclObject `$acl -ErrorAction Stop
-      'denied NT TASK\$Task writing and deleting in ' + `$f
-    } catch { 'COULD NOT DENY NT TASK\$Task writing in ' + `$f + ': ' + `$_.Exception.Message }
-  }
-
-  # BUILTIN\Users inherits read and create on C:\ and so on the whole site
-  # folder, config.json included; nothing here runs as a plain user. The
-  # folder stops inheriting, keeping a copy of what it had, and every Users
-  # rule goes. SYSTEM, Administrators and the site account above stay.
-  # Only the access rules are written back, through .NET: Set-Acl also tried
-  # to write the audit part here, which needs SeSecurityPrivilege, and an
-  # account without it (the build runner's) was refused (issue #1120).
-  function SetAccess(`$p, `$a) {
-    `$item = Get-Item -LiteralPath `$p -Force
-    if (`$PSVersionTable.PSEdition -eq 'Core') { [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]`$item, [Security.AccessControl.DirectorySecurity]`$a) }
-    else { `$item.SetAccessControl(`$a) }
-  }
-  try {
-    `$users = New-Object Security.Principal.SecurityIdentifier('S-1-5-32-545')
-    `$acl = Get-Acl -LiteralPath '$rootWin'
-    `$acl.SetAccessRuleProtection(`$true, `$true)
-    SetAccess '$rootWin' `$acl
-    `$acl = Get-Acl -LiteralPath '$rootWin'
-    `$acl.PurgeAccessRules(`$users)
-    SetAccess '$rootWin' `$acl
-    'BUILTIN\Users no longer reaches $rootWin'
-  } catch { 'COULD NOT TAKE BUILTIN\Users OFF ' + '$rootWin' + ': ' + `$_.Exception.Message }
 }
 # ==== end thornswood site account ====
 
@@ -838,6 +756,116 @@ if (-not `$have) {
     'COULD NOT UPDATE THE SCHEDULED TASK, it keeps what it had: ' + `$_.Exception.Message
   }
 }
+# ==== thornswood site grants ====
+# After the task is registered or updated, and not before (#4973). The grants
+# name NT TASK\$Task by its SID, and Windows maps a task's SID only once
+# that task is registered: on a box with no such task yet, icacls refused
+# every grant with "No mapping between account names and security IDs"
+# (#4968), the deploy carried on, and the new task ran with none of the
+# access below until a second deploy. LOCAL SERVICE's old rules come off
+# only once the grants are made. `$own is set only when the site runs on its
+# own SID: not for SYSTEM, and not for an account set by hand.
+if (`$own) {
+  `$refused = @()
+  foreach (`$g in @(
+      @('$rootWin', '(OI)(CI)M'),
+      @('$boxWin\Thornswood-Server\data', '(OI)(NP)R'),
+      @('$boxWin\Thornswood-Server', '(OI)(NP)R'),
+      @('$boxWin\Thornswood-Server-Dev', '(OI)(NP)R'),
+      @('$boxWin\Thornswood-Voice\chat', '(OI)(NP)R'),
+      @('$boxWin\Thornswood-Voice-Dev\chat', '(OI)(NP)R'),
+      @('$boxWin\Thornswood-Deploys\current', '(OI)(NP)R'))) {
+    if (-not (Test-Path -LiteralPath `$g[0])) { 'not here, nothing granted: ' + `$g[0]; continue }
+    `$said = & icacls `$g[0] /grant ('*' + `$own + ':' + `$g[1]) 2>&1
+    if (`$LASTEXITCODE -eq 0) { 'granted NT TASK\$Task ' + `$g[1] + ' on ' + `$g[0] }
+    else {
+      `$why = ((`$said | Out-String).Trim())
+      'COULD NOT GRANT NT TASK\$Task ' + `$g[1] + ' on ' + `$g[0] + ': ' + `$why
+      `$refused += `$g[1] + ' on ' + `$g[0] + ': ' + `$why
+    }
+  }
+  # A grant still refused stops the deploy (#4973): the site would start
+  # without what it needs and nothing would turn red. LOCAL SERVICE's old
+  # rules stay on, and SETUP DONE is never said, so nothing is swapped.
+  if (`$refused.Count) {
+    'GRANTS REFUSED to NT TASK\$Task, so the deploy stops here and nothing is swapped. Refused:'
+    foreach (`$x in `$refused) { '  ' + `$x }
+    'LOCAL SERVICE keeps its old rules. The task is registered; deploy again once the refusal above is mended.'
+    return
+  }
+  # The rules these grants gave LOCAL SERVICE before #4077, off every copy of
+  # those folders on the box: the ones an install moved aside keep them
+  # otherwise. The bot's and the runners' rules, and every other, stay.
+  `$was = @('$rootWin')
+  `$was += '$boxWin\Thornswood-Deploys\current'
+  foreach (`$d in @(Get-ChildItem -LiteralPath '$boxWin\' -Directory -Force -EA SilentlyContinue | Where-Object { `$_.Name -like 'Thornswood-Server*' })) {
+    `$was += `$d.FullName
+    `$was += (Join-Path `$d.FullName 'data')
+  }
+  foreach (`$d in @(Get-ChildItem -LiteralPath '$boxWin\' -Directory -Force -EA SilentlyContinue | Where-Object { `$_.Name -like 'Thornswood-Voice*' })) {
+    `$was += (Join-Path `$d.FullName 'chat')
+  }
+  foreach (`$p in `$was) {
+    if (-not (Test-Path -LiteralPath `$p)) { continue }
+    `$named = @((Get-Acl -LiteralPath `$p).GetAccessRules(`$true, `$false, [Security.Principal.SecurityIdentifier]) | Where-Object { `$_.IdentityReference.Value -eq 'S-1-5-19' })
+    if (-not `$named.Count) { continue }
+    `$said = & icacls `$p /remove:g '*S-1-5-19' 2>&1
+    if (`$LASTEXITCODE -eq 0) { 'LOCAL SERVICE no longer has a rule on ' + `$p }
+    else { 'COULD NOT TAKE LOCAL SERVICE OFF ' + `$p + ': ' + ((`$said | Out-String).Trim()) }
+  }
+
+  # #913, approved by Patrick on 28 Sep. The site reads the update feed and
+  # never writes it: only Remirror-Site-Feed and Publish-Update do, over scp
+  # as Administrator. So the site account is denied writing and deleting in
+  # feed and feed-dev, and keeps the read it inherits from the Modify above.
+  # The deny names the write rights one by one and is built in .NET, NOT with
+  # icacls (W,D,DC): icacls' W is FILE_GENERIC_WRITE, which carries
+  # SYNCHRONIZE, node opens every file asking for SYNCHRONIZE, and that deny
+  # took both feeds off the site for about four minutes on 28 Sep. A Deny rule
+  # built here leaves SYNCHRONIZE out, and adding the same rule twice keeps one.
+  `$fsr = [Security.AccessControl.FileSystemRights]
+  `$noWrite = `$fsr::WriteData -bor `$fsr::AppendData -bor `$fsr::WriteExtendedAttributes -bor ``
+    `$fsr::WriteAttributes -bor `$fsr::Delete -bor `$fsr::DeleteSubdirectoriesAndFiles
+  `$who = New-Object Security.Principal.SecurityIdentifier(`$own)
+  foreach (`$n in 'feed', 'feed-dev') {
+    `$f = Join-Path '$rootWin' `$n
+    if (-not (Test-Path -LiteralPath `$f)) { 'not here, nothing denied: ' + `$f; continue }
+    try {
+      `$acl = Get-Acl -LiteralPath `$f
+      `$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(`$who, `$noWrite,
+        [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
+        [Security.AccessControl.PropagationFlags]::None, [Security.AccessControl.AccessControlType]::Deny)))
+      # The deny that named LOCAL SERVICE before #4077 goes with its grant.
+      foreach (`$r in @(`$acl.GetAccessRules(`$true, `$false, [Security.Principal.SecurityIdentifier]) | Where-Object { `$_.IdentityReference.Value -eq 'S-1-5-19' })) { [void]`$acl.RemoveAccessRuleSpecific(`$r) }
+      Set-Acl -LiteralPath `$f -AclObject `$acl -ErrorAction Stop
+      'denied NT TASK\$Task writing and deleting in ' + `$f
+    } catch { 'COULD NOT DENY NT TASK\$Task writing in ' + `$f + ': ' + `$_.Exception.Message }
+  }
+
+  # BUILTIN\Users inherits read and create on C:\ and so on the whole site
+  # folder, config.json included; nothing here runs as a plain user. The
+  # folder stops inheriting, keeping a copy of what it had, and every Users
+  # rule goes. SYSTEM, Administrators and the site account above stay.
+  # Only the access rules are written back, through .NET: Set-Acl also tried
+  # to write the audit part here, which needs SeSecurityPrivilege, and an
+  # account without it (the build runner's) was refused (issue #1120).
+  function SetAccess(`$p, `$a) {
+    `$item = Get-Item -LiteralPath `$p -Force
+    if (`$PSVersionTable.PSEdition -eq 'Core') { [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]`$item, [Security.AccessControl.DirectorySecurity]`$a) }
+    else { `$item.SetAccessControl(`$a) }
+  }
+  try {
+    `$users = New-Object Security.Principal.SecurityIdentifier('S-1-5-32-545')
+    `$acl = Get-Acl -LiteralPath '$rootWin'
+    `$acl.SetAccessRuleProtection(`$true, `$true)
+    SetAccess '$rootWin' `$acl
+    `$acl = Get-Acl -LiteralPath '$rootWin'
+    `$acl.PurgeAccessRules(`$users)
+    SetAccess '$rootWin' `$acl
+    'BUILTIN\Users no longer reaches $rootWin'
+  } catch { 'COULD NOT TAKE BUILTIN\Users OFF ' + '$rootWin' + ': ' + `$_.Exception.Message }
+}
+# ==== end thornswood site grants ====
 
 # Read back rather than assumed. Set-ScheduledTask is quiet about settings
 # it did not apply.
@@ -1007,14 +1035,19 @@ $ownerVars = $siteAccountHelpers + "`$Owner = '" + $owner + "'`r`n"
 # is every service's.
 if ($appUnchanged -and $ownerNew -and -not $PutBack) {
   $restartVars = "`$Root = '" + $Root.Replace('/', '\').Replace("'", "''") + "'`r`n`$Wait = " + $Wait + "`r`n" +
-                 "`$Task = '" + $Task.Replace("'", "''") + "'`r`n`$Port = " + $Port + "`r`n"
+                 "`$Task = '" + $Task.Replace("'", "''") + "'`r`n`$Port = " + $Port + "`r`n" +
+                 "`$HoldBy = '" + (Get-ThornswoodHoldBy 'Deploy-Docs.ps1').Replace("'", "''") + "'`r`n"
   $eap = $ErrorActionPreference
   $ErrorActionPreference = 'Continue'
   try {
-    $restartOut = @(Remote ($ownerVars + $restartVars + $ThornswoodStopAndMoveText + $siteHooks + @'
+    $restartOut = @(Remote ($ownerVars + $restartVars + $ThornswoodHoldText + $ThornswoodStopAndMoveText + $siteHooks + @'
+# Held while it is stopped (#5155, ServerHold.ps1), so the watchdog leaves it.
+Set-ThornswoodHold -Target $Task -Why 'restarting the site to start it through its launcher' -By $HoldBy
 StopIt
 StartIt
-if (Healthy) { 'PASS: ' + (Answer); 'RESTART OK' } else { 'FAIL: it did not answer within ' + $Wait + ' seconds'; Why }
+$ok = Healthy
+Clear-ThornswoodHold -Target $Task
+if ($ok) { 'PASS: ' + (Answer); 'RESTART OK' } else { 'FAIL: it did not answer within ' + $Wait + ' seconds'; Why }
 '@) | ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
   } finally { $ErrorActionPreference = $eap }
   if ($restartOut -notcontains 'RESTART OK') {
@@ -1024,7 +1057,7 @@ if (Healthy) { 'PASS: ' + (Answer); 'RESTART OK' } else { 'FAIL: it did not answ
   }
 }
 if ($PutBack -or -not $appUnchanged) {
-$vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @()) +
+$vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @() $Task) +
         ("`$Task = '" + $Task.Replace("'", "''") + "'`r`n`$Port = " + $Port + "`r`n") +
         ('$Gone = @(' + ((@($gonePublic) | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ', ') + ")`r`n")
 $pick = ''
