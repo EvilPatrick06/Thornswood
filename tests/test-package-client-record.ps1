@@ -75,7 +75,7 @@ function New-ClientTree([string]$dir, [string]$body) {
 
 function New-RecordText($files, [string]$commit) {
     $rec = [ordered]@{
-        fork         = 'https://github.com/EvilPatrick06/skymp'
+        fork         = 'https://github.com/ThornswoodRP/skymp'
         forkBranch   = 'thornswood/engine-changes'
         forkCommit   = $commit
         upstreamBase = 'f926944b'

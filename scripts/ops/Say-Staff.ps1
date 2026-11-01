@@ -44,7 +44,7 @@
         developer's PC set up by Setup-SshKey.ps1). -From is then who the
         notice is from: one lower case word, claude, codex, djinn.
     no ssh here, gh here (a cloud thread; #3045): it starts the private
-        ops repository's staff-notice.yml (EvilPatrick06/Thornswood-Ops,
+        ops repository's staff-notice.yml (ThornswoodRP/Thornswood-Ops,
         where the VPS runners are registered, #4013) on its main with the
         notice, waits for the run to end, and prints the run's answer. The
         workflow checks out this repository's main and runs this script with
@@ -96,7 +96,7 @@ param(
     [switch]$OnTheBox,
     [int]$WaitMinutes = 15,
     # Where staff-notice.yml and the VPS runners are (#4013).
-    [string]$GitHubRepo = 'EvilPatrick06/Thornswood-Ops',
+    [string]$GitHubRepo = 'ThornswoodRP/Thornswood-Ops',
     [string]$VpsHost = '',
     [string]$VpsUser = ''
 )

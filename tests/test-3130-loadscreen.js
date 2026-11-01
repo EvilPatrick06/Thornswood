@@ -5,7 +5,7 @@
 //
 // #3130: the in-game loading screen is Thornswood's animated backdrop and one
 // of its own hints, with no still first. The engine tells the page the moment
-// the game's Loading Menu opens and closes (EvilPatrick06/skymp,
+// the game's Loading Menu opens and closes (ThornswoodRP/skymp,
 // LoadingScreen.h: window event 'skyrimPlatform:loading' with detail.loading,
 // and window.skyrimPlatformLoading) and draws the page while it is open. This
 // holds the page's half:

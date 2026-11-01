@@ -18,7 +18,7 @@
   secret through the Cloudflare connector, because a live secret would then
   sit in its transcript). Patrick made a Cloudflare API token that can only
   read Turnstile widgets and pastes it into the Actions secrets of the
-  private ops repository, EvilPatrick06/Thornswood-Ops, where the VPS
+  private ops repository, ThornswoodRP/Thornswood-Ops, where the VPS
   runners are registered (#4013), as CLOUDFLARE_TURNSTILE_TOKEN. This:
     1. has the box make its seal key if it has none, and print the public
        half (scripts\vps\Seal.ps1);
@@ -56,7 +56,7 @@ param(
   [string]$User = '',
   [string]$DocsRoot = 'C:/Thornswood-Docs',
   # Where turnstile-keys.yml and the VPS runners are (#4013).
-  [string]$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'
+  [string]$GitHubRepo = 'ThornswoodRP/Thornswood-Ops'
 )
 
 $ErrorActionPreference = 'Stop'

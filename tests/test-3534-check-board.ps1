@@ -51,7 +51,7 @@ $e = $null
 Yes 'it parses' (@($e).Count -eq 0)
 
 function Card([int]$n, [string]$state, [string]$status, $order, [string]$kind = 'Issue', [bool]$archived = $false) {
-    [ordered]@{ repo = 'EvilPatrick06/Thornswood'; number = $n; kind = $kind; title = "card $n"; state = $state; status = $status; order = $order; archived = $archived }
+    [ordered]@{ repo = 'ThornswoodRP/Thornswood'; number = $n; kind = $kind; title = "card $n"; state = $state; status = $status; order = $order; archived = $archived }
 }
 function Board($items, $statuses = @('Todo', 'In Progress', 'Done'), $addOn = $true, $closeOn = $false) {
     [ordered]@{

@@ -48,7 +48,7 @@ $e = $null; $null = [Management.Automation.Language.Parser]::ParseInput($t, [ref
 Yes 'Trace-Gate.ps1 parses' (-not $e.Count)
 $self = $t.IndexOf("Invoke-Box 'selftest'"); $start = $t.IndexOf("Invoke-Box 'start'")
 Yes '  runs the self-test before it starts the session' ($self -gt 0 -and $start -gt $self -and $t -match "if \(\`$b\.Code -ne 0\) \{ Die \('the self-test did not pass")
-Yes '  dispatches trace-gate.yml in the private ops repository, on its main, with the branch to trace as ref' ($t.Contains("[string]`$Repo = 'EvilPatrick06/Thornswood-Ops'") -and $t.Contains("workflow run trace-gate.yml --repo `$Repo --ref main '-f' ('ref=' + `$Ref)") -and $t.Contains('--workflow trace-gate.yml --branch main --event workflow_dispatch'))
+Yes '  dispatches trace-gate.yml in the private ops repository, on its main, with the branch to trace as ref' ($t.Contains("[string]`$Repo = 'ThornswoodRP/Thornswood-Ops'") -and $t.Contains("workflow run trace-gate.yml --repo `$Repo --ref main '-f' ('ref=' + `$Ref)") -and $t.Contains('--workflow trace-gate.yml --branch main --event workflow_dispatch'))
 Yes '  and downloads its gate-trace artifact' ($t -match 'run download \$run\.databaseId --repo \$Repo -n gate-trace')
 Yes '  stops the session in a finally, whatever the run did' ($t -match "(?s)\} finally \{\s*Head '3\. The session stopped'\s*\`$s = Invoke-Box 'stop'")
 Yes '  deletes the trace when there is no finished run, a refusal, or no read' (@([regex]::Matches($t, "\`$null = Invoke-Box 'clean'; Die")).Count -eq 3)

@@ -189,6 +189,11 @@ function Update-Checkout {
         if ($c -ne 0) { Send ('| git clone ended ' + $c + ', so main could not be read'); return '' }
     }
     foreach ($step in @(
+        # The checkout's origin is gate.json's remote, which Update-Gate.ps1
+        # keeps to the name GitHub gives the repository now: the deploy agent
+        # and Ship read owner/name from this origin, and a clone made before
+        # the move to ThornswoodRP kept the old one (#5184).
+        @('-C', $Repo, 'remote', 'set-url', 'origin', ([string]$Cfg.remote)),
         @('-C', $Repo, 'fetch', '--quiet', '--depth', '1', '--no-tags', 'origin', '+refs/heads/main:refs/remotes/origin/main'),
         @('-C', $Repo, 'checkout', '--quiet', '--force', '--detach', 'refs/remotes/origin/main'),
         @('-C', $Repo, 'clean', '-ffdxq'),
@@ -196,7 +201,10 @@ function Update-Checkout {
         # engine\skymp stayed at the pin before and every verb's freshness
         # check refused the checkout once main moved the pin (31 Oct, d258e53e
         # left behind by 50736fe6). This brings each fetched submodule to the
-        # commit main pins; one never fetched here stays unfetched.
+        # commit main pins; one never fetched here stays unfetched. Each
+        # fetched one is first pointed at the address main's .gitmodules gives
+        # it, so a moved fork is fetched under its new name (#5184).
+        @('-C', $Repo, 'submodule', 'sync', '--quiet'),
         @('-C', $Repo, 'submodule', 'update', '--checkout', '--force', '--depth', '1'))) {
         $c = Invoke-Child $git $step $Root 10
         if ($c -ne 0) { Send ('| git ' + $step[2] + ' ended ' + $c + ', so main could not be read'); return '' }

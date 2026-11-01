@@ -64,7 +64,7 @@
 param(
     [string]$VpsHost = '',
     [string]$VpsUser = '',
-    [string]$GitHubRepo = 'EvilPatrick06/Thornswood',
+    [string]$GitHubRepo = 'ThornswoodRP/Thornswood',
     [switch]$Status,
     [switch]$NoPause
 )

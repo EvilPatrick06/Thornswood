@@ -374,14 +374,14 @@ function Get-SourceRepo([string]$repoDir) {
         try { $remote = (@(& git -C $repoDir remote get-url origin 2>$null) | Select-Object -First 1) }
         finally { $ErrorActionPreference = $old }
     } else {
-        Write-Host '  git is not on the path, so the launcher''s draft is looked for on EvilPatrick06/Thornswood' -ForegroundColor Yellow
+        Write-Host '  git is not on the path, so the launcher''s draft is looked for on ThornswoodRP/Thornswood' -ForegroundColor Yellow
     }
     # A URL's port is not part of owner/name: the deploy gate's checkout reads
     # ssh://git@ssh.github.com:443/<owner>/<name>.git (Install-Gate.ps1), and
-    # on 31 Oct its main Ship asked gh for 443/EvilPatrick06/Thornswood, a
+    # on 31 Oct its main Ship asked gh for 443/ThornswoodRP/Thornswood, a
     # repository on a host named 443 ("error connecting to 443").
     if ($remote -and $remote -match 'github\.com(?::\d+(?=/))?[:/](.+?)(?:\.git)?\s*$') { return $Matches[1] }
-    return 'EvilPatrick06/Thornswood'
+    return 'ThornswoodRP/Thornswood'
 }
 
 # FOUND THROUGH REST, NOT GRAPHQL, issue #2432. The drafts release.yml makes

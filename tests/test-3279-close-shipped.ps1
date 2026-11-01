@@ -149,7 +149,7 @@ try {
     }
 
     # Not $Slug: PowerShell names are not case sensitive, and $r is each run.
-    $Slug = 'EvilPatrick06/Thornswood'
+    $Slug = 'ThornswoodRP/Thornswood'
     function Card([int]$n, [string]$status = 'Done', [string]$state = 'OPEN', [string]$repo = $Slug) {
         return [ordered]@{ repo = $repo; number = $n; kind = 'Issue'; title = "issue $n"; state = $state; status = $status; order = $null; archived = $false }
     }

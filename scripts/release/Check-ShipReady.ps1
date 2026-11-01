@@ -389,7 +389,7 @@ Write-Host ("  THORNSWOOD  -  can this machine ship? (" + $Channel + " channel)"
 # ---------------------------------------------------------------- the repo --
 Head 'This repository'
 $isClone = Test-Path (Join-Path $RepoDir '.git')
-Ready 'this is a git clone' $isClone $RepoDir 'git clone https://github.com/EvilPatrick06/Thornswood.git'
+Ready 'this is a git clone' $isClone $RepoDir 'git clone https://github.com/ThornswoodRP/Thornswood.git'
 
 if ($isClone) {
   $branch = (& git -C $RepoDir rev-parse --abbrev-ref HEAD 2>$null | Out-String).Trim()

@@ -101,7 +101,7 @@ param(
     [Parameter(Mandatory = $true)][string]$Commit,
     [string]$RepoDir = (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)),
     [string]$BoardFile,
-    [string]$GitHubRepo = 'EvilPatrick06/Thornswood',
+    [string]$GitHubRepo = 'ThornswoodRP/Thornswood',
     [switch]$Check,
     [switch]$NoPause
 )

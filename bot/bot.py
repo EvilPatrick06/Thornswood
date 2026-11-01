@@ -82,7 +82,7 @@ Everything it needs is in env:
                    TEST_FINDINGS_CHANNEL
   TESTER_ROLES     comma separated role IDs (preferred) or names that may use
                    that panel besides staff, default Playtester
-  KNOWN_ISSUES_REPO   default EvilPatrick06/Thornswood
+  KNOWN_ISSUES_REPO   default ThornswoodRP/Thornswood
   KNOWN_ISSUES_LABELS default Dev Findings,Main Findings
   KNOWN_ISSUES_EVERY  seconds between GitHub reads, default 300, never under 60
   PUBLIC_LISTS_FILE   where the site's known issues and roadmap are written,
@@ -4492,7 +4492,7 @@ async def test_task_cmd(interaction: discord.Interaction, title: str,
 #
 # GitHub: GITHUB_TOKEN in bot.env.json, a token for the issues of
 # KNOWN_ISSUES_REPO (read, and write for the comments and filed problems). No token means neither forum is kept, said once.
-KNOWN_REPO = os.environ.get('KNOWN_ISSUES_REPO', 'EvilPatrick06/Thornswood').strip()
+KNOWN_REPO = os.environ.get('KNOWN_ISSUES_REPO', 'ThornswoodRP/Thornswood').strip()
 KNOWN_LABELS = [l.strip() for l in
                 os.environ.get('KNOWN_ISSUES_LABELS',
                                'Dev Findings,Main Findings').split(',')

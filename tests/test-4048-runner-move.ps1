@@ -224,7 +224,7 @@ function Get-CimInstance {
   if ($ClassName -eq 'Win32_UserProfile' -and $global:loadedFixture) { [pscustomobject]@{ LocalPath='C:\Users\thornswood-pr'; Loaded=$true; SID='S-1-5-21-100-200-300-1001' } }
   if ([IO.File]::Exists($global:installedFixture)) {
     if ($ClassName -eq 'Win32_Service') {
-      [pscustomobject]@{ Name=('actions.runner.EvilPatrick06-Thornswood.thornswood-pr-' + [Environment]::MachineName.ToLower()); StartName='.\thornswood-pr'; PathName='"R:\Thornswood-RunnerPR\bin\RunnerService.exe"'; State='Running'; StartMode='Manual' }
+      [pscustomobject]@{ Name=('actions.runner.ThornswoodRP-Thornswood.thornswood-pr-' + [Environment]::MachineName.ToLower()); StartName='.\thornswood-pr'; PathName='"R:\Thornswood-RunnerPR\bin\RunnerService.exe"'; State='Running'; StartMode='Manual' }
     }
     if ($ClassName -eq 'Win32_Process' -and $Filter -match 'Runner.Listener.exe') { [pscustomobject]@{ ExecutablePath='R:\Thornswood-RunnerPR\bin\Runner.Listener.exe' } }
   }

@@ -36,7 +36,7 @@ function yes(what, cond) {
 }
 
 const A = 'a'.repeat(40), B = 'b'.repeat(40);
-const recorded = (/built from one commit,\s+\[`[0-9a-f]{7,40}`\]\(https:\/\/github\.com\/EvilPatrick06\/skymp\/tree\/([0-9a-f]{40})\)/.exec(CREDITS) || [])[1];
+const recorded = (/built from one commit,\s+\[`[0-9a-f]{7,40}`\]\(https:\/\/github\.com\/ThornswoodRP\/skymp\/tree\/([0-9a-f]{40})\)/.exec(CREDITS) || [])[1];
 const HAND = /Each server records which commit it runs, and this page names it here once\s+that record can be read\./;
 
 // ---- part one: the pure fill -------------------------------------------------
@@ -58,7 +58,7 @@ yes('  and neither row names a commit of its own (#421)', !/[0-9a-f]{7,40}/.test
 
 yes('no file: the page is the hand text, unchanged', fill(CREDITS, null, {}) === CREDITS);
 let one = fill(CREDITS, { live: { commit: A } }, {});
-yes('a file with only live: the page names the main server (#2303)', one.indexOf('The main server runs [`aaaaaaaa`](https://github.com/EvilPatrick06/skymp/tree/' + A + ').') >= 0);
+yes('a file with only live: the page names the main server (#2303)', one.indexOf('The main server runs [`aaaaaaaa`](https://github.com/ThornswoodRP/skymp/tree/' + A + ').') >= 0);
 yes('  and the hand sentence is gone, with nothing said about the test server', !HAND.test(one) && one.indexOf('test server runs') < 0);
 one = fill(CREDITS, { live: { commit: recorded } }, {});
 yes('only live, on the recorded commit: it says the main server runs it', one.indexOf('The main server runs it, [`' + recorded.slice(0, 8) + '`]') >= 0);
@@ -72,7 +72,7 @@ yes('garbage shapes do not throw and change nothing',
   fill(CREDITS, 'nope', 7) === CREDITS && fill(CREDITS, { live: 3, dev: [] }, null) === CREDITS);
 
 let out = fill(CREDITS, { live: { commit: A }, dev: { commit: A } }, {});
-yes('both on a new commit: the page names it', out.indexOf('Both servers run [`aaaaaaaa`](https://github.com/EvilPatrick06/skymp/tree/' + A + ')') >= 0);
+yes('both on a new commit: the page names it', out.indexOf('Both servers run [`aaaaaaaa`](https://github.com/ThornswoodRP/skymp/tree/' + A + ')') >= 0);
 yes('both on a new commit: the hand sentence is gone', !HAND.test(out));
 yes('  and the paragraph after it is untouched', out.indexOf('The six client files are built from the commit named by the feed') >= 0);
 yes('both on a new commit: it still says the record is not deployed', out.indexOf('The recorded build has not been deployed yet.') >= 0);
@@ -87,7 +87,7 @@ yes('dev ahead of live: it names each server',
   out.indexOf('has not been deployed yet') < 0);
 
 out = fill(CREDITS, null, { public: B, dev: A });
-yes('the feeds: the Public row names the public feed commit', /\|\s*Public\s*\|\s*`feed\/version\.json`\s*\|\s*\[`bbbbbbbb`\]\(https:\/\/github\.com\/EvilPatrick06\/skymp\/tree\/b{40}\)/.test(out));
+yes('the feeds: the Public row names the public feed commit', /\|\s*Public\s*\|\s*`feed\/version\.json`\s*\|\s*\[`bbbbbbbb`\]\(https:\/\/github\.com\/ThornswoodRP\/skymp\/tree\/b{40}\)/.test(out));
 yes('the feeds: the Dev row names the dev feed commit', /\|\s*Dev\s*\|\s*`feed-dev\/version\.json`\s*\|\s*\[`aaaaaaaa`\]/.test(out));
 yes('the feeds: the server sentence is left alone', HAND.test(out));
 yes('the feeds: each row is still a three cell table row', /\|\s*Public\s*\|\s*`feed\/version\.json`\s*\|\s*\[`bbbbbbbb`\]\([^)]+\)\s*\|\s*$/m.test(out) &&

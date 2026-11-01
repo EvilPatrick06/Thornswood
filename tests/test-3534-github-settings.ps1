@@ -146,8 +146,8 @@ function Invoke-WebRequest {
     $u = [string]$Uri
     if ($u -like 'https://token.test/*') { return [pscustomobject]@{ StatusCode = $s.tokenCode; Content = '{"value":"oidc-for-this-run"}' } }
     if ($u -eq 'http://127.0.0.1:7791/converge') { return [pscustomobject]@{ StatusCode = $s.code; Content = $s.content } }
-    if ($u.StartsWith('https://api.test/repos/EvilPatrick06/Thornswood/environments?')) { return [pscustomobject]@{ StatusCode = $s.envCode; Content = $s.envs } }
-    if ($u -match '^https://api\.test/repos/EvilPatrick06/Thornswood/environments/[^/]+/deployment-branch-policies\?') {
+    if ($u.StartsWith('https://api.test/repos/ThornswoodRP/Thornswood/environments?')) { return [pscustomobject]@{ StatusCode = $s.envCode; Content = $s.envs } }
+    if ($u -match '^https://api\.test/repos/ThornswoodRP/Thornswood/environments/[^/]+/deployment-branch-policies\?') {
         $n = [uri]::UnescapeDataString(($u -split '/')[7])
         return [pscustomobject]@{ StatusCode = 200; Content = (ConvertTo-Json -Compress -Depth 4 @{ total_count = 1; branch_policies = @($s.policies[$n]) }) }
     }
