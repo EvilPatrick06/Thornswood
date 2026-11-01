@@ -8,8 +8,9 @@
 //    (so the server sees one address a bot, as it sees one a person), and
 //    counts every byte and datagram each way;
 //  - load-bots.js's bot, against a stand-in for createBotClient: it logs in
-//    once connected, sends one face when the race menu is open, then a move
-//    every 130 ms, unreliable, walking; a Teleport2 moves it and its
+//    once connected and answers the login challenge with a join pass signed
+//    by the load copy's own key, sends one face when the race menu is open,
+//    then a move every 130 ms, unreliable, walking; a Teleport2 moves it and its
 //    teleportSeq is echoed; a refusal or a closed connection fails it with
 //    the reason; it keeps no message;
 //  - Load-Test.js's arithmetic: cores over the samples' own times, bytes on
@@ -100,7 +101,7 @@ function fakeAddon() {
 function botChecks() {
   const addon = fakeAddon();
   const b = new LoadBot(addon, { host: '127.0.0.1', port: 5000, password: '', name: 'x' });
-  b.profileId = 1900000123;
+  b.profileId = 1900000123; b.passKey = 'k'.repeat(64); b.server = 'dev';
   b.client = addon.createBotClient('127.0.0.1', 5000);
   b.state = 'connecting'; b.step = 'connecting'; b.deadline = Date.now() + 60000;
   const c = addon.made[0];
@@ -113,11 +114,24 @@ function botChecks() {
   yes('once connected it logs in with its profile id alone, as the game\'s first packet',
     login && login.t === 1 && JSON.parse(login.contentJsonDump).customPacketType === 'loginWithSkympIo' &&
     JSON.parse(login.contentJsonDump).gameData.profileId === 1900000123 && c.sent[0].reliable === true);
+  c.queue.push({ type: 'message', message: { t: 1, contentJsonDump: JSON.stringify({ customPacketType: 'thornswoodLoginChallenge', n: 'nonce-1' }) } });
+  b.pump(); b.advance(now);
+  const proof = c.sent[1] && JSON.parse(c.sent[1].m.contentJsonDump);
+  const parts = proof ? String(proof.pass).split('.') : [];
+  const body = parts.length === 3 ? JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8')) : {};
+  const sig = crypto.createHmac('sha256', 'k'.repeat(64)).update('jp1.' + parts[1]).digest('base64url');
+  yes('the login challenge is answered once, with a pass signed by the load copy\'s key for its profile and server, and a Discord id of its own',
+    proof && proof.customPacketType === 'thornswoodLoginProof' && parts[0] === 'jp1' && parts[2] === sig && body.p === 1900000123 && body.s === 'dev' &&
+    body.d === 'load-1900000123' && body.x > Date.now() + 3600000);
+  const lk = crypto.createHmac('sha256', 'k'.repeat(64)).update('jpk1.' + parts[2]).digest('base64url');
+  yes('its mac is the launcher\'s: HMAC of jlp1.<nonce> under the pass\'s login key', proof && proof.mac === crypto.createHmac('sha256', lk).update('jlp1.nonce-1').digest('base64url'));
+  c.sent.splice(1, 1);
   c.queue.push({ type: 'message', message: { t: 33, isMe: true, idx: 7, transform: { pos: [100, 200, 300], worldOrCell: 0x3c }, props: { isRaceMenuOpen: true } } });
   b.pump(); b.advance(now);
   const f = c.sent[1] && c.sent[1].m;
   yes('its character with the race menu open gets one face (UpdateAppearance) for its idx', f && f.t === 4 && f.idx === 7 && c.sent.length === 2);
   yes('then it is walking', b.step === 'moving');
+  b.lastMove = now;  // its beat starts somewhere in the first 130 ms; here, now
   now += MOVE_MS + 1; b.pump(); b.advance(now);
   const mv = c.sent[2];
   yes('a move is an UpdateMovement for its idx in its cell, sent unreliable, as the game sends it',
@@ -128,8 +142,10 @@ function botChecks() {
   yes('no second move inside 130 ms', c.sent.length === 3);
   b.advance(now + MOVE_MS + 1);
   yes('the next move comes once 130 ms have passed', c.sent.length === 4);
+  b.advance(now + 3 * MOVE_MS + 5);
+  yes('a bot a whole beat behind sends one move, not the missed ones', c.sent.length === 5 && b.lastMove === now + 3 * MOVE_MS + 5);
   c.queue.push({ type: 'message', message: { t: 31, pos: [5000, 6000, 7000], rot: [0, 0, 0], worldOrCell: 0x3c, teleportSeq: 4 } });
-  b.pump(); b.advance(now + 2 * MOVE_MS + 2);
+  b.pump(); b.advance(now + 4 * MOVE_MS + 10);
   const after = c.sent[c.sent.length - 1].m.data;
   yes('a Teleport2 moves it there, and its next move echoes the teleportSeq',
     Math.hypot(after.pos[0] - 5000, after.pos[1] - 6000) < 600 && after.teleportSeq === 4 && b.teleports === 1);
@@ -137,7 +153,7 @@ function botChecks() {
   b.pump();
   yes('it counts what it reads by type and keeps none of it', b.counts[2] === 50 && b.inbox.length === 0);
   c.queue.push({ type: 'disconnect' });
-  b.pump(); b.advance(now + 3 * MOVE_MS);
+  b.pump(); b.advance(now + 6 * MOVE_MS);
   yes('a closed connection fails it, saying at which step', b.step === 'failed' && /closed the connection at step moving/.test(b.why));
 
   const addon2 = fakeAddon();

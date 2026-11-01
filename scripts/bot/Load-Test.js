@@ -9,7 +9,11 @@
 //
 //   cores   the server process's CPU time over the step's window, divided by
 //           the window (load-sampler.js, inside the server, every thread);
-//   memory  the server process's working set at the end of the window;
+//   memory  the server process's private bytes (its commit, which Windows
+//           cannot trim) at the end of the window, read from outside with
+//           Get-Process, and its working set beside it. The working set
+//           alone misleads: measured on run 41353332627 it fell from 872 MB
+//           with nobody on to 156 MB with 20, as Windows trimmed it;
 //   bytes   every datagram between the bots and the server, each way
 //           (load-proxy.js), and on the wire with 28 bytes of IPv4 and UDP
 //           header on each.
@@ -22,7 +26,7 @@
 // that point the numbers are the runner's, not the server's.
 //
 //     node Load-Test.js --root <server folder> --out <result.json>
-//         [--steps 5,10,20,40] [--settle 20] [--hold 60] [--workers 3]
+//         [--steps 10,20,40,60,80,100] [--settle 20] [--hold 60] [--workers 3]
 //         [--shape crowd] [--summary <markdown file>]
 //
 // Exit 0 when every step it got to was measured, 1 when the server did not
@@ -33,6 +37,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { ServerRun, gitBlob } = require('./Bot-Pass.js');
+const { passKeyOf } = require('./load-bots.js');
 
 const HEADER = 28;           // IPv4 (20) and UDP (8) header bytes on each datagram
 const BUSY = 0.9;            // the share of the runner's CPU past which a step is the runner's
@@ -44,6 +49,19 @@ function readJson(file) {
 }
 
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+// The server process's private bytes and working set, from outside it, in
+// bytes: Windows only (Get-Process); elsewhere null, and the working set the
+// sampler reads stands alone.
+function processMemory(pid) {
+  if (process.platform !== 'win32' || !pid) { return null; }
+  const out = childProcess.execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    '$p = Get-Process -Id ' + Number(pid) + '; "$($p.PrivateMemorySize64) $($p.WorkingSet64) $($p.PeakWorkingSet64)"'],
+  { encoding: 'utf8', windowsHide: true, timeout: 30000 });
+  const n = String(out).trim().split(/\s+/).map(Number);
+  if (n.length !== 3 || n.some((x) => !(x > 0))) { throw new Error('Get-Process said "' + String(out).trim() + '" for the server, not its memory'); }
+  return { privateBytes: n[0], workingSet: n[1], peakWorkingSet: n[2] };
+}
 
 // The sampler's lines, oldest first.
 function samples(file) {
@@ -90,6 +108,8 @@ function windowOf(a, b, bots, people) {
     seconds: Math.round(sec * 10) / 10,
     serverCores: sms > 0 ? s / sms : 0,
     serverRssMB: b.server.rss / 1048576,
+    serverPrivateMB: b.memory ? b.memory.privateBytes / 1048576 : null,
+    serverPeakWorkingSetMB: b.memory ? b.memory.peakWorkingSet / 1048576 : null,
     serverHeapMB: b.server.heap / 1048576,
     upBytesPerS: up / sec,
     downBytesPerS: down / sec,
@@ -109,7 +129,8 @@ function perPerson(w, base) {
   if (!w.people) { return null; }
   return {
     cores: (w.serverCores - base.serverCores) / w.people,
-    memoryMB: (w.serverRssMB - base.serverRssMB) / w.people,
+    memoryMB: w.serverPrivateMB !== null && base.serverPrivateMB !== null && w.serverPrivateMB !== undefined && base.serverPrivateMB !== undefined
+      ? (w.serverPrivateMB - base.serverPrivateMB) / w.people : (w.serverRssMB - base.serverRssMB) / w.people,
     downKBps: w.downWirePerS / w.people / 1024,
     upKBps: w.upWirePerS / w.people / 1024
   };
@@ -124,12 +145,14 @@ function markdown(doc) {
   out.push('Engine ' + doc.engine + ', gamemode git blob ' + doc.blob.slice(0, 12) + ', ' + doc.cores + ' cores on the runner. ' +
     'Each bot logs in over the game port and walks, a move every 130 ms. Bytes are on the wire, IPv4 and UDP headers included.');
   out.push('');
+  out.push('Memory is the server process\'s private bytes; its working set, which Windows trims, is in result.json.');
+  out.push('');
   out.push('| People | Server cores | Server memory MB | Down KB/s | Up KB/s | Per person: cores | MB | down KB/s | up KB/s | Moves read per bot /s | Runner busy |');
   out.push('|---|---|---|---|---|---|---|---|---|---|---|');
   for (const st of doc.steps) {
     const w = st.window; const p = st.perPerson || {};
     if (!w) { out.push('| ' + st.people + ' | not measured: ' + st.stopped + ' |||||||||| '); continue; }
-    out.push('| ' + [w.people, fixed(w.serverCores, 3), fixed(w.serverRssMB, 0), fixed(w.downWirePerS / 1024, 1), fixed(w.upWirePerS / 1024, 1),
+    out.push('| ' + [w.people, fixed(w.serverCores, 3), fixed(w.serverPrivateMB === null || w.serverPrivateMB === undefined ? w.serverRssMB : w.serverPrivateMB, 0), fixed(w.downWirePerS / 1024, 1), fixed(w.upWirePerS / 1024, 1),
       fixed(p.cores, 4), fixed(p.memoryMB, 2), fixed(p.downKBps, 2), fixed(p.upKBps, 2), fixed(w.movesReadPerBotPerS, 1),
       fixed(w.machineBusy * 100, 0) + '%'].join(' | ') + ' |');
   }
@@ -172,7 +195,7 @@ function child(file, argv, log) {
 async function run(o) {
   const root = path.resolve(o.root);
   const log = o.log || ((s) => console.log(s));
-  const steps = String(o.steps || '5,10,20,40').split(',').map(Number).filter((n) => n > 0);
+  const steps = String(o.steps || '10,20,40,60,80,100').split(',').map(Number).filter((n) => n > 0);
   const settleMs = (Number(o.settle) || 20) * 1000;
   const holdMs = (Number(o.hold) || 60) * 1000;
   const workerCount = Math.max(1, Number(o.workers) || 3);
@@ -186,7 +209,7 @@ async function run(o) {
     cpuModel: (os.cpus()[0] || {}).model || '', totalMemMB: Math.round(os.totalmem() / 1048576), settleS: settleMs / 1000, holdS: holdMs / 1000,
     baseline: null, steps: [], problem: '', tail: [] };
   if (!(port > 0)) { doc.problem = 'server-settings.json names no port'; return doc; }
-  if (settings.thornswoodRequirePass !== false) { doc.problem = 'this server holds every login for a join pass (thornswoodRequirePass is not false), so it is not a load copy'; return doc; }
+  try { passKeyOf(root); } catch (e) { doc.problem = 'the bots cannot hold join passes here: ' + e.message; return doc; }
   if (Number(settings.maxPlayers) < Math.max(...steps)) { doc.problem = 'maxPlayers is ' + settings.maxPlayers + ', fewer than the ' + Math.max(...steps) + ' bots asked for'; return doc; }
 
   const sampleFile = path.join(root, 'load-samples.jsonl');
@@ -212,7 +235,8 @@ async function run(o) {
     const reading = async () => {
       const ss = samples(sampleFile);
       if (!ss.length) { throw new Error('the server wrote no samples to ' + sampleFile); }
-      return { at: Date.now(), server: ss[ss.length - 1], proxy: await proxy.ask({ report: true }, 'report', 10000), cpu: machineCpu() };
+      return { at: Date.now(), server: ss[ss.length - 1], proxy: await proxy.ask({ report: true }, 'report', 10000), cpu: machineCpu(),
+        memory: processMemory(server.child && server.child.pid) };
     };
     const botReports = () => Promise.all(workers.map((w) => w.ask({ report: true }, 'report', 10000)));
     // A window: settle, then read, wait, read. The server's samples come
@@ -231,7 +255,7 @@ async function run(o) {
     log('step 0: the server with nobody on it');
     const base = await measure(0);
     doc.baseline = base.window;
-    log('  server ' + fixed(base.window.serverCores, 3) + ' cores, ' + fixed(base.window.serverRssMB, 0) + ' MB');
+    log('  server ' + fixed(base.window.serverCores, 3) + ' cores, ' + fixed(base.window.serverPrivateMB, 0) + ' MB private, ' + fixed(base.window.serverRssMB, 0) + ' MB working set');
 
     let next = 1900000000 + Math.floor(Math.random() * 1000000) * 10;
     let have = 0;
@@ -265,7 +289,7 @@ async function run(o) {
       step.teleports = m.bots.reduce((x, r) => x + r.teleports, 0);
       for (const r of m.bots) { for (const k of Object.keys(r.counts)) { step.counts[k] = (step.counts[k] || 0) + r.counts[k]; } }
       const w = m.window;
-      log('  server ' + fixed(w.serverCores, 3) + ' cores, ' + fixed(w.serverRssMB, 0) + ' MB, down ' + fixed(w.downWirePerS / 1024, 1) +
+      log('  server ' + fixed(w.serverCores, 3) + ' cores, ' + fixed(w.serverPrivateMB, 0) + ' MB private, ' + fixed(w.serverRssMB, 0) + ' MB working set, down ' + fixed(w.downWirePerS / 1024, 1) +
         ' KB/s, up ' + fixed(w.upWirePerS / 1024, 1) + ' KB/s, each bot read ' + fixed(w.movesReadPerBotPerS, 1) +
         ' moves a second, runner ' + fixed(w.machineBusy * 100, 0) + '% busy');
       if (failed.length) { step.failed = failed; step.stopped = failed.length + ' bots were dropped during the window; the first: ' + failed[0].why; break; }
@@ -287,7 +311,7 @@ async function run(o) {
 async function main() {
   const o = args(process.argv.slice(2));
   if (!o.root || !o.out) {
-    console.log('node Load-Test.js --root <server folder> --out <result.json> [--steps 5,10,20,40] [--settle 20] [--hold 60] [--workers 3] [--shape crowd] [--summary <file>]');
+    console.log('node Load-Test.js --root <server folder> --out <result.json> [--steps 10,20,40,60,80,100] [--settle 20] [--hold 60] [--workers 3] [--shape crowd] [--summary <file>]');
     return 2;
   }
   const doc = await run(o);

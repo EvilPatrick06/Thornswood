@@ -7,8 +7,10 @@
 // bot.js), so it connects, logs in and moves the way a game does:
 //   1. connect over the game's port with the server's password (through
 //      load-proxy.js, which counts the bytes);
-//   2. log in as a profile nobody has (the load copy takes a profile id
-//      alone: thornswoodRequirePass is false there) and wait for its
+//   2. log in as a profile nobody has, with a join pass the bot signs with
+//      the load copy's own pass key (bot.js mintPass, the site's makePass;
+//      a Discord id of its own, so no two bots are one account), answer the
+//      login challenge with it as the launcher's game does, and wait for its
 //      character (createActor with isMe);
 //   3. send a face (UpdateAppearance), which closes the race menu the engine
 //      opens for a new character;
@@ -16,7 +18,9 @@
 //      reliability skymp5-client's SendInputsService.sendMovement uses, in a
 //      slow circle around where it was put, at a walk. A teleport the server
 //      sends (Teleport, Teleport2) is carried out and its teleportSeq echoed,
-//      as the game's RemoteServer does.
+//      as the game's RemoteServer does. Moves keep to their 130 ms beat
+//      (the next is due 130 ms after the last was due), so Windows' timer
+//      steps of about 15.6 ms do not slow a bot below the game's rate.
 // Every message the server sends is read and counted, by type; none is kept.
 //
 // Messages from Load-Test.js:
@@ -25,7 +29,9 @@
 //   { stop: true }              closes every bot and ends
 'use strict';
 const os = require('os');
-const { Bot, MSG, loadAddon } = require('./bot.js');
+const fs = require('fs');
+const path = require('path');
+const { Bot, MSG, loadAddon, mintPass, passLoginKey } = require('./bot.js');
 const { face } = require('./Bot-Pass.js');
 
 const MOVE_MS = 130;           // SendInputsService.sendMovement's sendMovementRateMs
@@ -67,6 +73,11 @@ class LoadBot extends Bot {
       this.counts[t] = (this.counts[t] || 0) + 1;
       if (!m) { continue; }
       if (m.t === MSG.CreateActor && m.isMe && !this.character) { this.character = m; }
+      if (m.t === MSG.CustomPacket && typeof m.contentJsonDump === 'string' && m.contentJsonDump.indexOf('thornswoodLoginChallenge') >= 0) {
+        let c = null;
+        try { c = JSON.parse(m.contentJsonDump); } catch (err) { this.fail('a login challenge that does not read as JSON'); return; }
+        this.onCustom(c);
+      }
       if ((m.t === TELEPORT && this.character && m.idx === this.character.idx) || m.t === TELEPORT2) {
         if (Array.isArray(m.pos) && m.pos.length === 3) { this.center = m.pos.map(Number); }
         if (typeof m.worldOrCell === 'number') { this.cell = m.worldOrCell; }
@@ -85,6 +96,11 @@ class LoadBot extends Bot {
     if (this.state === 'closed' && this.step !== 'new') { this.fail('the server closed the connection at step ' + this.step); return; }
     if (this.step !== 'moving' && this.deadline && now > this.deadline) { this.fail('no answer at step ' + this.step + ' in ' + STEP_MS / 1000 + ' s'); return; }
     if (this.step === 'connecting' && this.state === 'connected') {
+      if (this.passKey) {
+        const at = Date.now();
+        const pass = mintPass(this.passKey, { p: Number(this.profileId), s: this.server, v: 'load-test', d: 'load-' + this.profileId, i: at, x: at + 4 * 3600000 });
+        this.pass = { pass, loginKey: passLoginKey(this.passKey, pass) };
+      }
       this.sendCustom({ customPacketType: 'loginWithSkympIo', gameData: { profileId: Number(this.profileId) } });
       this.step = 'login'; this.deadline = now + STEP_MS;
       return;
@@ -100,8 +116,10 @@ class LoadBot extends Bot {
       return;
     }
     if (this.step === 'moving' && now - this.lastMove >= MOVE_MS) {
-      const dt = (now - this.lastMove) / 1000;
-      this.lastMove = now;
+      const dt = MOVE_MS / 1000;
+      // On the beat, unless the bot fell a whole beat behind, which starts
+      // the beat again from now rather than sending the missed ones at once.
+      this.lastMove = now - this.lastMove >= 2 * MOVE_MS ? now : this.lastMove + MOVE_MS;
       this.angle += (WALK * dt) / this.radius;
       const c = this.center;
       const pos = [c[0] + Math.cos(this.angle) * this.radius, c[1] + Math.sin(this.angle) * this.radius, c[2]];
@@ -113,6 +131,16 @@ class LoadBot extends Bot {
       } }, false);
     }
   }
+}
+
+// The load copy's own pass key and the name its passes carry: door.json in
+// its privDir, and thornswoodServer ("main" when unset, as the gamemode reads
+// it).
+function passKeyOf(root) {
+  const settings = JSON.parse(String(fs.readFileSync(path.join(root, 'server-settings.json'), 'utf8')).replace(/^\uFEFF/, ''));
+  const door = JSON.parse(String(fs.readFileSync(path.join(root, String(settings.privDir || 'private'), 'door.json'), 'utf8')).replace(/^\uFEFF/, ''));
+  if (!door.passKey) { throw new Error('door.json in ' + root + ' has no passKey, so no bot can hold a join pass there'); }
+  return { passKey: String(door.passKey), server: String(settings.thornswoodServer || '').trim().toLowerCase() || 'main' };
 }
 
 function args(argv) {
@@ -128,6 +156,7 @@ function main() {
     process.exit(2);
   }
   const addon = loadAddon(a.root);
+  const { passKey, server } = passKeyOf(a.root);
   const bots = [];
   let cpu0 = process.cpuUsage();
   let at0 = Date.now();
@@ -135,7 +164,7 @@ function main() {
     if (msg && Array.isArray(msg.add)) {
       for (const id of msg.add) {
         const b = new LoadBot(addon, { host: '127.0.0.1', port: Number(a.port), password: a.password || '', name: 'load ' + id });
-        b.profileId = id;
+        b.profileId = id; b.passKey = passKey; b.server = server;
         try {
           b.client = addon.createBotClient(b.host, b.port, b.password, b.timeoutMs);
           b.state = 'connecting'; b.step = 'connecting'; b.deadline = Date.now() + STEP_MS;
@@ -182,4 +211,4 @@ function main() {
 
 if (require.main === module) { main(); }
 
-module.exports = { LoadBot, MOVE_MS };
+module.exports = { LoadBot, MOVE_MS, passKeyOf };

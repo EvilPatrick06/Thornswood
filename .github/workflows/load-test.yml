@@ -36,7 +36,7 @@ on:
       steps:
         description: 'How many bots at each step, comma separated'
         required: false
-        default: '5,10,20,30,40,60'
+        default: '10,20,40,60,80,100'
       hold:
         description: 'Seconds each step is measured over'
         required: false
@@ -118,7 +118,7 @@ jobs:
       - name: Put the bots on it
         shell: pwsh
         env:
-          STEPS: ${{ github.event.inputs.steps || '5,10,20,30,40,60' }}
+          STEPS: ${{ github.event.inputs.steps || '10,20,40,60,80,100' }}
           HOLD: ${{ github.event.inputs.hold || '60' }}
         run: |
           node scripts/bot/Load-Test.js --root "$env:RUNNER_TEMP/server" --out "$env:RUNNER_TEMP/server/result.json" --steps $env:STEPS --hold $env:HOLD --shape ${{ matrix.shape }} --summary $env:GITHUB_STEP_SUMMARY

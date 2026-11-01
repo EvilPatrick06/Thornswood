@@ -24,9 +24,15 @@
 // Thornswood-Content.esp of ours needs nothing but the five masters. So the
 // world is the vanilla one with Thornswood's content on it.
 //
-// The settings are a load copy's: offline, no join pass (each bot logs in
-// with a profile id alone), seats for every bot, the dev server's name for
-// itself, and where new characters are put:
+// The settings are a load copy's: offline, seats for every bot, the dev
+// server's name for itself, the join pass held as on main, and where new
+// characters are put. The gamemode ends every session that has no valid join
+// pass three minutes in, whatever thornswoodRequirePass says (#937; measured
+// on run 41353332627, where every bot was ended at 180 s), so the load copy
+// has a pass key of its own: 32 random bytes made here, in private\door.json,
+// that no site or real server has. load-bots.js signs each bot's pass with
+// it, as the site signs a person's, and answers the login challenge with it.
+// Where new characters are put:
 //   crowd   everybody at one spot outside Whiterun (the engine's own start
 //           point), so everybody is near everybody: the most the server
 //           sends;
@@ -168,10 +174,12 @@ async function build(o) {
     npcSettings: {},
     startPoints: startPoints(shape),
     thornswoodServer: 'dev',
-    thornswoodRequirePass: false,
+    thornswoodRequirePass: true,
     thornswoodChargen: false
   };
   fs.writeFileSync(path.join(out, 'server-settings.json'), JSON.stringify(settings, null, 2) + '\n');
+  fs.mkdirSync(path.join(out, 'private'), { recursive: true });
+  fs.writeFileSync(path.join(out, 'private', 'door.json'), JSON.stringify({ passKey: crypto.randomBytes(32).toString('hex') }) + '\n');
   console.log('the load server is in ' + out + ': fork ' + commit + ', ' + shape + ', ' + seats + ' seats, ' + order.length + ' plugins');
   return { out, commit, settings };
 }
