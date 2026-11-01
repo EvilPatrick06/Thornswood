@@ -53,6 +53,15 @@
 # Weekly rather than daily: this is a small team, and a pull request a day
 # from a robot is a pull request nobody reads.
 #
+# ONE PULL REQUEST PER ECOSYSTEM A WEEK (#5250). Each pull request runs the
+# whole Build check (six Windows jobs) and CodeQL, and on 1 Nov the week's
+# updates came as six pull requests at once, four of them one action each:
+# about fifty jobs in one burst, which queued for up to sixteen minutes
+# behind everybody's own pull requests. So the actions come as one grouped
+# pull request, the bot's libraries as another, the same as the Electron
+# prototype's always did. A bump that breaks the build is still found: the
+# grouped pull request goes red and names the step.
+#
 # LABELS: each update names the area: label its part already has, so its pull
 # requests sort like everything else. Without a labels list Dependabot puts on
 # its own dependencies and github_actions, and makes them again when they are
@@ -65,6 +74,9 @@ updates:
       interval: weekly
     commit-message:
       prefix: "ci"
+    groups:
+      actions:
+        patterns: ["*"]
     labels:
       - "area: GitHub & CI"
 
@@ -74,6 +86,9 @@ updates:
       interval: weekly
     commit-message:
       prefix: "bot"
+    groups:
+      bot-libraries:
+        patterns: ["*"]
     labels:
       - "area: Discord"
 
