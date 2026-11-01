@@ -87,7 +87,9 @@
         "Status": "switch",
         "Tag": "^agent-v[0-9]{1,4}\\.[0-9]{1,4}\\.[0-9]{1,6}$",
         "NoBotPass": "switch",
-        "EndHung": "switch"
+        "EndHung": "switch",
+        "Main": "switch",
+        "NoMain": "switch"
       }
     },
     "Install-Voice": {
@@ -390,6 +392,58 @@
         "Lock": "switch",
         "NetworkOnly": "switch"
       }
+    },
+    "Install-Backup": {
+      "script": "scripts/deploy/Install-Backup.ps1",
+      "timeoutMinutes": 20,
+      "fixed": ["-FromGate", "-NoPause"],
+      "params": {
+        "RunNow": "switch",
+        "Status": "switch"
+      }
+    },
+    "Delete-Person": {
+      "script": "scripts/vps/Delete-Person.ps1",
+      "timeoutMinutes": 30,
+      "fixed": [],
+      "params": {
+        "DiscordId": "^[0-9]{17,20}$",
+        "Delete": "switch",
+        "By": "^[A-Za-z][A-Za-z0-9_-]{0,31}$",
+        "Reapply": "switch"
+      }
+    },
+    "Check-Roster": {
+      "script": "scripts/ops/Check-Roster.ps1",
+      "timeoutMinutes": 5,
+      "fixed": [],
+      "params": {}
+    },
+    "Chargen-Log": {
+      "script": "scripts/ops/Chargen-Log.ps1",
+      "timeoutMinutes": 5,
+      "fixed": [],
+      "params": {
+        "Lines": "^[0-9]{1,4}$"
+      }
+    },
+    "Check-Load": {
+      "script": "scripts/vps/Check-Load.ps1",
+      "timeoutMinutes": 5,
+      "fixed": ["-NoPause"],
+      "params": {}
+    },
+    "Check-ServerPriority": {
+      "script": "scripts/vps/Check-ServerPriority.ps1",
+      "timeoutMinutes": 5,
+      "fixed": [],
+      "params": {}
+    },
+    "Rotate-ServerPassword": {
+      "script": "scripts/deploy/Rotate-ServerPassword.ps1",
+      "timeoutMinutes": 10,
+      "fixed": ["-Yes"],
+      "params": {}
     },
     "Install-Tunnel": {
       "script": "scripts/deploy/Install-Tunnel.ps1",

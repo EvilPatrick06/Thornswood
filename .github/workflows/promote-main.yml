@@ -1,0 +1,132 @@
+# Puts a Release dev ran on the live server, once Patrick approves it on
+# GitHub (#5181; Patrick chose A on 31 Oct: a Main environment with him as its
+# only required reviewer).
+#
+# WHAT HAPPENS. Somebody starts this by hand on main with the tag of a build
+# Release (merge-release.yml makes one for every merge, #5179):
+#   gh workflow run promote-main.yml --ref main -f tag=build-<yyyyMMdd>.<run>
+# The first job holds the tag to a Release dev ran: a published build-*
+# Release with its signed manifest, and a Deployment of it to Dev that ended
+# in success. The second job is in the Main environment, so it waits until
+# Patrick approves it ("Review deployments" on the run); nothing runs before
+# that, and a rejection ends it. Once approved it makes a Deployment to Main
+# naming the Release and this run, and the box deploy agent puts that same
+# Release on the live server: the files dev ran, byte for byte, held to the
+# same signature (docs/DEPLOY-AGENT.md, "Main").
+#
+# WHY THE AGENT ASKS AGAIN. GitHub holds this job to the reviewer, but a
+# Deployment made any other way would be held to nothing, so the agent
+# applies a Main Deployment only when it names a run of this workflow on main
+# that was approved on Main, made no Deployment before, and is of a Release
+# dev ran (tools/DeployAgent/Agent.cs, NotApproved).
+#
+# Main goes back the same way: promote the Release main ran before. The
+# gate's Deploy-Release verb never puts a tag on main.
+#
+# GitHub also lists a Deployment of its own for the waiting job (no Release
+# in it); the agent never applies one, since GitHub has put a status on it
+# before the agent sees it.
+name: Promote to main
+run-name: Promote ${{ inputs.tag }} to main
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'The build Release dev ran, build-<yyyyMMdd>.<run>'
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: promote-main
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Hold the tag to a Release dev ran
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      deployments: read
+    outputs:
+      commit: ${{ steps.check.outputs.commit }}
+    steps:
+      # The tag reaches the script through env, never pasted into its text.
+      - name: The Release, its manifest, and dev's Deployment of it
+        id: check
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          function Stop-Promote([string]$why) { Write-Host "::error title=Not promoted::$why"; exit 1 }
+          $tag = $env:TAG
+          if ($tag -notmatch '^build-\d{8}\.\d{1,9}$') { Stop-Promote "$tag is not a build Release tag, build-<yyyyMMdd>.<run>" }
+          $repo = $env:GITHUB_REPOSITORY
+          $raw = gh api "repos/$repo/releases/tags/$tag"
+          if ($LASTEXITCODE -ne 0) { Stop-Promote "there is no Release $tag" }
+          $rel = ($raw -join "`n") | ConvertFrom-Json
+          if ($rel.draft) { Stop-Promote "$tag is a draft, never published, so dev never ran it" }
+          $names = @($rel.assets | ForEach-Object { $_.name })
+          if ($names -notcontains 'manifest.json' -or $names -notcontains 'manifest.cat') { Stop-Promote "$tag has no signed manifest" }
+          $asset = @($rel.assets | Where-Object name -eq 'manifest.json')[0]
+          $mraw = gh api -H 'Accept: application/octet-stream' "repos/$repo/releases/assets/$($asset.id)"
+          if ($LASTEXITCODE -ne 0) { Stop-Promote "the manifest of $tag could not be read" }
+          $m = ($mraw -join "`n") | ConvertFrom-Json
+          if ([string]$m.tag -ne $tag -or [string]$m.commit -notmatch '^[0-9a-f]{40}$') { Stop-Promote "the manifest of $tag names $($m.tag) at $($m.commit)" }
+          $draw = gh api "repos/$repo/deployments?environment=Dev&per_page=100"
+          if ($LASTEXITCODE -ne 0) { Stop-Promote 'the Deployments to Dev could not be read' }
+          $ran = $false
+          foreach ($d in @(($draw -join "`n") | ConvertFrom-Json)) {
+            $p = $d.payload
+            if ($p -is [string]) { try { $p = $p | ConvertFrom-Json } catch { continue } }
+            if ($null -eq $p -or [string]$p.release -ne $tag) { continue }
+            $st = gh api "repos/$repo/deployments/$($d.id)/statuses?per_page=100"
+            if ($LASTEXITCODE -ne 0) { Stop-Promote "the statuses of Deployment $($d.id) could not be read" }
+            if (@(($st -join "`n") | ConvertFrom-Json | Where-Object state -eq 'success').Count) { $ran = $true; Write-Host "dev ran $tag: Deployment $($d.id)"; break }
+          }
+          if (-not $ran) { Stop-Promote "dev has not run $tag: no Deployment of it to Dev ended in success" }
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("commit=" + $m.commit)
+          Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value "**$tag** (commit $($m.commit.Substring(0, 12))) ran on dev. It goes on the live server once Patrick approves this run."
+
+  promote:
+    name: Put it on main, once Patrick approves
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Patrick is the Main environment's only required reviewer: this job
+    # waits for him and runs only once he approves.
+    environment: Main
+    permissions:
+      deployments: write
+    steps:
+      - name: Ask the live server for it (a Deployment to Main)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          COMMIT: ${{ needs.check.outputs.commit }}
+        run: |
+          # required_contexts empty: the commit passed its checks before dev
+          # took it, and the Deployment must not wait on whatever else runs.
+          $body = [ordered]@{
+            ref = $env:COMMIT
+            task = 'deploy'
+            environment = 'Main'
+            auto_merge = $false
+            required_contexts = @()
+            production_environment = $true
+            transient_environment = $false
+            payload = [ordered]@{ release = $env:TAG; run = [long]$env:GITHUB_RUN_ID }
+            description = "Release $($env:TAG) to main, approved in run $($env:GITHUB_RUN_ID)"
+          }
+          $file = Join-Path $env:RUNNER_TEMP 'deployment.json'
+          [IO.File]::WriteAllText($file, ($body | ConvertTo-Json -Depth 4 -Compress))
+          $id = gh api --method POST "repos/$($env:GITHUB_REPOSITORY)/deployments" --input $file --jq .id
+          if ($LASTEXITCODE -ne 0 -or -not $id) { Write-Host '::error::GitHub made no Deployment'; exit 1 }
+          Write-Host "Deployment $id asks main for $($env:TAG); the box deploy agent applies it and says how it went on it"
+          Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value "Deployment $id asks **Main** for **$($env:TAG)**: https://github.com/$($env:GITHUB_REPOSITORY)/deployments"

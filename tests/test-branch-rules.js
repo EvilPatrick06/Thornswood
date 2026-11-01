@@ -90,7 +90,8 @@ yml.forEach(function (l) {
 // 31 Oct 2026: "gate" runs the gate harnesses in shares beside the build;
 // the required "Build check result" (#3683, build-pr.yml) needs both.
 // #5183: "pick" builds nothing; it says what each share of the gate runs.
-const main = jobs.filter(function (j) { return j.id !== 'tested' && j.id !== 'gate' && j.id !== 'pick'; });
+// #5295: "report" builds nothing either; it merges the shares' reports.
+const main = jobs.filter(function (j) { return j.id !== 'tested' && j.id !== 'gate' && j.id !== 'pick' && j.id !== 'report'; });
 yes('build.yml has exactly one build job beside its gate (found ' + main.length + ')', main.length === 1);
 const prYml = read('.github/workflows/build-pr.yml');
 yes('  and the required check of a pull request needs the build and the gate both', /\n    name: Build check result\n    needs: \[launcher, gate\]\n/.test(prYml));
