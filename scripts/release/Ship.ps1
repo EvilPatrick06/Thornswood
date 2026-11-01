@@ -2435,8 +2435,8 @@ $pubArgs = @{ Notes = $Notes; Root = $Root; RepoDir = $RepoDir; ReleaseDir = $Re
 if ($MoveServer) { $pubArgs['MoveServer'] = $true }
 if ($AcceptSize) { $pubArgs['AcceptSize'] = $true }
 if (-not $ModsOnly) { $pubArgs['Launcher'] = $true; $pubArgs['LauncherInputs'] = $LauncherInputs }
-# The number the exe carries, for both channels: Updater.cs is git's 0.0.0
-# again by the time Publish-Update reads it (#5179).
+# The number the exe was built with, for both channels: no file in the
+# checkout holds it (#4825), so Publish-Update takes it from here.
 $pubArgs['VersionOverride'] = $target
 if ($Dev) { $pubArgs['Channel'] = 'dev' }
 # -AllowStaleCheckout was Ship's alone, so Publish-Update refused what Ship had

@@ -36,8 +36,8 @@
   each run; its record, server-build.json, says which build it is) and the
   game files' list (game-files.json names the commit; game.zip is the same
   bytes for the same files, Build-GameFiles.ps1 says how). The
-  velopack part is made from the launcher and the game files, so it is never
-  compared on its own.
+  velopack and main parts, dev's and main's Velopack packages, are made from
+  the launcher and the game files, so neither is compared on its own.
 
   THE LAUNCHER'S PRINT is its source number (the manifest's launcherVersion,
   LauncherVersion.ps1), not its files (#4825). The exe carries the Velopack
@@ -89,7 +89,7 @@ function Get-MergeReleaseChanged {
   param([Parameter(Mandatory = $true)]$Manifest, $Previous = $null)
   $changed = New-Object System.Collections.Generic.List[string]
   foreach ($p in @($Manifest.parts.PSObject.Properties)) {
-    if ($p.Name -eq 'velopack') { continue }
+    if ($p.Name -in 'velopack', 'main') { continue }
     if ($null -eq $Previous -or (Get-MergeReleasePrint $Manifest $p.Name) -ne (Get-MergeReleasePrint $Previous $p.Name)) { $changed.Add($p.Name) }
   }
   # Unrolled: callers take it as @(...), which gives an empty array for none.

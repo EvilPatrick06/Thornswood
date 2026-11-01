@@ -18,7 +18,7 @@ namespace Thornswood
     ///   - a file beside Game that the install reads on the first start
     ///     (config.json, profile\, applied.txt, the source note and the
     ///     licence texts, scripts/release/Build-SetupFiles.ps1) must be in the
-    ///     signed release's setup-files.json the same way, and every file it
+    ///     signed release's setup-files.&lt;channel&gt;.json the same way, and every file it
     ///     names must be there.
     ///   - every program (.exe, .dll) anywhere else, the launcher itself,
     ///     the native libraries beside it and Velopack's own Update.exe and
@@ -54,12 +54,13 @@ namespace Thornswood
             string bad = Wanted(list, "game-files.json", want);
             if (bad.Length > 0) return bad;
             var wantSetup = new Dictionary<string, VeloRecord.GameFile>(StringComparer.OrdinalIgnoreCase);
-            bad = Wanted(setup, "setup-files.json", wantSetup);
+            string setupName = "setup-files." + setup.Channel + ".json";
+            bad = Wanted(setup, setupName, wantSetup);
             if (bad.Length > 0) return bad;
             foreach (string p in wantSetup.Keys)
             {
                 if (p.StartsWith("Game/", StringComparison.OrdinalIgnoreCase) || p.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || p.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
-                    return "has a setup-files.json that names " + p + ", which is a game file or a program, and those are held to their own checks.";
+                    return "has a " + setupName + " that names " + p + ", which is a game file or a program, and those are held to their own checks.";
             }
 
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

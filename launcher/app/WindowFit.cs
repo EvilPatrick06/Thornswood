@@ -20,9 +20,9 @@ namespace Thornswood
     /// with another scale. The minimums from the markup are kept, so a bigger
     /// screen gets them back.
     ///
-    /// Shared: the setup program compiles this file as well, so it uses
-    /// nothing else from launcher\app (no Swallow, no Paths). Callers wrap it
-    /// in their own try and log the way their exe logs.
+    /// The setup program compiled this file as well until #4824 retired it,
+    /// which is why it uses nothing else from launcher\app (no Swallow, no
+    /// Paths). Callers wrap it in their own try and log the way they log.
     /// tests\test-app-manifest.ps1 runs Clamp at 100 to 200 percent.
     /// </summary>
     static class WindowFit

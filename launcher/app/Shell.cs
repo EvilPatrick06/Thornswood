@@ -375,7 +375,7 @@ namespace Thornswood
             // this PC, and the privacy page says so (#3679). Here, inside this
             // install's mutex and before anything else in it writes the log.
             LocalKeep.Tidy(DateTime.Now);
-            // Profile\accepted.json is the setup program's record of the terms,
+            // Profile\accepted.json is the install window's record of the terms,
             // the privacy policy and the rules (issue #1009). An install made
             // before that has no file, and silence is not a yes. Ask before
             // anything else is opened. Uninstall must still be reachable.
@@ -663,7 +663,7 @@ namespace Thornswood
             StartStallWatch();
             if (!askedToUninstall && termsOnFile)
             {
-                // The record is already there (the setup program's, or the
+                // The record is already there (the install window's, or the
                 // first start's above). A page is asked again only when its
                 // text has changed since it was accepted, and then only that
                 // page: Patrick, 16 Oct 2026 (#2616), asked once at install,

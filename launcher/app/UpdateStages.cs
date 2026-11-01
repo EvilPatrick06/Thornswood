@@ -77,7 +77,7 @@ namespace Thornswood
                         // A whole release, synced to its record; when the record
                         // does not say its files are on the site, the packs.
                         got.Release = PrepareRecord(cfg, p.Record, p.Doc, log);
-                        if (got.Release == null) FetchPacks(cfg, Pending(p.Doc), got, log);
+                        if (got.Release == null) FetchPacks(cfg, Pending(cfg, p.Doc), got, log);
                         continue;
                     }
                     FetchPack(cfg, p, got, log);
@@ -88,6 +88,9 @@ namespace Thornswood
                 {
                     FetchLauncher(launcher, log);
                     got.Launcher = launcher;
+                    // On dev the package carries the game files too, and they
+                    // go in with WriteUpdate like a release's (SyncPackage.cs).
+                    if (Velo.GameFromPackage(cfg)) got.Release = PreparePackage(launcher, log);
                 }
                 return got;
             }
@@ -175,6 +178,7 @@ namespace Thornswood
             }
             got.Zips.Clear();
             got.Launcher = null;
+            if (got.Release != null && got.Release.Close != null) got.Release.Close();
         }
     }
 }

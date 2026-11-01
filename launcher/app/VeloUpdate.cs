@@ -28,7 +28,7 @@ namespace Thornswood
     ///   3. Every file in the package, however it was put together (whole, or
     ///      rebuilt from the version before and its deltas): each game file by
     ///      size and sha256 against the signed game-files.json, each file
-    ///      beside them against the signed setup-files.json, each program by
+    ///      beside them against the signed setup-files.&lt;channel&gt;.json, each program by
     ///      Signature.Refusal (VeloPackage.cs).
     ///   4. The Update.exe Velopack took out of the package, by Signature.Refusal,
     ///      since it is what applies the update.
@@ -49,6 +49,11 @@ namespace Thornswood
             public long Size;
             /// <summary>Set by FetchLauncher once the package is downloaded and every check passed.</summary>
             internal bool Checked;
+            // What FetchLauncher checked the package against, and where it is:
+            // the game files go in from it on dev (SyncPackage.cs).
+            internal VeloRecord.Manifest Record;
+            internal VeloRecord.GameList Game, Setup;
+            internal string Package;
         }
 
         /// <summary>What the last launcher check found, in words, for launcher.log.</summary>
@@ -120,7 +125,7 @@ namespace Thornswood
                 VeloRecord.Manifest m = VeloRecord.Get(u.Info.TargetFullRelease.Version, out recordSaid);
                 if (recordSaid.Length > 0) log(recordSaid);
                 VeloRecord.GameList list = VeloRecord.Game(m);
-                VeloRecord.GameList setup = VeloRecord.Setup(m);
+                VeloRecord.GameList setup = VeloRecord.Setup(m, u.Channel);
                 string said;
                 string why = VeloPackage.Refusal(pkg, list, setup, ExpectedSigner,
                     delegate (long done, long total) { PlayProgress.Files("Checking the update", done, total); }, out said);
@@ -132,6 +137,10 @@ namespace Thornswood
                     ? "is not there."
                     : Signature.Refusal(updateExe, ExpectedSigner, out exeSaid);
                 if (exeWhy.Length > 0) throw new Exception("Velopack's Update.exe, which applies the update, " + exeWhy);
+                u.Record = m;
+                u.Game = list;
+                u.Setup = setup;
+                u.Package = pkg;
             }
             catch (Exception ex)
             {

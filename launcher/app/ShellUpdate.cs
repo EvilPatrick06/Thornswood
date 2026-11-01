@@ -356,7 +356,7 @@ namespace Thornswood
                     " never reached the game folder on this install, a launcher fault fixed in " +
                     Updater.Version + ". " + (again == 1 ? "It goes" : "They go") +
                     " in again with this update.");
-            pendingPacks = Updater.Pending(v);
+            pendingPacks = Updater.Pending(cfg, v);
             // The launcher is offered by its Velopack channel (#4825), never by
             // the feed's launcherVersion: the launcher check that ran before
             // this answer (CheckUpdatesBackground) found it.
@@ -531,7 +531,7 @@ namespace Thornswood
                         // launcher check after it. The launcher's channel is
                         // on GitHub, which is not asked every thirty seconds
                         // (LauncherCheckDue).
-                        List<Pack> packs = Updater.Pending(v);
+                        List<Pack> packs = Updater.Pending(cfg, v);
                         due = packs.Count > 0;
                         what = packs.Count + (packs.Count == 1 ? " mod update" : " mod updates");
                     }
@@ -773,7 +773,7 @@ namespace Thornswood
                         // again unpacks them a second time, which rewrites each
                         // one's file list with every path marked as one the pack
                         // wrote over, so a later Remove leaves its own files.
-                        pendingPacks = Updater.Pending(doc);
+                        pendingPacks = Updater.Pending(cfg, doc);
                         txtUpdateTitle.Text = "Update failed";
                         updating = false;
                         btnUpdate.IsEnabled = true;

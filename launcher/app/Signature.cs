@@ -58,12 +58,13 @@ namespace Thornswood
     /// Identities and Ship that launcher, signed with the OLD profile, before
     /// anything is signed with the new one, or every installed launcher
     /// refuses the update. scripts\release\Assert-PublishSigned.ps1 runs this
-    /// same class on every launcher and setup program before a Ship
+    /// same class on every launcher before a Ship
     /// publishes, so a Ship signed by anything else stops there first.
     ///
     /// MicrosoftRefusal, at the end, asks the same question of a program
-    /// Microsoft signed itself: the WebView2 installer Voice downloads and
-    /// runs (issue #1330).
+    /// Microsoft signed itself. It was for the WebView2 installer voice
+    /// downloaded and ran (issue #1330); voice needs no WebView2 since #4823,
+    /// and nothing in the launcher calls it now.
     ///
     /// Kept apart from Updater, with nothing in it but the framework, so that
     /// tests\test-signer-check.ps1 can compile it on its own and point it at
@@ -373,8 +374,9 @@ namespace Thornswood
         /// otherwise the rest of a sentence that starts with the file's name,
         /// as Refusal returns it. said is the line for the log when it passed.
         ///
-        /// Voice.Bootstrap asks this before it runs the WebView2 installer it
-        /// has just downloaded. Until #1330 it ran whatever the download
+        /// Voice.Bootstrap asked this before it ran the WebView2 installer it
+        /// had just downloaded, until voice stopped needing WebView2 (#4823);
+        /// nothing calls it now. Until #1330 it ran whatever the download
         /// handed it, so whoever could change that file on the way, or at the
         /// server it came from, chose what ran on this machine.
         ///

@@ -26,9 +26,10 @@ namespace Thornswood
     /// one run number give both (scripts/release/MergeRelease.ps1,
     /// New-MergeReleaseNames), version yyyy.(month*100+day).run and tag
     /// build-yyyyMMdd.run. So the record is fetched from that tag whichever
-    /// Release served the package, which is what lets main serve the same
-    /// bytes from a Release of its own (#5181) and still be held to the
-    /// record dev's Release was signed with.
+    /// Release served the package. Main's package of the same version (the
+    /// part "main", packed beside dev's and listed in the same record) is
+    /// published from a Release of its own once Patrick approves it (#5181),
+    /// and is held to the record the merge release signed.
     ///
     /// Fetched from github.com's download addresses, never the API, so the
     /// check spends none of the sixty anonymous API requests an hour.
@@ -72,9 +73,21 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// A game file the release no longer ships, as a release record's
+        /// :gone: entry says it (Sync.cs): "always", the sha256 of the bytes
+        /// once shipped, or anything else for a file of ours to leave when
+        /// Vortex deploys that path (Build-GameFiles.ps1 writes them).
+        /// </summary>
+        public sealed class GoneFile
+        {
+            [JsonPropertyName("path")] public string Path { get; set; }
+            [JsonPropertyName("value")] public string Value { get; set; }
+        }
+
+        /// <summary>
         /// game-files.json as Build-GameFiles.ps1 writes it: every game file in
-        /// the package. setup-files.json (Build-SetupFiles.ps1) is the same
-        /// shape, for the files beside Game the install reads.
+        /// the package. setup-files.&lt;channel&gt;.json (Build-SetupFiles.ps1)
+        /// is the same shape, for the files beside Game the install reads.
         /// </summary>
         public sealed class GameList
         {
@@ -83,6 +96,8 @@ namespace Thornswood
             [JsonPropertyName("channel")] public string Channel { get; set; }
             [JsonPropertyName("from")] public string From { get; set; }
             [JsonPropertyName("files")] public GameFile[] Files { get; set; }
+            /// <summary>game-files.json only: what the release no longer ships. Null in a setup list.</summary>
+            [JsonPropertyName("gone")] public GoneFile[] Gone { get; set; }
         }
 
         /// <summary>
@@ -112,7 +127,13 @@ namespace Thornswood
         // through Velopack's own downloader.
         static byte[] Fetch(string tag, string name)
         {
-            string url = Download(tag, name);
+            return FetchUrl(tag, name, tag);
+        }
+
+        // From the Release <paramref name="on"/>, for the record of <paramref name="tag"/>.
+        static byte[] FetchUrl(string on, string name, string tag)
+        {
+            string url = Download(on, name);
             using (var req = new HttpRequestMessage(HttpMethod.Get, url))
             {
                 req.Headers.TryAddWithoutValidation("User-Agent", "ThornswoodLauncher/" + Updater.Version);
@@ -205,7 +226,7 @@ namespace Thornswood
             Manifest m;
             try { m = Get(a.Version, out said); }
             catch (Exception ex) { return "could not be held to its release record: " + ex.Message; }
-            PartFile f = m.File("velopack", a.FileName);
+            PartFile f = m.File(PartOf("dev"), a.FileName) ?? m.File(PartOf("main"), a.FileName);
             if (f == null)
                 return "is not among the Velopack files the signed release record of " + m.Tag + " lists.";
             if (!string.Equals(f.Sha256, a.SHA256, StringComparison.OrdinalIgnoreCase))
@@ -233,24 +254,48 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// setup-files.json of the Release <paramref name="m"/> records, among
-        /// its Velopack files, held to the sha256 the record gives it: the
-        /// files beside Game the install reads on the first start
-        /// (Build-SetupFiles.ps1). Throws with the reason.
+        /// The record's part that holds a channel's Velopack files: "velopack"
+        /// for dev, published with the merge release, and "main" for main,
+        /// held back until Patrick approves it (#5181, merge-release.yml).
         /// </summary>
-        public static GameList Setup(Manifest m)
+        public static string PartOf(string channel)
         {
-            PartFile f = m.File("velopack", "setup-files.json");
-            if (f == null) throw new Exception("The release record of " + m.Tag + " lists no setup-files.json, so the files beside the game files in the package cannot be held to a list.");
-            byte[] raw = Fetch(m.Tag, "setup-files.json");
+            return channel == "main" ? "main" : "velopack";
+        }
+
+        /// <summary>
+        /// setup-files.&lt;channel&gt;.json of the Release <paramref name="m"/>
+        /// records, among that channel's Velopack files, held to the sha256
+        /// the record gives it: the files beside Game the install reads on the
+        /// first start (Build-SetupFiles.ps1), which differ by channel in
+        /// config.json and applied.txt. Fetched from the build's own Release
+        /// for dev; main's sits on main's Release, which serves its package.
+        /// Throws with the reason.
+        /// </summary>
+        public static GameList Setup(Manifest m, string channel)
+        {
+            string name = "setup-files." + channel + ".json";
+            PartFile f = m.File(PartOf(channel), name);
+            if (f == null) throw new Exception("The release record of " + m.Tag + " lists no " + name + ", so the files beside the game files in the package cannot be held to a list.");
+            byte[] raw = channel == "main" ? FetchUrl(MainRelease(m.Tag), name, m.Tag) : Fetch(m.Tag, name);
             if (!string.Equals(Sha256(raw), f.Sha256, StringComparison.OrdinalIgnoreCase))
-                throw new Exception("setup-files.json of " + m.Tag + " is not the one its signed release record lists.");
+                throw new Exception(name + " of " + m.Tag + " is not the one its signed release record lists.");
             GameList list = JsonSerializer.Deserialize(raw, VeloJson.Default.GameList);
-            if (list == null || list.Schema != 1 || list.Files == null)
-                throw new Exception("setup-files.json of " + m.Tag + " is not a list this launcher reads.");
+            if (list == null || list.Schema != 1 || list.Files == null || !string.Equals(list.Channel, channel, StringComparison.Ordinal))
+                throw new Exception(name + " of " + m.Tag + " is not a list this launcher reads.");
             if (!string.Equals(list.Commit, m.Commit, StringComparison.OrdinalIgnoreCase))
-                throw new Exception("setup-files.json of " + m.Tag + " was built from " + list.Commit + ", and the release from " + m.Commit + ".");
+                throw new Exception(name + " of " + m.Tag + " was built from " + list.Commit + ", and the release from " + m.Commit + ".");
             return list;
+        }
+
+        /// <summary>
+        /// The tag of the Release the approval publishes main's files on
+        /// (#5181): main- and the build's tag. The build's own Release never
+        /// carries them, so nothing reaches a main launcher unapproved.
+        /// </summary>
+        public static string MainRelease(string buildTag)
+        {
+            return "main-" + buildTag;
         }
     }
 
