@@ -114,12 +114,12 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
                 catch (JsonException e) { return new Outcome("failure", "not applied: the Release's server-build.json does not read: " + e.Message); }
                 if (running == ServerBuild.RecordSum(record))
                 {
-                    logf($"dev already runs server build {rec.Short}, the one this Release records, so only the gamemode is reloaded");
+                    logf($"{env} already runs server build {rec.Short}, the one this Release records, so only the gamemode is reloaded");
                 }
                 else
                 {
-                    logf(running == "" ? $"dev has no server-build.json, so it is given server build {rec.Short} with the gamemode"
-                                       : $"dev runs another server build than {rec.Short}, the one this Release records, so the server is swapped with the gamemode under a hold");
+                    logf(running == "" ? $"{env} has no server-build.json, so it is given server build {rec.Short} with the gamemode"
+                                       : $"{env} runs another server build than {rec.Short}, the one this Release records, so the server is swapped with the gamemode under a hold");
                     try { swapZip = await ReleaseFetch.FetchFile(gh, rel, zipMf[0], f.Dir, ct); }
                     catch (Exception e) when (e is InvalidDataException or IOException or HttpRequestException) { return new Outcome("failure", "not applied: " + e.Message); }
                     logf($"server: {zipMf[0].Name}, held to the signed manifest");
@@ -232,7 +232,11 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
         var lines = new List<string>();
         void Logf(string s) { lines.Add($"{DateTime.Now:h:mm:ss tt}  {s}"); log(s); }
         Logf($"deploy agent {version} on {Host}: {tag} to {env}, by the deploy gate");
-        var outc = await ApplyRelease(env, tag, "", "tag-" + id, Logf, ct);
+        // Main takes only a Deployment Patrick approved (#5181); putting main
+        // back is promoting the Release before through promote-main.yml.
+        var outc = servers.TryGetValue(env, out var s0) && s0.Env.Approved
+            ? new Outcome("failure", $"not applied: {env} takes only a Deployment Patrick approved (promote-main.yml), never a tag by the gate")
+            : await ApplyRelease(env, tag, "", "tag-" + id, Logf, ct);
         Logf(outc.State.ToUpperInvariant() + ": " + outc.Summary);
         var url = PublishLog(env, id, lines);
         if (url != "") log("the log: " + url);
@@ -362,11 +366,14 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
                 {
                     tag = PayloadRelease(d.Payload);
                     var part = PayloadPart(d.Payload);
+                    var approved = servers.TryGetValue(env, out var srv) && srv.Env.Approved;
+                    var refused = approved ? await NotApproved(d, tag, Logf, ct) : "";
                     if (Apps.TryGetValue(env, out var app) && part != "" && part != AppKinds.Part(app.Env.Kind))
                         outc = new Outcome("failure", $"not applied: the Deployment asks for the {part} part, and {env} takes {AppKinds.Part(app.Env.Kind)}");
+                    else if (refused != "") outc = new Outcome("failure", "not applied: " + refused);
                     else
                     {
-                        outc = await ApplyRelease(env, tag, d.Sha, $"deployment-{d.Id}", Logf, ct, botPass: true);
+                        outc = await ApplyRelease(env, tag, d.Sha, $"deployment-{d.Id}", Logf, ct, botPass: !approved);
                         if (outc.State == "success" && env == DevEnv && Gate != null) outc = await LoadOrder(env, d.Sha, outc, Logf, ct);
                     }
                 }
@@ -499,6 +506,83 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
     }
 
     static string Short(string s) => s.Length > 12 ? s[..12] : s;
+
+    /// <summary>The workflow whose approved run is the only maker of a Main
+    /// Deployment the agent applies (#5181).</summary>
+    public const string PromoteWorkflow = ".github/workflows/promote-main.yml";
+    string RunsUsedPath => Path.Combine(cfg.Home, "state", "main-runs.txt");
+
+    /// <summary>Why a Main Deployment is not Patrick's approved promotion of a
+    /// Release dev ran, or "" when it is. GitHub holds the run that makes it
+    /// on the Main environment's required reviewer; nothing holds a
+    /// Deployment made some other way, so each is held here to that run:
+    ///  - made by GitHub Actions, naming the run in its payload;
+    ///  - the run is promote-main.yml on main, started by hand;
+    ///  - the run's wait on Main was approved, and nobody rejected it;
+    ///  - no other Deployment came from the same run (main-runs.txt);
+    ///  - dev applied this same Release, by a Deployment to Dev that ended in
+    ///    success, so main takes the signed files dev ran.</summary>
+    public async Task<string> NotApproved(Deployment d, string tag, Action<string> logf, CancellationToken ct)
+    {
+        if (d.Creator?.Name != "github-actions[bot]") return $"a Main Deployment is made by promote-main.yml, and this one was made by {d.Creator?.Name ?? "nobody named"}";
+        long run;
+        try { run = PayloadRun(d.Payload); }
+        catch (Exception e) when (e is InvalidDataException or JsonException) { return e.Message; }
+        WorkflowRun r;
+        List<RunApproval> approvals;
+        try
+        {
+            r = await gh.Run(run, ct);
+            approvals = await gh.RunApprovals(run, ct);
+        }
+        catch (GitHubException e) when (e.Status is 403 or 404)
+        {
+            // The status keeps 140 characters, so what to do comes first.
+            logf($"run {run}: HTTP {e.Status} {e.Message}");
+            return $"who approved run {run} could not be read (HTTP {e.Status}); the agent's token needs Actions: read from the box admin App";
+        }
+        if (r.Path != PromoteWorkflow || r.HeadBranch != "main" || r.Event != "workflow_dispatch")
+            return $"run {run} is {r.Path} on {r.HeadBranch} ({r.Event}), not {PromoteWorkflow} started by hand on main";
+        static bool OnMain(RunApproval a) => a.Environments.Any(x => x.Name == "Main");
+        var no = approvals.FirstOrDefault(a => a.State == "rejected" && OnMain(a));
+        if (no != null) return $"{no.User?.Name} rejected run {run}";
+        var yes = approvals.FirstOrDefault(a => a.State == "approved" && OnMain(a));
+        if (yes == null) return $"nobody approved run {run} on Main";
+        var used = File.Exists(RunsUsedPath) ? File.ReadAllLines(RunsUsedPath) : [];
+        if (used.Contains(run.ToString())) return $"run {run} already made a Main Deployment that was applied or refused";
+        var devEnv = cfg.Environments.TryGetValue("dev", out var de) ? de.GitHubEnvironment : "Dev";
+        var ran = false;
+        foreach (var dd in await gh.Deployments(devEnv, 100, ct))
+        {
+            string t;
+            try { t = PayloadRelease(dd.Payload); } catch (Exception e) when (e is InvalidDataException or JsonException) { continue; }
+            if (t != tag) continue;
+            var st = await gh.Statuses(dd.Id, ct);
+            if (st.Any(x => x.State == "success")) { ran = true; break; }
+        }
+        if (!ran) return $"dev has not run {tag}: no Deployment of it to {devEnv} ended in success";
+        Directory.CreateDirectory(Path.GetDirectoryName(RunsUsedPath)!);
+        File.AppendAllText(RunsUsedPath, run + "\r\n");
+        logf($"approved by {yes.User?.Name} in run {run} of promote-main.yml; dev ran {tag}");
+        return "";
+    }
+
+    /// <summary>The promote-main.yml run a Main Deployment names in its payload.</summary>
+    public static long PayloadRun(JsonElement payload)
+    {
+        var p = payload;
+        if (p.ValueKind == JsonValueKind.String)
+        {
+            using var d = JsonDocument.Parse(p.GetString() ?? "");
+            p = d.RootElement.Clone();
+        }
+        if (p.ValueKind == JsonValueKind.Object && p.TryGetProperty("run", out var r))
+        {
+            if (r.ValueKind == JsonValueKind.Number && r.TryGetInt64(out var n) && n > 0) return n;
+            if (r.ValueKind == JsonValueKind.String && long.TryParse(r.GetString(), out var m) && m > 0) return m;
+        }
+        throw new InvalidDataException("the Deployment's payload names no promote-main.yml run");
+    }
 
     /// <summary>The server build's zip, as ServerArtifact.ps1 names it: server-&lt;commit&gt;-&lt;sum&gt;.zip.</summary>
     static bool IsServerZip(string name) => name.StartsWith("server-", StringComparison.Ordinal) && name.EndsWith(".zip", StringComparison.Ordinal);

@@ -16,7 +16,9 @@
       the Release.
     - The gate has the verbs Deploy-Release (-Tag build-<...> and
       -Environment dev, site or discord only) and Install-DeployAgent
-      (-Status, -Tag, -NoBotPass and -EndHung only).
+      (-Status, -Tag, -NoBotPass, -EndHung, -Main and -NoMain only). -Main
+      has agent.json name main (#5181) and -NoMain takes it off; with
+      neither it is kept.
     - Deploy-Release.ps1 and Install-DeployAgent.ps1 send the box scripts that
       parse; the install one carries the signer read from Updater.cs, the
       launcher's own Signature.cs and the repository it was given, and no
@@ -120,7 +122,8 @@ try {
     Yes '  -Tag takes build-<...> and nothing else' (('build-20261101.12' -match $d.params.Tag) -and -not ('build-1; rm' -match $d.params.Tag) -and -not ('agent-v1.0.1' -match $d.params.Tag))
     $v = $verbs.verbs.'Install-DeployAgent'
     Yes 'the gate has Install-DeployAgent' ($null -ne $v -and $v.script -eq 'scripts/deploy/Install-DeployAgent.ps1')
-    Yes '  with -Status, -Tag, -NoBotPass and -EndHung only, and -NoPause fixed' ((@($v.params.PSObject.Properties.Name) -join ',') -eq 'Status,Tag,NoBotPass,EndHung' -and (@($v.fixed) -join ',') -eq '-NoPause' -and $v.params.NoBotPass -eq 'switch' -and $v.params.EndHung -eq 'switch')
+    Yes '  with -Status, -Tag, -NoBotPass, -EndHung, -Main and -NoMain only, and -NoPause fixed' ((@($v.params.PSObject.Properties.Name) -join ',') -eq 'Status,Tag,NoBotPass,EndHung,Main,NoMain' -and (@($v.fixed) -join ',') -eq '-NoPause' -and
+        $v.params.NoBotPass -eq 'switch' -and $v.params.EndHung -eq 'switch' -and $v.params.Main -eq 'switch' -and $v.params.NoMain -eq 'switch')
     Yes '  -Tag takes agent-v<a.b.c> and nothing else' (('agent-v1.0.12' -match $v.params.Tag) -and -not ('agent-v1.0.12; rm' -match $v.params.Tag) -and -not ('build-1' -match $v.params.Tag))
 
     # ---- the scripts they send the box ---------------------------------------------
@@ -173,6 +176,11 @@ try {
             Yes '  and names the folder in agent.json only once the task is set up' ($t.Contains('-NotePropertyName botPassRoot') -and $t.Contains('$noPass = [bool]0'))
             $off = Probe 'Install-DeployAgent.ps1' 'INSTALLED: probe' @('-Repo', 'O/R', '-NoBotPass')
             Yes '  -NoBotPass sends a script that parses and leaves the bot pass off' ($null -ne $off -and $off.Parses -and $off.Text.Contains('$noPass = [bool]1'))
+            Yes '  without -Main or -NoMain, main in agent.json is kept as it is' ($t.Contains('if ([bool]0) {') -and $t.Contains('elseif ([bool]0) {') -and $t.Contains("'main: kept, as agent.json said'"))
+            $mn = Probe 'Install-DeployAgent.ps1' 'INSTALLED: probe' @('-Repo', 'O/R', '-Main')
+            Yes '  -Main has agent.json name main, with the live server''s resources port for its logs' ($null -ne $mn -and $mn.Parses -and $mn.Text.Contains('if ([bool]1) {') -and $mn.Text -match "-NotePropertyName main -NotePropertyValue \(\[pscustomobject\]@\{ logBase = 'http://[A-Za-z0-9.-]+:3000/' \}\)")
+            $nm = Probe 'Install-DeployAgent.ps1' 'INSTALLED: probe' @('-Repo', 'O/R', '-NoMain')
+            Yes '  -NoMain takes it off' ($null -ne $nm -and $nm.Parses -and $nm.Text.Contains('elseif ([bool]1) {') -and $nm.Text.Contains("Properties.Remove('main')"))
             # How it picks the Release, run against a stand-in GitHub that hands
             # each JSON array back as one object, the way Invoke-RestMethod does:
             # the box once refused agent-v1.0.6 because the list was read whole.

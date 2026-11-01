@@ -28,6 +28,22 @@ public sealed class DeploymentStatus
 
 /// <summary>A published Release. The tag lookup never returns a draft, so a
 /// draft can never be deployed.</summary>
+public sealed class WorkflowRun
+{
+    [JsonPropertyName("id")] public long Id { get; set; }
+    [JsonPropertyName("path")] public string Path { get; set; } = "";
+    [JsonPropertyName("head_branch")] public string HeadBranch { get; set; } = "";
+    [JsonPropertyName("event")] public string Event { get; set; } = "";
+}
+
+public sealed class RunApproval
+{
+    [JsonPropertyName("state")] public string State { get; set; } = "";
+    [JsonPropertyName("user")] public Deployment.Login? User { get; set; }
+    [JsonPropertyName("environments")] public List<Named> Environments { get; set; } = new();
+    public sealed class Named { [JsonPropertyName("name")] public string Name { get; set; } = ""; }
+}
+
 public sealed class Release
 {
     [JsonPropertyName("tag_name")] public string TagName { get; set; } = "";
@@ -115,6 +131,15 @@ public sealed class GitHub(string api, string repo, ITokenSource tokens, HttpCli
         if (state == "success") body["auto_inactive"] = true;
         return Call<bool>(HttpMethod.Post, $"{RepoPath}/deployments/{id}/statuses", body, ct);
     }
+
+    /// <summary>One workflow run: which workflow, on which branch, started how.</summary>
+    public Task<WorkflowRun> Run(long id, CancellationToken ct) =>
+        Call<WorkflowRun>(HttpMethod.Get, $"{RepoPath}/actions/runs/{id}", null, ct);
+
+    /// <summary>Who approved or rejected a run's wait on an environment's
+    /// required reviewers (#5181). Needs Actions: read.</summary>
+    public Task<List<RunApproval>> RunApprovals(long id, CancellationToken ct) =>
+        Call<List<RunApproval>>(HttpMethod.Get, $"{RepoPath}/actions/runs/{id}/approvals", null, ct);
 
     public Task<Release> ReleaseByTag(string tag, CancellationToken ct) =>
         Call<Release>(HttpMethod.Get, $"{RepoPath}/releases/tags/{Uri.EscapeDataString(tag)}", null, ct);
@@ -212,6 +237,12 @@ public sealed class AppTokens(string api, string repo, string stateDir, HttpClie
     /// <summary>All a deploy by tag (the gate's Deploy-Release) asks: Releases
     /// to read. It reports on no Deployment, so it works before the App holds
     /// Deployments.</summary>
+    /// <summary>The service with main to look after (#5181): also Actions to
+    /// read, for who approved the run behind each Main Deployment. Asked only
+    /// then, so dev keeps working on an App that does not hold it.</summary>
+    public static readonly IReadOnlyDictionary<string, string> WithApprovals =
+        new SortedDictionary<string, string> { ["actions"] = "read", ["contents"] = "read", ["deployments"] = "write" };
+
     public static readonly IReadOnlyDictionary<string, string> ReleasesOnly =
         new SortedDictionary<string, string> { ["contents"] = "read" };
 

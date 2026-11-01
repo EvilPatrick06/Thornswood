@@ -46,8 +46,7 @@ public static class Files
     /// Reload.ps1 does: every CR LF made LF, then git's blob hash.</summary>
     public static string GamemodeBlob(string path) => GamemodeBlob(ReadShared(path));
 
-    /// <summary>The same for bytes already read, so a reader that holds one
-    /// read of the file names that read and not a later one.</summary>
+    /// <summary>The same, of bytes already read.</summary>
     public static string GamemodeBlob(byte[] b)
     {
         var lf = new MemoryStream(b.Length);

@@ -64,7 +64,8 @@ public static class Program
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(100) };
         // A deploy by tag reads Releases only, so it asks for nothing more and
         // works before the App holds Deployments (Patrick's step on the App).
-        var asks = verb == "deploy" ? AppTokens.ReleasesOnly : AppTokens.Permissions;
+        var asks = verb == "deploy" ? AppTokens.ReleasesOnly
+            : cfg.Environments.Values.Any(e => e.Approved) ? AppTokens.WithApprovals : AppTokens.Permissions;
         var gh = new GitHub(cfg.Api, cfg.Repo, new AppTokens(cfg.Api, cfg.Repo, cfg.AdminState, http, permissions: asks), http);
         var servers = cfg.Environments.Where(kv => kv.Value.Kind == EnvConfig.ServerKind).ToDictionary(kv => kv.Key, kv => new Server(kv.Value, http));
         var control = new WindowsAppControl();
