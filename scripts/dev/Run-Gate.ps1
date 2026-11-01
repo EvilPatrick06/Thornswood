@@ -373,11 +373,14 @@ if ($Pick -gt 0) {
     Set-StepOutput 'whole' $(if ($whole) { 'true' } else { 'false' })
     exit 0
 }
-if ($Of -gt 1) {
+if ($Of -gt 1 -or [string]$env:GATE_PLAN) {
     # A share. With the pick's plan in GATE_PLAN, its part of that; without
     # one, its part of the whole gate by place in the list. A share never
     # fetches a map or asks for a trace: a trace has to see every harness on
-    # one machine (gate-map.yml).
+    # one machine (gate-map.yml). Since #5292 the pick makes one share when
+    # the change reaches one harness, so a plan makes this a share whatever
+    # -Of says: share 1 of 1 runs the plan's one part, and never fetches a
+    # map for itself.
     $planText = [string]$env:GATE_PLAN
     if ($planText) {
         try { $plan = $planText | ConvertFrom-Json } catch { Write-Host ('::error::the pick''s plan does not read: ' + $_.Exception.Message); exit 1 }

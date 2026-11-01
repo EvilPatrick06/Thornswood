@@ -289,6 +289,8 @@ exit 0
     $r = Invoke-Gate 'pull_request' 'github-hosted' -extra @('-Pick', '5')
     $p = $null; if ($r.Plan) { $p = $r.Plan | ConvertFrom-Json }
     Yes ('two harnesses picked for five shares make two shares, and say so (' + $r.Plan + ')') ($r.Code -eq 0 -and $p -and [int]$p.of -eq 2 -and @($p.shares).Count -eq 2 -and $r.Outputs -match '(?m)^shares=\[1,2\]\s*$' -and $r.Text -match '2 share\(s\), not 5')
+    $r = Invoke-Gate 'pull_request' 'github-hosted' -extra @('-Shard', '1', '-Of', '1') -plan '{"of":1,"whole":false,"gate":3,"shares":[["test-a.js"]]}'
+    Yes ('share 1 of 1, given a plan, runs the plan''s one part and fetches no map (' + $(if ($r.Asked) { $r.Asked.Only } else { 'nothing' }) + ')') ($r.Code -eq 0 -and $r.Asked -and $r.Asked.Only -eq 'test-a.js' -and -not (Test-Path -LiteralPath $tokenFile) -and $r.Text -match 'Share 1 of 1 of what this change can reach')
     $quiet = Join-Path $scratch 'quiet'
     $null = New-Item -ItemType Directory -Path $quiet
     $quietTraces = Join-Path $scratch 'quiet.traces.jsonl.gz'
