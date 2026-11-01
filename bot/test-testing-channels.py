@@ -59,6 +59,7 @@ sys.path.insert(0, HERE)
 os.environ.setdefault('DISCORD_TOKEN', 'not-a-real-token')
 for _k in ('TEST_TASK_ROLES', 'LIVE_SMOKE_ADMIN_ROLES', 'GITHUB_TOKEN'):
     os.environ.pop(_k, None)
+os.environ['GITHUB_TOKEN_FILE'] = ''  # nor the box admin service's (#5184)
 
 import discord  # noqa: E402
 import bot  # noqa: E402
@@ -1747,6 +1748,36 @@ try:
     yes('  and its comments and new issues go to the name it has now',
         wrote == [bot.GITHUB_API + '/repos/ThornswoodRP/Thornswood/issues/2216/comments',
                   bot.GITHUB_API + '/repos/ThornswoodRP/Thornswood/issues'])
+    # The App's token from the box admin service (#5184, Patrick's A of 1 Nov).
+    tf = os.path.join(TMP, 'github-token.json')
+    t0 = 1793502400  # 2026-11-01T03:06:40Z
+    os.environ['GITHUB_TOKEN'] = 'github_pat_old'
+    try:
+        yes('no token file: the bot uses GITHUB_TOKEN',
+            bot.github_token(tf, t0) == 'github_pat_old' and bot._token_from_file(tf, t0)[1].endswith('is not there'))
+        with open(tf, 'w', encoding='utf-8') as f:
+            json.dump({'token': 'ghs_app', 'expires_at': '2026-11-01T04:06:40Z'}, f)
+        del said[:]
+        yes('  a token the App made, with an hour left, is the one used',
+            bot.github_token(tf, t0) == 'ghs_app' and bot.github_token_kind('ghs_app') == 'app installation')
+        yes('  and the log says which, once, never the token',
+            [x for x in said if 'github:' in x] == ["github: the App's token from " + tf] and not any('ghs_app' in x for x in said))
+        bot.github_token(tf, t0)
+        yes('  (said once while it stays the same)', len([x for x in said if 'github:' in x]) == 1)
+        yes('  one with under two minutes left is not used',
+            bot.github_token(tf, t0 + 3600 - 60) == 'github_pat_old' and 'ended at 2026-11-01T04:06:40Z' in bot._token_from_file(tf, t0 + 3540)[1])
+        with open(tf, 'w', encoding='utf-8') as f:
+            f.write('{half')
+        yes('  a file that will not read is not used, and why names no token',
+            bot.github_token(tf, t0) == 'github_pat_old' and 'will not read' in bot._token_from_file(tf, t0)[1])
+        os.environ['GITHUB_TOKEN'] = ''
+        yes('  with neither there is no token', bot.github_token(tf, t0) == '')
+    finally:
+        if token is None:
+            os.environ.pop('GITHUB_TOKEN', None)
+        else:
+            os.environ['GITHUB_TOKEN'] = token
+        bot._TOKEN_SAID['line'] = ''
     yes('  and the bot can say which kind of token it has, never the token',
         [bot.github_token_kind(t) for t in
          ('github_pat_x', 'ghp_x', 'ghs_x', 'gho_x', '', 'zzz')] ==
@@ -1851,8 +1882,8 @@ bot.client = Ready()
 del LOGGED[:]
 run(bot.watch_known_issues())
 bot.client = real
-yes('with no GITHUB_TOKEN the watcher says so once and stops',
-    any('no GITHUB_TOKEN' in l for l in LOGGED))
+yes('with no GitHub token, from the file or GITHUB_TOKEN, the watcher says so once and stops',
+    any('no GitHub token (GITHUB_TOKEN_FILE or GITHUB_TOKEN)' in l for l in LOGGED))
 yes('the poll is no more often than once a minute (default %ds)' % bot.KNOWN_EVERY,
     bot.KNOWN_EVERY >= 60)
 

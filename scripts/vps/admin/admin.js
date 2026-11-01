@@ -177,6 +177,11 @@ const API = (process.env.THORNSWOOD_ADMIN_GITHUB_API || 'https://api.github.com'
 const WEB = (process.env.THORNSWOOD_ADMIN_GITHUB_WEB || 'https://github.com').replace(/\/$/, '');
 const JWKS = process.env.THORNSWOOD_ADMIN_JWKS || 'https://token.actions.githubusercontent.com/.well-known/jwks';
 const PLAIN = 'box admin: not here';
+// The Discord bot's GitHub token (#5184, Patrick's A of 1 Nov 2026): the
+// folder the service writes it into, which Install-AdminService.ps1 makes and
+// gives the bot's own account read of, and how often a new one is made.
+const FOR_BOT = process.env.THORNSWOOD_ADMIN_FOR_BOT || path.join(path.dirname(STATE), 'for-bot');
+const BOT_EVERY = Math.max(1, Number(process.env.THORNSWOOD_ADMIN_BOT_EVERY) || 1800);
 
 // Where the records are, and where the runners and the workflow that asks
 // are (#4013).
@@ -1137,6 +1142,65 @@ async function installationRepos(token) {
   return { ok: true, lines, repos };
 }
 
+// ------------------------------------------------------------ the bot ----
+// The Discord bot reads Thornswood's issues and writes on them: the rule
+// comments under a refused test task and the issues Report a problem files
+// (bot\bot.py). It did that with a fine-grained token of Patrick's, which is
+// bound to EvilPatrick06 and can write nothing of a repository after the move
+// into ThornswoodRP (#5184). Patrick chose on 1 Nov 2026 (A) that this App
+// gives it one instead: issues write on Thornswood alone, made here every
+// BOT_EVERY seconds for the hour GitHub gives it, and written into FOR_BOT,
+// which only SYSTEM, Administrators, this task and the bot's own account
+// NT SERVICE\ThornswoodBot may read. No person's token, nothing to paste,
+// nothing that runs out. The App takes Issues write only once it is added on
+// its page and accepted on the installation; until then GitHub refuses, and
+// the refusal is what the log says. Nothing is written without the folder,
+// so a box whose install has not made it is left as it was.
+const BOT_PERMISSIONS = { issues: 'write' };
+const BOT_FILE = 'github-token.json';
+let botSaid = '';
+
+function botLog(line) {
+  if (line !== botSaid) log('bot token: ' + line);
+  botSaid = line;
+}
+
+// One new token into FOR_BOT, or the reason there is none. Written whole
+// beside the old one and renamed over it, so the bot never reads half a file.
+// The token is never logged. Returns the line it logged.
+async function botToken(now) {
+  if (!fs.existsSync(FOR_BOT)) { botLog('no ' + FOR_BOT + ', which Install-AdminService.ps1 makes, so none is made'); return botSaid; }
+  const held = readApp();
+  if (!held) { botLog('no App held yet, so none is made'); return botSaid; }
+  try {
+    const where = await installation(held, now);
+    const jwt = appJwt(held.app.id, held.pem, now);
+    const tok = await call('POST', API + '/app/installations/' + where.id + '/access_tokens', { Authorization: 'Bearer ' + jwt },
+      { repositories: [REPO.split('/')[1]], permissions: BOT_PERMISSIONS });
+    if (tok.status !== 201 || !tok.body || !tok.body.token) {
+      throw new Error('GitHub gave the App no issues token for ' + REPO + ' (' + said(tok) + '). It takes Issues write only once it is added on ' +
+        WEB + '/settings/apps/' + (held.app.slug || '<the App>') + '/permissions and accepted on the installation');
+    }
+    const doc = { token: tok.body.token, expires_at: String(tok.body.expires_at || ''), repository: REPO, permissions: BOT_PERMISSIONS, made: new Date(now * 1000).toISOString() };
+    const file = path.join(FOR_BOT, BOT_FILE);
+    const part = file + '.part';
+    fs.writeFileSync(part, JSON.stringify(doc) + '\n');
+    fs.renameSync(part, file);
+    botLog('made for ' + REPO + ' issues, written to ' + file + ', every ' + BOT_EVERY + ' seconds');
+  } catch (e) {
+    botLog(e.message);
+  }
+  return botSaid;
+}
+
+function keepBotToken() {
+  const once = () => botToken(Math.floor(Date.now() / 1000)).catch(e => botLog(e.message));
+  once();
+  const t = setInterval(once, BOT_EVERY * 1000);
+  if (t.unref) t.unref();
+  return t;
+}
+
 // ------------------------------------------------------------------- setup --
 function readSetup(now) {
   const p = path.join(STATE, 'setup.json');
@@ -1157,7 +1221,7 @@ function manifest() {
     hook_attributes: { url: 'https://thornswood.net/github-app/hook', active: false },
     redirect_url: 'https://thornswood.net/github-app/setup/done',
     public: false,
-    default_permissions: { administration: 'write', contents: 'read', secrets: 'write', actions_variables: 'read', environments: 'write', actions: 'write' },
+    default_permissions: { administration: 'write', contents: 'read', secrets: 'write', actions_variables: 'read', environments: 'write', actions: 'write', issues: 'write' },
     default_events: [],
   };
 }
@@ -1313,9 +1377,9 @@ function serve() {
       else res.end();
     });
   });
-  server.listen(PORT, '127.0.0.1', () => log('listening on 127.0.0.1:' + server.address().port));
+  server.listen(PORT, '127.0.0.1', () => { log('listening on 127.0.0.1:' + server.address().port); keepBotToken(); });
   return server;
 }
 
-module.exports = { verifyOidc, appJwt, call, planCollaborators, planPublic, publicStops, PUBLIC_DROPS, OPS_COPIES, PUBLIC_KEEPS, planLabels, planLeftovers, checkRecords, checkAbout, planAbout, runnerNumber, checkRulesets, checkSettings, planRulesets, rulesetBody, says, manifest, RULES, ASKS, REPO, RUNNERS_REPO, SETTINGS_REPOS, SCANNING_KEYS, MERGE_KEYS, SETTINGS_PERMISSIONS, SETTINGS_EXTRA, serve };
+module.exports = { verifyOidc, appJwt, call, botToken, BOT_PERMISSIONS, planCollaborators, planPublic, publicStops, PUBLIC_DROPS, OPS_COPIES, PUBLIC_KEEPS, planLabels, planLeftovers, checkRecords, checkAbout, planAbout, runnerNumber, checkRulesets, checkSettings, planRulesets, rulesetBody, says, manifest, RULES, ASKS, REPO, RUNNERS_REPO, SETTINGS_REPOS, SCANNING_KEYS, MERGE_KEYS, SETTINGS_PERMISSIONS, SETTINGS_EXTRA, serve };
 if (require.main === module) serve();
