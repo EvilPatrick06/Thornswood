@@ -257,10 +257,12 @@
 
 .NOTES
   A Ship builds no installer (#4824, #4825). The download is Velopack's
-  Setup.exe, which every merge release carries as Thornswood-Setup.exe
-  (.github\workflows\merge-release.yml), and the install is the launcher's
-  own first start. Until then a main Ship took -Package to rebuild the old
-  installer and refused to go out past one that was behind.
+  Setup.exe, which .github\workflows\merge-release.yml packs for both
+  channels: dev's is Thornswood-Dev-Setup.exe on the build-<date>.<n>
+  Release, and main's is Thornswood-Setup.exe on Release main-<tag> once
+  that build is approved (#5181). The install is the launcher's own first
+  start. Until then a main Ship took -Package to rebuild the old installer
+  and refused to go out past one that was behind.
 #>
 [CmdletBinding()]
 param(
