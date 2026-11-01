@@ -76,7 +76,9 @@ function descToId(desc, table) {
 
 // The living characters in root's world: [{ file, profileId, form }].
 function characters(root, settings) {
-  const dir = path.join(root, String(settings.worldDir || 'world'), 'changeForms');
+  // The engine's own setting names the folder: databaseName, "world" when
+  // unset (DatabaseFactory.cpp in the fork).
+  const dir = path.join(root, String(settings.databaseName || 'world'), 'changeForms');
   const out = [];
   for (const f of fs.readdirSync(dir)) {
     if (!/^\d+\.json$/.test(f)) { continue; }

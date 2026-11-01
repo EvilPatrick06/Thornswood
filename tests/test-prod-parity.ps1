@@ -56,7 +56,8 @@ function Facts { [ordered]@{
         @{ name = 'Thornswood Watch'; user = 'SYSTEM'; triggers = @('Time') }, @{ name = 'Thornswood Backup'; user = 'LOCAL SERVICE'; triggers = @('Daily') },
         @{ name = 'Thornswood Load'; user = 'SYSTEM'; triggers = @('Time') }, @{ name = 'Thornswood Disk History'; user = 'SYSTEM'; triggers = @('Daily') },
         @{ name = 'Thornswood Runner Logs'; user = 'SYSTEM'; triggers = @('Daily') }, @{ name = 'Thornswood Bridge'; user = 'LOCAL SERVICE'; triggers = @('Boot') },
-        @{ name = 'Thornswood Gate'; user = 'SYSTEM'; triggers = @('Boot') })
+        @{ name = 'Thornswood Gate'; user = 'SYSTEM'; triggers = @('Boot') },
+        @{ name = 'Thornswood Bot Pass'; user = 'LOCAL SERVICE'; triggers = @() })
     services = @(
         @{ name = 'sshd'; account = 'LocalSystem'; state = 'Running' }, @{ name = 'ThornswoodBot'; account = 'NT SERVICE\ThornswoodBot'; state = 'Running' },
         @{ name = 'actions.runner.X.thornswood-vps'; account = '.\thornswood-runner'; state = 'Running' })
