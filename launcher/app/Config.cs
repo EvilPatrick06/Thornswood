@@ -438,31 +438,27 @@ namespace Thornswood
         }
     }
 
+    /// <summary>
+    /// One note on the News tab: one build Release's notes (ReleaseNews.cs,
+    /// #5187). Filled by the launcher from GitHub, never read from the feed.
+    /// </summary>
     public class NewsItem
     {
-        [JsonInclude] public string date = "";
-        [JsonInclude] public string title = "";
-        [JsonInclude] public string body = "";
-        // What actually moved in that release, one line each. Written by
-        // Publish-Update from the diff rather than by hand, so it says the
-        // same thing whether or not anyone remembered to write a good note.
-        [JsonInclude] public string[] details = null;
-        // Every file that moved in that release, so a release can be read
-        // rather than taken on trust. Capped by the publisher.
-        [JsonInclude] public string[] files = null;
+        // When the Release was published, M-d-yyyy h:mm tt in this machine's time.
+        public string date = "";
+        public string title = "";
+        public string body = "";
+        // What changed in that release, one line each: the "- " lines of the
+        // Release's notes.
+        public string[] details = null;
 
-        // Which build this note came out on. Empty is main, the build
-        // everybody plays. "dev" is a dev release, and only the dev
-        // launcher ever sees one: its feed carries main's whole history
-        // with the dev notes sitting on top, so without this there is no
-        // way to look at the News tab and tell which is which.
-        //
-        // Written by the publisher on every dev release, over the whole
-        // list rather than only the new entry, by asking main's feed what
-        // it has. So it corrects itself: a note marked dev that reaches
-        // main loses the mark on the next dev release without anybody
-        // editing anything.
-        [JsonInclude] public string channel = "";
+        // Which build this note came out on. Empty is a release main's
+        // Deployment has reached, the build everybody plays. "dev" is one
+        // only dev's has, and only the dev launcher ever sees one, so the
+        // News tab can tell what is on dev and not on main yet. Worked out
+        // at every read from the two Deployments, so a note that reaches main
+        // loses the mark by itself.
+        public string channel = "";
 
         [JsonIgnore]
         public bool IsDev
@@ -657,7 +653,13 @@ namespace Thornswood
         // difference. Which is also the list of what wants testing before a
         // dev release becomes a main one.
         [JsonInclude] public string mainVersion = "";
-        [JsonInclude] public NewsItem[] news = new NewsItem[0];
+        /// <summary>
+        /// The News tab's notes, from the build Releases this channel's
+        /// Deployment reached (ReleaseNews.cs, #5187). Not read from the feed:
+        /// a "news" or "newsFile" there is a Ship's, which no Deployment
+        /// writes, so Updater.FillNews fills this after every check.
+        /// </summary>
+        [JsonIgnore] public NewsItem[] news = new NewsItem[0];
 
         /// <summary>
         /// The record of the release the feed is on, its "baseline" (#1011),
@@ -666,13 +668,6 @@ namespace Thornswood
         /// that one field and never the whole feed. Null when there is none.
         /// </summary>
         public RecordRef record;
-
-        /// <summary>
-        /// The news as a file of its own, "newsFile" (#1050, FeedNews.cs).
-        /// Read apart like the record, for the same reason. Null when there is
-        /// none.
-        /// </summary>
-        public NewsRef newsRef;
 
         /// <summary>
         /// The signed release manifest, "signedManifest" (#2163, FeedManifest.cs).
@@ -709,7 +704,6 @@ namespace Thornswood
             if (doc != null)
             {
                 doc.record = RecordRef.FromFeed(raw, at, assets);
-                doc.newsRef = NewsRef.FromFeed(raw, at, assets);
                 doc.manifestRef = ManifestRef.FromFeed(raw, at, assets);
                 doc.settingsRef = SettingsRef.FromFeed(raw, at);
                 if (doc.clientRuntime != null)
@@ -720,9 +714,9 @@ namespace Thornswood
 
         /// <summary>
         /// The feed whose update fields are top's and every other field rest's:
-        /// version.json and the settings file it names (#1050). The packs and
-        /// the news "news" carries stay in version.json, as empty lists, for
-        /// every launcher from before the split.
+        /// version.json and the settings file it names (#1050). The packs stay
+        /// in version.json, as an empty list, for every launcher from before
+        /// the split.
         /// </summary>
         public static VersionDoc Join(VersionDoc top, VersionDoc rest)
         {
@@ -731,9 +725,7 @@ namespace Thornswood
             rest.launcherSha256 = top.launcherSha256;
             rest.minLauncher = top.minLauncher;
             rest.packs = top.packs;
-            rest.news = top.news;
             rest.record = top.record;
-            rest.newsRef = top.newsRef;
             rest.settingsRef = top.settingsRef;
             return rest;
         }
@@ -812,8 +804,8 @@ namespace Thornswood
     /// is not about the update itself, as one asset stored under its own
     /// sha256 beside every other one. Its address is never taken from the
     /// feed: it is the feed's own assets folder plus the sha256, so it is on
-    /// the host the feed came from (FeedSettings.cs). Unlike the record and the
-    /// news file, a "settings" this launcher cannot use is not read as none,
+    /// the host the feed came from (FeedSettings.cs). Unlike the record, a
+    /// "settings" this launcher cannot use is not read as none,
     /// because the server, voice and Skyrim pin are in it: FromFeed gives one
     /// with an empty sha256, and the update check says the feed is unreadable.
     /// </summary>
@@ -843,44 +835,6 @@ namespace Thornswood
                 // The serializer has read this same text already, so this is
                 // a feed that parsed and a "settings" that did not: unusable.
                 return r;
-            }
-        }
-    }
-
-    /// <summary>
-    /// The feed's "newsFile" (#1050): { url, sha256, count }, a JSON list of
-    /// notes stored under its own sha256 beside every other asset. Read apart
-    /// from the serializer, so a newsFile of any other shape costs the news
-    /// file and never the feed.
-    /// </summary>
-    public class NewsRef
-    {
-        public string url = "";
-        public string sha256 = "";
-
-        /// <summary>The feed's "newsFile", or null when it names none this
-        /// launcher can use. Never throws.</summary>
-        public static NewsRef FromFeed(byte[] raw, int at, string assets)
-        {
-            try
-            {
-                var root = Json.Parse(Encoding.UTF8.GetString(raw, at, raw.Length - at)) as Dictionary<string, object>;
-                if (root == null) return null;
-                object b;
-                if (!root.TryGetValue("newsFile", out b)) return null;
-                var o = b as Dictionary<string, object>;
-                if (o == null) return null;
-                var r = new NewsRef();
-                r.sha256 = Json.Str(o, "sha256").ToLowerInvariant();
-                r.url = RecordRef.AssetUrl(Json.Str(o, "url"), r.sha256, assets);
-                if (!RecordRef.IsSha(r.sha256) || r.url.Length == 0) return null;
-                return r;
-            }
-            catch (Exception)
-            {
-                // A feed whose "newsFile" cannot be read has none: the News
-                // tab shows the notes the feed itself carries.
-                return null;
             }
         }
     }

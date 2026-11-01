@@ -157,8 +157,9 @@ namespace Thornswood
             {
                 VersionDoc v = Updater.Check(cfg);
                 if (v == null) { Dispatcher.UIThread.Post(delegate { CheckFailed("the update source had nothing to say"); }); return; }
-                // The news file the feed names, if any, here on the check's own
-                // thread, so the News tab has it (#1050, FeedNews.cs). Never throws.
+                // The notes of the Releases this channel's Deployment reached,
+                // here on the check's own thread, so the News tab has them
+                // (#5187, ReleaseNews.cs). Never throws.
                 Updater.FillNews(cfg, v);
                 Dispatcher.UIThread.Post(delegate { OnVersionDoc(v, loud); UpdateBySelf(); FixAfterVortex(); });
                 // Whether the release's signed manifest vouches for every

@@ -255,11 +255,18 @@ release record"). Once every launcher the feed lets in syncs, the feed's
 `packs` is empty (docs\FEED.md, "When the packs can go"), and the update card
 shows the note the record's pointer carries (`baseline.notes`, read by
 `RecordRef.FromFeed` in Config.cs) rather than the last pack's.
-FeedNews.cs is the News tab's half (#1050): when the feed
-names its notes as a file of their own (`newsFile`, an asset under its sha256),
-`FillNews()` fetches it once, checks it, keeps it in `Profile\news.json`, and
-puts its notes after the ones the feed carries, on the update check's own
-thread in `ShellUpdate.cs CheckUpdatesBackground`.
+ReleaseNews.cs is the News tab's half (#5187): the notes come from GitHub
+Releases, not the feed. On the update check's own thread
+(`ShellUpdate.cs CheckUpdatesBackground`), `FillNews()` asks GitHub's API,
+without a token, for the newest successful Deployment to this channel's
+environment (Dev or Main) that names a build Release (`payload.release`), and
+for the newest hundred Releases. Each published `Release build-<day>.<n>` at or
+before that one is a note: the first line of its body the title, each `- `
+line one line of what changed, the time it was published the date. On a dev
+launcher a note main's Deployment has not reached is marked DEV. The answer is
+kept for fifteen minutes (`NewsEvery`), because GitHub allows sixty anonymous
+requests an hour; a read that fails keeps the notes before and says why in
+launcher.log. A feed's `news` and `newsFile` are a Ship's and are not read.
 FeedSettings.cs reads the feed when the site answers it in two (#1050,
 docs\FEED.md "version.json in two"): `Updater.ReadFeed`, called by
 `Conditional` and `ReadCache`, reads version.json with every asset at the
@@ -273,8 +280,8 @@ asks `MainVersion.cs MainLauncherVersion()` for main's `launcherVersion` on a
 pool thread, through `CheckUrl` and the shared client, and puts the answer
 into the header line. Only while main's feed has not answered, or could not
 be read, does the header name the dev feed's `mainVersion` from the last
-update check, worded as such. The DEV marks on the notes still come from the
-dev feed.
+update check, worded as such. The DEV marks on the notes come from main's
+Deployment (ReleaseNews.cs, above).
 The launcher itself is not in the feed any more: it updates through Velopack
 (Velo, below), and VeloUpdate.cs is the same Updater class's half for it.
 `VeloUpdate.cs:68 CheckLauncher()` asks this install's channel on GitHub for a

@@ -24,8 +24,9 @@
     - the launcher, built from launcher\app\Thornswood.csproj the way the
       build builds it (tests\Launcher-Csc.ps1, Add-LauncherAssembly) and
       loaded into this PowerShell, which runs on .NET 10 as the launcher
-      does, reads that file with VersionDoc.Parse: every field it binds, the
-      record pointer and its note, and the news file
+      does, reads that file with VersionDoc.Parse: every field it binds, and
+      the record pointer and its note (the news file is the site's: the
+      launcher reads its News from the Releases, #5187)
 
   It runs on every machine with the .NET 10 SDK (#4823). Until then the
   launcher half ran under Windows PowerShell 5.1 on the .NET Framework, and
@@ -100,8 +101,6 @@ function Test-LauncherReads([string]$feedPath) {
         $null -ne $v.record -and $v.record.id -eq '20261012-115531' -and $v.record.sha256 -eq $NoteSha -and
         $v.record.url -eq ('https://thornswood.net/feed/assets/' + $NoteSha))
     Yes '  and its note, line break, quotes, backslash and accents as written' ($null -ne $v.record -and $v.record.notes -ceq $Note)
-    Yes '  the news file, read apart (NewsRef.FromFeed)' (
-        $null -ne $v.newsRef -and $v.newsRef.sha256 -eq $NewsSha -and $v.newsRef.url -eq ('https://thornswood.net/feed/assets/' + $NewsSha))
 }
 
 # ============================================================================

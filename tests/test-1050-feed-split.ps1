@@ -192,8 +192,8 @@ function Run {
         $v.maxOnline -eq 30 -and $v.collectionRevision -eq 4 -and @($v.depots).Count -eq 2 -and $v.discordAppId -eq '123456789012345678' -and $v.voiceUrl -eq '')
     Yes '  with the update fields from version.json' ($v.launcherVersion -eq '1.2.6' -and $v.minLauncher -eq '1.2.6' -and $v.launcherUrl -eq ($A + (Hex '1')) -and
         $null -ne $v.packs -and @($v.packs).Count -eq 0 -and $null -ne $v.news)
-    Yes '  the record, the news file and the client runtime at the assets folder plus their sha256' (
-        $v.record.url -eq ($A + (Hex '3')) -and $v.record.notes -eq 'The holds, the boards' -and $v.newsRef.url -eq ($A + (Hex '7')) -and $v.clientRuntime.url -eq ($A + (Hex '2')))
+    Yes '  the record and the client runtime at the assets folder plus their sha256' (
+        $v.record.url -eq ($A + (Hex '3')) -and $v.record.notes -eq 'The holds, the boards' -and $v.clientRuntime.url -eq ($A + (Hex '2')))
     Yes '  and the signed manifest and its catalog the same way' ($v.manifestRef.url -eq ($A + (Hex '5')) -and $v.manifestRef.catalogUrl -eq ($A + (Hex '6')))
 
     # 2. not on disk and nothing to fetch with: the copy kept on disk is not believed
