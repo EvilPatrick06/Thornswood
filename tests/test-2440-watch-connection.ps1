@@ -97,6 +97,17 @@ public class TsSite2440
 
     public void Stop() { listener.Stop(); }
 
+    // How many requests the site is holding open right now, so the harness
+    // knows the held ones really reached it before it asks the others.
+    int holding;
+    public int Holding { get { return Volatile.Read(ref holding); } }
+    void Hold()
+    {
+        Interlocked.Increment(ref holding);
+        try { Thread.Sleep(HoldMs); }
+        finally { Interlocked.Decrement(ref holding); }
+    }
+
     void Loop()
     {
         while (true)
@@ -130,12 +141,12 @@ public class TsSite2440
                 byte[] body = new byte[0];
                 if (first.Contains("/feed/watch"))
                 {
-                    Thread.Sleep(HoldMs);
+                    Hold();
                     head = "HTTP/1.1 204 No Content\r\n";
                 }
                 else
                 {
-                    if (first.Contains("/hold")) Thread.Sleep(HoldMs);
+                    if (first.Contains("/hold")) Hold();
                     body = new byte[200];
                     head = "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n";
                 }
@@ -150,19 +161,31 @@ public class TsSite2440
     }
 }
 
-public static class TsRun
+// What the call threw, if anything, is kept for the harness to print: an
+// exception left to escape a thread ends the whole PowerShell.
+public class TsRun
 {
-    public static Thread Start(MethodInfo m, object[] args)
+    public Thread Thread;
+    public volatile string Error = "";
+
+    public static TsRun Start(MethodInfo m, object[] args)
     {
-        var t = new Thread(() =>
+        var r = new TsRun();
+        r.Thread = new Thread(() =>
         {
             try { m.Invoke(null, args); }
-            catch (TargetInvocationException) { }
+            catch (Exception e)
+            {
+                Exception x = e is TargetInvocationException && e.InnerException != null ? e.InnerException : e;
+                r.Error = x.GetType().Name + ": " + x.Message;
+            }
         });
-        t.IsBackground = true;
-        t.Start();
-        return t;
+        r.Thread.IsBackground = true;
+        r.Thread.Start();
+        return r;
     }
+
+    public bool Join(int ms) { return Thread.Join(ms); }
 }
 '@
 
@@ -212,8 +235,10 @@ function Run {
             $sw = [Diagnostics.Stopwatch]::StartNew()
             $code = 0
             try {
-                $req = New-Object Net.Http.HttpRequestMessage ([Net.Http.HttpMethod]::Get), "$base$path"
-                $res = $sendM.Invoke($null, [object[]]@($req, 2000))
+                # ::new, not New-Object: New-Object hands back the request
+                # wrapped in a PSObject, which reflection cannot pass to Send.
+                $req = [Net.Http.HttpRequestMessage]::new([Net.Http.HttpMethod]::Get, "$base$path")
+                $res = $sendM.Invoke($null, [object[]]@($req.psobject.BaseObject, 2000))
                 $code = [int]$res.StatusCode
                 $res.Dispose()
             } catch { $code = -1 }
@@ -227,10 +252,13 @@ function Run {
         # downloading: on the .NET Framework that was the two connections a
         # host got, and the next request waited and timed out.
         $w = [TsRun]::Start($tipM, [object[]]@($cfg, "$base/feed/watch", '', 10000))
-        $heldReq = New-Object Net.Http.HttpRequestMessage ([Net.Http.HttpMethod]::Get), "$base/hold?shared"
-        $s = [TsRun]::Start($sendM, [object[]]@($heldReq, 10000))
+        $heldReq = [Net.Http.HttpRequestMessage]::new([Net.Http.HttpMethod]::Get, "$base/hold?shared")
+        $s = [TsRun]::Start($sendM, [object[]]@($heldReq.psobject.BaseObject, 10000))
         $p = [TsRun]::Start($getM, [object[]]@("$base/hold?picture", 10000))
-        Start-Sleep -Milliseconds 500
+        # Until the site holds all three, for two seconds at most.
+        $until = [DateTime]::UtcNow.AddSeconds(2)
+        while ($srv.Holding -lt 3 -and [DateTime]::UtcNow -lt $until) { Start-Sleep -Milliseconds 50 }
+        Yes ("the site is holding the watch, the shared request and the picture before the others ask ($($srv.Holding) held)") ($srv.Holding -eq 3)
         $q = Shared '/quick?voice'
         Yes ('with the feed watch and another request held in the shared client, a third through it answers in {0:N1} s' -f $q.Seconds) (
             $q.Code -eq 200 -and $q.Seconds -lt 1.5)
@@ -238,6 +266,9 @@ function Run {
         Yes ('with the feed watch held and a picture downloading, the gallery''s request answers in {0:N1} s' -f $q.Seconds) (
             $null -ne $q.Got -and $q.Got.Length -eq 200 -and $q.Seconds -lt 1.5)
         [void]$w.Join(10000); [void]$s.Join(10000); [void]$p.Join(10000)
+        if ($w.Error) { Write-Host ('      the watch ended with ' + $w.Error) }
+        if ($s.Error) { Write-Host ('      the shared request ended with ' + $s.Error) }
+        if ($p.Error) { Write-Host ('      the picture ended with ' + $p.Error) }
     }
     finally { $srv.Stop() }
 
