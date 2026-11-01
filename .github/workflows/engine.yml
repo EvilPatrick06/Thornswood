@@ -75,6 +75,19 @@
 # with no commit, the one this branch pins. A manual run only, so a change
 # to this file is first run by hand once it is on main.
 #
+# THE PIN HEARS AT ONCE (plan part 8, Patrick's yes of 31 Oct 2026). When a
+# run on main ends, however it ended, its second job "wake" starts
+# engine-pin.yml, which moves the pin once this has recorded the commit, or
+# goes red with this run's link when it did not. Until then engine-pin.yml
+# only learned of it at its next ten-minute tick. It is started by name
+# because GitHub starts no workflow_run for a run its own token started, and
+# engine-pin.yml starts this one with that token: measured on 31 Oct, run
+# 41253887577 (started by engine-pin.yml at 11:46 PM UTC) ended green and
+# engine-prune.yml, which waits on this workflow's workflow_run, never ran
+# for it. A workflow_dispatch is the event that token may start. The wake
+# job checks out nothing and runs nothing but gh, so the token that may
+# start a workflow is never near the fork's files.
+#
 # WHY THE ACTIONS ARE PINNED. Each is a full commit SHA with its tag in a
 # comment, as in build.yml and release.yml.
 # tests\test-459-engine-workflow.ps1 holds this file's shape.
@@ -270,3 +283,24 @@ jobs:
           $bundle = New-EngineRecordsBundle .
           foreach ($l in @(Get-LogHandBackLines ('ENGINE' + '-RECORDS') $bundle)) { Write-Host $l }
           Write-Host 'Take them into a checkout whose index pins this commit with  .\scripts\release\Get-EngineRecords.ps1 -Run <this run''s id>'
+
+  wake:
+    name: Wake the engine pin
+    needs: engine
+    # However the record ended: a green one is pinned, a red one is said.
+    # Main only, the branch engine-pin.yml reads runs on.
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Start engine-pin.yml
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run engine-pin.yml --repo $env:GITHUB_REPOSITORY --ref main
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::engine-pin.yml could not be started, so the pin waits for its next tick; gh says why above'; exit 1 }
+          Write-Host 'engine-pin.yml started: it moves the pin, or names this run if it ended red'

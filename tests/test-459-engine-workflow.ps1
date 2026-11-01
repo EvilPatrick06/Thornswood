@@ -76,12 +76,21 @@ Yes 'a manual run names the fork commit, empty for the pin' ($head -match '(?ms)
 Yes 'a manual run has no runner to choose: GitHub''s is the only one (#4983)' ($head -notmatch '(?m)^      runner:')
 Yes 'it runs only when started by hand: no pull request, push or other trigger (#1306)' (
     @([regex]::Matches(($head -replace '(?s)^.*?\non:\n', '' -replace '(?s)\npermissions:.*$', ''), '(?m)^  (\w+):') | ForEach-Object { $_.Groups[1].Value }) -join ',' -eq 'workflow_dispatch')
-Yes 'the token reads the repository and writes nothing' ($head -match '(?m)^permissions:\n  contents: read$' -and $code -notmatch ':\s*write\b')
+$wake = Get-Job 'wake'
+Yes 'the token reads the repository, and only the wake job writes, and only to start a workflow' ($head -match '(?m)^permissions:\n  contents: read$' -and
+    ($code.Replace($wake, '')) -notmatch ':\s*write\b' -and $wake -match '(?m)^    permissions:\n      contents: read\n      actions: write$')
 Yes 'a build is never cancelled by another run for the same commit' ($head -match '(?m)^  cancel-in-progress: false$')
 
 # ---- 2. where: GitHub's runner alone (#4983) -----------------------------------
 Yes 'the job is GitHub''s windows-2022, the image with the generator the fork demands' ($job -match '(?m)^    runs-on: windows-2022$')
-Yes '  the only job: no VPS fallback, no runner of the box, no BUILD_RUNNER switch' (@([regex]::Matches(($code.Substring($code.IndexOf("`njobs:"))), '(?m)^  \S')).Count -eq 1 -and $code -notmatch '(?<!deny-)self-hosted|thornswood-vps|BUILD_RUNNER')
+Yes '  two jobs, the record and the wake: no VPS fallback, no runner of the box, no BUILD_RUNNER switch' (
+    (@([regex]::Matches(($code.Substring($code.IndexOf("`njobs:"))), '(?m)^  (\S+):') | ForEach-Object { $_.Groups[1].Value }) -join ',') -eq 'engine,wake' -and $code -notmatch '(?<!deny-)self-hosted|thornswood-vps|BUILD_RUNNER')
+# The wake (plan part 8): engine-pin.yml hears the moment a run on main ends,
+# by a workflow_dispatch, because GitHub starts no workflow_run for a run the
+# workflow token started, which is how engine-pin.yml starts this one.
+Yes 'the wake job follows the record however it ended, on main only' ($wake -match '(?m)^    needs: engine$' -and $wake -match "(?m)^    if: always\(\) && github\.ref == 'refs/heads/main'$")
+Yes '  it starts engine-pin.yml on main and goes red when it cannot' ($wake -match 'gh workflow run engine-pin\.yml --repo \$env:GITHUB_REPOSITORY --ref main' -and $wake -match 'if \(\$LASTEXITCODE -ne 0\) \{[^}]*exit 1')
+Yes '  it checks out nothing, runs on GitHub''s Linux runner and has a timeout' ($wake -notmatch 'uses:' -and $wake -match '(?m)^    runs-on: ubuntu-latest$' -and $wake -match '(?m)^    timeout-minutes: \d+$')
 $tj = [regex]::Match($job, 'timeout-minutes: (\d+)')
 Yes 'it has 30 minutes: it only takes the fork''s build (#3014, #3399)' ($tj.Success -and [int]$tj.Groups[1].Value -eq 30)
 
@@ -119,7 +128,7 @@ $check = Get-Step $job 'Check the records name this commit'
 Yes 'both records are held to their shape and to the commit recorded' ($check -match 'Check-Records\.ps1' -and $check -match 'source\.commit' -and $check -match 'forkCommit')
 $hand = Get-Step $job 'Hand the records back in the log'
 Yes 'the server build is made as the store keeps it, and its name printed (ServerArtifact.ps1)' ($hand -match 'New-ThornswoodServerBuildArtifact -From engine\\skymp\\build\\dist\\server -Record records\\server-build\.json' -and $hand -match 'server build \{0\}')
-Yes 'no step cleans up after a run: GitHub''s runner is thrown away, and no job uses always()' ($code -notmatch 'Free the box' -and $code -notmatch 'always\(\)')
+Yes 'no step cleans up after a run: GitHub''s runner is thrown away, and the record job uses no always() (only the wake does, to say how it ended)' ($code -notmatch 'Free the box' -and $job -notmatch 'always\(\)')
 Yes 'nothing is sent and nothing committed: no ssh, scp, push or Deploy' ($code -notmatch '\b(ssh|scp)\b' -and $code -notmatch 'git push' -and $code -notmatch 'Deploy-|Publish-')
 
 # ---- 3b. the fork's own build first (Patrick's B, 16 Oct) -----------------------
