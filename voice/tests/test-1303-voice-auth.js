@@ -16,7 +16,7 @@
 // chat overlay and checks it spends a token on one try only. It fails with
 // either. Nothing is copied out of them, so they cannot drift apart.
 //
-// Writes only to temp folders, through voice\test-auth.js.
+// Writes only to temp folders, through voice\tests\test-auth.js.
 const path = require('path');
 const { spawnSync } = require('child_process');
 

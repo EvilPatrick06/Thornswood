@@ -406,7 +406,7 @@ const inbox = () => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'da
     const py = require('./bot-python').find();
     if (!py.cmd) {
       console.log('SKIP  no Python here loads the bot, so the issue is not made here ' +
-                  '(bot\\test-3155-problems.py covers it): ' + py.why);
+                  '(bot\\tests\\test-3155-problems.py covers it): ' + py.why);
     } else {
       const probe = path.join(dir, 'probe.py');
       fs.writeFileSync(probe, [

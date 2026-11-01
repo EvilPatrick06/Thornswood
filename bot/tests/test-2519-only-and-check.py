@@ -497,7 +497,7 @@ try:
 
     # ---- 6. ONLY with -Posts (#3656) ------------------------------------
     # post() and keep_changelog() are the build's own, and their work on a
-    # channel is bot/test-3336-changelogs.py's. Here they are recorders, so
+    # channel is bot/tests/test-3336-changelogs.py's. Here they are recorders, so
     # this sees which channels a run writes and with what.
     wrote, threads = [], []
     real_post, real_changelog = B.post, B.keep_changelog

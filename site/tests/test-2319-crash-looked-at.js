@@ -7,7 +7,7 @@
   Issue #2319, the part Patrick decided on 12 Oct: keep each crash snapshot
   until staff mark the crash looked at, at most two. The launcher half (which
   session each snapshot crashed in, and Tidy deleting only looked-at ones or
-  the oldest past two) is driven for real by tests\test-crash-snapshot.ps1.
+  the oldest past two) is driven for real by launcher\tests\test-crash-snapshot.ps1.
   This is the site half, against a real copy of site\server.js in a scratch
   folder on a spare port:
 

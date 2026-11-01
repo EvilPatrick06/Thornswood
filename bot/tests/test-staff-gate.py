@@ -94,15 +94,15 @@ BUTTONS = [
     ('thornswood:ping:', ANYBODY),     # ping roles: Member or staff, toggle_ping
     # A Jarl's office buttons (#2551): only the Jarl of a hold, for their own
     # hold, and nobody while two accounts hold that Jarl role: office_press
-    # and office_change. bot/test-2551-hold-offices.py presses them.
+    # and office_change. bot/tests/test-2551-hold-offices.py presses them.
     ('thornswood:office:', ANYBODY),
     # A faction Leader's member buttons (#3317): only the Leader of a
     # faction, for their own faction, and nobody while two accounts hold
     # that Leader role: faction_press and faction_change.
-    # bot/test-3317-faction-panel.py presses them.
+    # bot/tests/test-3317-faction-panel.py presses them.
     ('thornswood:faction:', ANYBODY),
     # Report a problem in #test-findings (#3155): playtesters and staff, five
-    # an hour each, problem_refusal. bot/test-3155-problems.py holds it.
+    # an hour each, problem_refusal. bot/tests/test-3155-problems.py holds it.
     ('thornswood:problem', ANYBODY),
 ]
 
