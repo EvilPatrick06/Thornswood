@@ -74,7 +74,7 @@
     <EmbeddedResource Include="..\logo.png"><LogicalName>logo.png</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\logo-dev.png"><LogicalName>logo-dev.png</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\launcher-header.jpg"><LogicalName>launcher-header.jpg</LogicalName></EmbeddedResource>
-    <EmbeddedResource Include="..\launcher-header.mp4"><LogicalName>launcher-header.mp4</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\launcher-header.webp"><LogicalName>launcher-header.webp</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\app.ico"><LogicalName>app.ico</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\app-dev.ico"><LogicalName>app-dev.ico</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\Thornswood.ini"><LogicalName>Thornswood.ini</LogicalName></EmbeddedResource>
