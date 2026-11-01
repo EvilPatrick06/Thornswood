@@ -54,6 +54,13 @@
   Deployment waits on a pass (tools\DeployAgent\BotPass.cs). -NoBotPass
   takes it off again.
 
+  THE SITE AND THE DISCORD BOT (#5190, #5187). agent.json names them, each
+  only where its full install has set it up (the task Thornswood Docs, the
+  service ThornswoodBot), and the agent then applies every Deployment to
+  Site and to Discord bot: the Release's site.zip or discord.zip swapped in
+  the way Deploy-Docs.ps1 and Install-Bot.ps1 -CodeOnly swap the app, with
+  the logs in the dev server's data folder.
+
   WHAT IT CANNOT DO YET. Until the box admin App holds Deployments: Read and
   write (its permissions page, then Accept on its installation, an owner's
   step), the agent runs and every pass says GitHub gave it no token; -Status
@@ -271,6 +278,23 @@ if (-not `$cfg.environments) { `$cfg | Add-Member -NotePropertyName environments
 if (-not `$cfg.environments.dev) { `$cfg.environments | Add-Member -NotePropertyName dev -NotePropertyValue (New-Object PSObject) -Force }
 `$cfg.environments.dev | Add-Member -NotePropertyName logBase -NotePropertyValue '$logBase' -Force
 'agent.json names $Repo'
+
+# The site and the Discord bot (#5190, #5187): the agent swaps in each
+# Deployment to Site and to Discord bot. Their logs go in the dev server's
+# data folder beside dev's, the one folder on the box served to the outside.
+# Named only where the app is set up, by its full install (Deploy-Docs.ps1,
+# Install-Bot.ps1); a box without one gets no Deployments applied for it.
+foreach (`$app in @(
+    @{ name = 'site'; there = [bool](Get-ScheduledTask -TaskName 'Thornswood Docs' -ErrorAction SilentlyContinue); what = 'the site''s task Thornswood Docs' },
+    @{ name = 'discord'; there = [bool](Get-Service -Name 'ThornswoodBot' -ErrorAction SilentlyContinue); what = 'the bot''s service ThornswoodBot' })) {
+  `$cfg.environments.PSObject.Properties.Remove(`$app.name)
+  if (-not `$app.there) { 'apps: ' + `$app.name + ' left out, ' + `$app.what + ' is not on this box'; continue }
+  `$e = New-Object PSObject
+  `$e | Add-Member -NotePropertyName logDir -NotePropertyValue 'C:\Thornswood-Server-Dev\data'
+  `$e | Add-Member -NotePropertyName logBase -NotePropertyValue '$logBase'
+  `$cfg.environments | Add-Member -NotePropertyName `$app.name -NotePropertyValue `$e -Force
+  'apps: ' + `$app.name + ' named; the agent applies its Deployments'
+}
 
 # The bot pass (#5196): its folder, its task, and agent.json naming the
 # folder only once the task runs as its own SID with rights there alone.

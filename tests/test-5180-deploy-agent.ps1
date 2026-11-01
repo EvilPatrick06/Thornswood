@@ -13,9 +13,9 @@
       as server-build.json, each with its sha256 (#5219).
     - gamemode-release.yml runs when the server build record changes too,
       fetches CI's build of the pin and puts its zip on the Release.
-    - The gate has the verbs Deploy-Release (-Tag build-<...> only, dev
-      fixed) and Install-DeployAgent (-Status, -Tag, -NoBotPass and -EndHung
-      only).
+    - The gate has the verbs Deploy-Release (-Tag build-<...> and
+      -Environment dev, site or discord only) and Install-DeployAgent
+      (-Status, -Tag, -NoBotPass and -EndHung only).
     - Deploy-Release.ps1 and Install-DeployAgent.ps1 send the box scripts that
       parse; the install one carries the signer read from Updater.cs, the
       launcher's own Signature.cs and the repository it was given, and no
@@ -109,7 +109,8 @@ try {
     $verbs = Get-Content -Raw (Join-Path $Repo 'scripts\vps\gate\verbs.json') | ConvertFrom-Json
     $d = $verbs.verbs.'Deploy-Release'
     Yes 'the gate has Deploy-Release' ($null -ne $d -and $d.script -eq 'scripts/deploy/Deploy-Release.ps1')
-    Yes '  with -Tag only, and -NoPause and dev fixed' ((@($d.params.PSObject.Properties.Name) -join ',') -eq 'Tag' -and (@($d.fixed) -join ',') -eq '-NoPause,-Environment,dev')
+    # The site and the Discord bot are rolled back by tag too (#5190, #5187); never main (#5181).
+    Yes '  with -Tag and -Environment dev, site or discord only, and -NoPause fixed' ((@($d.params.PSObject.Properties.Name) -join ',') -eq 'Tag,Environment' -and $d.params.Environment -eq '^(dev|site|discord)$' -and (@($d.fixed) -join ',') -eq '-NoPause')
     Yes '  -Tag takes build-<...> and nothing else' (('build-20261101.12' -match $d.params.Tag) -and -not ('build-1; rm' -match $d.params.Tag) -and -not ('agent-v1.0.1' -match $d.params.Tag))
     $v = $verbs.verbs.'Install-DeployAgent'
     Yes 'the gate has Install-DeployAgent' ($null -ne $v -and $v.script -eq 'scripts/deploy/Install-DeployAgent.ps1')

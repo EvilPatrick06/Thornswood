@@ -53,10 +53,10 @@ public interface IAppControl
 public sealed record StopResult(List<string> Lines, List<string> Left);
 
 /// <summary>One app folder the agent swaps a Release's zip into. The same two
-/// halves as Swap.ps1's service swap, in the same shapes on disk (.stage-,
-/// .prev-, the newest two kept), so Deploy-Docs.ps1 -PutBack and
+/// halves as Swap.ps1's service swap, with what it replaces kept the same way
+/// (.prev-&lt;stamp&gt;, the newest two), so Deploy-Docs.ps1 -PutBack and
 /// Install-Bot.ps1 -PutBack put back what the agent put in:
-///  1. the zip is opened into &lt;root&gt;\.stage-&lt;stamp&gt; while the app runs,
+///  1. the zip is opened into &lt;root&gt;\.agent-stage-&lt;stamp&gt; while the app runs,
 ///     every entry a plain path under the root, and only the files that
 ///     differ from what is there are kept; the programs are parsed and the
 ///     JSON read, and a refusal there touches nothing;
@@ -134,13 +134,17 @@ public sealed class App(EnvConfig env, HttpClient http, IAppControl control)
         if (!Directory.Exists(Root)) return new Outcome("failure", $"not applied: there is no {Root}; a full install puts the app there first");
 
         var stamp = Now().ToString("yyyyMMdd-HHmmss");
-        var stageName = ".stage-" + stamp;
+        // Not .stage-*: Deploy-Docs.ps1 and Install-Bot.ps1 clear every
+        // .stage-* they find as they start, and either may still be run by
+        // the gate. Inside the root, so a file moved in carries the root's
+        // permissions, which the app's account reads.
+        var stageName = ".agent-stage-" + stamp;
         var prevName = ".prev-" + stamp;
         var stage = Path.Combine(Root, stageName);
         var prev = Path.Combine(Root, prevName);
 
         // A stage a run that died part way left was never swapped in.
-        foreach (var d in Directory.EnumerateDirectories(Root, ".stage-*")) TryDelete(d);
+        foreach (var d in Directory.EnumerateDirectories(Root, ".agent-stage-*")) TryDelete(d);
 
         // ---- 1. the stage, while the app runs ----
         List<string> sent;
@@ -468,7 +472,7 @@ public sealed class App(EnvConfig env, HttpClient http, IAppControl control)
         foreach (var e in new DirectoryInfo(Root).EnumerateFileSystemInfos().OrderBy(e => e.Name, StringComparer.Ordinal))
         {
             var n = e.Name;
-            if (n.StartsWith(".stage-") || n.StartsWith(".prev-") || n.StartsWith(".undone-")) continue;
+            if (n.StartsWith(".stage-") || n.StartsWith(".agent-stage-") || n.StartsWith(".prev-") || n.StartsWith(".undone-")) continue;
             if (BotOwned.Any(o => Like(n, o))) continue;
             if (sent.Contains(n, StringComparer.OrdinalIgnoreCase)) continue;
             if (e is DirectoryInfo d && sentDirs.Contains(n, StringComparer.OrdinalIgnoreCase))

@@ -197,7 +197,7 @@ public sealed class AppTests : IDisposable
         Assert.Equal("// site v1", Read(prev, "server.js"));
         Assert.Equal("gone soon", Read(prev, "public/looks.css"));
         Assert.False(Has(prev, "public/home.css"));
-        Assert.Empty(Directory.GetDirectories(r.Root, ".stage-*"));
+        Assert.Empty(Directory.GetDirectories(r.Root, ".agent-stage-*"));
         Assert.Equal((1, 1), (r.Control.Stops, r.Control.Starts));
         Assert.Contains("server.js", r.Control.Parsed);
         Assert.DoesNotContain("hub.js", r.Control.Parsed);
@@ -237,7 +237,7 @@ public sealed class AppTests : IDisposable
         Assert.Equal("a", Read(r.Root, "public/a.css"));
         Assert.Equal("old", Read(r.Root, "public/old.css"));
         Assert.Empty(Directory.GetDirectories(r.Root, ".prev-*"));
-        Assert.Empty(Directory.GetDirectories(r.Root, ".stage-*"));
+        Assert.Empty(Directory.GetDirectories(r.Root, ".agent-stage-*"));
         Assert.Equal((2, 2), (r.Control.Stops, r.Control.Starts));
         Assert.False(File.Exists(Path.Combine(r.Root, "thornswood-deploy.json")));
         Assert.Empty(Directory.GetFiles(Path.Combine(r.Env.Watch, "holds")));
@@ -262,7 +262,7 @@ public sealed class AppTests : IDisposable
         Assert.Contains(want, o.Summary);
         Assert.Equal((0, 0), (r.Control.Stops, r.Control.Starts));
         Assert.Equal("// v1", Read(r.Root, "server.js"));
-        Assert.Empty(Directory.GetDirectories(r.Root, ".stage-*"));
+        Assert.Empty(Directory.GetDirectories(r.Root, ".agent-stage-*"));
     }
 
     [Fact]
