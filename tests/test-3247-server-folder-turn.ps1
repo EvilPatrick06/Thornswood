@@ -176,16 +176,24 @@ param([string]$Lib, [string]$Folder, [string]$Who, [int]$Wait, [int]$Hold, [stri
 # -Late stands in for a slow start, as on a runner's first build (#4342).
 Start-Sleep -Seconds $Late
 . $Lib
+# Each file is written whole under another name and then renamed into place,
+# so the test, which reads a file the moment it is there, never opens one
+# this run is still writing (a run on 1 Nov was refused the read, "being
+# used by another process", by WriteAllText still holding it).
+function Say([string]$path, [string]$text) {
+  [IO.File]::WriteAllText($path + '.part', $text)
+  [IO.File]::Move($path + '.part', $path)
+}
 $heard = New-Object System.Collections.ArrayList
 try {
   # The first time it is told it waits, it says so in a file of its own, so
   # the test gives the turn back only once it is waiting, not after a guess.
-  $t = Enter-ThornswoodServerFolderTurn $Folder $Who $Wait { param($m) if (-not $heard.Count) { [IO.File]::WriteAllText($Said + '.waiting', $m) }; [void]$heard.Add($m) }
-  [IO.File]::WriteAllText($Said, ('TAKEN' + "`n" + ($heard -join "`n")))
+  $t = Enter-ThornswoodServerFolderTurn $Folder $Who $Wait { param($m) if (-not $heard.Count) { Say ($Said + '.waiting') $m }; [void]$heard.Add($m) }
+  Say $Said ('TAKEN' + "`n" + ($heard -join "`n"))
   Start-Sleep -Seconds $Hold
   $t.Dispose()
 } catch {
-  [IO.File]::WriteAllText($Said, ('REFUSED ' + $_.Exception.Message + "`n" + ($heard -join "`n")))
+  Say $Said ('REFUSED ' + $_.Exception.Message + "`n" + ($heard -join "`n"))
 }
 '@)
 function Child([string]$who, [int]$wait, [int]$hold, [string]$said, [int]$late = 0) {
