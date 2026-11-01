@@ -815,9 +815,9 @@ What you run after the merge depends on what the pull request touched. A dev rel
 #### What this is
 
 Thornswood: a modded co-op Skyrim roleplay server on SkyMP, in alpha and
-open by application. This repo is the launcher (launcher\app, C# 13 and WPF on
-the .NET Framework 4.8.1, built with MSBuild from launcher\app\Thornswood.csproj,
-#498), the game plugins (game\plugins, Skyrim Platform
+open by application. This repo is the launcher (launcher\app, C# and Avalonia
+on .NET 10, published with Native AOT from launcher\app\Thornswood.csproj,
+#4823), the game plugins (game\plugins, Skyrim Platform
 JavaScript), the site (site, node), the Discord bot (bot,
 Python) and every script that ships or runs it. Owner: Patrick (EvilPatrick06).
 
@@ -1355,28 +1355,29 @@ from the board, none of these three puts an issue aside:
   (issue #440), along with the forwarding copies in `tools\`. The files a
   machine kept in `tools\` moved on 29 Sep (signing.json to `records\signing`,
   the setup stub to `out`, the rest to `local`) and the folder is gone.
-- The launcher builds with MSBuild from its project files, at C# 13.
-  Decided by Patrick on 11 Oct: option C on #498, switch the build fully,
-  and in his words "also we can lift the C# 5 rule"; the switch went in on
-  15 Oct, once the VPS build runners had the Build Tools (option A, 12 Oct).
-  `scripts\release\Build-Launcher.ps1` runs MSBuild on
-  `launcher\app\Thornswood.csproj` (the setup program's project went with
-  it in #4824) and has no other way; the in-box .NET Framework 4 csc it used to call, and
-  the C# 5 limit that came with it (the rule was always about that compiler,
-  never the framework, #499), are gone. `LangVersion` in both project files
-  is 13.0, the newest the Visual Studio 2022 Build Tools compiler offers.
-  The runtime is still .NET Framework 4.8.1, so the C# features that need a
-  newer runtime compile but do not work here: default interface methods,
-  static abstract interface members, Index and Range (`^1`, `a..b`), and
-  `init` or `required` members, whose attribute types Framework lacks. The
-  harnesses compile launcher files with the same compiler at the same
-  version (`tests\Launcher-Csc.ps1`). C# inside PowerShell scripts
-  (`Add-Type`, which Windows PowerShell 5.1 compiles with the Framework
-  compiler, as in `scripts\dev\Check-Secrets.ps1`) stays C# 5. So do the two
-  launcher files a script compiles that way: `launcher\app\Signature.cs`
-  (`Assert-PublishSigned.ps1`) and `launcher\app\VortexProfileState.cs`
-  (`scripts\mods\LoadOrder.ps1`); `tests\test-signer-check.ps1` and
-  `tests\test-vortex-profile-state.ps1` compile them at C# 5.
+- The launcher is Avalonia on .NET 10, Windows only, self-contained and
+  published with Native AOT, and Velopack installs and updates it. Decided
+  by Patrick on 26 Oct 2026 (#3209, docs\studies\launcher-stack\README.md):
+  the stack is Avalonia on .NET 10, the install moves into compiled code and
+  Velopack, and the game files update through Velopack with the feed's
+  checks rebuilt on top of it. It replaced the WPF launcher on the .NET
+  Framework 4.8.1 that MSBuild built (#498) in one change (#4823, #4824,
+  #4825), with nothing kept for the old one.
+  `scripts\release\Build-Launcher.ps1` runs `dotnet publish` on
+  `launcher\app\Thornswood.csproj` (win-x64, Native AOT, which publishes on
+  Windows only) and has no other way. `LangVersion` is latest. Code stays
+  AOT safe: System.Text.Json with a source-generated context, LibraryImport
+  or DllImport, generated COM interfaces, no reflection serializers and no
+  `Assembly.Location`; the project's AOT analyzers say when a change is not.
+  The harnesses build launcher files with the same .NET SDK at the same
+  settings, on any machine (`tests\Launcher-Csc.ps1`,
+  `tests\launcher-csc.js`). C# inside a script that Windows PowerShell 5.1
+  compiles with `Add-Type` (the Framework compiler, as in
+  `scripts\dev\Check-Secrets.ps1`) stays C# 5, and so do the launcher files
+  such a script compiles: `launcher\app\VortexProfileState.cs`
+  (`scripts\mods\LoadOrder.ps1`) and the others `tests\Framework-Csc.ps1`
+  names; `tests\test-vortex-profile-state.ps1`, `test-2791` and `test-2827`
+  hold them to it.
 - Every change goes out as one complete release: launcher, game files and
   server together, never a half.
 
@@ -1706,8 +1707,8 @@ this is the long form.
   server. There is one dev feed and the last dev Ship wins, so a Dev says in #dev-coordination before taking it. A main Ship preserves the Dev feed and baseline.
 - **Settled design is a proposal first.** Where the game runs from (its own
   folder, see One Skyrim of its own), Keep and Hold for Data\Platform, the
-  client built from the fork and recorded, the launcher build (MSBuild from
-  the project files, C# 13, #498), one complete release at a time: changing any of these starts as a few lines in #staff-updates, agreed by the
+  client built from the fork and recorded, the launcher build (Avalonia on
+  .NET 10 with Native AOT and Velopack, #4823), one complete release at a time: changing any of these starts as a few lines in #staff-updates, agreed by the
   team before code. Editing `Shell.cs`, `Checks.cs`, `Keep.cs`, `Hold.cs`,
   `Updater.cs` or `Publish-Update.ps1` in a way that blocks others' work gets a
   line in #dev-coordination from a Dev; every machine touches them.
@@ -2090,7 +2091,7 @@ release, launcher, game files and server together, are in How work moves.
 | Source repo | github.com/ThornswoodRP/Thornswood (private), clone at `C:\Users\<you>\Downloads\Thornswood-Repo` | Launcher source, plugins, site, bot, every script |
 | Feed store | On the VPS beside the feed the site serves: `C:\Thornswood-Docs\feed\{version.json, published.json, launchers.txt, history\}` and the same under `feed-dev`. Each machine's working copy is `%LOCALAPPDATA%\Thornswood\feed\main` and `\dev` | `version.json` (the feed, served at `/feed[-dev]/version.json`), `published.json` (the pack baseline), every launcher version the channel published, and each replaced file, none of those three served. Ship receives and sends them through `scripts\release\Feed-Store.ps1` (#907). Until then they were the `Thornswood-Releases` GitHub repository and its two clones |
 | Downloads | On the VPS, `C:\Thornswood-Docs\feed\assets` and `feed-dev\assets`, served at `https://thornswood.net/feed[-dev]/assets/<sha256>` | Every pack, launcher exe and client runtime a feed names, one file per sha256, one folder per channel (`docs\FEED.md` "Downloads come from the site") |
-| Launcher | `launcher\app\*.cs` + `launcher\ui.xaml`, built by `scripts\release\Build-Launcher.ps1` with MSBuild from `launcher\app\Thornswood.csproj`, C# 13 (#498) | WPF app at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on most machines); profile, config and packs under that folder. The scripts find the install on whichever fixed drive holds it; `-Root` overrides |
+| Launcher | `launcher\app\*.cs` + `launcher\app\*.axaml`, published by `scripts\release\Build-Launcher.ps1` with `dotnet publish` (Native AOT) from `launcher\app\Thornswood.csproj` (#4823) | Avalonia app, installed by Velopack, at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on most machines); profile, config and packs under that folder. The scripts find the install on whichever fixed drive holds it; `-Root` overrides |
 | Dev build | `<drive>:\Thornswood-DevBuild`, beside the main install, put there by the main launcher's Play page Server dropdown | Same exe, `config.json` says `Channel: dev`, `UpdateBranch: dev`, port 7787, voice 7789. Staff roles only (Owner, Dev, Gamemaster, Moderator, Loremaster) |
 | Game | `<Root>\Game`, Thornswood's own folder, which the launcher builds from the Steam copy of Skyrim Special Edition and what Vortex deployed from the Nexus collection (see One Skyrim of its own) | The launcher will not Play from the Steam copy itself. Thornswood's own loose files live in `Data\Platform` (plugins in `Plugins\thornswood-*.js`, page in `UI\`) and `Data\SKSE\Plugins\Thornswood.ini` |
 | Plugins | `game\plugins\thornswood-{front,emotes,mark,voice}.js`, UI in `game\ui` | Skyrim Platform JavaScript. Idle unless the client points at our server and the launcher left a fresh session note |
@@ -2878,7 +2879,7 @@ The bot scripts need Python 3.11 or newer (the bot runs on 3.12; Pillow 13 needs
 
 #### The .NET Framework
 
-Launcher code is C# 13, built with MSBuild from `launcher\app\Thornswood.csproj` (#498, switched 15 Oct, by Patrick's decision of 11 Oct); the runtime is .NET Framework 4.8.1, so features that need a newer runtime are out (the list is under "Settled design"), and C# inside PowerShell scripts stays C# 5. The window is `launcher\ui.xaml`. How the launcher starts is `launcher\app\ARCHITECTURE.md`. The six shared files in `launcher\app` are named in [D. Visual Studio Code](#d-visual-studio-code).
+Launcher code is C# on .NET 10 with Avalonia, published with Native AOT from `launcher\app\Thornswood.csproj` (#4823, Patrick's decision of 26 Oct), so it stays AOT safe (the rules are under "Settled design"), and C# that Windows PowerShell 5.1 compiles with Add-Type stays C# 5. The window is `launcher\app\MainWindow.axaml`. How the launcher starts is `launcher\app\ARCHITECTURE.md`. The six shared files in `launcher\app` are named in [D. Visual Studio Code](#d-visual-studio-code).
 
 #### SkyMP
 
