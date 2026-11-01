@@ -161,6 +161,8 @@ Yes 'Deploy-Server.ps1 stages thornswood-build.json with gamemode.js, so it is s
 
 if (-not (Test-Path -LiteralPath $helper)) { Done }
 . $helper
+# The rule the stamp's launcher number follows, to say what it should be.
+. (Join-Path $RepoPath 'scripts\release\LauncherVersion.ps1')
 
 # ---- a scratch repo, and the feeds where Ship.ps1 keeps them (#907) --------
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-build-stamp-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -189,7 +191,7 @@ $env:LOCALAPPDATA = Join-Path $tmp 'appdata'
 try {
     $gm = Join-Path $repo 'game\gamemode.js'
     Put $gm "'use strict';`nconsole.log('gamemode');`n"
-    Put (Join-Path $repo 'launcher\app\Updater.cs') "namespace T {`n    public static class Updater {`n        public const string Version = `"1.2.3`";`n    }`n}`n"
+    Put (Join-Path $repo 'launcher\app\Updater.cs') "namespace T {`n    public static class Updater {`n        public const string Version = `"0.0.0`";`n    }`n}`n"
     Put (Join-Path $repo 'version.json') '{ "launcherVersion": "0.9.9" }'
     Put (Join-Path $mainFeed 'version.json') '{ "launcherVersion": "1.2.3" }'
     Put (Join-Path $devFeed 'version.json') '{ "launcherVersion": "1.2.3.4" }'
@@ -202,6 +204,14 @@ try {
     $head = ''
     try { $head = ((& git -C $repo rev-parse --short HEAD) | Out-String).Trim() } catch { }
     Yes "the scratch repo has a commit to stamp ($head)" ([bool]$head)
+    # Updater.cs holds 0.0.0 in git, and the launcher's number is the time of
+    # the commit that last changed its sources, this one (LauncherVersion.ps1).
+    $lv = ''
+    try {
+        $ct = [long](((& git -C $repo log -1 --format=%ct HEAD) | Out-String).Trim())
+        $lv = Format-LauncherVersion ([DateTimeOffset]::FromUnixTimeSeconds($ct).UtcDateTime)
+    } catch { }
+    Yes "the launcher's number for the scratch commit is known ($lv)" ($lv -match '^\d{4}\.\d+\.\d+$')
 
     # ---- main ---------------------------------------------------------------
     $m = New-ThornswoodBuildStamp -Gamemode $gm -Channel main -RepoDir $repo
@@ -209,7 +219,7 @@ try {
     Yes "main: the commit is the repo's own short commit" ($head -and $m.commit -eq $head)
     Yes 'main: the gamemode is the committed one' ($m.gamemodeMatchesCommit -eq $true)
     Yes 'main: the hash is the gamemode file' ($m.gamemodeSha256 -eq (Sha $gm))
-    Yes 'main: the launcher version is the one in Updater.cs' ($m.launcherVersion -eq '1.2.3')
+    Yes 'main: the launcher version is main''s number for these sources, from git' ($lv -and $m.launcherVersion -eq $lv)
     Yes 'main: the feed version is this machine''s working copy of the main feed' ($m.feedVersion -eq '1.2.3')
     Yes 'main: the time is UTC in ISO form' ($m.stampedUtc -match '^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$')
     $t = [DateTime]::ParseExact($m.stampedUtc, "yyyy-MM-dd'T'HH:mm:ss'Z'", [Globalization.CultureInfo]::InvariantCulture,
@@ -221,7 +231,7 @@ try {
     # ---- dev ----------------------------------------------------------------
     $d = New-ThornswoodBuildStamp -Gamemode $gm -Channel dev -RepoDir $repo
     Yes 'dev: the channel is dev' ($d.channel -eq 'dev')
-    Yes 'dev: the launcher version is still the source number' ($d.launcherVersion -eq '1.2.3')
+    Yes 'dev: the launcher version is still main''s number, not the dev one' ($lv -and $d.launcherVersion -eq $lv)
     Yes 'dev: the feed version is the four part number only the dev feed has' ($d.feedVersion -eq '1.2.3.4')
 
     # ---- written to disk, and read the way the gamemode will read it -------
@@ -236,9 +246,9 @@ try {
     Yes 'saved: what it hands back is what it wrote' ($saved.gamemodeSha256 -eq (Sha $gm) -and $saved.channel -eq 'main')
     if (Get-Command node -ErrorAction SilentlyContinue) {
         $check = Join-Path $tmp 'read.js'
-        Put $check ("const j = JSON.parse(require('fs').readFileSync(process.argv[2], 'utf8'));`n" +
-                    "process.exit(j.channel === 'main' && j.launcherVersion === '1.2.3' && j.gamemodeMatchesCommit === true ? 0 : 3);`n")
-        & node $check $out
+        Put $check ("const lv = process.argv[3];`n" + "const j = JSON.parse(require('fs').readFileSync(process.argv[2], 'utf8'));`n" +
+                    "process.exit(j.channel === 'main' && j.launcherVersion === lv && j.gamemodeMatchesCommit === true ? 0 : 3);`n")
+        & node $check $out $lv
         Yes 'saved: node reads it with JSON.parse, as the gamemode will' ($LASTEXITCODE -eq 0)
     } else {
         Write-Host 'SKIP  node is not on this machine, so the JSON.parse read was not tried'
@@ -280,7 +290,7 @@ try {
     Yes 'worktree: the scratch worktree is there' ($null -ne $w)
     Yes 'worktree: main finds the same main feed' ($w -and $w.feedVersion -eq '1.2.3')
     Yes 'worktree: the commit and the launcher are the worktree''s own' (
-        $w -and $w.commit -eq $head -and $w.launcherVersion -eq '1.2.3' -and $w.gamemodeMatchesCommit -eq $true)
+        $w -and $w.commit -eq $head -and $w.launcherVersion -eq $lv -and $w.gamemodeMatchesCommit -eq $true)
     if ($w) {
         $w = New-ThornswoodBuildStamp -Gamemode (Join-Path $wt 'game\gamemode.js') -Channel dev -RepoDir $wt
     }

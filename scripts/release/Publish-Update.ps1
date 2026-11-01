@@ -53,9 +53,9 @@ param(
     # the dev server: its own release branch, its own baseline, its own pack
     # ids, and the dev ports in its version.json. Nothing about main moves.
     ,[ValidateSet('main', 'dev')][string]$Channel = 'main'
-    # The version to record for the launcher being published, when it is not
-    # the one written in app\Updater.cs. Ship uses it for dev builds, whose
-    # number lives only in the exe.
+    # The version to record for the launcher being published. Ship always
+    # passes the number its exe carries: git holds 0.0.0 in app\Updater.cs,
+    # and the real number lives only in the exe (#5179).
     ,[string]$VersionOverride
     # With -Launcher: the fingerprint of what that exe is compiled from, which
     # Ship works out (Get-LauncherInputHash). Written to the feed as
@@ -1401,7 +1401,7 @@ function Get-LauncherNumberRefusal($feed, [string]$version, [string]$sha, [strin
     $wasInputs = Field $feed 'launcherInputs'
     if ($wasInputs -and $inputs -and $wasInputs -eq $inputs) { return '' }
     $way = if ($channel -eq 'dev') { 'Ship without -Version so it takes the next dev number.' }
-           else { 'This is main''s number, so move main past it first with .\scripts\release\Bump-Version.ps1 and its pull request, then Ship again.' }
+           else { 'This is main''s number, the time the launcher last changed (LauncherVersion.ps1), so two launchers under it means the history was rewritten: say so on the board rather than ship it.' }
     return ("$version is already out on the $channel feed as a launcher built from other sources than these, and a launcher " +
             "updates by its number alone, so nobody on $version would ever be offered this one. $nothing $way")
 }
@@ -1418,7 +1418,8 @@ if ($Launcher) {
         if ($m.Success) { $launcherVersion = $m.Groups[1].Value }
     }
     if ($VersionOverride) { $launcherVersion = $VersionOverride }
-    if (-not $launcherVersion) { Die 'Could not read the version out of app\Updater.cs. Bump it before publishing a launcher.' }
+    if (-not $launcherVersion) { Die 'Could not read the version out of app\Updater.cs, and no -VersionOverride was given.' }
+    if ($launcherVersion -eq '0.0.0') { Die 'Updater.cs holds git''s 0.0.0, which no launcher carries. Pass -VersionOverride with the number the exe was built with (Ship does).' }
     # Before anything is sent (the launcher number block above, #2347).
     $numberWhy = Get-LauncherNumberRefusal $feedNow $launcherVersion (Get-FileHash $exePath -Algorithm SHA256).Hash $LauncherInputs $Channel 'Nothing was sent.'
     if ($numberWhy) { Die $numberWhy }
