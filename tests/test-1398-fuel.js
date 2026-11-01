@@ -463,10 +463,10 @@ function needsRig(states) {
   let next = 0x10;
   function idOf(d) { if (!ids[d]) { ids[d] = next++; } return ids[d]; }
   const mp = {
-    getOnlinePlayers: function () { return Object.keys(store).map(Number); },
     makeProperty: function () { },
     getDescFromId: function (id) { for (const d in ids) { if (ids[d] === id) { return d; } } return ''; },
     get: function (id, key) {
+      if (id === 0 && key === 'onlinePlayers') { return Object.keys(store).map(Number); }
       if (key === 'worldOrCellDesc') { return cells[id] || 'cell:X.esm'; }
       if (key === 'inventory') { return { entries: worn[id] || [] }; }
       if (key === 'equipment') { return { inv: { entries: worn[id] || [] } }; }

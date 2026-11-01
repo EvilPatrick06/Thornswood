@@ -77,10 +77,10 @@ function rig() {
   M.random = function () { return dice.next.length ? dice.next.shift() : 0.999; };
   const made = {};
   const mp = {
-    getOnlinePlayers: function () { return Object.keys(extra).map(Number); },
     makeProperty: function (name, opts) { made[name] = opts; },
     getDescFromId: function (id) { return 'ff' + id.toString(16) + ':Runtime'; },
     get: function (id, key) {
+      if (id === 0 && key === 'onlinePlayers') { return Object.keys(extra).map(Number); }
       const e = extra[id] || {};
       if (key === 'profileId') { return e.pid || 0; }
       if (key === 'isDead') { return !!e.dead; }
@@ -667,7 +667,7 @@ if (NEEDS_SRC && HURT_SRC && P) {
       /\(row\.c \? '<div/.test(FRONT) && /\|' \+ \(row\.c \|\| ''\)/.test(FRONT));
     yes('the near list carries the scar as c, never over the sleep key s',
       /w\[them\.id\.toString\(16\)\]\.c = them\.scar/.test(src) && !/\]\.s = them\.scar/.test(src));
-    yes('no line the block says calls anybody a player', !/player/i.test(HURT_SRC.replace(/getOnlinePlayers/g, '')));
+    yes('no line the block says calls anybody a player', !/player/i.test(HURT_SRC.replace(/'onlinePlayers'/g, '')));
     yes('no em dash in the block', HURT_SRC.indexOf('—') === -1);
   }
 }

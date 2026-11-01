@@ -67,8 +67,8 @@ function idOf(d) { return ids[d] || 0; }
 function rig() {
   const store = {}, fouled = [];
   const mp = {
-    getOnlinePlayers: function () { return []; }, makeProperty: function () { },
-    get: function (id, key) { if (key === 'worldOrCellDesc' || key === 'pos') { return null; } return store[id]; },
+    makeProperty: function () { },
+    get: function (id, key) { if (id === 0 && key === 'onlinePlayers') { return []; } if (key === 'worldOrCellDesc' || key === 'pos') { return null; } return store[id]; },
     set: function (id, key, v) { store[id] = JSON.parse(JSON.stringify(v)); }
   };
   const g = { __thornswoodHurt: { exposed: function (id, kind, source) { fouled.push([kind, source]); return false; } } };

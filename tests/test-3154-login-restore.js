@@ -160,7 +160,6 @@ function makeMp() {
       else { row[k] = copy(v); }
       store.set(id, row);
     },
-    getOnlinePlayers: function () { return online.slice(); },
     makeProperty: function () { }, makeEventSource: function () { },
     getNeighborsByPosition: function () { return online.slice(); },
     callPapyrusFunction: function (kind, cls, fn, self, args) {

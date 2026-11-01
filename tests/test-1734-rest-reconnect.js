@@ -125,9 +125,9 @@ const needsNamed = {};
 const needs = new Function('globalThis', 'mp', 'Date', 'console', 'setInterval', 'clearInterval',
   'guard', 'notify', 'say', needsBlock + '\nreturn globalThis.__thornswoodNeeds;')(
   needsG, {
-    getOnlinePlayers: function () { return online.slice(); },
     makeProperty: function () { },
     get: function (id, key) {
+      if (id === 0 && key === 'onlinePlayers') { return online.slice(); }
       if (key === 'worldOrCellDesc') { return refs[id] ? refs[id].worldOrCellDesc : ''; }
       return needsStore[id];
     },

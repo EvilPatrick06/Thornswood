@@ -167,9 +167,9 @@ function needsRig() {
   const store = {};
   const g = {};
   const fake = {
-    getOnlinePlayers: function () { return online.slice(); },
     makeProperty: function () { },
     get: function (id, key) {
+      if (id === 0 && key === 'onlinePlayers') { return online.slice(); }
       if (key === 'worldOrCellDesc') { return refs[id] ? refs[id].worldOrCellDesc : ''; }
       if (key === 'thornswoodNeeds') { return store[id] ? JSON.parse(JSON.stringify(store[id])) : undefined; }
       return refs[id] ? refs[id][key] : undefined;

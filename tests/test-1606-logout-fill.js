@@ -99,11 +99,9 @@ function rig(startAt, g) {
   };
   g.__thornswoodBeds = { off: function (id) { off.push(id); return ''; } };
   const mp = {
-    getOnlinePlayers: function () {
-      return Object.keys(store).map(Number).filter(function (id) { return !gone[id]; });
-    },
     makeProperty: function () { },
     get: function (id, key) {
+      if (id === 0 && key === 'onlinePlayers') { return Object.keys(store).map(Number).filter(function (id) { return !gone[id]; }); }
       if (key === 'worldOrCellDesc') { return 'cell:X.esm'; }
       return store[id];
     },
@@ -372,9 +370,9 @@ const needsNamed = {};
 const needs = new Function('globalThis', 'mp', 'Date', 'console', 'setInterval', 'clearInterval',
   'guard', 'notify', 'say', needsBlock + '\nreturn globalThis.__thornswoodNeeds;')(
   needsG, {
-    getOnlinePlayers: function () { return online.slice(); },
     makeProperty: function () { },
     get: function (id, key) {
+      if (id === 0 && key === 'onlinePlayers') { return online.slice(); }
       if (key === 'worldOrCellDesc') { return refs[id] ? refs[id].worldOrCellDesc : ''; }
       return needsStore[id];
     },
