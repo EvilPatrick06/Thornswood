@@ -182,7 +182,10 @@ the release workflow (#5179) makes one Deployment carry both meanings and
 every pull request that touches it, on Linux and on Windows. On main it builds
 the program with the version `1.0.<run>`, signs it, writes and signs its manifest the same way,
 and publishes the Release `agent-v<version>`. Every 15 minutes the agent
-looks for a newer one. It holds the new program to its manifest and to its
+looks for a newer one among all the `agent-v` tags and fetches its Release by
+the tag. It never reads GitHub's list of Releases for this: that list is one
+page in GitHub's own order (a Release's date is its commit's), so a new agent
+can sit far down it. It holds the new program to its manifest and to its
 own signature, renames itself aside (Windows lets a running program be
 renamed), moves the new one in, and ends with code 3. The service manager
 starts the new program, which removes the old one.
@@ -197,7 +200,7 @@ pwsh scripts/vps/Box-Run.ps1 -Line 'Install-DeployAgent'
 
 That is the gate verb for
 [Install-DeployAgent.ps1](../scripts/deploy/Install-DeployAgent.ps1). It
-takes the newest `agent-v` Release, holds it to the same checks on the box
+takes the Release of the newest `agent-v` tag, found the same way, holds it to the same checks on the box
 before anything is stopped, makes the service `ThornswoodDeployAgent`
 (started after boot, started again after an error exit, three times a day at
 most), starts it, and prints the agent's own check. To see it afterwards:

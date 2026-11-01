@@ -22,6 +22,8 @@ sealed class FakeGitHub : HttpMessageHandler
     public readonly Dictionary<long, byte[]> Files = new();
     public readonly Dictionary<long, string> Names = new();
     public readonly List<string> Downloaded = new();
+    /// <summary>Tags with no published Release.</summary>
+    public readonly List<string> BareTags = new();
     public Func<HttpRequestMessage, HttpResponseMessage>? Other { get; set; }
 
     public void AddRelease(string tag, Dictionary<string, byte[]> files)
@@ -118,8 +120,15 @@ sealed class FakeGitHub : HttpMessageHandler
                     ? Json(HttpStatusCode.OK, rel.ToJsonString())
                     : Json(HttpStatusCode.NotFound, "{\"message\":\"Not Found\"}");
             }
-            if (p == "/repos/O/R/releases")
-                return Json(HttpStatusCode.OK, new JsonArray(Releases.Values.Select(v => v.DeepClone()).ToArray()).ToJsonString());
+            // No list of Releases is served: GitHub's is one page in its own
+            // order, so the agent finds the newest of a kind from the tags.
+            const string mr = "/repos/O/R/git/matching-refs/tags/";
+            if (p.StartsWith(mr))
+            {
+                var prefix = Uri.UnescapeDataString(p[mr.Length..]);
+                return Json(HttpStatusCode.OK, new JsonArray(Releases.Keys.Concat(BareTags).Where(t => t.StartsWith(prefix, StringComparison.Ordinal))
+                    .Select(t => (JsonNode)new JsonObject { ["ref"] = "refs/tags/" + t }).ToArray()).ToJsonString());
+            }
             if (p.StartsWith("/repos/O/R/releases/assets/"))
             {
                 if (r.Headers.Accept.ToString() != "application/octet-stream") return new HttpResponseMessage(HttpStatusCode.UnsupportedMediaType);
@@ -652,6 +661,22 @@ public sealed class AgentTests : IDisposable
         Assert.Equal("old program", File.ReadAllText(exe + ".old"));
         await a.Start(default);
         Assert.False(File.Exists(exe + ".old"), "the old program was not removed at the next start");
+    }
+
+    [Fact]
+    public async Task ANewerTagWithNoPublishedReleaseLeavesTheAgentAsItIs()
+    {
+        var (_, gh, _, server, cfg) = Make();
+        var exe = Path.Combine(cfg.Home, "thornswood-agent.exe");
+        File.WriteAllText(exe, "old program");
+        gh.AddRelease("agent-v1.0.1", ReleaseFiles("agent-v1.0.1", Commit, "1.0.1", new() { ["agent"] = new() { ["thornswood-agent.exe"] = B("program 1.0.1") } }));
+        gh.BareTags.Add("agent-v1.0.2");
+        var lines = new List<string>();
+        var a = new Agent(cfg, new GitHub(FakeGitHub.Api, "O/R", new StaticToken("t"), new HttpClient(gh)), new FakeVerifier(),
+            new() { ["dev"] = server }, "1.0.0", exe, lines.Add);
+        await a.SelfUpdate(default);
+        Assert.Equal("old program", File.ReadAllText(exe));
+        Assert.Contains(lines, l => l.Contains("agent-v1.0.2 has no published Release"));
     }
 
     [Fact]

@@ -274,16 +274,26 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
     {
         var own = ParseVersion(version);
         if (own == null || own.All(x => x == 0) || exe == "") return;
-        Release? best = null;
+        string? newest = null;
         var bestV = own;
-        foreach (var r in await gh.Releases(30, ct))
+        foreach (var t in await gh.TagNames("agent-v", ct))
         {
-            var m = AgentTag.Match(r.TagName);
-            if (!m.Success || r.Draft) continue;
+            var m = AgentTag.Match(t);
+            if (!m.Success) continue;
             var v = ParseVersion($"{m.Groups[1]}.{m.Groups[2]}.{m.Groups[3]}")!;
-            if (Newer(v, bestV)) { best = r; bestV = v; }
+            if (Newer(v, bestV)) { newest = t; bestV = v; }
         }
-        if (best == null) return;
+        if (newest == null) return;
+        // The tag lookup answers with published Releases only. A newer tag with
+        // none (its Release taken down, or a tag somebody pushed by hand) is
+        // said and left; this agent stays as it is.
+        Release best;
+        try { best = await gh.ReleaseByTag(newest, ct); }
+        catch (GitHubException e) when (e.Status == 404)
+        {
+            log($"agent tag {newest} has no published Release; staying on {version}");
+            return;
+        }
         log($"agent {best.TagName} is out (this is {version}); fetching it");
         var dir = Path.Combine(cfg.Home, "work", "update");
         try
