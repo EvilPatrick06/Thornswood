@@ -22,9 +22,12 @@
   measured from the same map. On Linux a harness that needs Windows prints
   SKIP for those checks, and the shares run them on Windows.
 
-  With -Body, the pull request's body in a file is held to the bot's post
-  rules as "Test tasks in the pull request" holds it (bot\pr_tasks.py,
-  #5199); that needs the bot's libraries (bot\requirements.txt).
+  With -Body, the pull request's body in a file is checked as its checks
+  will: its release note line as "Release note" holds it
+  (scripts\dev\Check-PrBody.ps1, #5179), and its test tasks to the bot's
+  post rules as "Test tasks in the pull request" holds them
+  (bot\pr_tasks.py, #5199), which needs the bot's libraries
+  (bot\requirements.txt).
 
   COMMIT FIRST. The change is HEAD against the traced tree, as on GitHub, so
   edits not yet committed are not part of it; it stops when a tracked file
@@ -132,6 +135,9 @@ try {
         Say ''
         if (-not (Test-Path -LiteralPath $Body)) { Say ('FAIL  there is no body at ' + $Body); $code = 1 }
         else {
+            # Its release note, as the check "Release note" holds it (#5179).
+            & (Join-Path $Here 'Check-PrBody.ps1') -BodyFile (Resolve-Path -LiteralPath $Body).Path
+            if ($LASTEXITCODE -ne 0) { $code = 1 }
             $py = $null
             foreach ($c in 'python3.12', 'python3', 'python') { if (Get-Command $c -ErrorAction SilentlyContinue) { $py = $c; break } }
             if (-not $py) { Say 'SKIP  the test tasks: there is no Python here' }

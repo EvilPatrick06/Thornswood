@@ -20,8 +20,8 @@
        afterwards;
     4. with a token and no map it runs the whole gate and says why;
     5. -List says what would run and runs nothing;
-    6. a harness that fails makes it exit 1, and -Body with no file there
-       fails too.
+    6. a harness that fails makes it exit 1, and -Body with no file there,
+       or a body with no release note line (Check-PrBody.ps1), fails too.
 
   Writes only its scratch folder, in the system's temp folder, and deletes it.
 #>
@@ -49,7 +49,10 @@ try {
     $sr = Join-Path $scratch 'repo'
     $dev = Join-Path (Join-Path $sr 'scripts') 'dev'
     $null = New-Item -ItemType Directory -Force -Path $dev
-    foreach ($f in 'Check-Change.ps1', 'Affected-Harnesses.js') { Copy-Item -LiteralPath (Join-Path (Join-Path (Join-Path $repo 'scripts') 'dev') $f) -Destination $dev }
+    foreach ($f in 'Check-Change.ps1', 'Affected-Harnesses.js', 'Check-PrBody.ps1') { Copy-Item -LiteralPath (Join-Path (Join-Path (Join-Path $repo 'scripts') 'dev') $f) -Destination $dev }
+    $rel = Join-Path (Join-Path $sr 'scripts') 'release'
+    $null = New-Item -ItemType Directory -Force -Path $rel
+    Copy-Item -LiteralPath (Join-Path (Join-Path (Join-Path $repo 'scripts') 'release') 'Note-Rules.ps1') -Destination $rel
     Set-Content -LiteralPath (Join-Path $dev 'Gate-Harnesses.ps1') -Value "'test-a.js'`n'test-b.js'`n'test-c.js'`nexit 0"
     Set-Content -LiteralPath (Join-Path $dev 'Nightly-Harnesses.ps1') -Value @'
 param([string]$Only = '', [int]$Throttle = 0)
@@ -149,6 +152,10 @@ exit 0
     Yes 'a harness that fails makes it exit 1' ($r.Code -eq 1 -and $r.Text -match 'fix it before you push')
     $r = Invoke-Check -extra @('-Body', (Join-Path $scratch 'no-such-body.md')) -token 't0ken'
     Yes '-Body with no file there fails' ($r.Code -eq 1 -and $r.Text -match 'there is no body at')
+    $noNote = Join-Path $scratch 'body.md'
+    Set-Content -LiteralPath $noNote -Value "## What changed`n`nA change, and no release note line."
+    $r = Invoke-Check -extra @('-Body', $noNote) -token 't0ken'
+    Yes '-Body with no release note line fails as the check "Release note" would' ($r.Code -eq 1 -and $r.Text -match 'STOP  release note')
 } finally {
     Set-Location -LiteralPath $here
     foreach ($n in $keepEnv.Keys) { [Environment]::SetEnvironmentVariable($n, $keepEnv[$n]) }
