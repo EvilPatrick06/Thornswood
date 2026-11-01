@@ -150,15 +150,15 @@ namespace Thornswood
             public BLOB Digest;
         }
 
-        [DllImport("wintrust.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        static extern IntPtr CryptCATOpen(string fileName, uint openFlags, IntPtr hProv, uint publicVersion, uint encodingType);
+        [LibraryImport("wintrust.dll", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
+        private static partial IntPtr CryptCATOpen(string fileName, uint openFlags, IntPtr hProv, uint publicVersion, uint encodingType);
 
-        [DllImport("wintrust.dll", SetLastError = true)]
+        [LibraryImport("wintrust.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
-        static extern bool CryptCATClose(IntPtr hCatalog);
+        private static partial bool CryptCATClose(IntPtr hCatalog);
 
-        [DllImport("wintrust.dll")]
-        static extern IntPtr CryptCATEnumerateMember(IntPtr hCatalog, IntPtr prevMember);
+        [LibraryImport("wintrust.dll")]
+        private static partial IntPtr CryptCATEnumerateMember(IntPtr hCatalog, IntPtr prevMember);
 
         /// <summary>
         /// The digest of every member of the catalog, lowercase hex. For a
@@ -180,9 +180,9 @@ namespace Thornswood
                 IntPtr m = IntPtr.Zero;
                 while ((m = CryptCATEnumerateMember(cat, m)) != IntPtr.Zero)
                 {
-                    var member = (CRYPTCATMEMBER)Marshal.PtrToStructure(m, typeof(CRYPTCATMEMBER));
+                    var member = Marshal.PtrToStructure<CRYPTCATMEMBER>(m);
                     if (member.pIndirectData == IntPtr.Zero) continue;
-                    var ind = (SIP_INDIRECT_DATA)Marshal.PtrToStructure(member.pIndirectData, typeof(SIP_INDIRECT_DATA));
+                    var ind = Marshal.PtrToStructure<SIP_INDIRECT_DATA>(member.pIndirectData);
                     if (ind.Digest.cbData == 0 || ind.Digest.pbData == IntPtr.Zero) continue;
                     var b = new byte[ind.Digest.cbData];
                     Marshal.Copy(ind.Digest.pbData, b, 0, b.Length);

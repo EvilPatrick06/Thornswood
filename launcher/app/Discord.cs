@@ -336,10 +336,8 @@ namespace Thornswood
             // has to come back on the answer, so a request that did not start
             // here is dropped and the listener keeps waiting.
             string nonce;
-            using (var rng = new RNGCryptoServiceProvider())
             {
-                var nb = new byte[24];
-                rng.GetBytes(nb);
+                byte[] nb = RandomNumberGenerator.GetBytes(24);
                 var sb = new StringBuilder();
                 foreach (byte b in nb) sb.Append(b.ToString("x2"));
                 nonce = sb.ToString();

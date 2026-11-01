@@ -68,16 +68,26 @@ namespace Thornswood
     /// </summary>
     static partial class OwnGame
     {
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        static extern bool CreateHardLink(string lpFileName, string lpExistingFileName, IntPtr lpSecurityAttributes);
+        [LibraryImport("kernel32.dll", EntryPoint = "CreateHardLinkW", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static partial bool CreateHardLink(string lpFileName, string lpExistingFileName, IntPtr lpSecurityAttributes);
+
+        // FILETIME as the structure below holds it. Our own rather than
+        // ComTypes.FILETIME, which is another assembly's, so the generated
+        // call cannot count it as plain memory and refuses it (#4823).
+        struct FileTime
+        {
+            public int dwLowDateTime;
+            public int dwHighDateTime;
+        }
 
         [StructLayout(LayoutKind.Sequential)]
         struct FileInfoByHandle
         {
             public uint FileAttributes;
-            public System.Runtime.InteropServices.ComTypes.FILETIME CreationTime;
-            public System.Runtime.InteropServices.ComTypes.FILETIME LastAccessTime;
-            public System.Runtime.InteropServices.ComTypes.FILETIME LastWriteTime;
+            public FileTime CreationTime;
+            public FileTime LastAccessTime;
+            public FileTime LastWriteTime;
             public uint VolumeSerialNumber;
             public uint FileSizeHigh;
             public uint FileSizeLow;
@@ -86,11 +96,12 @@ namespace Thornswood
             public uint FileIndexLow;
         }
 
-        [DllImport("kernel32.dll", SetLastError = true)]
-        static extern bool GetFileInformationByHandle(SafeFileHandle hFile, out FileInfoByHandle info);
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static partial bool GetFileInformationByHandle(SafeFileHandle hFile, out FileInfoByHandle info);
 
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        static extern SafeFileHandle CreateFile(string lpFileName, uint dwDesiredAccess, uint dwShareMode,
+        [LibraryImport("kernel32.dll", EntryPoint = "CreateFileW", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
+        private static partial SafeFileHandle CreateFile(string lpFileName, uint dwDesiredAccess, uint dwShareMode,
             IntPtr lpSecurityAttributes, uint dwCreationDisposition, uint dwFlagsAndAttributes, IntPtr hTemplateFile);
 
         // Links opens a file for its attributes alone (#2210).
@@ -268,8 +279,9 @@ namespace Thornswood
 
         const int MoveReplaceExisting = 0x1;
         const int MoveWriteThrough = 0x8;
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        static extern bool MoveFileEx(string existing, string replacement, int flags);
+        [LibraryImport("kernel32.dll", EntryPoint = "MoveFileExW", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static partial bool MoveFileEx(string existing, string replacement, int flags);
 
         // ---- #2599: one name of the game folder replaced whole ------------------
 
@@ -330,10 +342,11 @@ namespace Thornswood
             }
         }
 
-        [DllImport("kernel32.dll", EntryPoint = "CreateFileW", CharSet = CharSet.Unicode, SetLastError = true)]
-        static extern Microsoft.Win32.SafeHandles.SafeFileHandle OpenForDelete(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
-        [DllImport("kernel32.dll", SetLastError = true)]
-        static extern bool SetFileInformationByHandle(Microsoft.Win32.SafeHandles.SafeFileHandle file, int infoClass, ref int info, int size);
+        [LibraryImport("kernel32.dll", EntryPoint = "CreateFileW", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
+        private static partial Microsoft.Win32.SafeHandles.SafeFileHandle OpenForDelete(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static partial bool SetFileInformationByHandle(Microsoft.Win32.SafeHandles.SafeFileHandle file, int infoClass, ref int info, int size);
 
         // ---- end #2599 -----------------------------------------------------------
 

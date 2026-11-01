@@ -838,21 +838,25 @@ namespace Thornswood
     }
 
     /// <summary>What the build asks of Windows: a file's number of names, and one rename over a record.</summary>
-    public static class GeneratedOs
+    public static partial class GeneratedOs
     {
         [StructLayout(LayoutKind.Sequential)]
         struct Info
         {
             public uint Attributes;
-            public System.Runtime.InteropServices.ComTypes.FILETIME C, A, W;
+            // The three FILETIMEs, each two DWORDs, as plain numbers: the
+            // structure must be all our own fields for the generated call.
+            public uint CLow, CHigh, ALow, AHigh, WLow, WHigh;
             public uint Volume, SizeHigh, SizeLow, Links, IndexHigh, IndexLow;
         }
 
-        [DllImport("kernel32.dll", SetLastError = true)]
-        static extern bool GetFileInformationByHandle(SafeFileHandle h, out Info info);
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static partial bool GetFileInformationByHandle(SafeFileHandle h, out Info info);
 
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        static extern bool MoveFileEx(string existing, string replacement, int flags);
+        [LibraryImport("kernel32.dll", EntryPoint = "MoveFileExW", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static partial bool MoveFileEx(string existing, string replacement, int flags);
 
         const int MoveReplaceExisting = 0x1;
         const int MoveWriteThrough = 0x8;
