@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  77,
-    "callCount":  309,
+    "callCount":  310,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -2478,6 +2478,15 @@
                       "via":  "ssh-keyscan",
                       "anchor":  "\u0026 ssh-keyscan -T 20 -p $port 127.0.0.1",
                       "does":  "asks the box for its host keys through the bridge listener",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/vps/Vps.ps1",
+                      "scope":  "Get-ThornswoodKnownHostsPath",
+                      "via":  "ssh",
+                      "anchor":  "\u0026 ssh -G -o StrictHostKeyChecking=yes $Address",
+                      "does":  "prints which known_hosts file ssh reads for the box; connects to nothing",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
                   },

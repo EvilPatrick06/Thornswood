@@ -413,7 +413,10 @@ function Invoke-Installer([string]$instArgs) {
     $code = $LASTEXITCODE
     if ($lines -contains 'INSTALL OK' -and $code -eq 0) { return }
     if ($lines -contains 'INSTALL REFUSED') {
-        Die "the installer refused, so the server up there was not stopped or changed. The lines above say why."
+        # A refusal can come after the stop (a folder that would not move,
+        # #5211), when the installer starts the old server again, so this
+        # says only what is always true and leaves the rest to its lines.
+        Die "the installer refused, so nothing new was installed and the server up there runs what it ran before. The lines above say why, and whether it was stopped and started again."
     }
     if ($lines -contains 'INSTALL ROLLED BACK') {
         Die "the new server did not answer, or its settings did not read back as the server's own, so the installer put the previous one back. The lines above say which, and whether it answers."

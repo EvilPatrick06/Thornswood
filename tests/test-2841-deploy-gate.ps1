@@ -122,7 +122,7 @@ Yes 'Setup-Discord runs on the box and only audits or checks: -Prune, -Posts, -G
 Yes 'Read-ServerHolders takes live or dev and a UTC minute of Defender''s log, never a folder, file or task' ((Words 'Read-ServerHolders') -eq '' -and
     (Words 'Read-ServerHolders -Server dev') -eq '-Server|dev' -and (Words 'Read-ServerHolders -Server main') -eq 'REFUSED' -and
     (Words 'Read-ServerHolders -DefenderFrom 2026-11-01T00:59 -DefenderMinutes 3') -eq '-DefenderFrom|2026-11-01T00:59|-DefenderMinutes|3' -and
-    (Words 'Read-ServerHolders -DefenderFrom yesterday') -eq 'REFUSED' -and (Words 'Read-ServerHolders -DefenderMinutes 100') -eq 'REFUSED' -and
+    (Words 'Read-ServerHolders -DefenderFrom yesterday') -eq 'REFUSED' -and (Words 'Read-ServerHolders -DefenderMinutes 100') -eq 'REFUSED' -and (Words 'Read-ServerHolders -TraceSeconds 10') -eq '-TraceSeconds|10' -and (Words 'Read-ServerHolders -TraceSeconds 100') -eq 'REFUSED' -and
     (Words 'Read-ServerHolders -Root C:/x') -eq 'REFUSED' -and (Words 'Read-ServerHolders -Path x') -eq 'REFUSED' -and (Words 'Read-ServerHolders -TaskName x') -eq 'REFUSED')
 $rh = Text 'scripts/vps/Read-ServerHolders.ps1'
 Yes '  it finds the server''s processes by the installer''s own rule and reads only: no Stop-, no Remove-, no Set-, no Move' (
