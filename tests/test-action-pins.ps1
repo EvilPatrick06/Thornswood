@@ -133,7 +133,7 @@ foreach ($want in 'build.yml', 'nightly.yml', 'release.yml', 'drop-claims.yml', 
 # given, held by tests\test-3534-clone-report.ps1, and order-on-filing.yml
 # (#3534) only sets a new issue's Order, held by
 # tests\test-3534-order-on-filing.ps1.
-$noActions = @('drop-claims.yml', 'board-status.yml', 'expire-claims.yml', 'done-on-merge.yml', 'area-label.yml', 'release-tag.yml', 'engine-prune.yml', 'board-read.yml', 'clone-report.yml', 'order-on-filing.yml')
+$noActions = @('drop-claims.yml', 'board-status.yml', 'expire-claims.yml', 'done-on-merge.yml', 'area-label.yml', 'release-tag.yml', 'engine-prune.yml', 'board-read.yml', 'clone-report.yml', 'order-on-filing.yml', 'engine-pin-aside.yml')
 
 $all = @()
 foreach ($f in $files) {

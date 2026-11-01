@@ -163,7 +163,7 @@ Yes 'no-build: the fork has no build of the head' ((Step $w).Step -eq 'no-build'
 $E = '4444444444444444444444444444444444444444'
 $O = '5555555555555555555555555555555555555555'
 function Fork-Run([long]$id, [string]$sha, [string]$status, $conclusion) {
-    return [pscustomobject]@{ id = $id; status = $status; conclusion = $conclusion; head_sha = $sha; head_branch = 'thornswood/engine-changes'; event = 'push'; html_url = "https://example/$id"; repository = [pscustomobject]@{ full_name = 'EvilPatrick06/skymp' }; head_repository = [pscustomobject]@{ full_name = 'EvilPatrick06/skymp' } }
+    return [pscustomobject]@{ id = $id; status = $status; conclusion = $conclusion; head_sha = $sha; head_branch = 'thornswood/engine-changes'; event = 'push'; html_url = "https://example/$id"; repository = [pscustomobject]@{ id = 1375283516; full_name = 'EvilPatrick06/skymp' }; head_repository = [pscustomobject]@{ id = 1375283516; full_name = 'EvilPatrick06/skymp' } }
 }
 function New-Building {
     $w = New-World
@@ -190,6 +190,10 @@ Yes '  a build of a commit the head is not ahead of (lost to a force push) is pa
 $w = New-Building
 $w.compare["$P...$E"] = 'behind'
 Yes '  a build the pin is ahead of is never the target, nor any older one' ((Step $w).Step -eq 'building')
+$w = New-Building
+foreach ($run in $w.forkRuns) { $run.repository = [pscustomobject]@{ id = 1375283516; full_name = 'Thornswood/skymp' } }
+$s = Step $w
+Yes '  a build is the fork''s by its repository id, not its name, which an org move changes (#5228)' ($s.Step -eq 'record' -and $s.Head -eq $E)
 $w = New-Building
 $w.forkRuns = @((Fork-Run 12 $H 'in_progress' $null), (Fork-Run 11 $E 'completed' 'failure'))
 Yes '  an earlier head whose build ended red is not one' ((Step $w).Step -eq 'building')
@@ -242,6 +246,7 @@ $n = Get-EnginePinNotes $P $H $fake
 Yes '  two notes join into one, the second headline as a line under the first' ($n.ReleaseNote -eq "The loading screen shows no flash`n- The screen stays dark until the picture is up.`n- An equipped form stays on`n- A worn piece is never drunk by mistake.")
 $pin = [IO.File]::ReadAllText((Join-Path $root 'scripts/release/Update-EnginePin.ps1'))
 Yes '  the pin body writes the joined note, none, or names the fork pull requests with no line' ($pin -match "'Release note: ' \+ \`$nl\[0\]" -and $pin -match "'Release note: none'" -and $pin -match 'carry no "Release note:" line')
+Yes '  a heading ends the last Test task before the ticked parts, so the Test tasks check does not read them as steps' ($pin.IndexOf("`$body.Add('### Which parts it touches, and what runs after the merge')") -gt $pin.IndexOf('foreach ($t in $notes.TestTasks)') -and $pin.IndexOf('foreach ($t in $notes.TestTasks)') -gt 0 -and $pin.IndexOf("`$body.Add('### Which parts it touches, and what runs after the merge')") -lt $pin.IndexOf("`$body.Add('- [x] The live server build"))
 
 # ---- 5. engine-pin.yml ----------------------------------------------------------
 $wf = [IO.File]::ReadAllText((Join-Path $root '.github/workflows/engine-pin.yml')).Replace("`r`n", "`n")
@@ -250,11 +255,16 @@ $code = (@($wf -split "`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n")
 $jobsText = $code.Substring([Math]::Max(0, $code.IndexOf("`njobs:")))
 function Get-Job([string]$name) { return [regex]::Match($jobsText, "(?ms)^  ${name}:\n.*?(?=^  \S|\z)").Value }
 $look = Get-Job 'look'; $make = Get-Job 'make'; $push = Get-Job 'push'
-Yes 'engine-pin.yml ticks on a schedule and runs by hand' ($code -match "(?m)^  schedule:\n    - cron: '[^']+'" -and $code -match '(?m)^  workflow_dispatch:')
+Yes 'engine-pin.yml runs by hand and when woken, never on a clock (plan part 8)' ($code -match '(?m)^  workflow_dispatch:' -and $code -notmatch '(?m)^\s*schedule:')
 Yes '  a push to main that moves engine/skymp starts a look (plan part 8)' ($code -match '(?m)^  push:\n    branches: \[main\]\n    paths: \[engine/skymp\]$')
 $eng0 = [IO.File]::ReadAllText((Join-Path $root '.github/workflows/engine.yml')).Replace("`r`n", "`n")
 Yes '  engine.yml starts a look when a record run on main ends (plan part 8)' ($eng0 -match 'gh workflow run engine-pin\.yml --repo \$env:GITHUB_REPOSITORY --ref main')
-Yes '  one tick at a time, never cancelling the one before' ($code -match '(?m)^  group: engine-pin\n  cancel-in-progress: false')
+$asideWf = [IO.File]::ReadAllText((Join-Path $root '.github/workflows/engine-pin-aside.yml')).Replace("`r`n", "`n")
+$aside = (@($asideWf -split "`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n")
+Yes '  a pull request that moves engine/skymp closed unmerged starts a look (engine-pin-aside.yml)' ($aside -match '(?m)^on:\n  pull_request:\n    types: \[closed\]\n    branches: \[main\]\n    paths: \[engine/skymp\]\n(?!    )' -and $aside -match 'gh workflow run engine-pin\.yml --repo \$env:GITHUB_REPOSITORY --ref main')
+Yes '    only one not merged, from this repository, and never engine-pin/next''s own' ($aside -match "(?m)^    if: github\.event\.pull_request\.merged == false && github\.event\.pull_request\.head\.ref != 'engine-pin/next' && github\.event\.pull_request\.head\.repo\.full_name == github\.repository$")
+Yes '    it checks out and runs nothing from the pull request, and its token may only start a workflow' ($aside -notmatch 'actions/checkout|github\.event\.pull_request\.(head\.sha|title|body)' -and $aside -match '(?m)^permissions: \{\}$' -and $aside -match '(?m)^    permissions:\n      actions: write\n(?!      )')
+Yes '  one look at a time, never cancelling the one before' ($code -match '(?m)^  group: engine-pin\n  cancel-in-progress: false')
 Yes '  the workflow''s own token reads only' ($code -match '(?m)^permissions:\n  contents: read\n(?!  )')
 Yes '  three jobs, look, make and push' ($look -and $make -and $push)
 Yes '  make holds a token that only reads' ($make -match '(?m)^    permissions:\n      contents: read\n      actions: read\n(?!      )')

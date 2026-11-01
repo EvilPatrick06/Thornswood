@@ -34,6 +34,12 @@
 # line by line for its marks; nothing of it is written to a terminal as it
 # is. An older gh has no such flag and refuses no log, so the flag is given
 # only when gh's own help names it. $Gh is the gh to ask (a test's stand-in).
+# Its answer is one string or nothing, so a caller takes it as
+# $flags = @(Get-GhLogFlags) before it splats @flags: PowerShell splats a
+# lone string into a native command letter by letter, so gh was handed 24
+# arguments for the flag and refused the log ("accepts 1 arg(s), received
+# 25"): engine-pin.yml run 41267774073 on 1 Nov 2026, the first pin to
+# reach its push job since the flag came in.
 function Get-GhLogFlags([string]$Gh = 'gh') {
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     try { $help = (& $Gh api --help 2>&1 | Out-String) } catch { $help = '' } finally { $ErrorActionPreference = $old }

@@ -15,6 +15,10 @@ public sealed class RestartException() : Exception("a newer signed agent is in p
 public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<string, Server> servers, string version, string exe, Action<string> log)
 {
     public string Host { get; set; } = System.Environment.MachineName;
+    /// <summary>Task Scheduler, for the bot pass's task. A test stands one in.</summary>
+    public ITasks Tasks { get; set; } = new WindowsTasks();
+    /// <summary>Makes the bot pass for a server. A test stands in its ports.</summary>
+    public Func<EnvConfig, BotPass>? MakeBotPass { get; set; }
     string StatePath => Path.Combine(cfg.Home, "state", "working.json");
     static readonly Regex BuildTag = new(@"^build-[A-Za-z0-9._-]{1,80}$");
     static readonly Regex AgentTag = new(@"^agent-v(\d+)\.(\d+)\.(\d+)$");
@@ -25,9 +29,12 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
     /// its gamemode to the environment's server: by a reload when the server
     /// runs the server build the Release records, and with that build by a
     /// stop, swap and start when it does not. expectCommit, when given, is
-    /// the commit the Release must be (a Deployment's). Writes the record on
-    /// success. Every line goes to log.</summary>
-    public async Task<Outcome> ApplyRelease(string env, string tag, string expectCommit, string workName, Action<string> logf, CancellationToken ct)
+    /// the commit the Release must be (a Deployment's). With botPass, and a
+    /// bot pass set up for the environment, nothing goes in until the bot
+    /// pass passed on a throwaway copy of the server with this gamemode and
+    /// the server build it goes onto (#5196). Writes the record on success.
+    /// Every line goes to log.</summary>
+    public async Task<Outcome> ApplyRelease(string env, string tag, string expectCommit, string workName, Action<string> logf, CancellationToken ct, bool botPass = false)
     {
         if (!servers.TryGetValue(env, out var srv)) return new Outcome("failure", $"not applied: this agent does not look after {env}");
         if (!BuildTag.IsMatch(tag)) return new Outcome("failure", $"not applied: \"{tag}\" is not a build-<...> Release tag");
@@ -39,9 +46,11 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
         try
         {
             Fetched f;
+            var pass = botPass && srv.Env.BotPassRoot != "";
+            string[] parts = pass ? ["gamemode", "bot"] : ["gamemode"];
             // The server build's zip is fetched only when dev does not run it
             // already: most Releases change the gamemode alone.
-            try { f = await ReleaseFetch.Fetch(gh, verify, rel, dir, ["gamemode"], logf, ct, optional: ["server"], later: IsServerZip); }
+            try { f = await ReleaseFetch.Fetch(gh, verify, rel, dir, parts, logf, ct, optional: ["server"], later: IsServerZip); }
             catch (Exception e) when (e is InvalidDataException or IOException or HttpRequestException) { return new Outcome("failure", "not applied: " + e.Message); }
             var m = f.Manifest;
             // The name, not the owner: the repositories move to an
@@ -51,16 +60,19 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
                 return new Outcome("failure", $"not applied: the Release was built from {m.Repo}, not {cfg.Repo}");
             if (expectCommit != "" && m.Commit != expectCommit)
                 return new Outcome("failure", $"not applied: the Release is commit {Short(m.Commit)} and the Deployment is {Short(expectCommit)}");
-            var others = m.Parts.Keys.Where(k => k is not "gamemode" and not "server").OrderBy(k => k, StringComparer.Ordinal).ToList();
+            var others = m.Parts.Keys.Where(k => !parts.Contains(k) && k != "server").OrderBy(k => k, StringComparer.Ordinal).ToList();
             if (others.Count > 0) logf($"the Release also carries {string.Join(", ", others)}, which this agent does not apply yet; left alone");
             logf($"release {rel.TagName}, commit {m.Commit}");
             var who = $"the deploy agent, {workName}";
-            Outcome outc;
+            // A Release carries the server build its commit records, so a
+            // gamemode never goes onto an engine it was not written for, and
+            // an engine pin reaches dev with the gamemode beside it. Which
+            // build dev will run is settled first, so the bot pass checks the
+            // gamemode on that build and not on the one it replaces.
+            string? swapZip = null;
+            byte[]? swapRecord = null;
             if (m.Parts.TryGetValue("server", out var serverPart))
             {
-                // A Release carries the server build its commit records, so a
-                // gamemode never goes onto an engine it was not written for,
-                // and an engine pin reaches dev with the gamemode beside it.
                 if (!f.Files.TryGetValue("server-build.json", out var recPath)) return new Outcome("failure", "not applied: the Release's server part has no server-build.json");
                 var zipMf = serverPart.Where(x => IsServerZip(x.Name)).ToList();
                 if (zipMf.Count != 1) return new Outcome("failure", $"not applied: the Release's server part carries {zipMf.Count} server zips, not one");
@@ -72,20 +84,32 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
                 if (running == ServerBuild.RecordSum(record))
                 {
                     logf($"dev already runs server build {rec.Short}, the one this Release records, so only the gamemode is reloaded");
-                    outc = await srv.ApplyGamemode(f.Files, who, logf, ct);
                 }
                 else
                 {
                     logf(running == "" ? $"dev has no server-build.json, so it is given server build {rec.Short} with the gamemode"
                                        : $"dev runs another server build than {rec.Short}, the one this Release records, so the server is swapped with the gamemode under a hold");
-                    string zip;
-                    try { zip = await ReleaseFetch.FetchFile(gh, rel, zipMf[0], f.Dir, ct); }
+                    try { swapZip = await ReleaseFetch.FetchFile(gh, rel, zipMf[0], f.Dir, ct); }
                     catch (Exception e) when (e is InvalidDataException or IOException or HttpRequestException) { return new Outcome("failure", "not applied: " + e.Message); }
                     logf($"server: {zipMf[0].Name}, held to the signed manifest");
-                    outc = await srv.ApplyServerBuild(zip, record, f.Files, who, logf, ct);
+                    swapRecord = record;
                 }
             }
-            else outc = await srv.ApplyGamemode(f.Files, who, logf, ct);
+            if (pass)
+            {
+                logf(swapZip == null ? "the bot pass first, on a throwaway copy of the server with this gamemode (#5196)"
+                                     : "the bot pass first, on a throwaway copy of the server with this gamemode and the new server build (#5196)");
+                var bp = await (MakeBotPass?.Invoke(srv.Env) ?? new BotPass(srv.Env, Tasks)).Run(f.Files, logf, ct, swapZip);
+                if (bp.State != "success") return bp;
+                logf(bp.Summary);
+            }
+            else if (botPass)
+            {
+                logf("no bot pass: it is not set up on this box yet (Install-DeployAgent.ps1 sets it up)");
+            }
+            var outc = swapZip != null && swapRecord != null
+                ? await srv.ApplyServerBuild(swapZip, swapRecord, f.Files, who, logf, ct)
+                : await srv.ApplyGamemode(f.Files, who, logf, ct);
             if (outc.State != "success") return outc;
             var gm = Path.Combine(srv.Env.Root, "gamemode.js");
             Records.Write(srv, new DeployRecord
@@ -95,7 +119,7 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
                 Commit = m.Commit,
                 Sha256 = ReleaseFetch.FileSha256(gm),
                 Size = new FileInfo(gm).Length,
-                Files = Server.ReloadFiles.Length,
+                Files = Server.ReloadFiles.Length + (f.Files.ContainsKey(Tables.Zip) ? Tables.Count(Path.Combine(srv.Env.Root, Tables.Dir)) : 0),
                 DeployedUtc = Records.UtcNow(),
                 From = $"deploy agent {version} on {Host}",
             }, logf);
@@ -108,7 +132,9 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
     }
 
     /// <summary>The gate's Deploy-Release verb: one Release by its tag, with no
-    /// Deployment to report on. Rollback is this with the Release before.</summary>
+    /// Deployment to report on. Rollback is this with the Release before. It
+    /// does not wait on a bot pass: a rollback puts back a gamemode dev has
+    /// already run, and is wanted at once.</summary>
     public async Task<Outcome> DeployTag(string env, string tag, CancellationToken ct)
     {
         var id = $"{tag}-{DateTime.Now:yyyyMMdd-HHmmss}";
@@ -232,7 +258,7 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
             else
             {
                 string tag;
-                try { tag = PayloadRelease(d.Payload); outc = await ApplyRelease(env, tag, d.Sha, $"deployment-{d.Id}", Logf, ct); }
+                try { tag = PayloadRelease(d.Payload); outc = await ApplyRelease(env, tag, d.Sha, $"deployment-{d.Id}", Logf, ct, botPass: true); }
                 catch (Exception e) when (e is InvalidDataException or JsonException) { outc = new Outcome("failure", "not applied: " + e.Message); }
             }
             Logf(outc.State.ToUpperInvariant() + ": " + outc.Summary);

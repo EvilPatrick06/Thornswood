@@ -72,6 +72,7 @@ public sealed class ServerLog(string root)
 {
     static readonly Regex RolledName = new(@"^server\.log\.\d+$");
     static readonly Regex BlobLine = new(@"gamemode\.js is git blob ([0-9a-f]{40})");
+    static readonly Regex TreeLine = new(@"gamemode tables are git tree ([0-9a-f]{40})");
     long at;
     HashSet<string> rolled = new();
     public List<string> Tail { get; } = new();
@@ -134,23 +135,31 @@ public sealed class ServerLog(string root)
     /// with this blob went, or the time is up. "" when that gamemode loaded,
     /// else why not, with the lines that said so. This waits on the server
     /// saying something, which the server orders after the load; it is not a
-    /// guess at how long a load takes.</summary>
-    public (string why, List<string> said) AwaitLoad(string blob, TimeSpan within, TimeSpan tick)
+    /// guess at how long a load takes. The load is held to the tree of its
+    /// tables as well (#5191), the line the gamemode logs after its blob; tree
+    /// "" is a folder with no tables, which a gamemode from before #5191 runs
+    /// beside, and then only the blob is held.</summary>
+    public (string why, List<string> said) AwaitLoad(string blob, string tree, TimeSpan within, TimeSpan tick)
     {
         var said = new List<string>();
         var last = "";
+        var lastTree = "";
         var deadline = DateTime.UtcNow + within;
         while (true)
         {
             foreach (var l in Lines())
             {
                 var m = BlobLine.Match(l);
-                if (m.Success) { last = m.Groups[1].Value; said.Add(l); }
+                var t = TreeLine.Match(l);
+                if (m.Success) { last = m.Groups[1].Value; lastTree = ""; said.Add(l); }
+                else if (t.Success) { lastTree = t.Groups[1].Value; said.Add(l); }
                 else if (l.Contains("[thornswood] gamemode client scripts "))
                 {
                     said.Add(l);
-                    if (last == blob) return ("", said);
-                    return (last != "" ? "a different gamemode loaded, git blob " + last : "a gamemode loaded without saying which it is", said);
+                    if (last == "") return ("a gamemode loaded without saying which it is", said);
+                    if (last != blob) return ("a different gamemode loaded, git blob " + last, said);
+                    if (tree == "" || lastTree == tree) return ("", said);
+                    return (lastTree != "" ? "the gamemode loaded a different set of tables, git tree " + lastTree : "the gamemode loaded without saying which tables it read", said);
                 }
                 else if (l.Contains("[thornswood] gamemode did not load") || l.Contains("Bad syntax, ignoring"))
                 {

@@ -84,7 +84,8 @@
       "fixed": ["-NoPause"],
       "params": {
         "Status": "switch",
-        "Tag": "^agent-v[0-9]{1,4}\\.[0-9]{1,4}\\.[0-9]{1,6}$"
+        "Tag": "^agent-v[0-9]{1,4}\\.[0-9]{1,4}\\.[0-9]{1,6}$",
+        "NoBotPass": "switch"
       }
     },
     "Install-Voice": {

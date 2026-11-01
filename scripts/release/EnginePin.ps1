@@ -211,7 +211,7 @@ function Find-EnginePinBuiltBefore([string]$Pin, [string]$ForkHead, [scriptblock
     $seen = @{}
     foreach ($run in @(@(Get-EnginePinValue $list 'workflow_runs') | Where-Object {
                 $_ -and [string]$_.event -eq 'push' -and [string]$_.head_branch -eq $ForkEngineBranch -and [string]$_.conclusion -eq 'success' -and
-                [string](Get-EnginePinValue (Get-EnginePinValue $_ 'repository') 'full_name') -eq $ForkEngineRepo
+                [string](Get-EnginePinValue (Get-EnginePinValue $_ 'repository') 'id') -eq [string]$ForkEngineRepoId
             } | Sort-Object { [long]$_.id } -Descending)) {
         $sha = ([string]$run.head_sha).ToLowerInvariant()
         if ($sha -notmatch '^[0-9a-f]{40}$' -or $sha -eq $ForkHead -or $sha -eq $Pin -or $seen[$sha]) { continue }

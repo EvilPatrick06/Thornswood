@@ -13,9 +13,14 @@
 
       pwsh -File scripts/release/New-SignedManifest.ps1 -Out <folder> -Tag <tag>
            -Commit <40 hex> -Part gamemode -Files <path>,<path> [-Version a.b.c]
-           [-ServerZip <server-<commit>-<sum>.zip>]
+           [-BotFiles <path>,<path>] [-ServerZip <server-<commit>-<sum>.zip>]
 
-  -ServerZip adds a second part, server: the server build's zip as
+  -BotFiles adds a part, "bot": the bot pass a dev Deployment waits
+  on (#5196, scripts\bot\Bot-Pass.js and what it needs). The agent puts
+  every file of a Release in one folder, so no two files of a Release may
+  have the same name.
+
+  -ServerZip adds a part, server: the server build's zip as
   ServerArtifact.ps1 makes it (Get-EngineArtifact.ps1 puts CI's build of the
   pin there), and the record it carries, server-build.json, beside it, so the
   agent can tell from the record alone whether dev runs that build already
@@ -37,6 +42,7 @@ param(
   [Parameter(Mandatory = $true)][ValidateSet('gamemode', 'agent')][string]$Part,
   [Parameter(Mandatory = $true)][string[]]$Files,
   [string]$Version = '',
+  [string[]]$BotFiles = @(),
   [string]$ServerZip = '',
   [string]$Repo = $env:GITHUB_REPOSITORY,
   [switch]$NoCatalog
@@ -53,22 +59,37 @@ $filesDir = Join-Path $Out 'files'
 $assets = Join-Path $Out 'assets'
 New-Item -ItemType Directory -Force -Path $filesDir, $assets | Out-Null
 
-$list = @()
-foreach ($f in $Files) {
-  if (-not (Test-Path -LiteralPath $f -PathType Leaf)) { throw "there is no file at $f" }
-  $name = Split-Path -Leaf $f
-  if ($name -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$' -or $name -in 'manifest.json', 'manifest.cat') { throw "$name is not a file name the agent takes" }
-  Copy-Item -LiteralPath $f -Destination (Join-Path $assets $name) -Force
-  $item = Get-Item -LiteralPath (Join-Path $assets $name)
-  $list += [ordered]@{ name = $name; sha256 = (Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash.ToLowerInvariant(); size = $item.Length }
+$names = @{}
+function Get-PartList([string[]]$paths) {
+  $out = @()
+  foreach ($f in $paths) {
+    if (-not (Test-Path -LiteralPath $f -PathType Leaf)) { throw "there is no file at $f" }
+    $name = Split-Path -Leaf $f
+    if ($name -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$' -or $name -in 'manifest.json', 'manifest.cat') { throw "$name is not a file name the agent takes" }
+    if ($names.ContainsKey($name)) { throw "two files are called $name, and the agent puts a Release's files in one folder" }
+    $names[$name] = $true
+    Copy-Item -LiteralPath $f -Destination (Join-Path $assets $name) -Force
+    $item = Get-Item -LiteralPath (Join-Path $assets $name)
+    $out += [ordered]@{ name = $name; sha256 = (Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash.ToLowerInvariant(); size = $item.Length }
+  }
+  return ,$out
+}
+$list = Get-PartList $Files
+$parts = [ordered]@{ $Part = @($list) }
+if (@($BotFiles).Count) {
+  if ($Part -ne 'gamemode') { throw "-BotFiles goes with a gamemode Release, the one a dev Deployment applies" }
+  $parts['bot'] = Get-PartList $BotFiles
 }
 
-$parts = [ordered]@{ $Part = @($list) }
 if ($ServerZip) {
   if ($Part -ne 'gamemode') { throw "a server build goes on a build Release beside the gamemode, not on an $Part Release" }
   if (-not (Test-Path -LiteralPath $ServerZip -PathType Leaf)) { throw "there is no server zip at $ServerZip" }
   $zipName = Split-Path -Leaf $ServerZip
   if ($zipName -notmatch '^server-[0-9a-f]{12}-[0-9a-f]{16}\.zip$') { throw "$zipName is not a server build zip as ServerArtifact.ps1 names one" }
+  foreach ($n in 'server-build.json', $zipName) {
+    if ($names.ContainsKey($n)) { throw "two files are called $n, and the agent puts a Release's files in one folder" }
+    $names[$n] = $true
+  }
   Copy-Item -LiteralPath $ServerZip -Destination (Join-Path $assets $zipName) -Force
   Add-Type -AssemblyName System.IO.Compression.FileSystem
   $za = [IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $ServerZip).ProviderPath)
@@ -97,7 +118,7 @@ $m = [ordered]@{
 $json = Join-Path $filesDir 'manifest.json'
 [IO.File]::WriteAllText($json, ($m | ConvertTo-Json -Depth 6 -Compress), (New-Object Text.UTF8Encoding($false)))
 Copy-Item -LiteralPath $json -Destination (Join-Path $assets 'manifest.json') -Force
-Write-Host ("manifest.json for {0}: {1} file(s) of {2}, commit {3}" -f $Tag, $list.Count, $Part, $Commit)
+Write-Host ("manifest.json for {0}: {1} file(s) of {2}{3}, commit {4}" -f $Tag, $list.Count, $Part, $(if ($parts.Contains('bot')) { ' and ' + @($parts['bot']).Count + ' of bot' } else { '' }), $Commit)
 if ($ServerZip) { Write-Host ("  and the server build {0} with its record" -f (Split-Path -Leaf $ServerZip)) }
 if ($NoCatalog) { exit 0 }
 

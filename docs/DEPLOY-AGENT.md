@@ -32,6 +32,7 @@ server build** (the engine).
 | Main | Not yet. Main waits on a Main environment that only Patrick can approve (#5181). The agent refuses any environment but dev. |
 | Bot, site | Not yet. Their own slices. |
 | Launcher and game files | Not the agent's job: they reach people through the launcher's feed and a Ship. The release workflow (#5179) moves them onto Releases. |
+| Bot pass before each dev Deployment | Once `Install-DeployAgent` has set up its task, every Deployment waits on a bot pass on a throwaway copy of dev with the new gamemode (#5196, below). A FAIL fails the Deployment and dev keeps what it runs. A deploy by tag (the gate's `Deploy-Release`, a rollback) does not wait on one. |
 | Parity check after a deploy | Not yet. The agent is to run `Check-ProdParity.ps1` after each deploy and file what differs as an issue, never putting it back by itself. That needs the parity scripts on the box from a signed Release, and the App to hold Issues write; until then the `Check-ProdParity` gate verb runs it. |
 
 The old way keeps working beside the agent until the agent has proved itself
@@ -86,12 +87,20 @@ the App holds Deployments.
    LF read as LF, the way the deploy scripts compare records); then the
    steps are the ones under "A new server build" instead of 4 to 6.
 4. The agent takes the server folders' turn, keeps the running
-   `gamemode.js`, `thornswood-build.json`, `server-settings.json` and the
-   deploy record in `.prev-<stamp>`, and moves the new stamp and then the new
-   gamemode in, one rename each.
-5. `server.log` has to say the new gamemode's git blob loaded (the reload
-   Reload.ps1 uses, #3196), and then the health address has to answer.
-6. If either does not happen, the old files go back the same way and the
+   `gamemode.js`, `thornswood-build.json`, `server-settings.json`, the
+   deploy record and the `gamemode-tables` folder in `.prev-<stamp>`, and
+   moves the new tables folder, then the new stamp, then the new gamemode in,
+   one rename each. The tables are the files game/gamemode-tables/<NAME>.json
+   the gamemode reads as it loads (#5191), carried in the Release as
+   `gamemode-tables.zip` and held to the manifest like the other files; a
+   Release without that zip leaves the folder as it is.
+5. `server.log` has to say the new gamemode's git blob loaded, and the git
+   tree id of its tables folder too when that gamemode reads tables (it
+   carries the line that logs them; one from before #5191 does not, whatever
+   folder is beside it) (the reload Reload.ps1 uses, #3196), and then the
+   health address has to answer.
+6. If either does not happen, the old files go back, the tables folder first
+   so the reload the old gamemode.js starts reads the old tables, and the
    old gamemode has to load again. The Deployment says **failure** and that
    the previous gamemode is back. If even that does not take, it says
    **error**, and dev needs `Deploy-DevGamemode.ps1 -PutBack`.
@@ -123,7 +132,8 @@ the build and the gamemode in together, the way Swap.ps1 swaps a server:
    for until it has exited, and a `restart.json` it never read removed.
 4. One rename per file. What each replaces goes to `.prev-<stamp>`, and so
    does any fork file the new record does not list, so the folder holds one
-   build.
+   build. The `gamemode-tables` folder, when the Release carries it, goes
+   aside and in whole, and step 5 waits for its tree id as well.
 5. The start, then both ports from the box (UDP, and the resources port
    taking a connection) within 170 seconds (ServerReadyWait.ps1's wait),
    then `server.log` saying the new gamemode's git blob loaded, then the
@@ -143,6 +153,68 @@ When several Deployments are waiting, only the newest is applied, and the
 older ones are marked inactive. The newest is the state dev should be in, and
 putting in the ones before it first would only put in what is about to be
 replaced.
+
+## The bot pass before each dev Deployment
+
+Issue #5196. Between holding the Release to its signature (step 3 above)
+and putting the gamemode in (step 4), the agent checks the new gamemode on
+a copy of dev that nobody plays on:
+
+1. It takes the server folders' turn and makes the copy in
+   `C:\Thornswood-BotPass\run\server`: dev's engine (`dist_back`,
+   `scam_native.node`, `package.json`, any DLL beside it), the Release's
+   `gamemode.js` and stamp, and dev's data folder without its plugins and
+   archives. Those are read where the bot pass keeps them,
+   `C:\Thornswood-BotPass\plugins`, copied from dev's only when one
+   changes, by their full paths. Dev's world, its `private` folder (the
+   door and the join pass key), its logs and deploy records never go in. The
+   world starts empty.
+2. The copy's settings are dev's with what reaches outside taken out
+   (`discordAuth`, `metricsAuth`, `masterKey`, `additionalServerSettings`):
+   no master server, offline login, no join pass hold, a password of its
+   own, the name with " (bot pass)" on the end, and a game port from 7900
+   that no server's settings name and nothing holds now, with its
+   resources port beside it and a voice port above.
+3. It starts the task **Thornswood Bot Pass**, which runs
+   [Bot-Pass.js](../scripts/bot/Bot-Pass.js) from the same Release. The
+   task runs as LOCAL SERVICE, Limited, with a SID of its own and rights in
+   `C:\Thornswood-BotPass` only, at below normal priority, the way the game
+   servers run (ServiceAccount.ps1). The agent never runs node or loads the
+   engine itself; it reads the result the task writes.
+4. Bot-Pass.js starts the copy, waits for it to say this gamemode loaded,
+   and has a bot log in the way the game does as a profile nobody has. It
+   checks, a line each: **loads**, **login**, **new** (the race menu is
+   open), **face** (a face is sent, the race menu closes and the plain
+   clothes arrive), **saved** (the world on disk holds the character by
+   name), **restart** (the copy is stopped and started again and loads
+   again) and **loads back** (a second bot logs in as the same profile and
+   gets the same character, where it was saved, with no race menu).
+5. Every line goes in the Deployment's log. All PASS and the gamemode goes
+   in as below. One FAIL, a pass that does not end within 30 minutes
+   (`botPassSeconds`), or no result, and the Deployment says **failure**
+   with the step and why, and dev is not touched. The copy is left until the
+   next pass, with its own server log at
+   `C:\Thornswood-BotPass\run\server\bot-pass-server.log`;
+   `Install-DeployAgent -Status` prints the last pass.
+
+The bot pass rides in the gamemode Release as a part of its own, `bot`
+(gamemode-release.yml, `New-SignedManifest.ps1 -BotFiles`), so the bot that
+checks a gamemode comes from the same commit and is signed with it. A change
+to the bot alone makes a Release too.
+
+Setting it up is part of `Install-DeployAgent`, once dev's engine has the
+bot client (`createBotClient`, skymp fork #137; the install checks and
+says so). The fail-safe on what no service may read comes first, the task is registered on LOCAL SERVICE and
+given its folder, and only then does `agent.json` name the folder
+(`botPassRoot`). It is never put on SYSTEM: when any of that cannot be
+done, the install says `BOT PASS NOT SET UP` and why, and Deployments go in
+without a pass, each log saying so.
+`pwsh scripts/vps/Box-Run.ps1 -Line 'Install-DeployAgent -NoBotPass'` takes
+it off.
+
+What the bot cannot reach yet: stations, claims and keys, needs, merchants
+and jail go over the voice relay, which the copy does not start, so they
+wait on a relay client for the bot (#5196).
 
 ## Why "Dev server" and not "Dev"
 
