@@ -259,7 +259,7 @@ const tagSet = {
   name: 'release tags', target: 'tag', enforcement: 'active', why: 'a note of the record\'s own',
   conditions: { ref_name: { include: ['refs/tags/v*'], exclude: [] } },
   rules: [{ type: 'creation' }, { type: 'update' }, { type: 'deletion' }],
-  bypass_actors: [{ actor_id: 5, actor_type: 'RepositoryRole', bypass_mode: 'always' }, { actor_id: 15368, actor_type: 'Integration', bypass_mode: 'always' }],
+  bypass_actors: [{ actor_id: 5, actor_type: 'RepositoryRole', bypass_mode: 'always' }, { actor_id: 5547080, actor_type: 'Integration', bypass_mode: 'always' }],
 };
 const mainSet = {
   name: 'main', target: 'branch', enforcement: 'disabled',
@@ -280,9 +280,11 @@ yes('one with no rules, or a rule with no type, stops', /no rules/.test(rstops([
 yes('one that does not say who may bypass it stops', /bypass/.test(rstops([with_(mainSet, 'bypass_actors', undefined)])));
 // The redesign's part 20 (1 Nov 2026): an App or a deploy key bypasses a tag
 // ruleset only, never a branch one.
-const appBypass = { actor_id: 15368, actor_type: 'Integration', bypass_mode: 'always' };
+const appBypass = { actor_id: 5547080, actor_type: 'Integration', bypass_mode: 'always' };
+yes('GitHub Actions as a bypass stops, named, since GitHub refuses it (#5296)',
+  /lets GitHub Actions \(15368\) bypass it, which GitHub refuses/.test(rstops([with_(tagSet, 'bypass_actors', [{ actor_id: 15368, actor_type: 'Integration', bypass_mode: 'always' }])])));
 yes('an App may bypass a tag ruleset', rstops([with_(tagSet, 'bypass_actors', [appBypass])]) === '');
-yes('an App that may bypass a branch ruleset stops, named', /main lets the App 15368 bypass a branch ruleset; an App or a deploy key may bypass only a tag ruleset/.test(rstops([with_(mainSet, 'bypass_actors', [appBypass])])));
+yes('an App that may bypass a branch ruleset stops, named', /main lets the App 5547080 bypass a branch ruleset; an App or a deploy key may bypass only a tag ruleset/.test(rstops([with_(mainSet, 'bypass_actors', [appBypass])])));
 yes('  and so does a deploy key', /lets a deploy key bypass a branch ruleset/.test(rstops([with_(mainSet, 'bypass_actors', [{ actor_id: 7, actor_type: 'DeployKey', bypass_mode: 'always' }])])));
 yes('  while a role on a branch ruleset still passes', rstops([with_(mainSet, 'bypass_actors', [{ actor_id: 5, actor_type: 'RepositoryRole', bypass_mode: 'always' }])]) === '');
 // What GitHub answered keeps its reasons (#5296): a 422 says why only in errors.
