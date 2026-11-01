@@ -1130,12 +1130,13 @@ function readJsonQuiet(file) {
    not there yet is asked about again RELEASE_LOOK_MS later, never sooner,
    which keeps the site inside GitHub's sixty unsigned calls an hour. The
    lookup never holds a download: the request that starts it is served from
-   here. tests/test-release-copies.js drives this block. */
+   here. tests/test-release-copies.js drives this block, and the setup
+   programs below it. */
 const RELEASE_REPO = 'ThornswoodRP/Thornswood';
 const RELEASE_DOWNLOAD = 'https://github.com/' + RELEASE_REPO + '/releases/download/';
 const RELEASE_LOOK_MS = 10 * 60 * 1000;
 const RELEASE_TAG_RE = /^release\/(main|dev)\/\d{8}-\d{4,6}(-dev)?$/;
-const releaseCopies = {};   // tag -> { files: { sha: { url, size } }, installer, seen } once found; { at, busy } while not
+const releaseCopies = {};   // tag -> { files: { sha: { url, size } }, seen } once found; { at, busy } while not
 const releaseTagOf = {};    // feed generation file -> the release tag it names, or ''
 function releaseGitHub(apiPath) {
   return new Promise((resolve) => {
@@ -1160,8 +1161,7 @@ function releaseGitHub(apiPath) {
   });
 }
 // The files of one published Release, from GitHub without a token. Only an
-// asset whose name is the sha256 GitHub itself measured on it counts, and
-// the installer only under its own name with GitHub's sha256 beside it.
+// asset whose name is the sha256 GitHub itself measured on it counts.
 async function lookReleaseCopies(tag) {
   // The newest Releases rather than /releases/tags/<tag>, which a tag with
   // slashes in it does not suit; a feed's current release is always among
@@ -1171,7 +1171,6 @@ async function lookReleaseCopies(tag) {
   const r = list.body.find((x) => x && x.tag_name === tag && !x.draft && Number.isInteger(x.id));
   if (!r) return { found: false, why: '' };
   const files = {};
-  let installer = null;
   for (let page = 1; page <= 10; page++) {
     const got = await releaseGitHub('/releases/' + r.id + '/assets?per_page=100&page=' + page);
     if (got.status !== 200 || !Array.isArray(got.body)) return { found: false, why: got.why || 'the asset list did not read' };
@@ -1182,11 +1181,10 @@ async function lookReleaseCopies(tag) {
       const m = /^sha256:([0-9a-f]{64})$/.exec(String(a.digest || ''));
       if (!m || !Number.isInteger(a.size)) continue;
       if (a.name === m[1]) files[m[1]] = { url, size: a.size };
-      else if (a.name === 'Thornswood-Setup.exe') installer = { sha: m[1], url, size: a.size };
     }
     if (got.body.length < 100) break;
   }
-  return { found: true, files, installer };
+  return { found: true, files };
 }
 function askReleaseCopies(tag) {
   const had = releaseCopies[tag];
@@ -1194,8 +1192,8 @@ function askReleaseCopies(tag) {
   releaseCopies[tag] = { at: Date.now(), busy: true };
   lookReleaseCopies(tag).then((v) => {
     if (v.found) {
-      releaseCopies[tag] = { files: v.files, installer: v.installer, seen: Date.now() };
-      console.log('[thornswood-docs] release copies: ' + tag + ' holds ' + Object.keys(v.files).length + ' file(s)' + (v.installer ? ' and the installer' : ''));
+      releaseCopies[tag] = { files: v.files, seen: Date.now() };
+      console.log('[thornswood-docs] release copies: ' + tag + ' holds ' + Object.keys(v.files).length + ' file(s)');
     } else {
       releaseCopies[tag] = { at: Date.now(), busy: false };
       if (v.why && !/ 404$/.test(v.why)) console.error('[thornswood-docs] release copies: ' + tag + ': ' + v.why);
@@ -1226,15 +1224,81 @@ function releaseCopy(channel, sha, size) {
   const f = c && c.files && c.files[sha];
   return f && f.size === size ? f.url : '';
 }
-// The same for the installer on the Downloads page: the main release's copy,
-// when it is the very file this site lists (its sha256 in files.json).
-function releaseInstallerCopy(sha, size) {
-  const tag = feedReleaseTag('feed');
-  if (!tag || !/^[0-9a-f]{64}$/.test(sha)) return '';
-  askReleaseCopies(tag);
-  const c = releaseCopies[tag];
-  const i = c && c.installer;
-  return i && i.sha === sha && i.size === size ? i.url : '';
+/* THE SETUP PROGRAMS (#4824). The download is Velopack's setup program, which
+   merge-release.yml makes and signs with the launcher's package inside it.
+   Main's, Thornswood-Setup.exe, goes on a Release main-<tag> of its own once
+   Patrick approves that build (#5181); dev's, Thornswood-Dev-Setup.exe, is on
+   every build Release <tag> that made a package (build-YYYYMMDD.N). Each
+   channel's is the one on the newest published Release of its kind, under
+   that name, with GitHub's own sha256 digest and a whole size beside it, and
+   /file/<name> answers 302 to it. Until GitHub has said so there is no setup
+   program to offer: the Downloads page says the installer is not published
+   yet and /file/<name> answers 404. The site's own downloads folder never
+   serves either name (downloadServed): the old installer Publish-Installer put
+   there went with that pipeline.
+
+   The same list as the release copies, asked the same way: without a token,
+   again RELEASE_LOOK_MS after the last answer and never sooner, without
+   holding the request that started it. A look that fails keeps what the last
+   one found. The list is walked a hundred Releases a page, because a main
+   Release is made only on an approval and can be older than the newest thirty
+   build Releases. */
+const SETUP_KINDS = {
+  main: { tag: /^main-build-\d{8}\.\d+$/, name: 'Thornswood-Setup.exe' },
+  dev: { tag: /^build-\d{8}\.\d+$/, name: 'Thornswood-Dev-Setup.exe' }
+};
+const SETUP_PAGES = 5;
+const setups = { main: null, dev: null, at: 0, busy: false };
+async function lookSetups() {
+  const out = { main: null, dev: null };
+  for (let page = 1; page <= SETUP_PAGES && !(out.main && out.dev); page++) {
+    const list = await releaseGitHub('/releases?per_page=100&page=' + page);
+    if (list.status !== 200 || !Array.isArray(list.body)) return { found: false, why: list.why || 'the Release list did not read' };
+    const rs = list.body.filter((r) => r && !r.draft && typeof r.tag_name === 'string' && Array.isArray(r.assets))
+      .sort((a, b) => (Date.parse(b.published_at || '') || 0) - (Date.parse(a.published_at || '') || 0));
+    for (const ch of Object.keys(SETUP_KINDS)) {
+      const k = SETUP_KINDS[ch];
+      for (const r of rs) {
+        if (out[ch]) break;
+        if (!k.tag.test(r.tag_name)) continue;
+        const a = r.assets.find((x) => x && x.name === k.name && x.state === 'uploaded');
+        if (!a) continue;
+        const url = String(a.browser_download_url || '');
+        const m = /^sha256:([0-9a-f]{64})$/.exec(String(a.digest || ''));
+        if (url !== RELEASE_DOWNLOAD + r.tag_name + '/' + k.name || !m || !Number.isInteger(a.size) || a.size <= 0) continue;
+        out[ch] = { name: k.name, url, size: a.size, sha256: m[1], tag: r.tag_name, at: Date.parse(r.published_at || '') || 0 };
+      }
+    }
+    if (list.body.length < 100) break;
+  }
+  return { found: true, main: out.main, dev: out.dev };
+}
+function askSetups() {
+  if (setups.busy || (setups.at && Date.now() - setups.at < RELEASE_LOOK_MS)) return;
+  setups.busy = true;
+  lookSetups().then((v) => {
+    setups.busy = false;
+    setups.at = Date.now();
+    if (!v.found) {
+      if (v.why && !/ 404$/.test(v.why)) console.error('[thornswood-docs] setup programs: ' + v.why);
+      return;
+    }
+    for (const ch of Object.keys(SETUP_KINDS)) {
+      const was = setups[ch], now = v[ch];
+      if (now && (!was || was.url !== now.url)) console.log('[thornswood-docs] setup programs: ' + ch + ' is ' + now.name + ' on ' + now.tag);
+      setups[ch] = now;
+    }
+  }, (e) => {
+    setups.busy = false;
+    setups.at = Date.now();
+    console.error('[thornswood-docs] setup programs: ' + (e && e.message));
+  });
+}
+// The newest setup program of a channel, 'main' or 'dev', as GitHub last said
+// it, or null: { name, url, size, sha256, tag, at }.
+function newestSetup(channel) {
+  askSetups();
+  return setups[channel] || null;
 }
 /* ---- end release copies ---- */
 function creditsFacts() {
@@ -2095,28 +2159,28 @@ setInterval(() => loginPrune(Date.now()), 10 * 60 * 1000).unref?.();
 // ==== end thornswood login limits ====
 
 // ------------------------------------------------------------- downloads --
-// The payload zip the two file setup program fetches through /api/payload:
-// the stable name Publish-Installer sends, or a stamped one an older publish
-// left.
-function payloadZip(name) {
-  return /^Thornswood-Setup(?:-\d{8}-\d{4})?\.zip$/i.test(name);
+// The old installer's names: the setup program and its payload zip, stamped or
+// not, as Publish-Installer put them in the downloads folder until #4824. The
+// setup program comes from a GitHub Release now (newestSetup), so a copy left
+// in the folder is never served or listed, whatever files.json still says.
+function oldInstaller(name) {
+  return /^Thornswood(?:-Dev)?-Setup(?:-\d{8}-\d{4})?\.(?:exe|zip)$/i.test(name);
 }
 
-// What /file/ serves, which is also all the Downloads list may show (#3798).
-// files.json is the list of what is published, so a name is served only when
-// it is listed there and not hidden, or is a listed payload zip, which is
-// hidden from people because the setup program fetches it itself. files.json
-// is served too: Ship's installer gate reads it at /file/files.json
-// (Read-SiteDownloads). Anything else in the folder is not published, and
-// answers 404. Until this the route served whatever sat in the folder, and a
-// read only diagnostic put there by hand on the box (a script naming a
-// staff member and the game server's address) went to anyone who asked for it
-// by name, while the Downloads page only hid it.
+// What /file/ serves from the downloads folder, which is also all the
+// Downloads list may show from it (#3798). files.json is the list of what is
+// published, so a name is served only when it is listed there and not hidden.
+// files.json itself is served too. Anything else in the folder is not
+// published, and answers 404. Until this the route served whatever sat in the
+// folder, and a read only diagnostic put there by hand on the box (a script
+// naming a staff member and the game server's address) went to anyone who
+// asked for it by name, while the Downloads page only hid it.
 function downloadServed(name, meta) {
   if (name === 'files.json') return true;
+  if (oldInstaller(name)) return false;
   const m = Object.prototype.hasOwnProperty.call(meta, name) ? meta[name] : null;
   if (!m || typeof m !== 'object') return false;
-  return !m.hidden || payloadZip(name);
+  return !m.hidden;
 }
 
 function listFiles() {
@@ -2138,23 +2202,24 @@ function listFiles() {
     try { st = fs.statSync(path.join(FILES, name)); } catch (e) { continue; }
     if (!st.isFile()) continue;
     const m = meta[name];
-    // hidden has to survive the trip. The payload zip is marked hidden by
-    // Publish-Installer because the setup program fetches it itself, and the
-    // page hides it on that flag. Dropping it here put the old two file
-    // instructions back on the downloads page and a 527 MB button next to
-    // them that does nothing on its own.
-    // The installer's SHA-256, which Publish-Installer writes, so the Downloads
-    // page can print it beside the size and date (To Do entry 176). Only a well
-    // formed hash goes out, in lower case because Get-FileHash writes upper and
-    // the page builds an address from it.
+    // A file's SHA-256, when files.json gives one, so the Downloads page can
+    // print it beside the size and date (To Do entry 176). Only a well formed
+    // hash goes out, in lower case because Get-FileHash writes upper and the
+    // page builds an address from it.
     const sha256 = String(m.sha256 || '').toLowerCase();
     const hash = /^[0-9a-f]{64}$/.test(sha256) ? sha256 : '';
-    // Who the installer is signed by, as Publish-Installer's sign gate held it
-    // (#5275): the name Windows shows as the publisher. An entry from before
-    // that has none, and the page then names nobody rather than a wrong name.
     out.push({ name, size: st.size, at: st.mtimeMs, hidden: !!m.hidden,
       label: m.label || name, version: m.version || '', note: m.note || '',
       sha256: hash, publisher: typeof m.publisher === 'string' ? m.publisher.trim() : '' });
+  }
+  // The installer: main's setup program, from its GitHub Release (#4824),
+  // with the sha256 GitHub measured on it. Who signed it is not on the
+  // Release, so the page names nobody rather than a name nothing checked
+  // (#5275). Dev's is not listed: it is for staff, at /file/ by its name.
+  const setup = newestSetup('main');
+  if (setup) {
+    out.push({ name: setup.name, size: setup.size, at: setup.at, hidden: false,
+      label: setup.name, version: setup.tag, note: '', sha256: setup.sha256, publisher: '' });
   }
   out.sort((a, b) => b.at - a.at);
   return out;
@@ -3440,9 +3505,10 @@ const sendJson = (res, code, obj) => send(res, code, JSON.stringify(obj));
   true, or returns false when there is no range to honour and the caller sends
   its own 200.
 
-  The static files had this and /file/ did not. /file/ is where the installer
-  gets its payload, and Bootstrap.cs asks for the rest of a half downloaded zip
-  with a Range header and appends whatever a 206 brings. The site answered
+  The static files had this and /file/ did not. /file/ was where the old
+  installer got its payload (until #4824), asking for the rest of a half
+  downloaded zip with a Range header and appending whatever a 206 brought,
+  and a browser resumes a download from it the same way. The site answered
   every such request 200 with the whole file and no Accept-Ranges, so a
   connection that dropped at 300 MB started again from nothing, while the Join
   page promises it carries on. The To Do List has it measured live: a Range
@@ -7113,67 +7179,6 @@ async function handle(req, res) {
     }), 'application/json; charset=utf-8', { 'Cache-Control': 'no-cache' });
   }
 
-  /*
-    What the setup program fetches. It is a small exe with the mods beside it,
-    so on startup it asks here for the name, the address and the size of the
-    payload, then downloads it with a Range header so a dropped connection
-    carries on rather than starting over.
-
-    This route did not exist. Every request for it fell through to the admin
-    API block below, which answers 401 sign in first to anybody not logged in,
-    and the installer showed "Could not reach https://thornswood.net to get the
-    mods ... (401) Unauthorized" to every new person. It has to stay above that
-    gate and stay public, because an installer cannot sign in.
-
-    The reply is read by Bootstrap.cs with plain string searches for "name":",
-    "url":", "size": and "sha256":", so the shape matters more than the field
-    order.
-  */
-  if (route === '/api/payload' && req.method === 'GET') {
-    /* A downloads folder that is there and cannot be read answered as if no
-       zip was there, so the installer said the site was not offering a
-       download when the site could not look (#2736). Now it is said and
-       answered 500. No folder is still no zip, tested for; a zip deleted by a
-       publish between the listing and the look at it is left out. */
-    let best = null;
-    // Only a zip files.json lists, since that is all /file/ serves (#3798): an
-    // unlisted one is a publish that never finished writing its list, and
-    // naming it would send the setup program to a 404.
-    const meta = jsonFile(path.join(FILES, 'files.json'), {});
-    try {
-      const names = fs.existsSync(FILES) ? fs.readdirSync(FILES) : [];
-      for (const name of names) {
-        if (!payloadZip(name) || !downloadServed(name, meta)) continue;
-        let st;
-        try { st = fs.statSync(path.join(FILES, name)); }
-        catch (e) { if (e.code === 'ENOENT') continue; throw e; }
-        if (!st.isFile()) continue;
-        if (!best || st.mtimeMs > best.at) best = { name, at: st.mtimeMs, size: st.size };
-      }
-    } catch (e) {
-      console.error('[thornswood-docs] could not read the downloads in ' + FILES + ' for /api/payload (' + (e.code || e.message) + ')');
-      return sendJson(res, 500, { error: 'the site could not look at its downloads' });
-    }
-    // No zip means a one file build, where the payload rides inside the exe
-    // and nothing should be fetched. Bootstrap turns an empty url into "The
-    // site is not offering a download right now", which is the truth.
-    if (!best) return sendJson(res, 200, {});
-    // The SHA-256 Publish-Installer measured on the zip it sent, kept in
-    // files.json beside its name. best is built from a stat and has no hash on
-    // it, so it is looked up here. Only a well formed one goes out: anything
-    // else would make every install delete a good download. An empty value is
-    // what an installer from before this sees when the field is missing; an
-    // installer from #1365 on stops on it rather than fetching half a
-    // gigabyte it has no way to measure.
-    const sha = String((meta[best.name] || {}).sha256 || '');
-    return sendJson(res, 200, {
-      name: best.name,
-      url: '/file/' + encodeURIComponent(best.name),
-      size: best.size,
-      sha256: /^[0-9a-f]{64}$/i.test(sha) ? sha.toLowerCase() : ''
-    });
-  }
-
   /* Reporting a problem is public on purpose. Somebody whose install will not
      start cannot sign in to say so, and making them ask in Discord first is
      how a bug turns into nobody bothering. Held to one short message at a
@@ -7639,10 +7644,18 @@ async function handle(req, res) {
   }
 
   // ------------------------------------------------------------- downloads
-  // Streamed, not read into memory. The installer is most of a gigabyte and
-  // reading it up front would hold all of that per person downloading.
+  // Streamed, not read into memory: a download can be hundreds of megabytes
+  // and reading it up front would hold all of that per person downloading.
   const dl = p.match(/^\/file\/([A-Za-z0-9._ -]+)$/);
   if (dl && req.method === 'GET') {
+    // The setup programs, from their GitHub Releases (newestSetup, #4824).
+    for (const ch of Object.keys(SETUP_KINDS)) {
+      if (dl[1] !== SETUP_KINDS[ch].name) continue;
+      const setup = newestSetup(ch);
+      if (!setup) return send(res, 404, 'the installer is not published yet', 'text/plain');
+      res.writeHead(302, { location: setup.url, 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' });
+      return res.end();
+    }
     const file = path.join(FILES, dl[1]);
     // Only what files.json publishes (downloadServed, #3798).
     const meta = jsonFile(path.join(FILES, 'files.json'), {});
@@ -7651,21 +7664,11 @@ async function handle(req, res) {
       return send(res, 404, 'no such file', 'text/plain');
     }
     const st = fs.statSync(file);
-    // The installer from the main release's GitHub Release, once it holds
-    // this very file publicly (release copies, #3686).
-    if (dl[1] === 'Thornswood-Setup.exe') {
-      const copy = releaseInstallerCopy(String((meta[dl[1]] || {}).sha256 || '').toLowerCase(), st.size);
-      if (copy) {
-        res.writeHead(302, { location: copy, 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' });
-        return res.end();
-      }
-    }
-    /* Resumable, because the payload is hundreds of megabytes and the Join
-       page says a dropped connection carries on. Accept-Ranges on the 200 so
-       a client knows before it starts. The ETag and Last-Modified are what a
-       browser needs before it will resume at all, and what If-Range is
-       checked against, so a one file installer taken in the browser resumes
-       too and never onto a different build. */
+    /* Resumable, because a dropped connection should carry on. Accept-Ranges
+       on the 200 so a client knows before it starts. The ETag and
+       Last-Modified are what a browser needs before it will resume at all,
+       and what If-Range is checked against, so a download taken in the
+       browser resumes too and never onto a different file. */
     const kind = {
       'content-type': 'application/octet-stream',
       'content-disposition': 'attachment; filename="' + path.basename(file) + '"',
