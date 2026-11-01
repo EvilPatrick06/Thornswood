@@ -202,6 +202,9 @@ Yes '  make holds a token that only reads' ($make -match '(?m)^    permissions:\
 Yes '  the npm build (Update-EnginePin.ps1, which runs Build-Front.ps1) is in make alone' ($make -match 'Update-EnginePin\.ps1' -and $look -notmatch 'Update-EnginePin|Build-Front|setup-node|yarn|npx' -and $push -notmatch 'Update-EnginePin|Build-Front|setup-node|yarn|npx')
 Yes '  push holds the pin to one commit on main with only a pin''s paths before it pushes' ($push -match 'is not one commit on main' -and $push -match 'changes more than a pin' -and $push.IndexOf('changes more than a pin') -lt $push.IndexOf('push --force'))
 Yes '  push starts the build check on the branch, then opens or updates the pull request' ($push -match 'gh workflow run build-pr\.yml --repo \$env:GITHUB_REPOSITORY --ref engine-pin/next' -and $push.IndexOf('build-pr.yml') -lt $push.IndexOf('Open-EnginePinPr.ps1'))
+Yes '  both places that open the pull request then start the test task check on the branch, whose result main requires (#5199)' (
+    $push.IndexOf('Open-EnginePinPr.ps1') -lt $push.IndexOf('gh workflow run test-tasks.yml --repo $env:GITHUB_REPOSITORY --ref engine-pin/next') -and
+    $look.IndexOf('Open-EnginePinPr.ps1') -ge 0 -and $look.IndexOf('Open-EnginePinPr.ps1') -lt $look.IndexOf('gh workflow run test-tasks.yml --repo $env:GITHUB_REPOSITORY --ref engine-pin/next'))
 Yes '  look starts engine.yml only on the record step, and goes red on red' ($look -match "if: steps\.look\.outputs\.step == 'record'" -and $look -match "if \(\`$s\.Step -eq 'red'\) \{[^}]*exit 1")
 Yes '  every checkout keeps no credentials on disk' (@([regex]::Matches($code, 'uses: actions/checkout@')).Count -eq 3 -and @([regex]::Matches($code, 'persist-credentials: false')).Count -eq 3)
 Yes '  every job has a timeout' (@([regex]::Matches($code, '(?m)^    timeout-minutes: \d+$')).Count -eq 3)
@@ -215,6 +218,8 @@ $eng = [IO.File]::ReadAllText((Join-Path $root '.github/workflows/engine.yml')).
 Yes 'engine.yml''s runs carry the commit in their title, which Get-EnginePinStep finds them by' ($eng -match "(?m)^run-name: Engine build of \$\{\{ inputs\.commit \|\| 'the pin' \}\}$")
 $bp = [IO.File]::ReadAllText((Join-Path $root '.github/workflows/build-pr.yml')).Replace("`r`n", "`n")
 Yes 'build-pr.yml can be started by hand on the pin branch' ($bp -match '(?m)^on:\n  pull_request:\n  workflow_dispatch:\n')
+$tt = [IO.File]::ReadAllText((Join-Path $root '.github/workflows/test-tasks.yml')).Replace("`r`n", "`n")
+Yes 'test-tasks.yml can be started by hand on the pin branch' ($tt -match '(?m)^  workflow_dispatch:\s*$')
 $gs = [IO.File]::ReadAllText((Join-Path $root 'records/github-settings.json')) | ConvertFrom-Json
 Yes 'the run''s token may open pull requests, and its default stays read' ($gs.workflow_token.can_approve_pull_request_reviews -eq $true -and $gs.workflow_token.default_workflow_permissions -eq 'read')
 Yes 'fork pull requests still get no write token and no secret' ($gs.fork_pull_requests.send_write_tokens_to_workflows -eq $false -and $gs.fork_pull_requests.send_secrets_and_variables -eq $false)

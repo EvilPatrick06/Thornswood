@@ -19,6 +19,18 @@
   look, because a thing that crashes on startup restarted forever is a thing
   nobody ever finds out about.
 
+  It leaves alone a server somebody stopped on purpose (#5155). Whoever stops
+  one leaves a hold beside it, holds\<task or service>.json in this folder,
+  saying who, why and until when: 30 minutes unless they say, 2 hours at most
+  (ServerHold.ps1 writes it; every script that stops a server on purpose
+  sends it, and Hold-Server.ps1 is the same for a stop by hand). While the
+  hold runs this neither starts that server nor says anything about it. When
+  it runs out this takes it away, says once in #staff-updates who held it and
+  why, and starts the server. With no hold, a server that is not answering is
+  started straight away, as before. Until then a stop on purpose was started
+  again within five minutes: the live server at 4:01 PM on 31 Oct 2026, in
+  the middle of a merchant ledger swap.
+
   Somebody is told (issue #447). Each run decides, for everything it watches,
   whether it is down, and keeps that in outages.txt. The first run that finds
   a thing down writes ONE message saying what died and when; the message
@@ -93,10 +105,10 @@
     backup    the Thornswood Backup task's last result, and a backup file in
               C:\Thornswood-Backup less than 26 hours old
     offbox    the copy of the backups off this box is less than 26 hours
-              old: the newest copy Fetch-Backups.ps1 on One has checked, by
-              the name it writes into offbox.txt in this folder after each
-              run (#2755). Judged here, not on One, so a One that is off is
-              told about, since that is when the copy falls behind
+              old: the newest backup the Oracle VM took from
+              Send-Backups.ps1, by the name it writes into offbox.txt in
+              this folder after each one (#2755, #2862). Judged here, so a
+              copy that stopped going is told about
     runner    every build runner's Windows service is running: the first,
               thornswood-vps, and the numbered ones Install-Runner.ps1
               -Number puts beside it (4 October)
@@ -146,6 +158,7 @@ if (Test-Path -LiteralPath $staffFile) { $StaffChannel = ("$(Get-Content -Litera
 if ($StaffChannel -notmatch '^\d{17,20}$') { $StaffChannel = '' }
 . (Join-Path $Here 'Send-Script.ps1')
 . (Join-Path $Here 'Lock-Folder.ps1')
+. (Join-Path $Here 'ServerHold.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
@@ -390,6 +403,80 @@ $now = Get-Date
 
 function UnixTime($t) { return ([DateTimeOffset]$t).ToUnixTimeSeconds() }
 
+# ------------------------------------------------------------- holds ---
+#
+# A server stopped on purpose leaves a hold beside it (#5155, Patrick's answer
+# A on 31 Oct 2026): holds\<its task or service name>.json in this folder,
+# written by ServerHold.ps1, which every script that stops a server on purpose
+# sends with its stop, and Hold-Server.ps1 for a stop by hand. While a hold
+# runs this leaves that server alone: no start, no message. When it runs out
+# this takes it away, tells staff once and starts the server. A server with no
+# hold that is not answering is started straight away, as before.
+#
+# The most a hold can be is two hours from when its file was written, whatever
+# it says, so a hold written wrong cannot keep a server down for longer. A
+# file that does not read is a hold too, of the usual thirty minutes from when
+# it was written: somebody meant to hold it, and thirty minutes is what they
+# would have had without saying. tests\test-5155-server-holds.ps1 writes holds
+# with ServerHold.ps1 and reads them with this, so the two agree.
+$holdDir   = Join-Path $root 'holds'
+$holdUsual = 30
+$holdMost  = 120
+
+function HoldFile($target) {
+  return (Join-Path $holdDir ((($target -replace '[^A-Za-z0-9]+', '-').Trim('-')) + '.json'))
+}
+
+# $null when nothing holds it, else who, why, from when, until when, whether
+# it has run out, and its file.
+function ReadHold($target) {
+  $f = HoldFile $target
+  $item = Get-Item -LiteralPath $f -EA SilentlyContinue
+  if (-not $item) { return $null }
+  $wrote = $item.LastWriteTime
+  $h = @{ File = $f; By = 'somebody'; Why = 'its hold file does not say why'; Set = $wrote; Until = $wrote.AddMinutes($holdUsual) }
+  $j = $null
+  try { $j = [IO.File]::ReadAllText($f) | ConvertFrom-Json } catch { $j = $null }
+  if ($j) {
+    if ("$($j.by)".Trim()) { $h.By = "$($j.by)".Trim() }
+    if ("$($j.why)".Trim()) { $h.Why = "$($j.why)".Trim() }
+    # A time that is not a number of seconds is left as the file's own time.
+    $n = [int64]0
+    if ([int64]::TryParse("$($j.set)", [ref]$n) -and $n -gt 0 -and $n -lt 253402300799) { $h.Set = [DateTimeOffset]::FromUnixTimeSeconds($n).LocalDateTime }
+    $n = [int64]0
+    if ([int64]::TryParse("$($j.until)", [ref]$n) -and $n -gt 0 -and $n -lt 253402300799) { $h.Until = [DateTimeOffset]::FromUnixTimeSeconds($n).LocalDateTime }
+  } else { $h.Why = 'its hold file does not read' }
+  $most = $wrote.AddMinutes($holdMost)
+  if ($h.Until -gt $most) { $h.Until = $most }
+  $h.Over = ($now -ge $h.Until)
+  return $h
+}
+
+# A check's name for itself in the middle of a sentence: 'the live game server'.
+function Lower($s) { return ($s.Substring(0, 1).ToLower() + $s.Substring(1)) }
+
+# The one message when a hold runs out: who held it, why, until when, and
+# what the watchdog did, in $after.
+function TellHold($c, $h, $after) {
+  $head = 'The hold on ' + (Lower $c.Say) + ' has run out.'
+  $plain = $h.By + ' stopped it on purpose (' + $h.Why + ') and held it from '
+  $discord = $plain + (Shown $h.Set $true) + ' until ' + (Shown $h.Until $true) + '. ' + $after
+  $plain = $plain + (Shown $h.Set $false) + ' until ' + (Shown $h.Until $false) + '. ' + $after
+  Tell $c 'hold' $head $discord $plain
+}
+
+# What the watchdog did once a hold ran out, said after who held it.
+function HoldWords($how) {
+  switch ($how) {
+    'running' { return 'It was already running, so whoever stopped it started it again and left the hold behind. The watchdog took the hold away.' }
+    'back'    { return 'The watchdog started it and it answered again.' }
+    'stuck'   { return 'The watchdog started it and it is not answering. From here it is watched like any server that is down.' }
+    'refused' { return 'Windows would not start it. From here it is watched like any server that is down.' }
+    'gaveup'  { return 'The watchdog has already restarted it three times this hour, so it did not start it. It needs a person.' }
+  }
+  return ''
+}
+
 # '' when the address answers over HTTP within ten seconds, else why not.
 # Any answer under 500 counts: the process is alive and answering.
 function HealthProblem($url) {
@@ -445,6 +532,10 @@ function HowItEnded($task) {
   if ($code -lt 0) { $code += 4294967296 }
   if (@(0, 267009, 267011) -contains $code) { return '' }
   $hex = '0x' + $code.ToString('X8')
+  # 0x00041306 is Task Scheduler saying the task was stopped by request
+  # (#5155). Somebody stopped it on purpose without leaving a hold, so it is
+  # started again like any other, and the words say so.
+  if ($code -eq 267014) { return ('it was stopped on purpose (' + $hex + ') and nobody left a hold, so it is started again as if it had stopped by itself') }
   if ($code -lt 3221225472) { return ('its last run ended with code ' + $code + ' (' + $hex + ')') }
   $names = @{ [int64]3221225477 = 'an access violation'; [int64]3221225725 = 'a stack overflow'; [int64]3221226356 = 'heap corruption'; [int64]3221226505 = 'a fail fast' }
   $what = 'an exception'
@@ -495,18 +586,19 @@ function BackupProblem($task, $folder, $hours) {
 }
 
 # '' when the newest copy off this box is younger than $hours, else why not
-# (#2755). Fetch-Backups.ps1 on One writes the name of the newest copy it has
-# checked into offbox.txt after each run, so this box knows how far behind the
-# copy off it is even while One is off, which is when it falls behind. The
+# (#2755). Send-Backups.ps1 writes the name of each backup the Oracle VM took
+# into offbox.txt (#2862; until 31 Oct Fetch-Backups.ps1 on One wrote the
+# newest it had checked), so this box knows how far behind the copy off it
+# is. The
 # age is read from the name, stamped by this box's clock when it took the
 # backup, so the two machines' clocks never meet.
 function OffBoxProblem($file, $hours) {
-  if (-not (Test-Path -LiteralPath $file)) { return ('One has not said it holds a copy: there is no ' + $file + ', which Fetch-Backups.ps1 writes after each copy it checks') }
+  if (-not (Test-Path -LiteralPath $file)) { return ('no copy has been sent off this box: there is no ' + $file + ', which Send-Backups.ps1 writes after each backup the VM took') }
   $name = ('' + (Get-Content -LiteralPath $file -TotalCount 1 -EA SilentlyContinue)).Trim()
   if ($name -notmatch '^thornswood-(\d{8}-\d{6})\.zip(\.enc)?$') { return ($file + ' does not name a backup') }
   $taken = [datetime]::ParseExact($Matches[1], 'yyyyMMdd-HHmmss', [Globalization.CultureInfo]::InvariantCulture)
   $age = ($now - $taken).TotalHours
-  if ($age -gt $hours) { return ('the newest copy One has checked is ' + $name + ', ' + [math]::Floor($age) + ' hours old, and the line is ' + $hours) }
+  if ($age -gt $hours) { return ('the newest copy sent off this box is ' + $name + ', ' + [math]::Floor($age) + ' hours old, and the line is ' + $hours) }
   return ''
 }
 
@@ -758,7 +850,7 @@ $checks = @(
 $tellOnly = @(
   @{ Name = 'backup'; Say = 'The nightly backup'; Fails = 'is failing'; Recovers = 'is working again'; Backup = 'Thornswood Backup'; Folder = 'C:\Thornswood-Backup'; Hours = 26 },
   @{ Name = 'offbox'; Say = 'The copy of the backups off the VPS'; Fails = 'is out of date'; Recovers = 'is up to date again'; OffBox = (Join-Path $root 'offbox.txt'); Hours = 26
-     Fix = 'Fetch-Backups.ps1 on One brings the nightly backup down at 04:15 while One is on and signed in. Run .\scripts\vps\Fetch-Backups.ps1 there, and -Schedule again if its task is gone. Until then a VPS lost is everything since that copy lost too.' },
+     Fix = 'The Thornswood Send Backups task sends each nightly to the Oracle VM when the backup task ends (#2862). Its record says why it did not: the gate verb Send-Backups -Status. Until then a VPS lost is everything since that copy lost too.' },
   @{ Name = 'runner'; Say = 'The build runner (Launcher builds on thornswood-vps and every numbered one)'; Service = 'actions.runner.*.thornswood-vps*' },
   # Caddy's own certificate (#2995), which only this box can reach now.
   @{ Name = 'cert'; Say = 'The certificate Caddy holds for thornswood.net'; Fails = 'needs a look'; Recovers = 'is fine again'; Cert = 'https://thornswood.net/'; Days = 14
@@ -779,12 +871,35 @@ function IsUp($c) {
   return (Answers $c.Port)
 }
 
+# A check's verdict once the watchdog has acted on it. $h is the hold that
+# ran out this run, or $null: then the one message is the hold's, saying what
+# the start did, and a start that worked is not an outage (#5155).
+function Verdict($c, $h, $why, $how) {
+  if (-not $h) { Observe $told $c $true $false $why $how; return }
+  TellHold $c $h (HoldWords $how)
+  if ($how -eq 'back') { Observe $told $c $false $false '' ''; return }
+  Observe $told $c $true $false $why $how
+}
+
 $fresh = @()
 $told = ReadOutages
 foreach ($c in $checks) {
+  # Held on purpose (#5155): left alone until the hold runs out, and nothing
+  # said. A hold that has run out is taken away here, and this run starts it.
+  $target = ''
+  if ($c.ContainsKey('Svc')) { $target = $c.Svc } elseif ($c.ContainsKey('Task')) { $target = $c.Task }
+  $held = $null
+  if ($target) { $held = ReadHold $target }
+  if ($held -and -not $held.Over) {
+    Note ($c.Name + ' is held by ' + $held.By + ' until ' + (Shown $held.Until $false) + ' (' + $held.Why + '), so it is left alone')
+    continue
+  }
+  if ($held) { Remove-Item -LiteralPath $held.File -Force -EA SilentlyContinue }
+
   # What is wrong with it in words, when it is down.
   $why = DownWords $c
   if (IsUp $c) {
+    if ($held) { TellHold $c $held (HoldWords 'running'); $held = $null }
     $sick = ''
     if ($c.ContainsKey('Health')) { $sick = HealthProblem $c.Health }
     # Running is not working (#449). Ten quiet minutes is already the grace,
@@ -802,11 +917,13 @@ foreach ($c in $checks) {
   if ($recent.ContainsKey($c.Name)) { $already = $recent[$c.Name] }
   if ($already -ge 3) {
     Note ($c.Name + ' is still down after ' + $already + ' restarts this hour. Leaving it. This one needs a look.')
-    Observe $told $c $true $false $why 'gaveup'
+    Verdict $c $held $why 'gaveup'
     continue
   }
 
-  $fresh += ((Get-Date).ToString('o') + '|' + $c.Name)
+  # A start because a hold ran out is not a restart after a failure, so it
+  # does not count towards the three an hour.
+  if (-not $held) { $fresh += ((Get-Date).ToString('o') + '|' + $c.Name) }
   if ($c.ContainsKey('Svc')) {
     # By the service's name. Restart-Service starts one that is stopped, and
     # stopping this one stops python and anything it started.
@@ -816,18 +933,21 @@ foreach ($c in $checks) {
     try { Restart-Service -Name $c.Svc -Force -ErrorAction Stop } catch { $rc = 1; $err = $_.Exception.Message }
     if ($rc -ne 0) {
       Note ($c.Name + ' could not be restarted: ' + $err + ' Is the service called ' + $c.Svc + ' ?')
-      Observe $told $c $true $false $why 'refused'
+      Verdict $c $held $why 'refused'
       continue
     }
   } else {
-    $ended = HowItEnded $c.Task
+    # Stopped by request is what a hold's own stop leaves, so it is not said
+    # once the hold has run out.
+    $ended = ''
+    if (-not $held) { $ended = HowItEnded $c.Task }
     if ($ended) { $why = $why + ', and ' + $ended }
     Note ($c.Name + ' is not answering' + $(if ($ended) { ': ' + $ended } else { '' }) + '. Starting ' + $c.Task)
     $null = & schtasks /run /tn $c.Task 2>&1
     $rc = $LASTEXITCODE
     if ($rc -ne 0) {
       Note ($c.Name + ' could not be started. schtasks exited with ' + $rc + '. Is the task called ' + $c.Task + ' ?')
-      Observe $told $c $true $false $why 'refused'
+      Verdict $c $held $why 'refused'
       continue
     }
   }
@@ -835,8 +955,21 @@ foreach ($c in $checks) {
   # Caddy's first start after a gap waits on its certificate, so it is given
   # longer before the watcher decides it did not come back.
   Start-Sleep -Seconds $(if ($c.ContainsKey('Url')) { 45 } else { 25 })
-  if (IsUp $c) { Note ($c.Name + ' is back'); Observe $told $c $true $false $why 'back' }
-  else { Note ($c.Name + ' did not come back in time'); Observe $told $c $true $false $why 'stuck' }
+  if (IsUp $c) {
+    Note ($c.Name + ' is back')
+    Verdict $c $held $why 'back'
+  }
+  else { Note ($c.Name + ' did not come back in time'); Verdict $c $held $why 'stuck' }
+}
+
+# A hold on something this does not watch, run out, is taken away too, so the
+# folder only ever holds holds that mean something.
+foreach ($f in @(Get-ChildItem -LiteralPath $holdDir -Filter '*.json' -File -EA SilentlyContinue)) {
+  $h = ReadHold $f.BaseName
+  if ($h -and $h.Over) {
+    Remove-Item -LiteralPath $f.FullName -Force -EA SilentlyContinue
+    Note ('took away the hold on ' + $f.BaseName + ' by ' + $h.By + ', which ran out at ' + (Shown $h.Until $false))
+  }
 }
 
 if ($fresh.Count -gt 0) { Add-Content -LiteralPath $hist -Value $fresh }
@@ -1095,19 +1228,24 @@ if (Test-Path '$Root\alerts-webhook.txt') {
 } else { 'webhook   none yet. Messages wait for the bot until -SetWebhook is run' }
 "@
 
+  # A FAILED line, or nothing back, is exit 1, so a run through the gate
+  # (Box-Run.ps1 -Line 'Watch-Services -Install') says it did not work (#5155).
+  $failed = -not @($out).Count
   foreach ($l in $out) {
     $c = 'Gray'
-    if ("$l" -match '^FAILED') { $c = 'Red' }
+    if ("$l" -match '^FAILED') { $c = 'Red'; $failed = $true }
     if ("$l" -match '^(wrote|made)') { $c = 'Green' }
     Say "  $l" $c
   }
 
   Head 'From now on'
-  Say '  Anything that stops gets started again within five minutes.' 'DarkGray'
+  Say '  Anything that stops gets started again within five minutes,' 'DarkGray'
+  Say '  except a server held on purpose (any deploy, or Hold-Server.ps1), until its hold runs out.' 'DarkGray'
   Say '  #staff-updates hears once when something goes down and once when it is back.' 'DarkGray'
   Say '  Run this script with no switches to see what it has been doing.' 'DarkGray'
   Write-Host ''
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+  if ($failed) { exit 1 }
   exit 0
 }
 
@@ -1215,9 +1353,13 @@ if (Test-Path '$Root\outages.txt') {
   }
 }
 if (`$down.Count) { 'told      DOWN: ' + (`$down -join ', ') } else { 'told      nothing is down' }
+# Who is holding what stopped on purpose (#5155), which the watcher leaves alone.
+$(Get-ThornswoodHoldScript)
+Get-ThornswoodHolds
 "@
 foreach ($l in $out) {
   $c = 'Gray'
+  if ("$l" -match '^held ') { $c = 'Yellow' }
   if ("$l" -match 'DOWN|NOT installed|LOW$|CRITICAL$|OFF DISCORD|Stopped$|NOT #staff-updates|WOULD NOT SAY|NO say-staff') { $c = 'Red' }
   if ("$l" -match '\bup$|installed$|Running$') { $c = 'Green' }
   Say "  $l" $c

@@ -180,7 +180,8 @@ The words this guide uses. The long alphabetical list, with file names, is [docs
 | Creation Kit | Bethesda's tool for plugin records. A release does not ship the kit itself |
 | Node | The program that runs the website, the voice service, and `node tests\...` |
 | Bot | The Discord bot in the `bot` folder |
-| Build check result | The check on a pull request: it passes only when Launcher builds and every share of the gate passed. Merge when it says pass |
+| Build check result | The check on a pull request: it passes only when Launcher builds and every share of the gate passed. Merge when it and Test tasks in the pull request say pass |
+| Test tasks in the pull request | The check that holds each `Test task for #N:` block in a pull request's body to the bot's post rules before the merge. Editing the body runs it again |
 | Worktree | A second folder on this PC, checked out on its own branch |
 
 ## 1. First Time Setup
@@ -662,6 +663,8 @@ pwsh scripts/mods/Run-OnBox.ps1 scripts/dev/Build-NpcPopulation.py --settings '{
 
 `{data}` is the run's copy of the plugins with this commit's own in their place, `{plugins}` the server's load order as a plugins.txt and `{settings}` as a server-settings.json. The whole rebuild runs the same way (`Run-OnBox.ps1 scripts/mods/Rebuild-ContentTables.ps1 -Data '{data}' -PluginsTxt '{plugins}'`), and writes the tables a game PC writes: every builder reads the load order `game\data\npc-population.json` records, and the crime table reads the script pack in `records\papyrus-scripts.json` (#3105).
 
+From a cloud thread the deploy gate runs that whole rebuild with main's builders: `pwsh scripts/vps/Box-Run.ps1 -Line 'Rebuild-ContentTables -Pull <number> -Head <its full head commit>'` reads only the pull request's data files (the content plugin, `records\recipe-owners.json`, `game\data\last-plugin-policy.json` and `scripts\mods\content-salvaged.json`), never its code, so a change to a builder is merged on its own first. Add `-Stations` when the stations moved: it runs `Build-StationSites.py` and `Add-ContentRecords.py --masters` before the chain.
+
 #### Switch between branches
 
 The folder shows one branch at a time. The files in Visual Studio Code are the branch named in the status bar. Every other local branch stays on this PC with its own commits.
@@ -785,16 +788,16 @@ If the stop was a rebase rather than a merge, the last step is `git rebase --con
 
 #### Merge your own pull request
 
-Wait until the check named `Build check result` is green on the commit you are merging. It passes only when `Launcher builds` and the five `Gate harnesses (n of 5)` checks all passed. Pending means it is still running. A red check means the branch is not ready. Fix it on the same branch and push again.
+Wait until the check named `Build check result` is green on the commit you are merging. It passes only when `Launcher builds` and the five `Gate harnesses (n of 5)` checks all passed. Main also requires `Test tasks in the pull request`, which holds the test tasks in the body to the bot's rules; when it is red, fix the body, and the edit runs it again. Pending means it is still running. A red check means the branch is not ready. Fix it on the same branch and push again.
 
 ```powershell
-gh pr checks
-gh pr merge --squash
+gh pr merge --auto --squash
+gh pr checks --watch
 git switch main
 git pull
 ```
 
-When `Build check result` says pass, and you are confident in the change, merge it yourself. A merge gets no line in #staff-updates, and neither does the release that carries it. On the website the button is **Squash and merge**. GitHub deletes the branch after a squash merge. A green check is required. Merge a pull request you understand. Leave one you do not.
+Auto-merge is on for the repository (#5182, Patrick's A on 31 Oct). Turn it on for your pull request as soon as it is open and you are confident in the change: GitHub squash-merges it by itself the moment `Build check result` is green, and main's ruleset refuses a merge past red for everybody. On the website the button is **Enable auto-merge**. A merge gets no line in #staff-updates, and neither does the release that carries it. GitHub deletes the branch after a squash merge. Turn auto-merge on only for a pull request you understand. Leave one you do not.
 
 What you run after the merge depends on what the pull request touched. A dev release is [section 3](#3-how-to-release-to-dev). A main release is [section 4](#4-how-to-release-to-main).
 
@@ -1127,6 +1130,19 @@ the fix commit is in the newest `release/main/` tag, and no staff or dev
 command. Known issues: open, no merged pull request names it, no test task.
 One post per issue per forum. The bot's token needs issues write to comment.
 
+The same rules run on a pull request before it merges (#5199). The check
+`Test tasks in the pull request` (`.github\workflows\test-tasks.yml`, with
+`bot\pr_tasks.py`) reads each `Test task for #N:` block in the body the way
+done-on-merge.yml will copy it, and calls `post_problems` on it for the forum
+its Server line names. It also refuses what only a pull request gets wrong:
+two of one kind for one issue, a Main one longer than the bot's first post,
+a body that also says `Closes #N` for that issue (the merge would close it
+before the test task is copied), and an issue that is closed or is not an
+issue. Main's ruleset requires it beside `Build check result`. A body with
+no test task passes. When it is red, edit the body; the edit runs it again.
+To run it on a body before you push:
+`python bot\pr_tasks.py --file <the body, saved as a file>`.
+
 Three Discord forums show testing, and the bot keeps all three from the
 board (`bot\README.md`, Testing). Patrick, 22 Oct: "dev test tasks are for
 things that only devs can test and can still be there while on main; main
@@ -1394,13 +1410,19 @@ The short form of the rules. The same decisions, with the dates they were made, 
   access to on main: a change comes through a pull request (with no approval
   needed), and a force push or deleting main is refused. None of that applies
   to the admin account while `enforce_admins` is off.
-  Because nothing enforces the build check, it has to be kept by hand: on 25 Sep 35 pull
-  requests were merged with their VPS build red and 18 with no build at all,
-  and main went red with them. Wait for `Build check result` to say pass before
-  merging, every time, including your own and including a Claude's. The last
-  GitHub setting, "require branches to be up to date" with no check listed,
-  was removed on 27 Sep at Patrick's word ("we use the VPS's build checker"),
-  so GitHub requires nothing at all now.
+  Branch protection still enforces no build check, but main's ruleset does:
+  on 25 Sep 35 pull requests were merged with their VPS build red and 18 with
+  no build at all, and main went red with them, so since 31 Oct (#3683,
+  `records/github-repo-settings.json`) the ruleset named main requires
+  `Build check result` and has an empty bypass list. A ruleset holds the
+  admin account too, whatever `enforce_admins` says, so GitHub refuses a
+  merge past red for everybody. And since 31 Oct auto-merge is on (#5182,
+  Patrick's A): turn it on when the pull request opens, with
+  `gh pr merge --auto --squash`, and GitHub squash-merges it the moment
+  `Build check result` is green, so nobody waits to press merge. Turning it on
+  is the moment you say you are confident in the change. The last classic
+  setting, "require branches to be up to date" with no check listed, was
+  removed on 27 Sep at Patrick's word ("we use the VPS's build checker").
   What changed on 23 Sep, since 22 Sep: the review requirement was one
   approving review, which Patrick could not give himself and had to override
   with `--admin` on every one of his own pull requests, and it is now zero.
@@ -1610,11 +1632,12 @@ this is the long form.
   still has to come through a pull request, and a force push or deleting
   main is refused; with `enforce_admins` off, GitHub holds an admin to none
   of main's rules. The build check,
-  `Launcher builds` in `.github/workflows/build.yml`, runs on every pull
-  request on the VPS runner, and the rule is ours rather than a setting:
-  merge your own pull request once it is green, and you are confident in the change. Nothing merges by itself: auto-merge is off on the repository, so
-  somebody presses merge or runs `gh pr merge --squash`. Each of us merges
-  our own. Somebody else on the team reading a pull request first is a habit,
+  `Build check result` in `.github/workflows/build-pr.yml`, runs on every pull
+  request on GitHub's runners, and main's ruleset makes it a setting, not only
+  a rule of ours:
+  turn on auto-merge for your own pull request when you are confident in the
+  change, and GitHub merges it once `Build check result` is green, which main's
+  ruleset requires of everybody (#5182). Each of us does this for our own. Somebody else on the team reading a pull request first is a habit,
   not a setting. `.github/CODEOWNERS` asks the rest of the team for a review when
   a pull request touches one of the shared files, and blocks nothing while
   the code owner review is off. The settings change without a commit, so
@@ -2014,7 +2037,7 @@ release, launcher, game files and server together, are in How work moves.
 | Voice | `C:\Thornswood-Voice` 7778 and `C:\Thornswood-Voice-Dev` 7789 | node, `voice\voice-server.js`; the launcher holds the microphone, the game plugin relays state through files in `Data\Platform` |
 | Site | `site`, on the VPS at `C:\Thornswood-Docs`, node on 127.0.0.1:3001 behind Caddy, https://thornswood.net | Public pages from `data\site\*.md`, admin hub, Discord login, the door API, uploads, news |
 | Bot | `bot`, on the VPS at `C:\Thornswood-Bot`, the Windows service `ThornswoodBot` under its own account, `NT SERVICE\ThornswoodBot` | discord.py: tickets, join cards, staff tools |
-| Watchdog | `C:\Thornswood-Watch\watch.ps1`, every five minutes | Restarts any service that stops answering, three tries an hour, and tells #staff-updates (the id in `bot\staff-channel.txt`) once when anything dies and once when it is back: the servers, voice, the site, the bot, the nightly backup, the build runner and the disk. Through the bot, or its own webhook when the bot is down |
+| Watchdog | `C:\Thornswood-Watch\watch.ps1`, every five minutes | Restarts any service that stops answering, three tries an hour, and tells #staff-updates (the id in `bot\staff-channel.txt`) once when anything dies and once when it is back: the servers, voice, the site, the bot, the nightly backup, the build runner and the disk. Through the bot, or its own webhook when the bot is down. A server stopped on purpose is held (`C:\Thornswood-Watch\holds`, #5155): left alone until its hold runs out, 30 minutes unless the stop says, 2 hours at most, then told once and started. Every script that stops a server writes and removes its own hold; a stop by hand in a run note is held with `.\scripts\vps\Hold-Server.ps1 -Service <name> -Why "<why>"` first and `-Clear` after, or from a cloud thread `pwsh scripts/vps/Box-Run.ps1 -Line 'Hold-Server -Service <name> -Why "<why>"'`. Its install is the gate verb `Watch-Services -Install` |
 
 The server's SkyMP fork is on GitHub (github.com/EvilPatrick06/skymp, branch
 `thornswood/engine-changes`), so its source survives any one machine, and since

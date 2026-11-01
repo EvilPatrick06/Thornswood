@@ -93,6 +93,14 @@ try {
     T ($x.Report -match '\| file \| C:\\Thornswood-Caddy\\Caddyfile \|[^\n]*\| same \| ok \|') 'the live Caddyfile is compared with scripts\deploy\Caddyfile'
     T ($x.Report -match 'botKey \(string\)' -and $x.Report -notmatch 'PLANTED') 'the report carries setting names and types only'
 
+    # The deploy gate's verb names one folder for both files (-Out), which the
+    # broker sends back to a cloud thread.
+    $od = Join-Path $scratch 'out'
+    New-Item -ItemType Directory -Path $od | Out-Null
+    Copy-Item (Join-Path $scratch 'facts.json') (Join-Path $od 'prod-facts.json')
+    $o = & $ps51 -NoProfile -ExecutionPolicy Bypass -File $check -Out $od -Now '2026-10-11T12:00:00Z' 2>&1 | Out-String
+    T ($LASTEXITCODE -eq 0 -and (Test-Path (Join-Path $od 'prod-parity.md'))) '-Out reads prod-facts.json from the folder and writes prod-parity.md beside it'
+
     $b = Facts
     ($b.listeners | Where-Object { $_.port -eq 3001 }).address = '0.0.0.0'
     $b.listeners += @{ proto = 'tcp'; address = '0.0.0.0'; port = 8080; process = 'node' }

@@ -63,7 +63,7 @@ function Import-Functions([string]$rel, [string[]]$names) {
 }
 
 $gateFiles = @('scripts/vps/gate/Gate.ps1', 'scripts/vps/gate/GateBroker.ps1', 'scripts/vps/gate/GateRules.ps1')
-$all = $gateFiles + @('scripts/deploy/Install-Gate.ps1', 'scripts/vps/Box-Run.ps1', 'scripts/vps/Grant-BoxAccess.ps1')
+$all = $gateFiles + @('scripts/vps/gate/Update-Gate.ps1', 'scripts/deploy/Install-Gate.ps1', 'scripts/vps/Box-Run.ps1', 'scripts/vps/Grant-BoxAccess.ps1')
 
 # ---- 1. parses, and plain ASCII where 5.1 reads it ---------------------------
 foreach ($f in $all) {
@@ -91,6 +91,69 @@ Yes 'an enum value outside its list is refused' ((Words 'Deploy-DevGamemode -Npc
 # nothing else, never the folder it reads.
 Yes 'Read-LauncherStarts takes -Days, a number, and nothing else' ((Words 'Read-LauncherStarts -Days 7') -eq '-Days|7' -and (Words 'Read-LauncherStarts') -eq '' -and
     (Words 'Read-LauncherStarts -Days week') -eq 'REFUSED' -and (Words 'Read-LauncherStarts -Folder x') -eq 'REFUSED')
+# The box's read only checks, which only One could run before (the cloud
+# reaches neither game port nor the box's shell): each takes nothing a caller
+# could steer, and Check-ProdParity sends its facts and report back.
+foreach ($check in 'Read-Online', 'Check-LiveGamemode', 'Check-ServiceOwners', 'Check-ProdParity') {
+    Yes "$check takes no parameter of the caller's" ((Words "$check -Vps x") -eq 'REFUSED' -and (Words "$check -User x") -eq 'REFUSED' -and (Words $check) -ne 'REFUSED')
+}
+Yes '  Check-LiveGamemode never waits for Enter, and Check-ProdParity collects into the run''s folder' ((Words 'Check-LiveGamemode') -eq '-NoPause' -and
+    (Words 'Check-ProdParity') -eq '-Collect' -and (Test-ThornswoodGateRequest -Line 'Check-ProdParity' -Verbs $verbs).Out -eq '-Out' -and
+    (Words 'Check-ProdParity -Facts x') -eq 'REFUSED' -and (Words 'Check-ProdParity -Record x') -eq 'REFUSED')
+# The box installs and reads that only One could run before (#2862): each
+# runs main's script with fixed words, and takes no host, user, folder,
+# address or webhook from the caller.
+Yes 'Install-Bridge takes -Status, -Record and -Wait, never -Remove or a site' ((Words 'Install-Bridge -Record') -eq '-NoPause|-Record' -and (Words 'Install-Bridge -Status') -eq '-NoPause|-Status' -and
+    (Words 'Install-Bridge -Remove') -eq 'REFUSED' -and (Words 'Install-Bridge -Site x') -eq 'REFUSED' -and (Words 'Install-Bridge -AsSystem') -eq 'REFUSED')
+Yes 'Setup-Domain takes -TaskOnly and -SkipDnsCheck, never a domain, an address or another Caddy' ((Words 'Setup-Domain -TaskOnly') -eq '-TaskOnly' -and
+    (Words 'Setup-Domain -Domain x.net') -eq 'REFUSED' -and (Words 'Setup-Domain -Email a') -eq 'REFUSED' -and (Words 'Setup-Domain -CaddyVersion 1') -eq 'REFUSED' -and (Words 'Setup-Domain -AsSystem') -eq 'REFUSED')
+Yes 'Read-Availability reads the box''s own alerts.jsonl over -Days, never a path' ((Words 'Read-Availability -Days 28') -eq '-NoPause|-Days|28' -and (Words 'Read-Availability -Path x') -eq 'REFUSED')
+Yes 'Send-Backups installs with an IPv4 address only, reads its status, or sends; never another root, folder or user' ((Words 'Send-Backups -Install -VmHost 10.0.0.5') -eq '-NoPause|-Install|-VmHost|10.0.0.5' -and
+    (Words 'Send-Backups') -eq '-NoPause' -and (Words 'Send-Backups -Status') -eq '-NoPause|-Status' -and
+    (Words 'Send-Backups -Install -VmHost vm.example') -eq 'REFUSED' -and (Words 'Send-Backups -Root x') -eq 'REFUSED' -and
+    (Words 'Send-Backups -WatchRoot x') -eq 'REFUSED' -and (Words 'Send-Backups -Days 400') -eq 'REFUSED')
+Yes 'Start-Backup takes nothing: it starts the nightly''s own task' ((Words 'Start-Backup') -eq '-NoPause' -and (Words 'Start-Backup -TaskName x') -eq 'REFUSED' -and (Words 'Start-Backup -Minutes 1') -eq 'REFUSED')
+Yes 'Set-InboundRules takes -Check and -Own, never another box, user, record or known_hosts' ((Words 'Set-InboundRules -Own -Check') -eq '-NoPause|-Own|-Check' -and
+    (Words 'Set-InboundRules -Vps x') -eq 'REFUSED' -and (Words 'Set-InboundRules -Record x') -eq 'REFUSED' -and (Words 'Set-InboundRules -KnownHosts x') -eq 'REFUSED')
+Yes 'Setup-Discord runs on the box and only audits or checks: -Prune, -Posts, -Give and another guild wait for Patrick' ((Words 'Setup-Discord -Audit') -eq '-OnBox|-Audit' -and
+    (Words 'Setup-Discord -Prune') -eq 'REFUSED' -and (Words 'Setup-Discord -Posts') -eq 'REFUSED' -and (Words 'Setup-Discord -Give x') -eq 'REFUSED' -and (Words 'Setup-Discord -Guild 1') -eq 'REFUSED')
+# What has a server's folder open, read on the box (#5211): live or dev, and
+# a minute of Defender's log, never a folder, a file or a process of the caller's.
+Yes 'Read-ServerHolders takes live or dev and a UTC minute of Defender''s log, never a folder, file or task' ((Words 'Read-ServerHolders') -eq '' -and
+    (Words 'Read-ServerHolders -Server dev') -eq '-Server|dev' -and (Words 'Read-ServerHolders -Server main') -eq 'REFUSED' -and
+    (Words 'Read-ServerHolders -DefenderFrom 2026-11-01T00:59 -DefenderMinutes 3') -eq '-DefenderFrom|2026-11-01T00:59|-DefenderMinutes|3' -and
+    (Words 'Read-ServerHolders -DefenderFrom yesterday') -eq 'REFUSED' -and (Words 'Read-ServerHolders -DefenderMinutes 100') -eq 'REFUSED' -and
+    (Words 'Read-ServerHolders -Root C:/x') -eq 'REFUSED' -and (Words 'Read-ServerHolders -Path x') -eq 'REFUSED' -and (Words 'Read-ServerHolders -TaskName x') -eq 'REFUSED')
+$rh = Text 'scripts/vps/Read-ServerHolders.ps1'
+Yes '  it finds the server''s processes by the installer''s own rule and reads only: no Stop-, no Remove-, no Set-, no Move' (
+    $rh.Contains("`$p.CommandLine.IndexOf(`$mark, [StringComparison]::OrdinalIgnoreCase)") -and $rh.Contains('Get-ThornswoodPathOpeners $Root') -and
+    (($rh -replace '(?s)<#.*?#>', '') -notmatch 'Stop-Process|Stop-ScheduledTask|Remove-Item|Set-Content|Set-MpPreference|Add-MpPreference|Move-ThornswoodPath|\.Kill\('))
+Yes 'Check-Site takes nothing of the caller''s' ((Words 'Check-Site') -eq '-NoPause' -and (Words 'Check-Site -Who 1') -eq 'REFUSED' -and (Words 'Check-Site -Site x') -eq 'REFUSED')
+# Box keys and runners, renewed from the cloud and never made new (#2862,
+# Patrick's A on q-retire-box-keys, 31 Oct 2026).
+Yes 'Renew-BoxKey takes desk or notices and nothing else: no name, environment, repository or file' ((Words 'Renew-BoxKey -Which desk') -eq '-NoPause|-Which|desk' -and
+    (Words 'Renew-BoxKey -Which notices') -eq '-NoPause|-Which|notices' -and (Words 'Renew-BoxKey -Which cloud') -eq 'REFUSED' -and
+    (Words 'Renew-BoxKey -Which desk -AdminState x') -eq 'REFUSED' -and (Words 'Renew-BoxKey -Name djinn') -eq 'REFUSED')
+Yes 'Install-Runner runs from the gate with a number, -Status, -Lock or -NetworkOnly: never -Remove, -OffBox, another repository, name or folder' (
+    (Words 'Install-Runner -Number 2') -eq '-FromGate|-AllowHost|pypi.org,files.pythonhosted.org,registry.npmjs.org|-NoPause|-Number|2' -and
+    (Words 'Install-Runner -Number 2 -Status') -ne 'REFUSED' -and (Words 'Install-Runner -Remove') -eq 'REFUSED' -and (Words 'Install-Runner -OffBox') -eq 'REFUSED' -and
+    (Words 'Install-Runner -Repo x/y') -eq 'REFUSED' -and (Words 'Install-Runner -RunnerName x') -eq 'REFUSED' -and (Words 'Install-Runner -Root C:/x') -eq 'REFUSED' -and
+    (Words 'Install-Runner -Number 100') -eq 'REFUSED' -and (Words 'Install-Runner -AllowHost x') -eq 'REFUSED')
+$rk = Text 'scripts/vps/Renew-BoxKey.ps1'
+Yes '  Renew-BoxKey keeps the old line until the secret holds the new key, and puts the file back on any stop before that' (
+    $rk.IndexOf('[IO.File]::WriteAllLines($KeysFile, [string[]](@($have) + $newLine)') -gt 0 -and
+    $rk.IndexOf('[IO.File]::WriteAllLines($KeysFile, [string[]](@($have) + $newLine)') -lt $rk.IndexOf('& $ssh -n -F none -i $keyFile') -and
+    $rk.IndexOf('& $ssh -n -F none -i $keyFile') -lt $rk.IndexOf('& gh secret set $K.Secret') -and
+    $rk.IndexOf('& gh secret set $K.Secret') -lt $rk.IndexOf('Where-Object { $old -notcontains $_ }') -and
+    $rk.Contains('if ($changed -and -not $done) { [IO.File]::WriteAllBytes($KeysFile, $before) }'))
+Yes '  its key goes only to the two fixed secrets of the ops repository, with the old line''s options and the App''s environments token' (
+    $rk.Contains("`$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'") -and $rk.Contains("Secret = 'DESK_KEY_B64'") -and $rk.Contains("Secret = 'NOTICE_KEY_B64'") -and
+    $rk.Contains('$newLine = $opts + '' '' + $bare + $tag') -and $rk.Contains('Get-ThornswoodOpsAccess -Repo $RepoRoot -For keys') -and
+    $rk.Contains('does not let in main alone'))
+$ir = Text 'scripts/deploy/Install-Runner.ps1'
+Yes '  Install-Runner from the gate is the ops repository''s, with the App''s runners token, and puts back only a runner the records or GitHub already name' (
+    $ir.Contains("`$Repo = 'EvilPatrick06/Thornswood-Ops'") -and $ir.Contains('Get-ThornswoodOpsAccess -Repo') -and $ir.Contains('-For runners') -and
+    $ir.Contains('is in no runner record and not registered on') -and $ir.IndexOf('function Invoke-Gh') -lt $ir.IndexOf('is in no runner record and not registered on'))
 # Publish-Server through the gate is the dev server's, from the box's store,
 # and nothing else (#4987): main stays with a Main run Patrick approves.
 Yes 'Publish-Server is held to -Channel dev' ((Words 'Publish-Server') -eq '-Channel|dev' -and
@@ -136,10 +199,24 @@ $rebuild = Text 'scripts/mods/Rebuild-OnBox.ps1'
 Yes '  a pull request by number and its full head commit' ((Words "Rebuild-ContentTables -Pull 4835 -Head $sha") -eq "-Pull|4835|-Head|$sha" -and
     (Words 'Rebuild-ContentTables -Pull 0') -eq 'REFUSED' -and (Words 'Rebuild-ContentTables -Head abc') -eq 'REFUSED' -and (Words 'Rebuild-ContentTables -Pull x') -eq 'REFUSED')
 Yes '  it takes only the listed data files from the pull request, held to its head, and commits them for Run-OnBox.ps1' (
-    $rebuild.Contains("`$DataFromPull = @('game/content/Thornswood-Content.esp', 'records/recipe-owners.json')") -and
+    $rebuild.Contains("`$DataFromPull = @('game/content/Thornswood-Content.esp', 'records/recipe-owners.json', 'game/data/last-plugin-policy.json', 'scripts/mods/content-salvaged.json')") -and
     $rebuild.Contains("'checkout', `$Head, '--', `$p") -and $rebuild.Contains('if ($at -cne $Head)') -and $rebuild.Contains("'commit', '--quiet', '--allow-empty'") -and
     $rebuild.IndexOf("'commit', '--quiet'") -lt $rebuild.IndexOf("Run-OnBox.ps1')"))
 Yes '  and no file of the list is a script' (@([regex]::Match($rebuild, '\$DataFromPull = @\(([^)]*)\)').Groups[1].Value -split ',' | Where-Object { $_ -match '\.(ps1|psm1|py|js|cmd|bat|exe|dll)''' }).Count -eq 0)
+# The stations first (#1387): main's Build-StationSites.py measures them over
+# the server's plugins, main's Add-ContentRecords.py writes the plugin from
+# that table, each committed in the checkout, and then the chain.
+Yes '  -Stations is a switch, with a pull request or without' ((Words "Rebuild-ContentTables -Stations -Pull 1387 -Head $sha") -eq "-Stations|-Pull|1387|-Head|$sha" -and
+    (Words 'Rebuild-ContentTables -Stations') -eq '-Stations' -and (Words 'Rebuild-ContentTables -Stations yes') -eq 'REFUSED')
+$sites = $rebuild.IndexOf("'scripts/dev/Build-StationSites.py' '--data' '{data}' -Server `$Server -Out `$Out")
+$records = $rebuild.IndexOf("'scripts/mods/Add-ContentRecords.py' '--masters' '{data}' -Server `$Server -Out `$Out")
+$chain = $rebuild.IndexOf("'scripts/mods/Rebuild-ContentTables.ps1' '-Data'")
+Yes '  with it the stations are measured, then the plugin written, then the chain runs' ($rebuild.Contains('if ($Stations) {') -and $sites -gt 0 -and $records -gt $sites -and $chain -gt $records)
+Yes '  each step is committed, new files and all, before the next is sent' (
+    $rebuild.IndexOf("Save-Step 'Build-StationSites.py'") -gt $sites -and $rebuild.IndexOf("Save-Step 'Build-StationSites.py'") -lt $records -and
+    $rebuild.IndexOf("Save-Step 'Add-ContentRecords.py'") -gt $records -and $rebuild.IndexOf("Save-Step 'Add-ContentRecords.py'") -lt $chain -and
+    $rebuild.Contains("Invoke-PullGit @('add', '--all')"))
+Yes '  and a step that fails stops the run before the chain' (([regex]::Matches($rebuild, 'if \(\$LASTEXITCODE -ne 0\) \{ Write-Host "STOP\. (Build-StationSites|Add-ContentRecords)\.py ended')).Count -eq 2)
 Yes '  it runs the chain by Run-OnBox.ps1, its words quoted so none is read as a parameter' ($rebuild.Contains("'scripts/mods/Rebuild-ContentTables.ps1' '-Data' '{data}' '-PluginsTxt' '{plugins}' -Server `$Server -Out `$Out"))
 Yes '  and Run-OnBox.ps1 copies what came back into -Out as well as the checkout' ((Text 'scripts/mods/Run-OnBox.ps1').Contains('foreach ($into in @($repo, $Out | Where-Object { $_ }))'))
 # The Ship verbs (Patrick's A, 30 Oct 2026: the box admin App mints the
@@ -361,6 +438,48 @@ Yes '  and the installer no longer puts a verbs.json beside the broker, and take
     (Text 'scripts/deploy/Install-Gate.ps1') -notmatch "\$Files = @\([^)]*verbs\.json" -and (Text 'scripts/deploy/Install-Gate.ps1').Contains('Remove-Item -LiteralPath (Join-Path `$root ''verbs.json'') -Force'))
 Yes 'what runs is the tip of main: fetched into origin/main and checked out from it' (
     $brokerCode.Contains("'+refs/heads/main:refs/remotes/origin/main'") -and $brokerCode.Contains("'--detach', 'refs/remotes/origin/main'") -and $brokerCode.Contains("'clean', '-ffdxq'"))
+Yes '  and each fetched submodule is brought to main''s pin after the checkout, never left at the old one' (
+    $brokerCode.Contains("'submodule', 'update', '--checkout', '--force', '--depth', '1'") -and -not $brokerCode.Contains("'submodule', 'update', '--init'") -and
+    $brokerCode.IndexOf("'submodule', 'update'") -gt $brokerCode.IndexOf("'--detach', 'refs/remotes/origin/main'"))
+# The same steps, run with git on a checkout whose submodule main moved
+# (31 Oct: the gate's engine\skymp stayed at d258e53e when main pinned
+# 50736fe6, and every verb's freshness check refused the checkout).
+$gitExe = (Get-Command git -ErrorAction SilentlyContinue)
+if (-not $gitExe) { Write-Host 'SKIP: the submodule move needs git' -ForegroundColor Yellow } else {
+    $sm = Join-Path ([IO.Path]::GetTempPath()) ('tw-2841-sub-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+    New-Item -ItemType Directory -Path $sm -Force | Out-Null
+    function SmGit([string]$dir) { $a = @('-c', 'protocol.file.allow=always', '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'init.defaultBranch=main', '-C', $dir) + $args; $o = & git @a 2>&1; return [pscustomobject]@{ Code = $LASTEXITCODE; Out = @($o | ForEach-Object { [string]$_ }) } }
+    try {
+        $fork = Join-Path $sm 'fork'; $up = Join-Path $sm 'up'
+        New-Item -ItemType Directory -Path $fork, $up -Force | Out-Null
+        [void](SmGit $fork init -q); [void](SmGit $fork config uploadpack.allowAnySHA1InWant true)
+        Set-Content -LiteralPath (Join-Path $fork 'a.txt') -Value 'one'; [void](SmGit $fork add -A); [void](SmGit $fork commit -qm one)
+        $pinA = ((SmGit $fork rev-parse HEAD).Out -join '').Trim()
+        [void](SmGit $up init -q); [void](SmGit $up submodule add -q $fork engine/skymp); [void](SmGit $up commit -qm pinA)
+        $gate = Join-Path $sm 'gate'
+        [void](SmGit $sm clone -q --depth 1 --no-tags --branch main ('file://' + $up.Replace('\', '/')) $gate)
+        [void](SmGit $gate submodule update --init --depth 1)
+        Set-Content -LiteralPath (Join-Path $fork 'a.txt') -Value 'two'; [void](SmGit $fork commit -qam two)
+        $pinB = ((SmGit $fork rev-parse HEAD).Out -join '').Trim()
+        [void](SmGit (Join-Path $up 'engine/skymp') fetch -q origin); [void](SmGit (Join-Path $up 'engine/skymp') checkout -q $pinB)
+        [void](SmGit $up add engine/skymp); [void](SmGit $up commit -qm pinB)
+        $steps = @(
+            @('fetch', '--quiet', '--depth', '1', '--no-tags', 'origin', '+refs/heads/main:refs/remotes/origin/main'),
+            @('checkout', '--quiet', '--force', '--detach', 'refs/remotes/origin/main'),
+            @('clean', '-ffdxq'))
+        foreach ($st in $steps) { [void](SmGit $gate @st) }
+        $before = ((SmGit (Join-Path $gate 'engine/skymp') rev-parse HEAD).Out -join '').Trim()
+        Yes '  (without the move, the submodule stays at the old pin, as the gate''s did)' ($before -eq $pinA -and $pinA -ne $pinB)
+        $r = SmGit $gate submodule update --checkout --force --depth 1
+        $after = ((SmGit (Join-Path $gate 'engine/skymp') rev-parse HEAD).Out -join '').Trim()
+        $status = (SmGit $gate status --porcelain).Out -join ' '
+        Yes '  the move takes the fetched submodule to the new pin, and leaves no change behind' ($r.Code -eq 0 -and $after -eq $pinB -and -not $status.Trim())
+        $bare = Join-Path $sm 'gate2'
+        [void](SmGit $sm clone -q --depth 1 --no-tags --branch main ('file://' + $up.Replace('\', '/')) $bare)
+        $r2 = SmGit $bare submodule update --checkout --force --depth 1
+        Yes '  and a submodule never fetched stays unfetched' ($r2.Code -eq 0 -and -not (Test-Path -LiteralPath (Join-Path $bare 'engine/skymp/a.txt')))
+    } finally { Remove-Item -LiteralPath $sm -Recurse -Force -ErrorAction SilentlyContinue }
+}
 Yes 'a live verb runs only when main is at the build it named, checked after the fetch' ($brokerCode.Contains('if ($req.Build -and $req.Build -cne $commit)') -and
     $brokerCode.IndexOf('if ($req.Build -and $req.Build -cne $commit)') -gt $brokerCode.IndexOf('$commit = Update-Checkout') -and
     $brokerCode.IndexOf('if ($req.Build -and $req.Build -cne $commit)') -lt $brokerCode.IndexOf('Invoke-Child ([string]$Cfg.pwsh)'))
@@ -531,7 +650,60 @@ $small = [Security.Cryptography.RSA]::Create(2048)
 $threw = $false; try { [void](Protect-ThornswoodSealed $plain ([Convert]::ToBase64String($small.ExportSubjectPublicKeyInfo()))) } catch { $threw = $true }
 Yes '  a recipient key under 3072 bits is refused' $threw
 $br = Text 'scripts/vps/Box-Run.ps1'
-Yes 'the box half uses the Microsoft-signed ssh.exe by its full path' ($br.Contains("& `$sshExe @sshArgs (`$GateUser + '@127.0.0.1') `$Line") -and $br.Contains('Get-AuthenticodeSignature') -and $br.Contains("O=Microsoft Corporation"))
+Yes 'the box half uses the Microsoft-signed ssh.exe by its full path' ($br.Contains("& `$sshExe @sshArgs (`$GateUser + '@127.0.0.1') `$GateLine") -and $br.Contains('Get-AuthenticodeSignature') -and $br.Contains("O=Microsoft Corporation"))
+# The gate follows main (#5178): the broker's ping names the copies of its
+# three files it runs, and Box-Run sends Update-Gate before any verb when they
+# are not main's, so a merged gate fix needs nobody on One.
+$fdir = Join-Path ([IO.Path]::GetTempPath()) ('gate-files-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path (Join-Path $fdir 'lf'), (Join-Path $fdir 'crlf') | Out-Null
+foreach ($n in 'Gate.ps1', 'GateBroker.ps1', 'GateRules.ps1') {
+    [IO.File]::WriteAllText((Join-Path $fdir "lf/$n"), "line one`nline two $n`n")
+    [IO.File]::WriteAllText((Join-Path $fdir "crlf/$n"), "line one`r`nline two $n`r`n")
+}
+$lfLine = Get-ThornswoodGateFileLine (Join-Path $fdir 'lf')
+Yes 'the gate''s file line names all three files with a sha256 each' ($lfLine -match '^Gate\.ps1=[0-9a-f]{64} GateBroker\.ps1=[0-9a-f]{64} GateRules\.ps1=[0-9a-f]{64}$')
+Yes '  a CRLF checkout and an LF one give the same line' ($lfLine -ceq (Get-ThornswoodGateFileLine (Join-Path $fdir 'crlf')))
+[IO.File]::WriteAllText((Join-Path $fdir 'crlf/GateRules.ps1'), "line one`nline three`n")
+Yes '  a changed file changes it' ($lfLine -cne (Get-ThornswoodGateFileLine (Join-Path $fdir 'crlf')))
+Remove-Item -LiteralPath (Join-Path $fdir 'crlf/Gate.ps1')
+Yes '  and a missing one is none' ((Get-ThornswoodGateFileLine (Join-Path $fdir 'crlf')) -match '^Gate\.ps1=none ')
+Remove-Item -LiteralPath $fdir -Recurse -Force
+$gb = Text 'scripts/vps/gate/GateBroker.ps1'
+Yes 'the broker''s ping prints the line for the copies it runs from' ($gb.Contains("Send ('| GATE FILES ' + (Get-ThornswoodGateFileLine `$Root))") -and $gb.IndexOf('GATE FILES') -lt $gb.IndexOf("Log 'PING'"))
+$pi = $br.IndexOf("Invoke-GateLine 'ping'"); $ui = $br.IndexOf("Invoke-GateLine 'Update-Gate'"); $li = $br.IndexOf('Invoke-GateLine $Line')
+Yes 'Box-Run pings, then sends Update-Gate when the copies are not main''s, then the verb' ($pi -gt 0 -and $ui -gt $pi -and $li -gt $ui -and
+    $br.Contains("Get-ThornswoodGateFileLine (Join-Path `$Here 'gate')") -and $br.Contains('if ($have -ne $want)'))
+Yes '  never for ping or Update-Gate itself, and it sends no verb when the gate is still behind after one Update-Gate' (
+    $br.Contains("if (`$req.Verb -cne 'ping' -and `$req.Verb -cne 'Update-Gate')") -and $br.Contains('if (-not $refused) {') -and
+    ([regex]::Matches($br, "Invoke-GateLine 'Update-Gate'")).Count -eq 1)
+# Update-Gate (#5178): main's three files go into the installed ones, which
+# keep their access lists, the old copies are kept, and the broker hands
+# over by itself once the request that changed its files has answered.
+$ug = Join-Path $Repo 'scripts/vps/gate/Update-Gate.ps1'
+$groot = Join-Path ([IO.Path]::GetTempPath()) ('update-gate-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $groot | Out-Null
+foreach ($n in 'Gate.ps1', 'GateBroker.ps1', 'GateRules.ps1') { [IO.File]::WriteAllText((Join-Path $groot $n), "# the old $n`n") }
+[IO.File]::WriteAllText((Join-Path $groot 'gate.json'), '{"commit":"' + ('0' * 40) + '","git":"git"}')
+$o = & pwsh -NoProfile -File $ug -Root $groot -NoRestart 2>&1 | Out-String
+$head = (& git -C $Repo rev-parse HEAD).Trim()
+Yes 'Update-Gate puts main''s three files in place and records main''s commit' ($LASTEXITCODE -eq 0 -and $o -match 'CHANGED Gate\.ps1, GateBroker\.ps1, GateRules\.ps1' -and
+    (Get-ThornswoodGateFileLine $groot) -ceq (Get-ThornswoodGateFileLine (Join-Path $Repo 'scripts/vps/gate')) -and
+    ([IO.File]::ReadAllText((Join-Path $groot 'gate.json')) | ConvertFrom-Json).commit -eq $head)
+$kept = @(Get-ChildItem -LiteralPath (Join-Path $groot 'update') -Directory)
+Yes '  and keeps the files it replaced' ($kept.Count -eq 1 -and [IO.File]::ReadAllText((Join-Path $kept[0].FullName 'Gate.ps1')) -eq "# the old Gate.ps1`n")
+$o = & pwsh -NoProfile -File $ug -Root $groot -NoRestart 2>&1 | Out-String
+Yes '  a second run changes nothing' ($LASTEXITCODE -eq 0 -and $o -match 'ALREADY')
+$o = & pwsh -NoProfile -File $ug -Root $groot 2>&1 | Out-String
+Yes '  outside the gate it refuses' ($LASTEXITCODE -eq 1 -and $o -match 'Nothing was changed')
+Remove-Item -LiteralPath $groot -Recurse -Force
+$ugt = Text 'scripts/vps/gate/Update-Gate.ps1'
+Yes '  each new file must parse first, and the old ones go back when the new broker does not start' ($ugt.Contains('[Management.Automation.Language.Parser]::ParseFile($src') -and
+    $ugt.Contains("did not start, so the files it replaced were put back from") -and $ugt.Contains("[IO.FileMode]::Truncate"))
+Yes '  its restart task starts at once and waits for the broker to end, never for a set time' ($ugt.Contains("Start-ScheduledTask -TaskName 'Thornswood Gate Update'") -and
+    $ugt -notmatch 'New-ScheduledTaskTrigger' -and $ugt -notmatch 'Start-Sleep -Seconds 3')
+Yes 'the broker ends once a request has changed its files on disk, without opening the pipe again' ($gb.Contains('$StartedOn = Get-ThornswoodGateFileLine $Root') -and
+    $gb.Contains("Log ('BROKER handing over: its files on disk are now ' + `$onDisk); break") -and $gb.IndexOf('BROKER handing over') -gt $gb.IndexOf('$pipe.Dispose()'))
+Yes 'Update-Gate is a verb that takes nothing' ((Words 'Update-Gate') -eq '' -and (Words 'Update-Gate -Root x') -eq 'REFUSED' -and (Words 'Update-Gate -NoRestart') -eq 'REFUSED')
 Yes '  with the host keys held to the checkout''s pins, in a known_hosts of the run''s own' ($br.Contains('Get-ThornswoodVpsCommitted') -and $br.Contains("UserKnownHostsFile=`$knownHosts") -and $br.Contains("'-F', 'none'"))
 Yes '  and prints none of the verb''s output into the run''s log' ($br -notmatch 'Write-Host \$Matches\[1\]' -and $br.Contains("[IO.File]::AppendAllText(`$out, `$Matches[1]"))
 

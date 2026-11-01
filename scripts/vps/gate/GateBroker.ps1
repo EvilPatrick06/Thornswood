@@ -191,7 +191,13 @@ function Update-Checkout {
     foreach ($step in @(
         @('-C', $Repo, 'fetch', '--quiet', '--depth', '1', '--no-tags', 'origin', '+refs/heads/main:refs/remotes/origin/main'),
         @('-C', $Repo, 'checkout', '--quiet', '--force', '--detach', 'refs/remotes/origin/main'),
-        @('-C', $Repo, 'clean', '-ffdxq'))) {
+        @('-C', $Repo, 'clean', '-ffdxq'),
+        # A checkout moves its submodules only when told to, so a fetched
+        # engine\skymp stayed at the pin before and every verb's freshness
+        # check refused the checkout once main moved the pin (31 Oct, d258e53e
+        # left behind by 50736fe6). This brings each fetched submodule to the
+        # commit main pins; one never fetched here stays unfetched.
+        @('-C', $Repo, 'submodule', 'update', '--checkout', '--force', '--depth', '1'))) {
         $c = Invoke-Child $git $step $Root 10
         if ($c -ne 0) { Send ('| git ' + $step[2] + ' ended ' + $c + ', so main could not be read'); return '' }
     }
@@ -237,6 +243,9 @@ function Invoke-Request($Pipe) {
         $main = if ($tip.Code -eq 0 -and ($tip.Out -join ' ') -match '([0-9a-f]{40})\s+refs/heads/main') { $Matches[1] } else { '' }
         if (-not $main) { Send ('| GATE BROKEN: GitHub did not answer with the deploy key: ' + (($tip.Out | Select-Object -Last 2) -join ' ')); Send '@END 66'; Log 'PING main unreadable'; return }
         Send ('| GATE READY, installed from ' + $Cfg.commit + ', main at ' + $main + ', runs the verbs of main''s scripts/vps/gate/verbs.json')
+        # The copies it runs from, so Box-Run.ps1 can tell whether main's gate
+        # has moved past them (GateRules.ps1, Get-ThornswoodGateFileLine).
+        Send ('| GATE FILES ' + (Get-ThornswoodGateFileLine $Root))
         Send '@END 0'
         Log 'PING'
         return
@@ -288,6 +297,11 @@ function Invoke-Request($Pipe) {
 }
 
 Log ('BROKER started, installed from ' + $Cfg.commit)
+# The copies of its own files it started on. When a request changes them on
+# disk (Update-Gate, #5178), this broker answers that request, ends, and
+# opens the pipe no more, so no caller reaches the old code after that
+# answer; Update-Gate's one-time task starts the task again on the new files.
+$StartedOn = Get-ThornswoodGateFileLine $Root
 while ($true) {
     $pipe = New-GatePipe
     try {
@@ -299,4 +313,7 @@ while ($true) {
         try { if ($pipe.IsConnected) { $pipe.WaitForPipeDrain(); $pipe.Disconnect() } } catch { Log ('HUNG UP before the answer was read: ' + $_.Exception.Message) }
         $pipe.Dispose()
     }
+    $onDisk = Get-ThornswoodGateFileLine $Root
+    if ($onDisk -cne $StartedOn) { Log ('BROKER handing over: its files on disk are now ' + $onDisk); break }
 }
+exit 0

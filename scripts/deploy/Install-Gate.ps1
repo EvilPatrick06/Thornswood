@@ -76,6 +76,8 @@ $Vps = Join-Path (Split-Path -Parent $Here) 'vps'
 . (Join-Path $Vps 'Vps.ps1')
 . (Join-Path $Vps 'Send-Script.ps1')
 . (Join-Path $Vps 'Lock-Folder.ps1')
+# The hold the install writes while it has the gate stopped (#5155).
+. (Join-Path $Vps 'ServerHold.ps1')
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -335,6 +337,10 @@ foreach (`$k in 'github_known_hosts', 'box_known_hosts') { Set-SystemAdminsOnly 
 [IO.File]::WriteAllText((Join-Path `$root 'gate.json'), ((@{ commit = '$Commit'; git = `$git; pwsh = `$pwsh; ssh = `$ssh; gh = `$gh; remote = '$Remote'; deploySid = `$sid } | ConvertTo-Json)), `$utf8)
 
 # ---- the task, SYSTEM from boot, started again on this commit
+# Held from the stop until it is started again (#5155, ServerHold.ps1), like
+# every stop on purpose on the box.
+$(Get-ThornswoodHoldScript -Script 'Install-Gate.ps1')
+Set-ThornswoodHold -Target `$task -Why 'installing the gate broker on a new commit' -By `$HoldBy
 `$t = Get-ScheduledTask -TaskName `$task -EA SilentlyContinue
 if (`$t) { Stop-ScheduledTask -TaskName `$task -EA SilentlyContinue; Unregister-ScheduledTask -TaskName `$task -Confirm:`$false }
 `$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + (Join-Path `$root 'GateBroker.ps1') + '"')
@@ -343,6 +349,7 @@ if (`$t) { Stop-ScheduledTask -TaskName `$task -EA SilentlyContinue; Unregister-
 Register-ScheduledTask -TaskName `$task -Action `$action -Trigger (New-ScheduledTaskTrigger -AtStartup) -Settings `$settings -Principal `$principal | Out-Null
 Start-ScheduledTask -TaskName `$task
 Start-Sleep -Seconds 5
+Clear-ThornswoodHold -Target `$task
 `$state = (Get-ScheduledTask -TaskName `$task).State
 if (`$state -ne 'Running') { 'STOP the task ' + `$task + ' is ' + `$state + ' after its start. Its log: ' + (Join-Path `$root 'log\gate.log'); exit 1 }
 'CHANGED the task ' + `$task + ', SYSTEM from boot, running'

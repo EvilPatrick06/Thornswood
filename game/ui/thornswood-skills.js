@@ -100,11 +100,13 @@
     spellPoints: <number>                what is left to spend
 
     college: { gain: <number>, school: '<taught school>' | null,
-               opens: <ms>, hours: <number>, rooms: [ '<a room, in words>' ] }
+               opens: <ms>, hours: <number>, halls: [ '<a hall, in words>' ] }
       A semester at the College (#1387), sent to anybody magic is open to: a
       mage, or somebody a Master mage taught. opens is when the next semester
-      opens on the server's clock, 0 when one is open now. Study sends
-      'skills:pick study'; a refusal comes back as a note about 'study'.
+      opens on the server's clock, 0 when one is open now. A semester is
+      taken by pressing E at a study desk in one of the halls (Patrick, 22
+      October 2026), and the server answers in the chat: this page sends
+      nothing for it.
 
     apprentice: { took: [ { id, name, half, kind } ], by: [ { id, name, half, kind, stands } ],
                   mastered: [ '<half>' ], sister: { half, rank } | null, used: <n>, of: <n> }
@@ -413,7 +415,7 @@
     */
     college: {
       title: 'College',
-      lead: 'Stand in one of the rooms of the College of Winterhold and press Study, and the College hands you spell points, once a semester. Anywhere else, it says no.',
+      lead: 'Press E at a study desk in one of the halls of the College of Winterhold, and the College hands you spell points, once a semester.',
       rows: []
     },
     /*
@@ -524,7 +526,7 @@
   */
   // ==== PROFESSION_GUIDES ====
   /* Built by scripts/dev/Build-ProfessionGuides.js out of game/data and game/gamemode.js. Do not hand edit. */
-  var GUIDES = {"ladder":{"per":{"advanced":100,"expert":250,"master":600},"rest":{"novice":1.5,"advanced":1.2,"expert":0.9,"master":0.6},"craftRest":15,"party":15,"perSpell":5,"perRank":10,"toolUses":50},"professions":{"warrior":{"halves":{"bulwark":{"count":0,"families":[],"first":[],"race":0,"benches":[],"maneuvers":[["Set","novice",15,45],["Plant","advanced",20,60],["Cover","expert",25,90],["Wall","master",40,180]]},"berserker":{"count":0,"families":[],"first":[],"race":0,"benches":[],"maneuvers":[["Rush","novice",15,30],["Heavy","advanced",20,45],["Break","expert",25,60],["Wreck","master",40,120]]}},"materials":[]},"mage":{"halves":{},"materials":[]},"alchemist":{"halves":{"blightbrewer":{"count":0,"families":[],"first":[],"race":0,"benches":[["Alchemy lab","novice"]]},"physicker":{"count":12,"families":[["Other food and drink",3,3,3,1],["Other goods",1,1,0,0]],"first":["Potion of Minor Healing","Poultice"],"race":0,"benches":[["Alchemy lab","novice"]]}},"materials":[["Blue Mountain Flower",4,"gatherer","advanced","",[],[],0],["Eye of Sabre Cat",3,"hunter","novice","",[],["Sabre Cat","Vale Sabre Cat","Animal Gladiator"],1],["Mudcrab Chitin",3,"hunter","novice","",[],["Mudcrab"],0],["Swamp Fungal Pod",3,"gatherer","advanced","",[],[],0],["Wheat",3,"farmer","advanced","",[],[],0],["Blisterwort",2,"gatherer","expert","",[],[],0],["Snowberries",2,"gatherer","advanced","",[],[],0],["White Cap",2,"gatherer","novice","",[],[],0],["Creep Cluster",1,"gatherer","novice","",[],[],0],["Fire Salts",1,"miner","expert","",[],[],0]]},"cook":{"halves":{"hearthcook":{"count":64,"families":[["Other food and drink",7,9,0,0],["Stews",5,2,4,1],["Meat dishes",7,3,0,1],["Soups",4,2,3,0],["Bread",0,4,0,0],["Vegetable dishes",3,1,0,0],["Cheese",0,3,0,0],["Fish dishes",2,0,0,0],["Chowders",1,0,0,0],["Crab dishes",1,0,0,0],["Ingredients",0,0,0,1]],"first":["First Planting Mead","Beef Stew","Cabbage Soup","Cooked Beef"],"race":0,"benches":[["Cookpot","novice"],["Grain mill","novice"],["Oven","novice"]]},"confectioner":{"count":12,"families":[["Desserts",1,10,1,0]],"first":["Apple Dumpling"],"race":0,"benches":[["Oven","novice"]]}},"materials":[["Salt Pile",46,"miner","novice","",[],[],0],["Butter",23,"farmer","novice","",[],[],0],["Sack of Flour",19,"farmer","advanced","Grain mill",["Wheat"],[],0],["Garlic",16,"gatherer","novice","",[],[],0],["Frost Mirriam",12,"gatherer","novice","",[],[],0],["Lavender",8,"gatherer","novice","",[],[],0],["Chicken's Egg",7,"farmer","novice","",[],[],0],["Juniper Berries",7,"gatherer","novice","",[],[],0],["Snowberries",7,"gatherer","advanced","",[],[],0],["Elves Ear",6,"gatherer","expert","",[],[],0]]},"smith":{"halves":{"platewright":{"count":244,"families":[["Body armour",21,51,11,7],["Helmets",9,21,8,5],["Gauntlets",12,18,6,5],["Armoured boots",8,16,6,5],["Shields",2,9,3,2],["Ingots",11,0,0,0],["Other armour and clothing",2,1,0,0],["Leather",2,0,0,0],["Hats and hoods",0,1,0,0],["Other goods",1,0,0,0],["Robes and body wear",0,1,0,0]],"first":["Fur Armor","Corundum Ingot","Ancient Nord Gauntlets","Fur Helmet"],"race":13,"benches":[["Forge","novice"],["Smelter","novice"],["Tanning rack","novice"],["Skyforge","advanced"]]},"edgewright":{"count":79,"families":[["Swords",1,7,3,2],["War axes",2,6,3,2],["Battleaxes",1,5,2,2],["Greatswords",1,5,2,2],["Maces",2,4,2,2],["Daggers",1,4,2,2],["Warhammers",1,4,2,2],["Other goods",4,0,0,0],["Other weapons",1,0,0,0]],"first":["Key Mold","Iron War Axe","Iron Battleaxe","Iron Dagger"],"race":1,"benches":[["Forge","novice"],["Skyforge","advanced"]]}},"materials":[["Leather Strips",283,"hunter","novice","Tanning rack",["Leather"],[],0],["Iron Ingot",170,"miner","novice","Smelter",["Iron Ore"],["Raven Rock Mine","Halted Stream Camp","Fort Fellhammer Mines"],43],["Steel Ingot",134,"miner","advanced","Smelter",["Corundum Ore","Iron Ore"],["Knifepoint Mine","Dead Drop Mine","Goldenrock Mine"],18],["Leather",80,"hunter","novice","Tanning rack",[],[],0],["Corundum Ingot",41,"miner","advanced","Smelter",["Corundum Ore"],["Knifepoint Mine","Dead Drop Mine","Goldenrock Mine"],18],["Refined Moonstone",30,"miner","expert","Smelter",["Moonstone Ore"],["Soljund's Sinkhole","Mzulft","Mzulft Boilery"],11],["Quicksilver Ingot",25,"miner","advanced","Smelter",["Quicksilver Ore"],["Quicksilver Mine","Blind Cliff Bastion","Altar of Thrond Cave"],10],["Ebony Ingot",21,"miner","master","Smelter",["Ebony Ore"],["Gloombound Mine","Raven Rock Mine","Redbelly Mine"],1],["Orichalcum Ingot",17,"miner","advanced","Smelter",["Orichalcum Ore"],["Bilegulch Mine","Dushnikh Mine","Mor Khazgur Mine"],5],["Netch Leather",16,"hunter","advanced","",[],["Betty Netch","Bull Netch"],0]]},"enchanter":{"halves":{"bladebinder":{"count":13,"families":[["Staves",3,6,4,0]],"first":["Staff of Flames"],"race":0,"benches":[["Arcane enchanter","novice"],["Staff enchanter","novice"]]},"wardweaver":{"count":0,"families":[],"first":[],"race":0,"benches":[["Arcane enchanter","novice"]]}},"materials":[["Heart Stone",13,"miner","master","",[],["Coldcinder Cave","Broken Tusk Mine","Fort Frostmoth"],1],["Unenchanted Destruction Staff",10,"","","",[],[],0],["Unenchanted Restoration Staff",2,"","","",[],[],0],["Unenchanted Conjuration Staff",1,"","","",[],[],0]]},"tailor":{"halves":{"liverywright":{"count":82,"families":[["Robes and body wear",38,0,5,3],["Hats and hoods",15,0,0,1],["Other armour and clothing",0,10,0,0],["Shoes and light boots",7,0,0,0],["Gloves",3,0,0,0]],"first":["Black Robes","Black Cowl","Boots"],"race":2,"benches":[["Forge","novice"],["Loom","novice"],["Tanning rack","advanced"]]},"haberdasher":{"count":171,"families":[["Robes and body wear",43,2,0,3],["Shoes and light boots",31,1,1,6],["Hats and hoods",23,6,1,2],["Other armour and clothing",2,12,6,0],["Other goods",13,4,0,0],["Gloves",6,1,2,6]],"first":["Belted Tunic","Chef's Hat","Boots","Bandage"],"race":23,"benches":[["Forge","novice"],["Loom","novice"],["Tanning rack","novice"]]}},"materials":[["Thread",164,"gatherer","novice","Loom",["Tundra Cotton"],[],0],["Leather",104,"hunter","novice","Tanning rack",[],[],0],["Leather Strips",60,"hunter","novice","Tanning rack",["Leather"],[],0],["Linen Wrap",39,"","","",[],[],0],["Troll Fat",32,"hunter","advanced","",[],["Frost Troll","Troll","Snow Troll"],2],["Fur Plate",19,"hunter","novice","Tanning rack",[],[],0],["Gold Ingot",7,"miner","expert","Smelter",["Gold Ore"],["Kolskeggr Mine","Frossel","Darkshade"],14],["Common Soul Gem",5,"","","",[],[],0],["Dwarven Metal Ingot",4,"","","",[],[],0],["Ebony Ingot",4,"miner","master","Smelter",["Ebony Ore"],["Gloombound Mine","Raven Rock Mine","Redbelly Mine"],1]]},"woodworker":{"halves":{"charburner":{"count":5,"families":[["Other goods",2,1,1,1]],"first":["Poor Charcoal"],"race":0,"benches":[["Charcoal kiln","novice"]]},"woodwright":{"count":44,"families":[["Other goods",14,0,1,1],["Arrows and bolts",3,5,3,2],["Bows",0,4,4,2],["Other weapons",3,0,0,0],["Greatswords",0,2,0,0]],"first":["Bar Stool","Drum","Dwarven Arrow"],"race":3,"benches":[["Charcoal kiln","novice"],["Forge","novice"],["Woodworking bench","novice"],["Dawnguard bench","advanced"],["Skyforge","advanced"]]}},"materials":[["Firewood",36,"woodworker","novice","",[],[],0],["Leather Strips",13,"hunter","novice","Tanning rack",["Leather"],[],0],["Iron Ingot",10,"miner","novice","Smelter",["Iron Ore"],["Raven Rock Mine","Halted Stream Camp","Fort Fellhammer Mines"],43],["Steel Ingot",10,"miner","advanced","Smelter",["Corundum Ore","Iron Ore"],["Knifepoint Mine","Dead Drop Mine","Goldenrock Mine"],18],["Tundra Cotton",6,"gatherer","novice","",[],[],0],["Dwarven Metal Ingot",4,"","","",[],[],0],["Refined Moonstone",4,"miner","expert","Smelter",["Moonstone Ore"],["Soljund's Sinkhole","Mzulft","Mzulft Boilery"],11],["Quicksilver Ingot",3,"miner","advanced","Smelter",["Quicksilver Ore"],["Quicksilver Mine","Blind Cliff Bastion","Altar of Thrond Cave"],10],["Chaurus Chitin",2,"hunter","expert","",[],["Chaurus","Frozen Chaurus","Chaurus Hunter"],3],["Ebony Ingot",2,"miner","master","Smelter",["Ebony Ore"],["Gloombound Mine","Raven Rock Mine","Redbelly Mine"],1]]}}};
+  var GUIDES = {"ladder":{"per":{"advanced":100,"expert":250,"master":600},"rest":{"novice":1.5,"advanced":1.2,"expert":0.9,"master":0.6},"craftRest":15,"party":15,"perSpell":5,"perRank":10,"toolUses":50},"professions":{"warrior":{"halves":{"bulwark":{"count":0,"families":[],"first":[],"race":0,"benches":[],"maneuvers":[["Set","novice",15,45],["Plant","advanced",20,60],["Cover","expert",25,90],["Wall","master",40,180]]},"berserker":{"count":0,"families":[],"first":[],"race":0,"benches":[],"maneuvers":[["Rush","novice",15,30],["Heavy","advanced",20,45],["Break","expert",25,60],["Wreck","master",40,120]]}},"materials":[]},"mage":{"halves":{},"materials":[]},"alchemist":{"halves":{"blightbrewer":{"count":0,"families":[],"first":[],"race":0,"benches":[["Alchemy lab","novice"]]},"physicker":{"count":12,"families":[["Other food and drink",3,3,3,1],["Other goods",1,1,0,0]],"first":["Potion of Minor Healing","Poultice"],"race":0,"benches":[["Alchemy lab","novice"]]}},"materials":[["Blue Mountain Flower",4,"gatherer","advanced","",[],[],0],["Eye of Sabre Cat",3,"hunter","novice","",[],["Sabre Cat","Vale Sabre Cat","Animal Gladiator"],1],["Mudcrab Chitin",3,"hunter","novice","",[],["Mudcrab"],0],["Swamp Fungal Pod",3,"gatherer","advanced","",[],[],0],["Wheat",3,"farmer","advanced","",[],[],0],["Blisterwort",2,"gatherer","expert","",[],[],0],["Snowberries",2,"gatherer","advanced","",[],[],0],["White Cap",2,"gatherer","novice","",[],[],0],["Creep Cluster",1,"gatherer","novice","",[],[],0],["Fire Salts",1,"miner","expert","",[],[],0]]},"cook":{"halves":{"hearthcook":{"count":64,"families":[["Other food and drink",7,9,0,0],["Stews",5,2,4,1],["Meat dishes",7,3,0,1],["Soups",4,2,3,0],["Bread",0,4,0,0],["Vegetable dishes",3,1,0,0],["Cheese",0,3,0,0],["Fish dishes",2,0,0,0],["Chowders",1,0,0,0],["Crab dishes",1,0,0,0],["Ingredients",0,0,0,1]],"first":["First Planting Mead","Beef Stew","Cabbage Soup","Cooked Beef"],"race":0,"benches":[["Cookpot","novice"],["Grain mill","novice"],["Oven","novice"]]},"confectioner":{"count":12,"families":[["Desserts",1,10,1,0]],"first":["Apple Dumpling"],"race":0,"benches":[["Oven","novice"]]}},"materials":[["Salt Pile",46,"miner","novice","",[],[],0],["Butter",23,"farmer","novice","",[],[],0],["Sack of Flour",19,"farmer","advanced","Grain mill",["Wheat"],[],0],["Garlic",16,"gatherer","novice","",[],[],0],["Frost Mirriam",12,"gatherer","novice","",[],[],0],["Lavender",8,"gatherer","novice","",[],[],0],["Chicken's Egg",7,"farmer","novice","",[],[],0],["Juniper Berries",7,"gatherer","novice","",[],[],0],["Snowberries",7,"gatherer","advanced","",[],[],0],["Elves Ear",6,"gatherer","expert","",[],[],0]]},"smith":{"halves":{"platewright":{"count":244,"families":[["Body armour",21,51,11,7],["Helmets",9,21,8,5],["Gauntlets",12,18,6,5],["Armoured boots",8,16,6,5],["Shields",2,9,3,2],["Ingots",11,0,0,0],["Other armour and clothing",2,1,0,0],["Leather",2,0,0,0],["Hats and hoods",0,1,0,0],["Other goods",1,0,0,0],["Robes and body wear",0,1,0,0]],"first":["Fur Armor","Corundum Ingot","Ancient Nord Gauntlets","Fur Helmet"],"race":13,"benches":[["Forge","novice"],["Smelter","novice"],["Tanning rack","novice"],["Skyforge","advanced"]]},"edgewright":{"count":83,"families":[["Swords",1,7,3,2],["War axes",2,6,3,2],["Battleaxes",1,5,2,2],["Greatswords",1,5,2,2],["Maces",2,4,2,2],["Daggers",1,4,2,2],["Warhammers",1,4,2,2],["Other goods",8,0,0,0],["Other weapons",1,0,0,0]],"first":["Alembic","Iron War Axe","Iron Battleaxe","Iron Dagger"],"race":1,"benches":[["Forge","novice"],["Skyforge","advanced"]]}},"materials":[["Leather Strips",284,"hunter","novice","Tanning rack",["Leather"],[],0],["Iron Ingot",174,"miner","novice","Smelter",["Iron Ore"],["Raven Rock Mine","Halted Stream Camp","Fort Fellhammer Mines"],43],["Steel Ingot",134,"miner","advanced","Smelter",["Corundum Ore","Iron Ore"],["Knifepoint Mine","Dead Drop Mine","Goldenrock Mine"],18],["Leather",80,"hunter","novice","Tanning rack",[],[],0],["Corundum Ingot",41,"miner","advanced","Smelter",["Corundum Ore"],["Knifepoint Mine","Dead Drop Mine","Goldenrock Mine"],18],["Refined Moonstone",30,"miner","expert","Smelter",["Moonstone Ore"],["Soljund's Sinkhole","Mzulft","Mzulft Boilery"],11],["Quicksilver Ingot",25,"miner","advanced","Smelter",["Quicksilver Ore"],["Quicksilver Mine","Blind Cliff Bastion","Altar of Thrond Cave"],10],["Ebony Ingot",21,"miner","master","Smelter",["Ebony Ore"],["Gloombound Mine","Raven Rock Mine","Redbelly Mine"],1],["Orichalcum Ingot",17,"miner","advanced","Smelter",["Orichalcum Ore"],["Bilegulch Mine","Dushnikh Mine","Mor Khazgur Mine"],5],["Netch Leather",16,"hunter","advanced","",[],["Betty Netch","Bull Netch"],0]]},"enchanter":{"halves":{"bladebinder":{"count":13,"families":[["Staves",3,6,4,0]],"first":["Staff of Flames"],"race":0,"benches":[["Arcane enchanter","novice"],["Staff enchanter","novice"]]},"wardweaver":{"count":0,"families":[],"first":[],"race":0,"benches":[["Arcane enchanter","novice"]]}},"materials":[["Heart Stone",13,"miner","master","",[],["Coldcinder Cave","Broken Tusk Mine","Fort Frostmoth"],1],["Unenchanted Destruction Staff",10,"","","",[],[],0],["Unenchanted Restoration Staff",2,"","","",[],[],0],["Unenchanted Conjuration Staff",1,"","","",[],[],0]]},"tailor":{"halves":{"liverywright":{"count":82,"families":[["Robes and body wear",38,0,5,3],["Hats and hoods",15,0,0,1],["Other armour and clothing",0,10,0,0],["Shoes and light boots",7,0,0,0],["Gloves",3,0,0,0]],"first":["Black Robes","Black Cowl","Boots"],"race":2,"benches":[["Forge","novice"],["Loom","novice"],["Tanning rack","advanced"]]},"haberdasher":{"count":171,"families":[["Robes and body wear",43,2,0,3],["Shoes and light boots",31,1,1,6],["Hats and hoods",23,6,1,2],["Other armour and clothing",2,12,6,0],["Other goods",13,4,0,0],["Gloves",6,1,2,6]],"first":["Belted Tunic","Chef's Hat","Boots","Bandage"],"race":23,"benches":[["Forge","novice"],["Loom","novice"],["Tanning rack","novice"]]}},"materials":[["Thread",164,"gatherer","novice","Loom",["Tundra Cotton"],[],0],["Leather",104,"hunter","novice","Tanning rack",[],[],0],["Leather Strips",60,"hunter","novice","Tanning rack",["Leather"],[],0],["Linen Wrap",39,"","","",[],[],0],["Troll Fat",32,"hunter","advanced","",[],["Frost Troll","Troll","Snow Troll"],2],["Fur Plate",19,"hunter","novice","Tanning rack",[],[],0],["Gold Ingot",7,"miner","expert","Smelter",["Gold Ore"],["Kolskeggr Mine","Frossel","Darkshade"],14],["Common Soul Gem",5,"","","",[],[],0],["Dwarven Metal Ingot",4,"","","",[],[],0],["Ebony Ingot",4,"miner","master","Smelter",["Ebony Ore"],["Gloombound Mine","Raven Rock Mine","Redbelly Mine"],1]]},"woodworker":{"halves":{"charburner":{"count":5,"families":[["Other goods",2,1,1,1]],"first":["Poor Charcoal"],"race":0,"benches":[["Charcoal kiln","novice"]]},"woodwright":{"count":45,"families":[["Other goods",15,0,1,1],["Arrows and bolts",3,5,3,2],["Bows",0,3,5,2],["Other weapons",3,0,0,0],["Greatswords",0,2,0,0]],"first":["Bar Stool","Drum","Dwarven Arrow"],"race":3,"benches":[["Charcoal kiln","novice"],["Forge","novice"],["Woodworking bench","novice"],["Dawnguard bench","advanced"],["Skyforge","advanced"]]}},"materials":[["Firewood",37,"woodworker","novice","",[],[],0],["Leather Strips",13,"hunter","novice","Tanning rack",["Leather"],[],0],["Iron Ingot",10,"miner","novice","Smelter",["Iron Ore"],["Raven Rock Mine","Halted Stream Camp","Fort Fellhammer Mines"],43],["Steel Ingot",10,"miner","advanced","Smelter",["Corundum Ore","Iron Ore"],["Knifepoint Mine","Dead Drop Mine","Goldenrock Mine"],18],["Tundra Cotton",6,"gatherer","novice","",[],[],0],["Dwarven Metal Ingot",4,"","","",[],[],0],["Refined Moonstone",4,"miner","expert","Smelter",["Moonstone Ore"],["Soljund's Sinkhole","Mzulft","Mzulft Boilery"],11],["Quicksilver Ingot",3,"miner","advanced","Smelter",["Quicksilver Ore"],["Quicksilver Mine","Blind Cliff Bastion","Altar of Thrond Cave"],10],["Chaurus Chitin",2,"hunter","expert","",[],["Chaurus","Frozen Chaurus","Chaurus Hunter"],3],["Ebony Ingot",2,"miner","master","Smelter",["Ebony Ore"],["Gloombound Mine","Raven Rock Mine","Redbelly Mine"],1]]}}};
   // ==== end PROFESSION_GUIDES ====
 
   /*
@@ -1572,7 +1574,7 @@
     if (section === 'tree') return 15;
     if (section === 'spells') return bookRows().length;
     if (section === 'staff') return staffRows().length;
-    // The College page is a page to read and one button.
+    // The College page is a page to read: the semester is the desk's.
     if (section === 'college') return 0;
     // Masters and apprentices: its buttons are on its cards.
     if (section === 'apprentice') return 0;
@@ -2881,9 +2883,9 @@
   }
 
   /*
-    The College page (#1387): what a semester hands this character, where it
-    is studied, and when the next one opens. Everything on it is the
-    server's. Study is the foot's button.
+    The College page (#1387): what a semester hands this character, where its
+    study desks stand, and when the next one opens. Everything on it is the
+    server's. It has no button: the semester is E at a desk.
   */
   function drawCollege() {
     var cv = collegeView();
@@ -2895,10 +2897,11 @@
       (gain === 1 ? ' spell point' : ' spell points') +
       (cv.school ? ', and it buys a Novice spell of ' + cap(cv.school) + ', the school you were taught, from its tome.'
                  : ', for the spell book.')));
-    var rooms = Array.isArray(cv.rooms) ? cv.rooms.map(String) : [];
-    if (rooms.length) {
-      elBody.appendChild(el('p', 'lead', 'The rooms that count: ' +
-        (rooms.length > 1 ? rooms.slice(0, -1).join(', ') + ' and ' + rooms[rooms.length - 1] : rooms[0]) + '.'));
+    var halls = Array.isArray(cv.halls) ? cv.halls.map(String) : [];
+    if (halls.length) {
+      elBody.appendChild(el('p', 'lead', 'A study desk stands in ' +
+        (halls.length > 1 ? halls.slice(0, -1).join(', ') + ' and ' + halls[halls.length - 1] : halls[0]) +
+        '. Press E at one to study.'));
     }
     elBody.appendChild(el('p', 'lead', opens > Date.now()
       ? 'Your next semester opens ' + whenOpens(opens) + '.'
@@ -3525,13 +3528,12 @@
     var line = status || hint();
     // The spell book's own button says Learn, because what it sends is not a
     // choice about who you are: it is the spells you marked, one pick each.
-    var label = (!cr && section === 'spells') ? 'Learn' : ((!cr && section === 'staff') ? 'Unlock'
-      : ((!cr && section === 'college') ? 'Study' : 'Confirm'));
+    var label = (!cr && section === 'spells') ? 'Learn' : ((!cr && section === 'staff') ? 'Unlock' : 'Confirm');
     // The recipe book sends nothing, the same way the tree's plus buttons are
     // the tree's own sending, so neither carries a Confirm.
     var showConfirm = cr ? section === 'review'
       : (section !== 'start' && section !== 'tree' && section !== 'recipes' && section !== 'guides' && section !== 'property' && section !== 'office' &&
-         section !== 'apprentice' && section !== 'hairdye' && section !== 'body' && section !== 'alchemy');
+         section !== 'apprentice' && section !== 'hairdye' && section !== 'body' && section !== 'alchemy' && section !== 'college');
     var shut = closeWord();
     var key = JSON.stringify([line, statusKind, can, label, showConfirm, cr, shut, keyName]);
     if (key === footKey) return;
@@ -3586,10 +3588,7 @@
       if (dyeTarget) return 'Offer to dye asks them. They answer on their own prompt.';
       return 'Dye my hair uses the dye at once. The server answers in the chat.';
     }
-    if (section === 'college') {
-      if (studyWaiting()) return 'Sent. The server is checking.';
-      return 'Press Study in one of the College\'s rooms. Anywhere else, the College says no.';
-    }
+    if (section === 'college') return 'Press E at a study desk in one of the College\'s halls. The College answers in the chat.';
     if (section === 'office') return 'Each button is checked again by the server, and it answers in the chat.';
     if (section === 'body') return 'As the server counted it when K opened. Read again asks it now.';
     if (section === 'alchemy') return 'What your character knows, as K opened. Nothing here is picked or sent.';
@@ -3693,29 +3692,6 @@
     staffAt = Date.now();
     status = 'Sent. The server is checking.'; statusKind = '';
     setTimeout(function () { if (!staffWaiting()) draw(); }, LEARN_WAIT_MS + 50);
-    draw();
-  }
-
-  /*
-    Study, on the College page (#1387): one press, dark from the moment it
-    sends until the answer is back or LEARN_WAIT_MS has passed, the way
-    Learn is. Lit whatever the clock says: the server holds the clock and
-    says when the next semester opens if it is not open yet.
-  */
-  var studyAt = 0;
-  function studyWaiting() {
-    if (!studyAt) return false;
-    if (Date.now() - studyAt >= LEARN_WAIT_MS) { studyAt = 0; return false; }
-    for (var i = 0; i < pending.length; i++) if (pending[i].section === 'college') return true;
-    studyAt = 0;
-    return false;
-  }
-  function study() {
-    if (studyWaiting() || !collegeView()) return;
-    send('college', 'study');
-    studyAt = Date.now();
-    status = 'Sent. The server is checking.'; statusKind = '';
-    setTimeout(function () { if (!studyWaiting()) draw(); }, LEARN_WAIT_MS + 50);
     draw();
   }
 
@@ -3880,7 +3856,6 @@
     if (creating()) return section === 'review' && !!softHome() && !homeInFlight();
     if (section === 'spells') return canLearn();
     if (section === 'staff') return canUnlockStaff();
-    if (section === 'college') return !!collegeView() && !studyWaiting();
     var p = picked[section];
     if (!p || !p.row) return false;
     if (section === 'class') return !haveClass();
@@ -3933,7 +3908,6 @@
     if (creating()) { begin(); return; }
     if (section === 'spells') { learn(); return; }
     if (section === 'staff') { unlockStaff(); return; }
-    if (section === 'college') { study(); return; }
     var p = picked[section];
     send(section, section === 'class' ? 'class ' + p.row : 'profession ' + p.row + ' ' + p.subs.join(','));
     status = 'Sent. The server is checking.'; statusKind = '';
@@ -4140,12 +4114,6 @@
         markedStaff[p.spell] = false;
         cleared = true;
       }
-      else if (p.section === 'college' && after.college && before && before.college &&
-               after.college.opens !== before.college.opens) {
-        // The server opened a semester and moved the clock: the points are
-        // in the spell book, and the chat says how many.
-        status = 'Studied. The next semester opens ' + whenOpens(Number(after.college.opens) || 0) + '.'; statusKind = 'ok';
-      }
       else if (p.section === 'tree') { status = 'Spent.'; statusKind = 'ok'; }
       else if (p.section === 'perk' && perkRunning('fontofmagic')) { status = 'Font of Magic: for 15 seconds, a spell costs nothing.'; statusKind = 'ok'; }
       else if (p.section === 'weave' && after.weave && after.weave !== (before && before.weave)) {
@@ -4184,7 +4152,7 @@
     list on PENDING_MS. The card stays as it was picked either way, so it can
     be sent again or replaced.
   */
-  var ABOUT_SECTION = { 'class': 'class', 'profession': 'profession', 'spell': 'spells', 'staffspell': 'staff', 'town': 'home', 'spend': 'tree', 'perk': 'perk', 'study': 'college', 'weave': 'weave' };
+  var ABOUT_SECTION = { 'class': 'class', 'profession': 'profession', 'spell': 'spells', 'staffspell': 'staff', 'town': 'home', 'spend': 'tree', 'perk': 'perk', 'weave': 'weave' };
   function refused(text, about) {
     status = 'No: ' + text + '.'; statusKind = 'no';
     if (!pending.length) return;

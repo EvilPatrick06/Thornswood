@@ -33,20 +33,32 @@
   issue or a record change.
 
 .EXAMPLE
+  pwsh scripts/vps/Box-Run.ps1 -Line 'Check-ProdParity'      from the cloud, through the deploy gate
   .\scripts\vps\Check-ProdParity.ps1 -Collect -Facts $env:TEMP\prod-facts.json -Report $env:TEMP\prod-parity.md
   .\scripts\vps\Check-ProdParity.ps1 -Facts .\facts.json -Report .\parity.md
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)][string]$Facts,
+    [string]$Facts,
     [string]$Report,
     [switch]$Collect,
+    # A folder for both files, the facts and the report, named
+    # prod-facts.json and prod-parity.md. The deploy gate's Check-ProdParity
+    # verb sets it to a folder of the run's own and sends both back, so a
+    # cloud thread collects with no key to the box.
+    [string]$Out,
     [string]$Record,
     [datetime]$Now = (Get-Date).ToUniversalTime(),
     [switch]$Strict
 )
 
 $ErrorActionPreference = 'Stop'
+if ($Out) {
+    if (-not (Test-Path -LiteralPath $Out)) { New-Item -ItemType Directory -Path $Out -Force | Out-Null }
+    if (-not $Facts) { $Facts = Join-Path $Out 'prod-facts.json' }
+    if (-not $Report) { $Report = Join-Path $Out 'prod-parity.md' }
+}
+if (-not $Facts) { Write-Host 'Name -Facts, the facts file, or -Out, a folder for both files.' -ForegroundColor Red; exit 1 }
 $Repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 if (-not $Record) { $Record = Join-Path $Repo 'records\prod-parity.json' }
 

@@ -18,6 +18,7 @@ The rulebook says what each station is for and who works it, and names no town. 
 - **Alchemy lab** ([physicker.md](professions/alchemist/physicker.md), [injury.md](injury.md)): the poultice and the remedy are made only at Thornswood's lab. One in the apothecary of each of the nine hold capitals, beside Skyrim's own lab there; Winterhold has no apothecary in town, so the College's Hall of Countenance; Windhelm's Palace of the Kings is tried after the White Phial.
 - **Well bucket** ([drink.md](drink.md)): water is drawn at a well by activating it (Patrick, 12 Oct, #1382), and every placed well in the load order is a static, which the game never lets anybody activate. So one bucket beside each of the 30 placed wells in `game/data/wells.json`, the nearest clear spot within 400 units of the well. Activating it fills an empty bottle with well water. A well in a cell that no master of the content plugin carries (the two in the sewers) is left out, since the plugin can only place into its masters' cells.
 - **Water bucket** ([drink.md](drink.md)): drawing spots at rivers and lakes (Patrick, 12 Oct, #1382). One for each of the nine towns with a forge, on the river nearest it, or for Riften on Lake Honrich: the nearest clear spot to the forge within 3,000 units whose cell's water `game/data/waters.json` classes as a river (for Riften, the deep water of the lake), at its edge: ground no lower than the water and no more than 120 units above it, with navmesh under the water within 160 units, so the water is there to reach. Lake water is worth what river water is (Patrick, 20 Oct), so one bucket serves both, and the water drawn there must be boiled.
+- **Study desk** ([magic.md](magic.md)): a semester at the College is taken at a study desk in the College halls, not a command (Patrick, 22 Oct, A on #1387). Skyrim's desks are statics, which nobody can activate, so the plugin stands an activator wearing Skyrim's NobleDesk01. One in each of the four halls, the Hall of the Elements, the Hall of Countenance, the Hall of Attainment and the Arcanaeum, the nearest clear spot within 900 units of the hall's own reading tables (the Hall of the Elements has only benches), measured off the cells by `scripts/dev/List-CellRefs.py`. Pressing E at it is the semester.
 
 Each rule gives its anchors nearest first. The builder searches round each in turn, every step out to the kind's reach in eight turns, and takes the nearest clear spot; the first anchor with one wins.
 
@@ -70,7 +71,7 @@ The same measure as the benches, but where the rule above lets a kiln stand amon
 | Where | From Skyrim's own lab |
 | --- | --- |
 | Angeline's Aromatics, Solitude | 587 units |
-| Arcadia's Cauldron, Whiterun | 131 units |
+| Arcadia's Cauldron, Whiterun | 178 units |
 | Elgrim's Elixirs, Riften | 131 units |
 | Grave Concoctions, Falkreath | 256 units |
 | Thaumaturgist's Hut, Morthal | 124 units |
@@ -87,7 +88,7 @@ Each row is the well the bucket stands beside, by its base and cell, as the tabl
 | ImpWell01 in 9722:Skyrim.esm | 244 units |
 | ImpWell01 in BloatedMansRuins | 115 units |
 | FarmWell01 in DLC1RedwaterDen01 | 176 units |
-| FarmBWellEnt01 in DLC2HrodulfsHouse | 97 units |
+| FarmBWellEnt01 in DLC2HrodulfsHouse | 96 units |
 | RedoranWell01 in DLC2RavenRock02 | 272 units |
 | GenericWell01 in DushnikhYalExterior02 | 115 units |
 | FarmBWellEnt01 in FalkreathBarracksJail | 32 units |
@@ -99,7 +100,7 @@ Each row is the well the bucket stands beside, by its base and cell, as the tabl
 | ImpWell01 in FortSungardExterior01 | 144 units |
 | ImpExtIceWell01 in FrostflowLighthouseExterior01 | 112 units |
 | ImpWell01 in POIPineForest08 | 143 units |
-| FarmWell01 in POITundra08 | 226 units |
+| FarmWell01 in POITundra08 | 80 units |
 | RTPlazaWell01 in RiftenOrigin | 284 units |
 | ImpWell01 in TrevasWatchExterior01 | 222 units |
 
@@ -109,6 +110,17 @@ Each row is the well the bucket stands beside, by its base and cell, as the tabl
 | --- | --- | --- |
 | Lake Honrich at Riften | RiftenOrigin | 754 units |
 | the river at Riverwood | Riverwood02 | 2,338 units |
+
+### Study desks (4), 26 Oct 2026 (#1387)
+
+| Where | Beside | From its anchor | Nearest solid thing |
+| --- | --- | --- | --- |
+| the Arcanaeum, the College of Winterhold | a square reading table | 135 units | that table, 42 units |
+| the Hall of Attainment, the College of Winterhold | the round table | 118 units | a barrel, 33 units |
+| the Hall of Countenance, the College of Winterhold | the square table on the lower floor | 138 units | a wall shelf, 39 units |
+| the Hall of the Elements, the College of Winterhold | a bench | 234 units | that bench, 31 units |
+
+Measured on the box on 26 Oct, when the station table first read the floor items Thornswood-Last.esp switches off (#3077) as nothing in the way. Three spots measured before that moved within their cells: Arcadia's Cauldron's lab, and the well buckets at Hrodulf's House and in POITundra08.
 
 ### Where the rule led to the other server's spot
 
@@ -131,7 +143,7 @@ Nothing is placed where the measure refuses every spot. Measured over the same l
   - ImpWell01 in FortGreenwall04: no clear spot within 400 units beside it (12503 off the navmesh; 3185 touches RiftenRWHallLadderDoor01, its way through).
   - ImpWell01 in FortGreymoorExterior03: no clear spot within 400 units beside it (10633 its cell 99e8:Skyrim.esm: Embers XD.esp changes it before the content plugin; 3868 off the navmesh; 767 touches ImpDoorDoubleLoad01, its way through; 237 touches Bucket01).
   - ImpWell01 in FortSungardCourtyard: the well 352a9:Skyrim.esm is not placed, or is switched off or has an enable parent.
-  - FarmWell01 in POITundra08: it shares the bucket of well-23, 226 units away.
+  - FarmWell01 in POITundra08: it shares the bucket of well-23, 80 units away.
   - GenericWell01 in SSewersSolitude02: the well 27172:SkyrimSewers.esp stands in a cell of skyrimsewers.esp, which is not a master of Thornswood-Content.esp.
   - FarmBWell01 in SSewersWRBurrow: the well 3907d:SkyrimSewers.esp stands in a cell of skyrimsewers.esp, which is not a master of Thornswood-Content.esp.
   - FarmBWell01 in WindhelmMarketplaceExterior: no clear spot within 400 units beside it (7841 off the navmesh; 3061 touches ImpExtBlocks01SnowLight; 1861 touches TreeFloraHangingMoss01; 1151 touches FishRack01Light_SNWH).
@@ -146,7 +158,7 @@ Nothing is placed where the measure refuses every spot. Measured over the same l
   - the river at Windhelm: 98048 not by river or lake water.
 - Lod's house in Falkreath, which Skyrim marks as a farm, has 3 crop plots near its door: a smith's yard, not a field, so no hive.
 
-To change one: edit the kind's rule or a site in `SITES` in `scripts/dev/Build-StationSites.py`, run it with `--data <the game's Data>`, then `python scripts/mods/Add-ContentRecords.py --masters <the game's Data>`, then `pwsh scripts/mods/Rebuild-ContentTables.ps1`, which rebuilds every table read out of the load order, in the order `scripts/mods/content-tables.json` gives, and the plugin's hash in `records/asset-provenance.json`.
+To change one: edit the kind's rule or a site in `SITES` in `scripts/dev/Build-StationSites.py`, run it with `--data <the game's Data>`, then `python scripts/mods/Add-ContentRecords.py --masters <the game's Data>`, then `pwsh scripts/mods/Rebuild-ContentTables.ps1`, which rebuilds every table read out of the load order, in the order `scripts/mods/content-tables.json` gives, and the plugin's hash in `records/asset-provenance.json`. From a cloud thread all three run on the box with main's scripts: `pwsh scripts/vps/Box-Run.ps1 -Line 'Rebuild-ContentTables -Stations -Pull <number> -Head <its full head commit>'`.
 
 ## Woodworking benches (#516)
 

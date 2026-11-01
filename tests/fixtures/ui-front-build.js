@@ -680,6 +680,56 @@ eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export */ __webpac
 
 /***/ }),
 
+/***/ "./src/components/SkyrimFrame/img sync recursive ^\\.\\/.*\\.svg$":
+/*!************************************************************!*\
+  !*** ./src/components/SkyrimFrame/img/ sync ^\.\/.*\.svg$ ***!
+  \************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+eval("var map = {\n\t\"./Border down.svg\": \"./src/components/SkyrimFrame/img/Border down.svg\",\n\t\"./Border left down.svg\": \"./src/components/SkyrimFrame/img/Border left down.svg\",\n\t\"./Border left top.svg\": \"./src/components/SkyrimFrame/img/Border left top.svg\",\n\t\"./Border left.svg\": \"./src/components/SkyrimFrame/img/Border left.svg\",\n\t\"./Border middle.svg\": \"./src/components/SkyrimFrame/img/Border middle.svg\",\n\t\"./Border right down.svg\": \"./src/components/SkyrimFrame/img/Border right down.svg\",\n\t\"./Border right top.svg\": \"./src/components/SkyrimFrame/img/Border right top.svg\",\n\t\"./Border right.svg\": \"./src/components/SkyrimFrame/img/Border right.svg\",\n\t\"./Border top.svg\": \"./src/components/SkyrimFrame/img/Border top.svg\",\n\t\"./Header left-2.svg\": \"./src/components/SkyrimFrame/img/Header left-2.svg\",\n\t\"./Header left.svg\": \"./src/components/SkyrimFrame/img/Header left.svg\",\n\t\"./Header right-2.svg\": \"./src/components/SkyrimFrame/img/Header right-2.svg\",\n\t\"./Header right.svg\": \"./src/components/SkyrimFrame/img/Header right.svg\",\n\t\"./Header top 3 1.svg\": \"./src/components/SkyrimFrame/img/Header top 3 1.svg\",\n\t\"./Header top.svg\": \"./src/components/SkyrimFrame/img/Header top.svg\"\n};\n\n\nfunction webpackContext(req) {\n\tvar id = webpackContextResolve(req);\n\treturn __webpack_require__(id);\n}\nfunction webpackContextResolve(req) {\n\tif(!__webpack_require__.o(map, req)) {\n\t\tvar e = new Error(\"Cannot find module '\" + req + \"'\");\n\t\te.code = 'MODULE_NOT_FOUND';\n\t\tthrow e;\n\t}\n\treturn map[req];\n}\nwebpackContext.keys = function webpackContextKeys() {\n\treturn Object.keys(map);\n};\nwebpackContext.resolve = webpackContextResolve;\nmodule.exports = webpackContext;\nwebpackContext.id = \"./src/components/SkyrimFrame/img sync recursive ^\\\\.\\\\/.*\\\\.svg$\";\n\n//# sourceURL=webpack://ui_webpack/./src/components/SkyrimFrame/img/_sync_^\\.\\/.*\\.svg$?");
+
+/***/ }),
+
+/***/ "./src/sound sync recursive ^\\.\\/.*$":
+/*!**********************************!*\
+  !*** ./src/sound/ sync ^\.\/.*$ ***!
+  \**********************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+eval("var map = {\n\t\"./HP_minus.mp3\": \"./src/sound/HP_minus.mp3\",\n\t\"./HP_plus.mp3\": \"./src/sound/HP_plus.mp3\",\n\t\"./Initiative.mp3\": \"./src/sound/Initiative.mp3\",\n\t\"./Magic.mp3\": \"./src/sound/Magic.mp3\",\n\t\"./Shield.mp3\": \"./src/sound/Shield.mp3\",\n\t\"./Sword.mp3\": \"./src/sound/Sword.mp3\",\n\t\"./Vampire.mp3\": \"./src/sound/Vampire.mp3\",\n\t\"./Werewolf.mp3\": \"./src/sound/Werewolf.mp3\",\n\t\"./coin.mp3\": \"./src/sound/coin.mp3\",\n\t\"./dice1.mp3\": \"./src/sound/dice1.mp3\",\n\t\"./dice2.mp3\": \"./src/sound/dice2.mp3\",\n\t\"./dice3.mp3\": \"./src/sound/dice3.mp3\",\n\t\"./pouch_close.mp3\": \"./src/sound/pouch_close.mp3\",\n\t\"./pouch_open.mp3\": \"./src/sound/pouch_open.mp3\",\n\t\"./state0.wav\": \"./src/sound/state0.wav\",\n\t\"./state1.wav\": \"./src/sound/state1.wav\"\n};\n\n\nfunction webpackContext(req) {\n\tvar id = webpackContextResolve(req);\n\treturn __webpack_require__(id);\n}\nfunction webpackContextResolve(req) {\n\tif(!__webpack_require__.o(map, req)) {\n\t\tvar e = new Error(\"Cannot find module '\" + req + \"'\");\n\t\te.code = 'MODULE_NOT_FOUND';\n\t\tthrow e;\n\t}\n\treturn map[req];\n}\nwebpackContext.keys = function webpackContextKeys() {\n\treturn Object.keys(map);\n};\nwebpackContext.resolve = webpackContextResolve;\nmodule.exports = webpackContext;\nwebpackContext.id = \"./src/sound sync recursive ^\\\\.\\\\/.*$\";\n\n//# sourceURL=webpack://ui_webpack/./src/sound/_sync_^\\.\\/.*$?");
+
+/***/ }),
+
+/***/ "./src/sound sync recursive ^\\.\\/.*\\.mp3$":
+/*!***************************************!*\
+  !*** ./src/sound/ sync ^\.\/.*\.mp3$ ***!
+  \***************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+eval("var map = {\n\t\"./HP_minus.mp3\": \"./src/sound/HP_minus.mp3\",\n\t\"./HP_plus.mp3\": \"./src/sound/HP_plus.mp3\",\n\t\"./Initiative.mp3\": \"./src/sound/Initiative.mp3\",\n\t\"./Magic.mp3\": \"./src/sound/Magic.mp3\",\n\t\"./Shield.mp3\": \"./src/sound/Shield.mp3\",\n\t\"./Sword.mp3\": \"./src/sound/Sword.mp3\",\n\t\"./Vampire.mp3\": \"./src/sound/Vampire.mp3\",\n\t\"./Werewolf.mp3\": \"./src/sound/Werewolf.mp3\",\n\t\"./coin.mp3\": \"./src/sound/coin.mp3\",\n\t\"./dice1.mp3\": \"./src/sound/dice1.mp3\",\n\t\"./dice2.mp3\": \"./src/sound/dice2.mp3\",\n\t\"./dice3.mp3\": \"./src/sound/dice3.mp3\",\n\t\"./pouch_close.mp3\": \"./src/sound/pouch_close.mp3\",\n\t\"./pouch_open.mp3\": \"./src/sound/pouch_open.mp3\"\n};\n\n\nfunction webpackContext(req) {\n\tvar id = webpackContextResolve(req);\n\treturn __webpack_require__(id);\n}\nfunction webpackContextResolve(req) {\n\tif(!__webpack_require__.o(map, req)) {\n\t\tvar e = new Error(\"Cannot find module '\" + req + \"'\");\n\t\te.code = 'MODULE_NOT_FOUND';\n\t\tthrow e;\n\t}\n\treturn map[req];\n}\nwebpackContext.keys = function webpackContextKeys() {\n\treturn Object.keys(map);\n};\nwebpackContext.resolve = webpackContextResolve;\nmodule.exports = webpackContext;\nwebpackContext.id = \"./src/sound sync recursive ^\\\\.\\\\/.*\\\\.mp3$\";\n\n//# sourceURL=webpack://ui_webpack/./src/sound/_sync_^\\.\\/.*\\.mp3$?");
+
+/***/ }),
+
+/***/ "./src/sound sync recursive ^\\.\\/dice.*\\.mp3$":
+/*!*******************************************!*\
+  !*** ./src/sound/ sync ^\.\/dice.*\.mp3$ ***!
+  \*******************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+eval("var map = {\n\t\"./dice1.mp3\": \"./src/sound/dice1.mp3\",\n\t\"./dice2.mp3\": \"./src/sound/dice2.mp3\",\n\t\"./dice3.mp3\": \"./src/sound/dice3.mp3\"\n};\n\n\nfunction webpackContext(req) {\n\tvar id = webpackContextResolve(req);\n\treturn __webpack_require__(id);\n}\nfunction webpackContextResolve(req) {\n\tif(!__webpack_require__.o(map, req)) {\n\t\tvar e = new Error(\"Cannot find module '\" + req + \"'\");\n\t\te.code = 'MODULE_NOT_FOUND';\n\t\tthrow e;\n\t}\n\treturn map[req];\n}\nwebpackContext.keys = function webpackContextKeys() {\n\treturn Object.keys(map);\n};\nwebpackContext.resolve = webpackContextResolve;\nmodule.exports = webpackContext;\nwebpackContext.id = \"./src/sound sync recursive ^\\\\.\\\\/dice.*\\\\.mp3$\";\n\n//# sourceURL=webpack://ui_webpack/./src/sound/_sync_^\\.\\/dice.*\\.mp3$?");
+
+/***/ }),
+
+/***/ "./src/sound sync recursive ^\\.\\/pouch_.*\\.mp3$":
+/*!*********************************************!*\
+  !*** ./src/sound/ sync ^\.\/pouch_.*\.mp3$ ***!
+  \*********************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+eval("var map = {\n\t\"./pouch_close.mp3\": \"./src/sound/pouch_close.mp3\",\n\t\"./pouch_open.mp3\": \"./src/sound/pouch_open.mp3\"\n};\n\n\nfunction webpackContext(req) {\n\tvar id = webpackContextResolve(req);\n\treturn __webpack_require__(id);\n}\nfunction webpackContextResolve(req) {\n\tif(!__webpack_require__.o(map, req)) {\n\t\tvar e = new Error(\"Cannot find module '\" + req + \"'\");\n\t\te.code = 'MODULE_NOT_FOUND';\n\t\tthrow e;\n\t}\n\treturn map[req];\n}\nwebpackContext.keys = function webpackContextKeys() {\n\treturn Object.keys(map);\n};\nwebpackContext.resolve = webpackContextResolve;\nmodule.exports = webpackContext;\nwebpackContext.id = \"./src/sound sync recursive ^\\\\.\\\\/pouch_.*\\\\.mp3$\";\n\n//# sourceURL=webpack://ui_webpack/./src/sound/_sync_^\\.\\/pouch_.*\\.mp3$?");
+
+/***/ }),
+
 /***/ "./src/img/bg.png":
 /*!************************!*\
   !*** ./src/img/bg.png ***!
@@ -691,69 +741,25 @@ eval("module.exports = __webpack_require__.p + \"f4d6dc3e7665a2c2fc6d.png\";\n\n
 
 /***/ }),
 
-/***/ "./src/fonts/Bankir-Retro.ttf":
-/*!************************************!*\
-  !*** ./src/fonts/Bankir-Retro.ttf ***!
-  \************************************/
+/***/ "./src/fonts/Barlow-SemiBold.ttf":
+/*!***************************************!*\
+  !*** ./src/fonts/Barlow-SemiBold.ttf ***!
+  \***************************************/
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
-eval("module.exports = __webpack_require__.p + \"855bfaf67c57745958d3.ttf\";\n\n//# sourceURL=webpack://ui_webpack/./src/fonts/Bankir-Retro.ttf?");
+eval("module.exports = __webpack_require__.p + \"dc3cbd21104d40477da6.ttf\";\n\n//# sourceURL=webpack://ui_webpack/./src/fonts/Barlow-SemiBold.ttf?");
 
 /***/ }),
 
-/***/ "./src/fonts/din-pro-condensed-bold-italic.ttf":
-/*!*****************************************************!*\
-  !*** ./src/fonts/din-pro-condensed-bold-italic.ttf ***!
-  \*****************************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-eval("module.exports = __webpack_require__.p + \"fdf086661e1600f95a34.ttf\";\n\n//# sourceURL=webpack://ui_webpack/./src/fonts/din-pro-condensed-bold-italic.ttf?");
-
-/***/ }),
-
-/***/ "./src/fonts/din-pro.ttf":
-/*!*******************************!*\
-  !*** ./src/fonts/din-pro.ttf ***!
-  \*******************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-eval("module.exports = __webpack_require__.p + \"268a0df3f0e2c23d1ea6.ttf\";\n\n//# sourceURL=webpack://ui_webpack/./src/fonts/din-pro.ttf?");
-
-/***/ }),
-
-/***/ "./src/fonts/futura-pt-cond-book.ttf":
-/*!*******************************************!*\
-  !*** ./src/fonts/futura-pt-cond-book.ttf ***!
-  \*******************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-eval("module.exports = __webpack_require__.p + \"6f802bf60c545304b09e.ttf\";\n\n//# sourceURL=webpack://ui_webpack/./src/fonts/futura-pt-cond-book.ttf?");
-
-/***/ }),
-
-/***/ "./src/fonts/futura-pt-cond-medium.ttf":
+/***/ "./src/fonts/BigShoulders-Variable.ttf":
 /*!*********************************************!*\
-  !*** ./src/fonts/futura-pt-cond-medium.ttf ***!
+  !*** ./src/fonts/BigShoulders-Variable.ttf ***!
   \*********************************************/
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
-eval("module.exports = __webpack_require__.p + \"00e4a2200c3e5ae71d67.ttf\";\n\n//# sourceURL=webpack://ui_webpack/./src/fonts/futura-pt-cond-medium.ttf?");
-
-/***/ }),
-
-/***/ "./src/fonts/icomoon.ttf":
-/*!*******************************!*\
-  !*** ./src/fonts/icomoon.ttf ***!
-  \*******************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-eval("module.exports = __webpack_require__.p + \"d213051bb6f28a25fb26.ttf\";\n\n//# sourceURL=webpack://ui_webpack/./src/fonts/icomoon.ttf?");
+eval("module.exports = __webpack_require__.p + \"4b2950a2781132b82147.ttf\";\n\n//# sourceURL=webpack://ui_webpack/./src/fonts/BigShoulders-Variable.ttf?");
 
 /***/ })
 

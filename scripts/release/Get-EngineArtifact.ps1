@@ -25,7 +25,10 @@
   Sync-Client.ps1 runs this when it needs the client from that folder and the
   folder is not there yet, so a Ship and Go do not need it run by hand.
 
-  It reads GitHub through gh, signed in as anybody (the fork is public, and
+  It asks the fork's package of the build first, kept for good on GitHub's
+  registry with no account needed (#5152, EngineArtifact.ps1 says what is
+  held), and the fork's artifacts after it. It reads GitHub through gh,
+  signed in as anybody (the fork is public, and
   GitHub serves its artifacts to any account), and writes nothing but the
   folder and its own scratch under the repository's temp folder, which it
   removes. It sends nothing, starts nothing and never builds the engine.
@@ -56,6 +59,10 @@
 param(
   [switch]$Check,
   [string]$Gh = 'gh',
+  # The registry the fork's package is read from (#5152). 'none' asks none,
+  # and only the fork's artifacts are looked at; a harness sets
+  # THORNSWOOD_ENGINE_REGISTRY to its own stand-in or to none.
+  [string]$Registry = $(if ($env:THORNSWOOD_ENGINE_REGISTRY) { $env:THORNSWOOD_ENGINE_REGISTRY } else { 'https://ghcr.io' }),
   [switch]$NoPause
 )
 $ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
@@ -84,6 +91,39 @@ if (Test-Path -LiteralPath $into) {
   exit 0
 }
 
+# The fork's package of the pin first (EngineArtifact.ps1, THE FORK'S
+# PACKAGE OF THE BUILD): kept for good, so an old pin ships as a new one does.
+$pkgWhy = $null
+if ($Registry -and $Registry -ne 'none') {
+  $http = New-EnginePackageHttp
+  try { $look = Get-EnginePackageBuild -Commit $commit -Registry $Registry -Http $http -Look } catch { Stop-Here ("the fork's package of the pin could not be asked for: " + $_.Exception.Message) }
+  Say ('  ' + $look.Why) 'Gray'
+  if ($look.State -eq 'found') {
+    if ($Check) {
+      Say ("  not here yet; Get-EngineArtifact.ps1 fetches it ({0:N0} bytes)" -f [long]$look.Artifact.size_in_bytes) 'Yellow'
+      exit 2
+    }
+    $pscratch = [string](& (Join-Path $PSScriptRoot 'Get-ScratchDir.ps1') ('Thornswood-engine-package-' + [Guid]::NewGuid().ToString('N')))
+    try {
+      $null = New-Item -ItemType Directory -Force -Path $pscratch
+      $dl = Join-Path $pscratch 'build'
+      try { $p = Get-EnginePackageBuild -Commit $commit -Registry $Registry -Http $http -Into $dl } catch { Stop-Here ("the fork's package of the pin could not be fetched: " + $_.Exception.Message) }
+      $why = @(Get-EngineArtifactProblems $dl $RepoDir ([long]$p.Run.id))
+      if (-not $why.Count) {
+        try { $stamp = Install-EngineArtifact -From $dl -Repo $RepoDir -Into $into -Run $p.Run -Artifact $p.Artifact }
+        catch { Stop-Here $_.Exception.Message }
+        Say ("  every file held to the records; {0} is this checkout's CI engine build from the fork's package (server {1})" -f $into, $stamp.serverZip) 'Green'
+        if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+        exit 0
+      }
+      $pkgWhy = ("the package {0}: {1}" -f $p.Artifact.name, ($why -join '; '))
+      Say ("  the package is not the build this checkout records ({0}), so it is passed over for the fork's artifacts" -f ($why -join '; ')) 'Yellow'
+    } finally {
+      if (Test-Path -LiteralPath $pscratch) { Remove-Item -LiteralPath $pscratch -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+  }
+}
+
 # gh api through the gh this was given. Its error is the answer, not "none".
 if (-not (Get-Command $Gh -ErrorAction SilentlyContinue)) { Stop-Here "gh is not here. winget install --id GitHub.cli -e, then gh auth login (any GitHub account: $EngineArtifactRepo is public)." }
 function Invoke-Gh([string[]]$GhArgs) {
@@ -96,7 +136,7 @@ function Invoke-Gh([string[]]$GhArgs) {
 $get = { param($path) (Invoke-Gh @('api', $path)) | ConvertFrom-Json }
 try { $f = Find-EngineArtifact $commit $get } catch { Stop-Here ('GitHub could not be asked which build of the pin the fork keeps: ' + $_.Exception.Message) }
 Say ('  ' + $f.Why) $(if ($f.State -eq 'found') { 'Gray' } else { 'Yellow' })
-if ($f.State -ne 'found') { Stop-Here $f.Why }
+if ($f.State -ne 'found') { Stop-Here ($f.Why + $(if ($pkgWhy) { ' And ' + $pkgWhy + '.' } else { '' })) }
 if ($Check) {
   Say ("  not here yet; {0} fetches it ({1:N0} bytes)" -f 'Get-EngineArtifact.ps1', [long]$f.Artifact.size_in_bytes) 'Yellow'
   exit 2
@@ -122,7 +162,7 @@ try {
     Remove-Item -LiteralPath $dl -Recurse -Force
   }
   if (-not $taken) {
-    Stop-Here ("no $name the fork keeps is the build this checkout records, and nothing was put in place. " + ($passedOver -join ' | ') + ". The records name another build of the commit: the one engine.yml recorded is gone, so the pin needs records of one the fork keeps (engine.yml for the commit hands them back, engine\README.md).")
+    Stop-Here ("no $name the fork keeps is the build this checkout records, and nothing was put in place. " + (@($passedOver) + @($pkgWhy | Where-Object { $_ }) -join ' | ') + ". The records name another build of the commit: the one engine.yml recorded is gone, so the pin needs records of one the fork keeps (engine.yml for the commit hands them back, engine\README.md).")
   }
   if ($n -gt 1) { Say ("  run {0}'s {1} is this checkout's" -f $taken.Run.id, $name) 'Gray' }
   try { $stamp = Install-EngineArtifact -From $dl -Repo $RepoDir -Into $into -Run $taken.Run -Artifact $taken.Artifact }

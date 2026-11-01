@@ -45,7 +45,7 @@ yes("the warning still comes at 15 left", !!warnM && warnM[1] === "15");
 // ------------------------------------------------------------ the code, run
 
 const toolsSrc = slice(gm, "\nconst TOOLS = {", "\n};\n");
-const fns = ["function idOf(", "function toolFor(", "function toolStamps(", "function handTool(",
+const fns = ["function idOf(", "function aWord(", "function toolFor(", "function toolStamps(", "function handTool(",
   "function giveTool(", "function heldToolId(", "function wearTool("].map(cut);
 yes("TOOLS and the tool functions are in the gamemode", !!toolsSrc && fns.every(function (f) { return !!f; }));
 
@@ -100,15 +100,17 @@ function held(actor, desc) {
 }
 function stamps(actor) { return props[actor + ":thornswoodTools"] || {}; }
 
-// Each tool, handed at the pick the way creation hands it, then worked.
-const KINDS = ["miner", "farmer", "woodworker", "fisher"];
+// Each tool, handed at the pick the way creation hands it, then worked: the
+// four gathering tools and the bench trades' five (#3162).
+const KINDS = ["miner", "farmer", "woodworker", "fisher", "smith", "tailor", "cook", "alchemist", "enchanter"];
+yes("TOOLS holds exactly these " + KINDS.length + " tools", ran && JSON.stringify(Object.keys(box.TOOLS).sort()) === JSON.stringify(KINDS.slice().sort()));
 let actor = 0x1000;
 KINDS.forEach(function (key) {
   if (!ran) { yes(key + ": not run", false); return; }
   const a = actor++;
   const tool = box.TOOLS[key];
   const line = box.giveTool(a, key);
-  yes(key + ": the pick hands the " + tool.name + " (" + line + ")", held(a, tool.give) === 1 && /You are handed a/.test(line || ""));
+  yes(key + ": the pick hands the " + tool.name + " (" + line + ")", held(a, tool.give) === 1 && /You are handed an? /.test(line || ""));
   yes(key + ": handing it starts no count of its own", !Object.prototype.hasOwnProperty.call(stamps(a), "wear:" + key));
   const said = [];
   let brokeAt = 0;

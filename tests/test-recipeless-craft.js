@@ -174,7 +174,7 @@ function context(opts) {
   const fn = new Function(
     'globalThis', 'log', 'notify', 'say', 'mp', 'idOf', 'Number',
     'RECIPES_BY_ID', 'BENCH_BY_BASE', 'RANK_LADDER', 'NO_PROFESSION_AT_A_BENCH', 'raceOf',
-    'creditWork', 'holdsPerk',
+    'creditWork', 'holdsPerk', 'toolGate', 'wearTool', 'toolFor', 'benchToolKey',
     GATE + '\n' + block +
     '\nreturn { recipelessCraft: recipelessCraft, craftAnswer: craftAnswer };');
 
@@ -224,7 +224,10 @@ function context(opts) {
     // piece of work takes; what it was asked to count is what is checked.
     function (id, half) { credited.push(half); return null; },
     // No perks here: Master Chemist's batch is test-1389-lists.js L9.
-    function () { return false; });
+    function () { return false; },
+    // The trade's tool is held (#3162); tests/test-3162-bench-tools.js asks the refusal.
+    function () { return null; }, function () { return null; }, function () { return { name: 'tool' }; },
+    function () { return ''; });
   return { api: api, said: said, spoken: spoken, logs: logs, credited: credited, told: told };
 }
 

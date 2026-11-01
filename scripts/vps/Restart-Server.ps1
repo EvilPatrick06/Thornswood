@@ -44,6 +44,8 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $Here 'Vps.ps1')
 . (Join-Path $Here 'Send-Script.ps1')
+# The hold the restart writes while the service is stopped (#5155).
+. (Join-Path $Here 'ServerHold.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
@@ -107,7 +109,11 @@ Head 'Restarting'
 if ($it.Svc) {
   $out = Remote @"
 if (-not (Get-Service -Name '$($it.Svc)' -EA SilentlyContinue)) { 'NO SUCH SERVICE: $($it.Svc)'; return }
+$(Get-ThornswoodHoldScript -Script 'Restart-Server.ps1')
+# Held from the stop to the start (#5155, ServerHold.ps1), so the watchdog leaves it.
+Set-ThornswoodHold -Target '$($it.Svc)' -Why 'restarting it' -By `$HoldBy
 try { Restart-Service -Name '$($it.Svc)' -Force -ErrorAction Stop } catch { 'COULD NOT RESTART: ' + `$_.Exception.Message }
+Clear-ThornswoodHold -Target '$($it.Svc)'
 Start-Sleep -Seconds 12
 'state ' + (Get-Service -Name '$($it.Svc)').Status
 "@
@@ -115,9 +121,13 @@ Start-Sleep -Seconds 12
   if ("$out" -match 'NO SUCH SERVICE') { Die "There is no service called $($it.Svc) on the VPS. Install-Bot.ps1 puts it there." }
 } else {
   $out = Remote @"
+$(Get-ThornswoodHoldScript -Script 'Restart-Server.ps1')
+# Held from the stop to the start (#5155, ServerHold.ps1), so the watchdog leaves it.
+Set-ThornswoodHold -Target '$($it.Task)' -Why 'restarting it' -By `$HoldBy
 Stop-ScheduledTask -TaskName '$($it.Task)' -EA SilentlyContinue
 Start-Sleep -Seconds 4
 Start-ScheduledTask -TaskName '$($it.Task)' -EA SilentlyContinue
+Clear-ThornswoodHold -Target '$($it.Task)'
 Start-Sleep -Seconds 12
 `$t = Get-ScheduledTask -TaskName '$($it.Task)' -EA SilentlyContinue
 if (`$t) { 'state ' + `$t.State } else { 'NO SUCH TASK: $($it.Task)' }
