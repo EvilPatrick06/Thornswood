@@ -1,0 +1,156 @@
+# Traces the whole gate on GitHub's hosted Windows runner and keeps the map
+# of which harnesses a change can reach as a workflow artifact (#5183; the
+# redesign's part 4, decided 31 Oct 2026, 6:34 PM).
+#
+# WHY. A pull request should run only the gate harnesses its change can
+# reach (scripts/dev/Affected-Harnesses.js), and which those are is measured
+# by tracing every file each harness opens, on the machine the gate runs on
+# (Patrick's q-3114 option C). Until #5119 an administrator task on the box
+# traced each main build and handed the map on; since every build runs on
+# GitHub's runner nothing traces, and every share runs everything. A hosted
+# runner's job runs as its administrator, so the same ETW session
+# (scripts/dev/Trace-Gate-Box.ps1) is started right here, through
+# scripts/dev/Trace-Gate-Here.ps1, around the whole gate.
+#
+# WHAT IT KEEPS. An artifact named gate-map, the shape Run-Gate.ps1 and
+# Gate-Map.ps1 -Fetch read: latest.json (the commit traced, this run's key,
+# when), <key>.map.json (Affected-Harnesses.js build, from the traces) and
+# <key>.tree.gz (the traced tree's listing, so a change is measured from it
+# without fetching it). The raw trace never leaves the runner: the read keeps
+# only paths inside the checkout and deletes the trace. Only a run of main's
+# own file, on main, from the schedule or by hand, keeps it under that name
+# (Gate-Map.ps1 -Fetch also checks the run it reads is one). A pull request
+# that changes the trace's own scripts runs it too, so a broken trace is red
+# before it merges; its map is kept as gate-map-trial, which nothing reads.
+#
+# WHEN. Every night at 10:30 UTC (3:30 AM MT in winter), after the nightly
+# at 9:00 UTC, and by hand:
+#   gh workflow run gate-map.yml --ref main
+# A map is measured from its own tree, so merges since it count as part of a
+# pull request's change; a day-old map runs a little more, never less.
+#
+# A gate harness that fails still leaves its paths in the map (Affected-
+# Harnesses.js runs one that did not pass every time), so the map is kept
+# whatever the gate did, and the job is red after if the gate was. A trace
+# that lost an event is refused and keeps no map.
+#
+# WHERE IT RUNS. GitHub's hosted windows-latest, free on a public
+# repository; about twenty minutes. No secret. The run's own token is not
+# given to any harness.
+#
+# Every action is named by a full length commit SHA with its tag in the
+# comment, for the reason build.yml gives.
+name: Gate map
+on:
+  schedule:
+    - cron: '30 10 * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/gate-map.yml
+      - scripts/dev/Trace-Gate-Here.ps1
+      - scripts/dev/Trace-Gate-Box.ps1
+      - scripts/dev/Affected-Harnesses.js
+permissions:
+  contents: read
+concurrency:
+  group: gate-map-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  trace:
+    name: Trace the gate and keep its map
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Check the trace sees what it should, on this runner
+        shell: pwsh
+        run: |
+          # A probe whose file work is known runs under a trace of its own;
+          # every open must come back. A failure here means no map from this
+          # runner can be trusted, so nothing below runs.
+          .\scripts\dev\Trace-Gate-Here.ps1 -Mode selftest
+          exit $LASTEXITCODE
+
+      - name: Start the trace
+        shell: pwsh
+        run: |
+          .\scripts\dev\Trace-Gate-Here.ps1 -Mode start
+          exit $LASTEXITCODE
+
+      - name: Run the whole gate, saying which process is which harness's
+        id: gate
+        shell: pwsh
+        run: |
+          # build.yml's gate, all of it in one job, since a trace has to see
+          # every harness on one machine. Its exit code is kept for the last
+          # step; the map is taken either way.
+          $keep = Join-Path $env:RUNNER_TEMP 'gate-trace'
+          $null = New-Item -ItemType Directory -Force -Path $keep
+          .\scripts\dev\Run-Gate.ps1 -Throttle 6 -BudgetSeconds 2700 -StartLog (Join-Path $keep 'starts.jsonl')
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ('code=' + $LASTEXITCODE)
+
+      - name: Stop the trace
+        if: always()
+        shell: pwsh
+        run: |
+          # A trace that lost an event is refused here, and no map is kept.
+          .\scripts\dev\Trace-Gate-Here.ps1 -Mode stop
+          if ($LASTEXITCODE -ne 0) { .\scripts\dev\Trace-Gate-Here.ps1 -Mode clean; exit 1 }
+
+      - name: Read the trace into the map
+        shell: pwsh
+        env:
+          RUN_KEY: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          $keep = Join-Path $env:RUNNER_TEMP 'gate-trace'
+          $out = Join-Path $env:RUNNER_TEMP 'gate-map'
+          $null = New-Item -ItemType Directory -Force -Path $out
+          $commit = (git rev-parse HEAD).Trim()
+          if ($commit -notmatch '^[0-9a-f]{40}$') { Write-Host '::error::the checkout has no commit to name'; exit 1 }
+          $traces = Join-Path $keep 'traces.jsonl.gz'
+          .\scripts\dev\Trace-Gate-Here.ps1 -Mode read -Starts (Join-Path $keep 'starts.jsonl') -Workspace (Get-Location).Path -OutFile $traces
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          node scripts/dev/Affected-Harnesses.js build $traces (Join-Path $out ($env:RUN_KEY + '.map.json')) $commit
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          node scripts/dev/Affected-Harnesses.js tree HEAD (Join-Path $out ($env:RUN_KEY + '.tree.gz'))
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          [ordered]@{ commit = $commit; key = $env:RUN_KEY; read = [DateTime]::UtcNow.ToString('yyyy-MM-dd HH:mm') + ' UTC' } |
+            ConvertTo-Json -Compress | Set-Content -LiteralPath (Join-Path $out 'latest.json') -Encoding utf8NoBOM
+
+      # Main's map, which Gate-Map.ps1 -Fetch reads, only from main's own
+      # schedule or a run by hand on main.
+      - name: Keep the map
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: gate-map
+          path: ${{ runner.temp }}/gate-map
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Keep the trial map
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: gate-map-trial
+          path: ${{ runner.temp }}/gate-map
+          retention-days: 3
+          if-no-files-found: error
+
+      - name: Say how the gate went
+        shell: pwsh
+        env:
+          CODE: ${{ steps.gate.outputs.code }}
+        run: |
+          if ("$env:CODE" -ne '0') { Write-Host "::error::the gate failed under the trace (exit $env:CODE); the map was kept, and a harness that failed always runs"; exit 1 }
+          Write-Host 'the gate passed under the trace, and its map is kept'
