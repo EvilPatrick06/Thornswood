@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  77,
-    "callCount":  309,
+    "scriptCount":  79,
+    "callCount":  315,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -2795,6 +2795,60 @@
                       "does":  "-OnBox: writes Build-Discord.py, content.py and staff-channel.txt to a new folder in C:\\Windows\\Temp, runs Build-Discord.py there with the token from C:\\Thornswood-Bot\\bot.env.json and the bot\u0027s own Python libraries, then removes the folder (#2519)",
                       "class":  "admin",
                       "reason":  "reads the bot token from the bot\u0027s settings, which only an administrator may read, and works outside the gate verbs"
+                  },
+                  {
+                      "script":  "scripts/deploy/Deploy-Release.ps1",
+                      "scope":  "Remote",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "return Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $script",
+                      "does":  "sends a script or file for its caller",
+                      "class":  "transport",
+                      "reason":  "carries what its caller hands it; each caller is mapped"
+                  },
+                  {
+                      "script":  "scripts/deploy/Deploy-Release.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "\u0026 \u0027$exe\u0027 deploy --environment \u0027$Environment\u0027 --tag \u0027$Tag\u0027 2\u003e\u00261 | ForEach-Object { \"`$_\" }",
+                      "does":  "runs the deploy agent\u0027s deploy, which puts a signed build Release\u0027s gamemode into the running dev server and confirms the load from server.log, or puts the old one back (#5180)",
+                      "class":  "swap",
+                      "reason":  "reload; replaces the dev server\u0027s gamemode.js and stamp"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-DeployAgent.ps1",
+                      "scope":  "Remote",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "return Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $script",
+                      "does":  "sends a script or file for its caller",
+                      "class":  "transport",
+                      "reason":  "carries what its caller hands it; each caller is mapped"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-DeployAgent.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "\u0027--- agent.log, last 30 ---\u0027",
+                      "does":  "reads the deploy agent\u0027s service, version, its own check and the end of agent.log",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-DeployAgent.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "\u0026 sc.exe delete \u0027$agentSvc\u0027 | Out-Null",
+                      "does":  "stops and deletes the ThornswoodDeployAgent service, leaving its folder and logs",
+                      "class":  "admin",
+                      "reason":  "sends sc.exe delete"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-DeployAgent.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "\u0026 icacls.exe `$root /inheritance:r /grant:r \u0027*S-1-5-18:(OI)(CI)F\u0027 \u0027*S-1-5-32-544:(OI)(CI)F\u0027 | Out-Null",
+                      "does":  "locks C:\\Thornswood-Agent, downloads and checks the newest signed agent-v Release, writes agent.json, and makes, sets and starts the LocalSystem service ThornswoodDeployAgent, or puts the old program back (#5180)",
+                      "class":  "admin",
+                      "reason":  "ACLs and sc.exe create"
                   }
               ]
 }

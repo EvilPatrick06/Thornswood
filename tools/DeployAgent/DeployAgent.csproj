@@ -22,9 +22,14 @@
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <!-- The box is Windows x64; naming it here keeps it in packages.lock.json. -->
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
-    <!-- It ships as one file (dotnet publish -p:PublishSingleFile=true); the
-         analyzer is on in every build so the locked packages are the same. -->
-    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+    <!-- It ships as one file (dotnet publish -p:PublishSingleFile=true). The
+         single-file analyzer is off: it brings in Microsoft.NET.ILLink.Tasks at
+         the installed SDK's own version, so packages.lock.json would hold
+         only on a machine with that exact SDK (the gate's Windows runner had
+         10.0.13 where the lock said 10.0.14). The agent finds its folder by
+         AppContext.BaseDirectory and Environment.ProcessPath, which hold in
+         one file. -->
+    <EnableSingleFileAnalyzer>false</EnableSingleFileAnalyzer>
     <!-- Set by the workflow: -p:Version=1.0.<run> -p:ExpectedSigner=<name>. -->
     <Version Condition="'$(Version)' == ''">0.0.0</Version>
     <ExpectedSigner Condition="'$(ExpectedSigner)' == ''"></ExpectedSigner>

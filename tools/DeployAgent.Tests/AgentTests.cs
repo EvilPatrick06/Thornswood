@@ -263,6 +263,7 @@ public sealed class AgentTests : IDisposable
         env.Turn = Temp();
         env.Store = Path.Combine(home, "store");
         env.Health = "https://health.test/api/servers/thornswood/manifest.json";
+        env.LogBase = "http://box.test:7788/";
         env.LoadSeconds = 10;
         env.TurnSeconds = 10;
         var cfg = new Config { Repo = "O/R", Api = FakeGitHub.Api, Home = home, Environments = { ["dev"] = env } };

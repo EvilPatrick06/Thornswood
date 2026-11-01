@@ -125,7 +125,7 @@ try {
     # ---- one check, one environment ---------------------------------------------
     $proj = [IO.File]::ReadAllText((Join-Path $Repo 'tools\DeployAgent\DeployAgent.csproj'))
     Yes 'the agent compiles launcher\app\Signature.cs in from where it lives' ($proj.Contains('<Compile Include="..\..\launcher\app\Signature.cs" Link="Signature.cs" />'))
-    Yes '  and keeps no copy of its own' (-not (Test-Path (Join-Path $Repo 'tools\DeployAgent\Signature.cs')))
+    Yes '  and keeps no copy of its own' (@(Get-ChildItem -LiteralPath (Join-Path $Repo 'tools\DeployAgent') -Filter 'Signature*.cs' -File).Count -eq 0)
     $cfg = [IO.File]::ReadAllText((Join-Path $Repo 'tools\DeployAgent\AgentConfig.cs'))
     $gw = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\gamemode-release.yml'))
     Yes 'the agent watches "Dev server" and the workflow asks "Dev server"' ($cfg.Contains('GitHubEnvironment = "Dev server"') -and $gw.Contains("environment = 'Dev server'"))

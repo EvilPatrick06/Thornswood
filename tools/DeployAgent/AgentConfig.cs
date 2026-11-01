@@ -40,7 +40,9 @@ public sealed class Config
         Turn = @"C:\Thornswood-Backup",
         Store = @"C:\Thornswood-Deploys",
         Health = "http://127.0.0.1:7788/api/servers/thornswood/manifest.json",
-        LogBase = "http://play.thornswood.net:7788/",
+        // Written by the installer from scripts/vps/vps.json, the one place
+        // the box's address lives; "" leaves a Deployment without a log link.
+        LogBase = "",
         LoadSeconds = 300,
         TurnSeconds = 1200,
         LivePort = 7777,

@@ -92,20 +92,25 @@ if (-not $Repo) {
     else { Die "this checkout's origin ($remote) is not a GitHub repository; pass -Repo owner/name. Nothing was sent." }
 }
 if ($Repo -notmatch '^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$') { Die "-Repo $Repo is not owner/name. Nothing was sent." }
+# Where a Deployment's log link points: the dev server's resources port on
+# the box's public name, from vps.json, the one place the address is kept.
+$publicName = Get-ThornswoodVpsAddress
+if ($publicName -notmatch '^[A-Za-z0-9.-]+$') { Die "vps.json's address ($publicName) is not a plain host name. Nothing was sent." }
+$logBase = 'http://' + $publicName + ':7788/'
 
 $target = "$VpsUser@$VpsHost"
 $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
 function Remote($script) { return Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $script }
 
-$service = 'ThornswoodDeployAgent'
+$agentSvc = 'ThornswoodDeployAgent'
 $exe = $Root.TrimEnd('\') + '\thornswood-agent.exe'
 
 # ------------------------------------------------------------------ status --
 if ($Status) {
     $out = @(Remote @"
-`$s = Get-Service -Name '$service' -ErrorAction SilentlyContinue
-if (-not `$s) { 'NOT INSTALLED: there is no service $service'; exit 0 }
-'service $service is ' + `$s.Status + ', start ' + `$s.StartType
+`$s = Get-Service -Name '$agentSvc' -ErrorAction SilentlyContinue
+if (-not `$s) { 'NOT INSTALLED: there is no service $agentSvc'; exit 0 }
+'service $agentSvc is ' + `$s.Status + ', start ' + `$s.StartType
 if (Test-Path -LiteralPath '$exe') { & '$exe' version 2>&1 | ForEach-Object { "`$_" } }
 '--- the agent''s own check ---'
 & '$exe' check 2>&1 | ForEach-Object { "`$_" }
@@ -120,11 +125,11 @@ if (Test-Path -LiteralPath `$log) { Get-Content -LiteralPath `$log -Tail 30 } el
 # ------------------------------------------------------------------ remove --
 if ($Remove) {
     $out = @(Remote @"
-`$s = Get-Service -Name '$service' -ErrorAction SilentlyContinue
+`$s = Get-Service -Name '$agentSvc' -ErrorAction SilentlyContinue
 if (`$s) {
-  if (`$s.Status -ne 'Stopped') { Stop-Service -Name '$service' -Force; `$s.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(60)) }
-  & sc.exe delete '$service' | Out-Null
-  'REMOVED the service $service; $Root is left with its logs'
+  if (`$s.Status -ne 'Stopped') { Stop-Service -Name '$agentSvc' -Force; `$s.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(60)) }
+  & sc.exe delete '$agentSvc' | Out-Null
+  'REMOVED the service $agentSvc; $Root is left with its logs'
 } else { 'NOT INSTALLED' }
 "@)
     foreach ($l in $out) { Say ("  $l") }
@@ -147,7 +152,7 @@ $out = @(Remote @"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 `$root = '$Root'
 `$exe = '$exe'
-`$service = '$service'
+`$agentSvc = '$agentSvc'
 `$want = '$Tag'
 `$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 `$stage = Join-Path `$root ('.stage-' + `$stamp)
@@ -216,13 +221,16 @@ if (`$got -ne `$entry[0].sha256 -or (Get-Item -LiteralPath `$new).Length -ne `$e
 if (Test-Path -LiteralPath `$cfgPath) { try { `$cfg = [IO.File]::ReadAllText(`$cfgPath) | ConvertFrom-Json } catch { Refuse (`$cfgPath + ' does not read as JSON: ' + `$_.Exception.Message) } }
 `$cfg | Add-Member -NotePropertyName repo -NotePropertyValue '$Repo' -Force
 `$cfg | Add-Member -NotePropertyName home -NotePropertyValue `$root -Force
+if (-not `$cfg.environments) { `$cfg | Add-Member -NotePropertyName environments -NotePropertyValue (New-Object PSObject) -Force }
+if (-not `$cfg.environments.dev) { `$cfg.environments | Add-Member -NotePropertyName dev -NotePropertyValue (New-Object PSObject) -Force }
+`$cfg.environments.dev | Add-Member -NotePropertyName logBase -NotePropertyValue '$logBase' -Force
 [IO.File]::WriteAllText(`$cfgPath, (`$cfg | ConvertTo-Json -Depth 10))
 'agent.json names $Repo'
 
 # In place, with the one it replaces kept beside it until the new one runs.
-`$svc = Get-Service -Name `$service -ErrorAction SilentlyContinue
+`$svc = Get-Service -Name `$agentSvc -ErrorAction SilentlyContinue
 if (`$svc -and `$svc.Status -ne 'Stopped') {
-  Stop-Service -Name `$service -Force
+  Stop-Service -Name `$agentSvc -Force
   `$svc.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(120))
 }
 `$prev = `$exe + '.prev'
@@ -233,25 +241,25 @@ Remove-Item -LiteralPath `$stage -Recurse -Force
 if (-not `$svc) {
   # The path has no spaces (-Root is held to that), so it needs no quotes of
   # its own, which Windows PowerShell 5.1 would not pass through whole.
-  & sc.exe create `$service binPath= (`$exe + ' service') start= delayed-auto obj= LocalSystem DisplayName= 'Thornswood deploy agent' | Out-Null
-  if (`$LASTEXITCODE -ne 0) { 'COULD NOT MAKE the service ' + `$service; exit 1 }
-  & sc.exe description `$service 'Applies Thornswood Deployments from signed GitHub Releases (#5180). Outbound only.' | Out-Null
+  & sc.exe create `$agentSvc binPath= (`$exe + ' service') start= delayed-auto obj= LocalSystem DisplayName= 'Thornswood deploy agent' | Out-Null
+  if (`$LASTEXITCODE -ne 0) { 'COULD NOT MAKE the service ' + `$agentSvc; exit 1 }
+  & sc.exe description `$agentSvc 'Applies Thornswood Deployments from signed GitHub Releases (#5180). Outbound only.' | Out-Null
 }
-& sc.exe failure `$service reset= 86400 actions= restart/10000/restart/10000/restart/60000 | Out-Null
-& sc.exe failureflag `$service 1 | Out-Null
+& sc.exe failure `$agentSvc reset= 86400 actions= restart/10000/restart/10000/restart/60000 | Out-Null
+& sc.exe failureflag `$agentSvc 1 | Out-Null
 
 # A start that fails or does not finish in time is said here and answered
 # below, where the agent it replaced goes back.
-`$svc = Get-Service -Name `$service
-try { Start-Service -Name `$service; `$svc.WaitForStatus('Running', [TimeSpan]::FromSeconds(60)) }
+`$svc = Get-Service -Name `$agentSvc
+try { Start-Service -Name `$agentSvc; `$svc.WaitForStatus('Running', [TimeSpan]::FromSeconds(60)) }
 catch { 'the service did not reach Running: ' + `$_.Exception.Message }
 `$svc.Refresh()
 if (`$svc.Status -ne 'Running') {
   'the new agent did not start (' + `$svc.Status + ')'
   if (Test-Path -LiteralPath `$prev) {
-    Stop-Service -Name `$service -Force -ErrorAction SilentlyContinue
+    Stop-Service -Name `$agentSvc -Force -ErrorAction SilentlyContinue
     Move-Item -LiteralPath `$prev -Destination `$exe -Force
-    Start-Service -Name `$service -ErrorAction SilentlyContinue
+    Start-Service -Name `$agentSvc -ErrorAction SilentlyContinue
     'PUT BACK: the agent it replaced is in place again'
   }
   exit 1
@@ -260,7 +268,7 @@ Remove-Item -LiteralPath `$prev -Force -ErrorAction SilentlyContinue
 & `$exe version 2>&1 | ForEach-Object { "`$_" }
 '--- the agent''s own check ---'
 & `$exe check 2>&1 | ForEach-Object { "`$_" }
-'INSTALLED: ' + `$service + ' runs ' + `$best.tag_name
+'INSTALLED: ' + `$agentSvc + ' runs ' + `$best.tag_name
 "@)
 foreach ($l in $out) { Say ("  $l") }
 if ($out -match '^INSTALLED: ') { Say 'The deploy agent is installed and running.' Green; exit 0 }
