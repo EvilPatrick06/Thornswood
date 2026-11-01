@@ -246,6 +246,7 @@ $n = Get-EnginePinNotes $P $H $fake
 Yes '  two notes join into one, the second headline as a line under the first' ($n.ReleaseNote -eq "The loading screen shows no flash`n- The screen stays dark until the picture is up.`n- An equipped form stays on`n- A worn piece is never drunk by mistake.")
 $pin = [IO.File]::ReadAllText((Join-Path $root 'scripts/release/Update-EnginePin.ps1'))
 Yes '  the pin body writes the joined note, none, or names the fork pull requests with no line' ($pin -match "'Release note: ' \+ \`$nl\[0\]" -and $pin -match "'Release note: none'" -and $pin -match 'carry no "Release note:" line')
+Yes '  a heading ends the last Test task before the ticked parts, so the Test tasks check does not read them as steps' ($pin.IndexOf("`$body.Add('### Which parts it touches, and what runs after the merge')") -gt $pin.IndexOf('foreach ($t in $notes.TestTasks)') -and $pin.IndexOf('foreach ($t in $notes.TestTasks)') -gt 0 -and $pin.IndexOf("`$body.Add('### Which parts it touches, and what runs after the merge')") -lt $pin.IndexOf("`$body.Add('- [x] The live server build"))
 
 # ---- 5. engine-pin.yml ----------------------------------------------------------
 $wf = [IO.File]::ReadAllText((Join-Path $root '.github/workflows/engine-pin.yml')).Replace("`r`n", "`n")
