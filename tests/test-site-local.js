@@ -196,7 +196,10 @@ yes('every route in the table is one server.js answers, with that method' +
 // the path without it.
 const unasked = [];
 rows.forEach(function (r) {
-  if (r.routes.indexOf('/api/play/who') >= 0) { return; }
+  // A route the table says nothing asks any more names no caller, and the
+  // check below each one holds that to the code: /api/play/who, and
+  // /api/payload since the setup program retired (#4824).
+  if (/^nothing in the repo asks it now/.test(r.text)) { return; }
   if (!r.files.length) { unasked.push(r.routes[0] + ' names no caller'); return; }
   const text = r.files.map(function (f) { return read(f.split(BS).join('/')) || ''; }).join('\n');
   r.files.forEach(function (f) { if (read(f.split(BS).join('/')) === null) { unasked.push(f + ' is not there'); } });
@@ -219,7 +222,7 @@ function walk(dir, re, out) {
   });
   return out;
 }
-const askers = walk('launcher/app', /\.cs$/, []).concat(walk('installer/setup', /\.cs$/, []),
+const askers = walk('launcher/app', /\.cs$/, []).concat(
   walk('game/plugins', /\.js$/, []), walk('game/ui', /\.js$/, []),
   walk('voice', /\.js$/, []), walk('bot', /\.py$/, []), ['game/gamemode.js']);
 const whoRow = rows.filter(function (r) { return r.routes.indexOf('/api/play/who') >= 0; })[0];
@@ -227,6 +230,12 @@ const whoCallers = askers.filter(function (f) { return (read(f) || '').indexOf('
 yes('the table says nothing asks /api/play/who, and nothing in ' + askers.length + ' files does' +
     (whoCallers.length ? ', but ' + whoCallers.join(', ') + ' does' : ''),
     !!whoRow && /^nothing in the repo asks it now/.test(whoRow.text) && askers.length > 20 && whoCallers.length === 0);
+
+const payloadRow = rows.filter(function (r) { return r.routes.indexOf('/api/payload') >= 0; })[0];
+const payloadCallers = askers.filter(function (f) { return (read(f) || '').indexOf('/api/payload') >= 0; });
+yes('the table says nothing asks /api/payload since the setup program retired, and nothing does' +
+    (payloadCallers.length ? ', but ' + payloadCallers.join(', ') + ' does' : ''),
+    !!payloadRow && /^nothing in the repo asks it now/.test(payloadRow.text) && payloadCallers.length === 0);
 
 // Nothing the launcher or a key holder asks can be left out of the table.
 const inTable = [].concat.apply([], rows.map(function (r) { return r.routes; }));

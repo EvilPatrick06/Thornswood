@@ -6,7 +6,7 @@
 
   Until 27 September the pin was compiled into the exe: the exe size in
   Config.cs, the three depot manifests and the newer build's size in
-  Downgrade.cs, and a second copy of the depots in Setup-Thornswood.ps1. Now
+  Downgrade.cs, and a second copy of the depots in the install script. Now
   version.json carries expectedExeBytes, newerExeBytes and depots, written by
   Publish-Update from records\skyrim-pin.json, OnVersionDoc takes them through
   Downgrade.AdoptPin into config.json, and the compiled numbers are the
@@ -19,7 +19,9 @@
     - a feed with them moves the checks and the three download_depot lines
     - half a pin, or a depot list the button cannot use, is not taken
     - what the publisher writes is what the launcher reads
-    - the record, the compiled fallback and Setup-Thornswood.ps1 agree
+    - the record and the compiled fallback agree, and the install (the
+      launcher's InstallSteps.cs since #4824) reads the build's exe size out of
+      records\skyrim-files.json rather than keeping a copy
 
   Config.cs is compiled whole and the pin methods are lifted out of
   Downgrade.cs by brace matching, with the compiler the build runs at the C#
@@ -68,7 +70,7 @@ $downSrc = Read-Text (Join-Path $app 'Downgrade.cs')
 $configSrc = Read-Text (Join-Path $app 'Config.cs')
 $recordPath = Join-Path $Root 'records\skyrim-pin.json'
 $publishPath = Join-Path $Root 'scripts\release\Publish-Update.ps1'
-$setupPath = Join-Path $Root 'installer\Setup-Thornswood.ps1'
+$setupPath = Join-Path $app 'InstallSteps.cs'
 
 # ---- lift the pin methods out of Downgrade.cs ---------------------------------
 # From the start of the signature's line to the brace that closes it, and the
@@ -340,11 +342,10 @@ try {
     $cfgDefaults = @([regex]::Matches($configSrc, 'ExpectedExeBytes(?: <= 0\) ExpectedExeBytes)? = (\d+);') | ForEach-Object { $_.Groups[1].Value })
     Yes "P8 and the same exe size as both of Config.cs's defaults ($($cfgDefaults -join ', '))" ($cfgDefaults.Count -eq 2 -and @($cfgDefaults | Where-Object { $_ -ne [string]$rec.expectedExeBytes }).Count -eq 0)
     $setup = Read-Text $setupPath
-    $setupExe = [regex]::Match($setup, '(?m)^\$TARGET_EXE_BYTES = (\d+)').Groups[1].Value
-    $setupApp = [regex]::Match($setup, '(?m)^\$AppId\s*=\s*''(\d+)''').Groups[1].Value
-    $setupDepots = @([regex]::Matches($setup, '(?m)^\s*''(\d+)'' = ''(\d+)''') | ForEach-Object { 'download_depot ' + $setupApp + ' ' + $_.Groups[1].Value + ' ' + $_.Groups[2].Value })
-    Yes 'P8 Setup-Thornswood.ps1 checks for the same exe size' ($setupExe -eq [string]$rec.expectedExeBytes)
-    Yes 'P8 and names the same three depots' (Same $setupDepots $recLines)
+    Yes 'P8 the install reads the exe size out of records\skyrim-files.json and keeps no copy of the pin' (
+        $setup.Contains('GetManifestResourceStream("skyrim-files.json")') -and
+        $setup.Contains('GetProperty("SkyrimSE.exe").GetProperty("bytes")') -and
+        -not $setup.Contains([string]$rec.expectedExeBytes) -and -not $setup.Contains('download_depot'))
 
     # ---- P9: the wiring ---------------------------------------------------------
     $ovd = $null

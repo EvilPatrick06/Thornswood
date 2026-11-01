@@ -125,7 +125,7 @@ resources.forEach(function (name) {
 // FromGameDeflate.cs, is zlib 1.3 translated into C#. It went out from #2827
 // with no zlib notice and THIRD-PARTY.md calling everything compiled in
 // Thornswood's own (#3668). So the header of every .cs file under
-// launcher\app and installer\setup (its comments down to the first type it
+// launcher\app (its comments down to the first type it
 // declares) is read for outside projects: the libraries in
 // records\client-licences, the numeric and compression ones the launcher's
 // work touches, and any line saying code was translated, ported, adapted or
@@ -134,7 +134,7 @@ resources.forEach(function (name) {
 // names, and a row that says a file carries a library's code needs that
 // library's notice in the file's header word for word, the file marked as
 // altered, and THIRD-PARTY.md pointing at the licence text.
-const SRC_DIRS = [path.join('launcher', 'app'), path.join('installer', 'setup')];
+const SRC_DIRS = [path.join('launcher', 'app')];
 const LIC_DIR = path.join(REPO, 'records', 'client-licences');
 const licNames = (fs.existsSync(LIC_DIR) ? fs.readdirSync(LIC_DIR) : [])
   .filter(function (n) { return /\.txt$/i.test(n); })

@@ -118,8 +118,10 @@ const rmf = read(RMF);
 yes(RMF + ' is there', rmf !== null);
 if (rmf !== null) {
   clean(RMF, rmf);
-  yes(RMF + ' names the setup program Package-Thornswood.ps1 builds, Thornswood-Setup.exe',
-      /Thornswood-Setup\.exe/.test(rmf) && /Thornswood-Setup\.exe/.test(pkg || ''));
+  // Since #4824 the install is the launcher's first start, after Velopack's
+  // setup: the launcher asks for the drive and the four yeses.
+  yes(RMF + ' says the launcher asks for the drive and the four yeses before it installs (#4824)',
+      /opens the launcher/.test(rmf) && /drive/.test(rmf) && /age box, the terms, the privacy policy and the rules/.test(rmf.replace(/\s+/g, ' ')));
   yes(RMF + ' says the collection comes through Vortex, as join.md does',
       /Vortex/.test(rmf) && /collection/i.test(rmf));
   yes(RMF + ' names build 1.6.1170 and the launcher\'s Downgrade button',

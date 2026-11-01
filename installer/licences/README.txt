@@ -2,7 +2,7 @@
 ==================================
 
 These three files are staged into every installer beside SOURCE CODE.txt
-(Package-Thornswood.ps1), copied into the install folder (Setup-Thornswood.ps1),
+(Package-Thornswood.ps1), copied into the install folder (launcher\app\InstallSteps.cs),
 and removed on uninstall (Uninstall.cs). Issue #421.
 
   GPL-3.0.txt

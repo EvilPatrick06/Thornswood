@@ -14,7 +14,8 @@
 // dev build, although every change goes to the dev build first. And none of
 // these six folders had a word written about it outside the code:
 // launcher reads like the launcher's source and holds one HTML page, and
-// installer\setup holds the installer, not the launcher.
+// installer holds what the install hands over, while the install itself is
+// in the launcher's first start (#4824).
 //
 // A README is worth having only while it is true, so this checks what each one
 // states against the code that decides it, not only that the file is there:
@@ -141,7 +142,7 @@ function glob(f) {
 const SIX = ['docs-app', 'voice', 'ts-plugins', 'ts-ui', 'setup', 'launcher'];
 // Where each lives: voice left tools for the repository root on 25 September.
 const AT = { 'voice': 'voice', 'docs-app': 'site', 'ts-plugins': 'game/plugins', 'ts-ui': 'game/ui',
-  'launcher': 'launcher', 'setup': 'installer/setup' };
+  'launcher': 'launcher', 'setup': 'installer' };
 function at(d) { return AT[d] || ('tools/' + d); }
 const HEADS = ['## What it is', '## On your machine', '## Where it runs'];
 const readme = {};
@@ -328,31 +329,28 @@ SIX.forEach(function (d) {
       t.indexOf('`launcher' + BS + 'app`') >= 0 && t.indexOf('ui.xaml') >= 0 && t.indexOf('voice-host.html') >= 0);
 }
 
-// ------------------------------------------------------------ installer\setup --
+// ------------------------------------------------------------ installer --
+// Since #4824 the install is compiled code in the launcher's first start and
+// Velopack's Setup.exe: no setup program, script or batch file of its own.
 {
   const t = readme.setup || '';
   const bl = read('scripts/release/Build-Launcher.ps1') || '';
-  const boot = read('installer/setup/Bootstrap.cs') || '';
-  const held = files('installer/setup').filter(function (f) { return f !== 'README.md'; });
-  // Setup.manifest since issue #463: the setup program's own application
-  // manifest (per-monitor DPI, asInvoker), embedded by Build-Launcher.ps1.
-  // Setup.csproj since issue #498: the same program as an MSBuild project.
-  yes('installer' + BS + 'setup: holds the three files its README says, Bootstrap.cs, Setup.manifest and Setup.csproj (' + held.join(', ') + ')',
-      held.length === 3 && held.indexOf('Bootstrap.cs') >= 0 && held.indexOf('Setup.manifest') >= 0 && held.indexOf('Setup.csproj') >= 0 &&
-      t.indexOf('`Bootstrap.cs`') >= 0 && t.indexOf('`Setup.manifest`') >= 0 && t.indexOf('`Setup.csproj`') >= 0);
-  const setupProj = read('installer/setup/Setup.csproj') || '';
-  yes('installer' + BS + 'setup: Setup.csproj compiles Bootstrap.cs by name, and Build-Launcher.ps1 builds it into setup-stub.exe',
-      /<Compile Include="Bootstrap\.cs"/.test(setupProj) &&
-      bl.indexOf("installer\\setup\\Setup.csproj'") >= 0 && bl.indexOf("'setup-stub.exe'") >= 0 &&
-      t.indexOf('setup-stub.exe') >= 0);
-  const inst = (/installRoot = @"([^"]+)"/.exec(boot) || [])[1];
-  yes('installer' + BS + 'setup: the README gives the install folder Bootstrap.cs offers, ' + inst,
+  const place = read('launcher/app/InstallPlace.cs') || '';
+  const held = files('installer').filter(function (f) { return f !== 'README.md'; });
+  yes('installer: holds READ ME FIRST.txt and licences, and nothing to compile or run (' + held.join(', ') + ')',
+      held.length === 1 && held[0] === 'READ ME FIRST.txt' && exists('installer/licences/README.txt') &&
+      !exists('installer/setup') && t.indexOf('`READ ME FIRST.txt`') >= 0 && t.indexOf('`licences' + BS + '`') >= 0);
+  yes('installer: the README names where the install is, and those files are there',
+      ['InstallWindow.cs', 'InstallSteps.cs', 'InstallPlace.cs'].every(function (f) {
+        return exists('launcher/app/' + f) && t.indexOf('launcher' + BS + 'app' + BS + f) >= 0;
+      }));
+  yes('installer: Build-Launcher.ps1 builds no setup program of its own',
+      bl.indexOf('Setup.csproj') < 0 && bl.indexOf('setup-stub.exe') < 0);
+  const inst = (/return @"([^"]+)";/.exec(place) || [])[1];
+  yes('installer: the README gives the install folder InstallPlace.cs falls back to, ' + inst,
       !!inst && t.indexOf('`' + inst + '`') >= 0);
-  const site = (/const string Site = "([^"]+)"/.exec(boot) || [])[1];
-  yes('installer' + BS + 'setup: and the address it downloads the payload from',
-      !!site && boot.indexOf('Site + "/api/payload"') >= 0 && t.indexOf(site + '/api/payload') >= 0);
-  yes('installer' + BS + 'setup: the README says it is not the launcher source, and where that is',
-      /not the launcher's\s+source/.test(t) && t.indexOf('`launcher' + BS + 'app`') >= 0);
+  yes('installer: the README says the script and the batch files are gone and nothing falls back to them',
+      /Setup-Thornswood/.test(t) && /nothing falls back to them/.test(t));
 }
 
 // ------------------------------------------- nothing carries a README out --
@@ -407,7 +405,7 @@ SIX.forEach(function (d) {
       fileLists.length === 0);
 
   const bl = read('scripts/release/Build-Launcher.ps1') || '';
-  yes('Build-Launcher.ps1 never lists launcher or installer' + BS + 'setup, so only the named file goes in',
+  yes('Build-Launcher.ps1 never lists launcher or installer, so only the named file goes in',
       !bl.split('\n').some(function (l) {
         return /Get-ChildItem/.test(l) && /'(\.\.\\launcher|\.\.\\installer\\setup|launcher|setup)(['\\])/.test(l);
       }));
