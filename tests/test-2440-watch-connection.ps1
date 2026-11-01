@@ -19,7 +19,7 @@
   token (The operation has timed out)", and the gallery list read the same way
   leaves Play's card hidden. Patrick's report the same evening: the Play
   gallery goes blank or loads its pictures slowly, where it used to turn
-  through them steadily. Updater.Tip now puts the watch in a connection group
+  through them steadily. Updater.Tip then put the watch in a connection group
   of its own (Updater.WatchGroup), which counts its connections apart.
 
   Since the move to .NET 10 (#4823) the launcher's requests go through
