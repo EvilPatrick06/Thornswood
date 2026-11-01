@@ -280,7 +280,7 @@ namespace Thornswood
         /// </summary>
         public static VersionDoc Check(Config cfg)
         {
-            // No ServicePointManager.SecurityProtocol line any more (#4825). On
+            // No line setting the security protocol any more (#4825). On
             // the .NET Framework it added TLS 1.2 to an old default (#1360). On
             // .NET 10 the default is whatever Windows allows, TLS 1.3 included,
             // and adding TLS 1.2 to that default would have turned it into TLS
