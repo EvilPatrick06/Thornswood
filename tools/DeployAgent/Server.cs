@@ -1,4 +1,5 @@
 #nullable enable
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -225,6 +226,241 @@ public sealed class Server(EnvConfig env, HttpClient http)
         return clean
             ? new Outcome("failure", Trim(why) + "; the previous gamemode is back and loaded", oldBlob, prevName)
             : new Outcome("error", Trim(why) + "; putting the old one back did not take either, so dev needs Deploy-DevGamemode.ps1 -PutBack", Prev: prevName);
+    }
+
+    // ---- a new server build: stop, swap, start under a hold ------------------
+
+    /// <summary>Stops and starts the server; Swap.ps1's ways, on the box.</summary>
+    public IServerControl Control { get; set; } = new WindowsServerControl();
+    /// <summary>How long a stopped process may take to exit (StopAndMove.ps1).</summary>
+    public TimeSpan ExitWithin { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>The record of the build the server folder runs (its
+    /// server-build.json, which every server deploy leaves beside the files),
+    /// as its sum, or "" when there is none.</summary>
+    public string RunningRecordSum()
+    {
+        var p = Path.Combine(Root, "server-build.json");
+        return File.Exists(p) ? ServerBuild.RecordSum(Files.ReadShared(p)) : "";
+    }
+
+    /// <summary>Puts a new server build (an engine pin's) and the gamemode
+    /// written for it into the server, the way Swap.ps1's swap block does:
+    ///  - the stage first, while the old server runs: every fork file out of
+    ///    the zip held to the record, the record the one the signed manifest
+    ///    names, and the engine one that says how a gamemode load went;
+    ///  - then the server folders' turn (#3247) and a hold (#5155), so the
+    ///    nightly backup and the watchdog stay out until it ends;
+    ///  - the stop: the process on this server's own UDP port, waited for
+    ///    until it has exited, and a restart.json it never read removed;
+    ///  - one rename per file, what it replaces into .prev-&lt;stamp&gt;, and any
+    ///    fork file the new record does not list moved there too;
+    ///  - the start, then both ports, server.log saying the new gamemode
+    ///    loaded, and the health address;
+    ///  - when any of that does not happen, the stop again, the old files
+    ///    back the same way, and the old server started and asked again.
+    /// files are the Release's gamemode part (gamemode.js and its stamp).</summary>
+    public async Task<Outcome> ApplyServerBuild(string zip, byte[] record, IReadOnlyDictionary<string, string> files, string who, Action<string> log, CancellationToken ct)
+    {
+        foreach (var n in ReloadFiles)
+            if (!files.ContainsKey(n)) return new Outcome("failure", "the Release's gamemode part has no " + n);
+        if (env.Task == "") return new Outcome("failure", "not applied: no scheduled task is named for this server, so the agent cannot stop and start it for a new server build");
+        JsonElement st;
+        try { st = Settings(); }
+        catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException) { return new Outcome("failure", "not applied: the server's settings do not read: " + e.Message); }
+        var port = st.TryGetProperty("port", out var pv) && pv.ValueKind == JsonValueKind.Number ? pv.GetInt32() : 0;
+        if (port <= 0) return new Outcome("failure", "not applied: the server's settings name no port, so there is no telling which process is this server");
+        if (env.LivePort != 0 && port == env.LivePort) return new Outcome("failure", $"not applied: {Root} is on port {port}, which is the live server");
+        // skymp5-server/ts/ui.ts: 3000 when the game port is 7777, the game port plus one otherwise.
+        var resPort = port == 7777 ? 3000 : port + 1;
+        ServerBuild.Record rec;
+        try { rec = ServerBuild.Read(record); }
+        catch (Exception e) when (e is JsonException or DecoderFallbackException) { return new Outcome("failure", "not applied: the Release's server-build.json does not read: " + e.Message); }
+
+        var stamp = Now().ToString("yyyyMMdd-HHmmss");
+        var prevName = ".prev-" + stamp;
+        var prev = Path.Combine(Root, prevName);
+        var stage = Path.Combine(Root, ".agent-stage-" + stamp);
+
+        // The stage, while the old server runs. A refusal here has touched nothing.
+        Dictionary<string, string> sums;
+        try
+        {
+            sums = ServerBuild.Expand(zip, stage, out var zipRecord);
+            if (ServerBuild.RecordSum(zipRecord) != ServerBuild.RecordSum(record))
+                throw new InvalidDataException("the zip's server-build.json is not the one the signed manifest names");
+            Files.WriteWhole(Path.Combine(stage, "server-build.json"), record);
+            foreach (var rel in ReloadFiles) Files.Copy(files[rel], Path.Combine(stage, rel));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            TryDelete(stage);
+            return new Outcome("failure", "not applied: the new server build could not be staged: " + e.Message);
+        }
+        var bad = ServerBuild.Problems(rec, sums, "the Release's server build");
+        try
+        {
+            if (!File.ReadAllText(Path.Combine(stage, "dist_back", "skymp5-server.js")).Contains("[thornswood] gamemode did not load; the error is above"))
+                bad.Add("the new engine does not say how a gamemode load went (it needs the fork from Thornswood #3196)");
+        }
+        catch (IOException e) { bad.Add("the new engine does not read: " + e.Message); }
+        if (bad.Count > 0)
+        {
+            foreach (var b in bad) log("REFUSED: " + b);
+            TryDelete(stage);
+            return new Outcome("failure", "not applied: the server build is not the one its record names: " + bad[0]);
+        }
+        var want = sums.Keys.Append("server-build.json").Concat(ReloadFiles).ToList();
+        var newBlob = Files.GamemodeBlob(Path.Combine(stage, "gamemode.js"));
+        log($"the stage checks out: server build {rec.Short}, {sums.Count} file(s) held to its record, and gamemode git blob {newBlob}");
+
+        Turn turn;
+        try { turn = Turn.Take(env.Turn, who, TimeSpan.FromSeconds(env.TurnSeconds), log); }
+        catch (Exception e) when (e is TimeoutException or IOException or UnauthorizedAccessException) { TryDelete(stage); return new Outcome("failure", "not applied: " + e.Message); }
+        using var _ = turn;
+        Hold.Set(env.Watch, env.Task, $"the deploy agent is swapping in server build {rec.Short} at {Root}", who, 30, log);
+        try
+        {
+            var stopWhy = StopServer(port, log);
+            if (stopWhy != "")
+            {
+                TryDelete(stage);
+                return new Outcome("error", $"not applied: {stopWhy}, so nothing was swapped; the old files are in place and the watchdog starts the server once the hold is gone");
+            }
+
+            // The fork files the new record does not list go aside too, so the
+            // folder is one build, the way a whole install leaves it.
+            var stale = ServerBuild.FolderForkFiles(Root).Where(r => !sums.ContainsKey(r)).ToList();
+            var placed = new List<string>();
+            var aside = new List<string>();
+            var why = "";
+            foreach (var rel in want.Concat(stale))
+            {
+                var at = Path.Combine(Root, rel);
+                try
+                {
+                    if (File.Exists(at))
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(prev, rel))!);
+                        File.Move(at, Path.Combine(prev, rel));
+                        aside.Add(rel);
+                    }
+                    if (stale.Contains(rel)) continue;
+                    Directory.CreateDirectory(Path.GetDirectoryName(at)!);
+                    File.Move(Path.Combine(stage, rel), at);
+                    placed.Add(rel);
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException) { why = $"could not swap {rel}: {e.Message}"; break; }
+            }
+            if (why == "")
+            {
+                log($"swapped in {placed.Count} file(s); the ones they replaced are in {prevName}");
+                why = await StartAndCheck(port, resPort, newBlob, log, ct);
+            }
+            if (why == "")
+            {
+                TryDelete(stage);
+                PruneOld(log);
+                return new Outcome("success", $"dev runs server build {rec.Short} and gamemode blob {newBlob[..12]}, restarted", newBlob, prevName);
+            }
+
+            // The way back: stop what was started, the new files out, the old ones in, and the old server started.
+            log(why);
+            log("putting the previous server build back");
+            var clean = StopServer(port, log) == "";
+            for (int i = want.Count + stale.Count - 1; i >= 0; i--)
+            {
+                var rel = i < want.Count ? want[i] : stale[i - want.Count];
+                var at = Path.Combine(Root, rel);
+                try
+                {
+                    if (placed.Contains(rel) && File.Exists(at))
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(stage, rel))!);
+                        File.Move(at, Path.Combine(stage, rel), true);
+                    }
+                    if (aside.Contains(rel))
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(at)!);
+                        File.Move(Path.Combine(prev, rel), at);
+                    }
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException) { log($"COULD NOT PUT THE OLD {rel} BACK: {e.Message}"); clean = false; }
+            }
+            if (clean)
+            {
+                var back = await StartAndCheck(port, resPort, Files.GamemodeBlob(Path.Combine(Root, "gamemode.js")), log, ct);
+                if (back != "") { log("the previous server build is back and does not answer either: " + back); clean = false; }
+                else log("the previous server build is back and answering");
+            }
+            if (clean)
+            {
+                TryDelete(stage);
+                TryDelete(prev);
+                return new Outcome("failure", Trim(why) + "; the previous server build is back and answering");
+            }
+            return new Outcome("error", Trim(why) + $"; putting the old build back did not take either: what it replaced is in {prevName}, and dev needs Publish-Server -PutBack", Prev: prevName);
+        }
+        finally { Hold.Clear(env.Watch, env.Task, log); }
+    }
+
+    /// <summary>Stops whatever holds this server's UDP port and waits for it
+    /// to exit, then removes a restart.json the old process never read (the
+    /// next process would count down on its own). "" when the port is free.</summary>
+    string StopServer(int port, Action<string> log)
+    {
+        List<int> pids;
+        try { pids = Control.UdpHolders(port); }
+        catch (ControlException e) { return $"the UDP ports could not be listed to find what holds {port} ({e.Message})"; }
+        log($"stopping whatever holds UDP {port}" + (pids.Count > 0 ? $": pid {string.Join(", ", pids)}" : ", which nothing does"));
+        var left = Control.Stop(env.Task, pids, ExitWithin);
+        foreach (var l in left) log(l);
+        if (left.Count > 0) return "what the stop ended has not all exited, so its files may still be open";
+        try
+        {
+            var still = Control.UdpHolders(port);
+            if (still.Count > 0) return $"UDP {port} is still held by pid {string.Join(", ", still)} after the stop";
+        }
+        catch (ControlException e) { return $"the UDP ports could not be listed after the stop ({e.Message})"; }
+        var rq = Path.Combine(DataDir(), "restart.json");
+        try { if (File.Exists(rq)) { File.Delete(rq); log("removed a restart.json the old process never read"); } }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { log($"COULD NOT REMOVE {rq}, so the new process may count down on its own: {e.Message}"); }
+        return "";
+    }
+
+    /// <summary>Starts the task, then waits for both ports (UDP held, the
+    /// resources port taking a connection), server.log saying the gamemode
+    /// blob loaded, and the health address. "" when all of them did.</summary>
+    async Task<string> StartAndCheck(int port, int resPort, string blob, Action<string> log, CancellationToken ct)
+    {
+        var sl = new ServerLog(Root);
+        sl.Mark();
+        try { Control.Start(env.Task); }
+        catch (ControlException e) { return $"the task {env.Task} did not start: {e.Message}"; }
+        log($"started, giving it {env.StartSeconds} seconds to answer on UDP {port} and on {resPort}");
+        var until = Now() + TimeSpan.FromSeconds(env.StartSeconds);
+        var listWhy = "";
+        while (true)
+        {
+            var udp = false;
+            try { udp = Control.UdpHolders(port).Count > 0; listWhy = ""; }
+            catch (ControlException e) { listWhy = e.Message; }
+            if (udp && Control.TcpAnswers(resPort)) break;
+            if (Now() > until)
+            {
+                foreach (var l in Redact(sl.Lines().TakeLast(30))) log("  " + l);
+                return $"nothing answered on UDP {port} and {resPort} within {env.StartSeconds} seconds" + (listWhy != "" ? $" (the ports could not be listed: {listWhy})" : "");
+            }
+            await Task.Delay(Tick, ct);
+        }
+        log($"answering on UDP {port} and {resPort}; waiting up to {env.LoadSeconds} seconds for server.log to say gamemode git blob {blob} loaded");
+        var (got, said) = sl.AwaitLoad(blob, TimeSpan.FromSeconds(env.LoadSeconds), Tick);
+        foreach (var l in Redact(said)) log("  " + l);
+        if (got != "") return "the gamemode did not take on the new start: " + got;
+        var sick = await Unhealthy(ct);
+        if (sick != "") return "the health check failed after the start: " + sick;
+        log($"health: {env.Health} answers 200");
+        return "";
     }
 
     static string Trim(string s) => s.Length > 90 ? s[..87] + "..." : s;

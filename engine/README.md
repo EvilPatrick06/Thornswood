@@ -313,8 +313,13 @@ A change to the engine goes like this:
    which moves the pin in the index, runs `Get-EngineRecords.ps1`,
    `Build-Front.ps1 -Record` and `Write-EnginePinText.ps1`, runs the checks
    and stages the change.
-5. After it merges: the server to the dev server with `Publish-Server.ps1
-   -Channel dev`, the client with the next dev Ship. A machine without that
+5. After it merges, the dev server takes it by itself (#5219):
+   `gamemode-release.yml` runs because the pin changed
+   `records\server-build.json`, puts CI's server build of the pin on a signed
+   Release beside the gamemode, and the box deploy agent swaps it in under a
+   hold and starts dev on it (docs\DEPLOY-AGENT.md, "A new server build").
+   The client goes with the next dev Ship. By hand, as before: the server
+   to the dev server with `Publish-Server.ps1 -Channel dev`. A machine without that
    build puts it on from the store on the box, where the publish or deploy
    that sent it kept it: `Publish-Server.ps1 -Channel dev -FromStore`, and
    for live `Deploy-Server.ps1 -FromStore` (#459). `-ServerBuild <zip>` sends a
