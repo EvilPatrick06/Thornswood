@@ -90,7 +90,7 @@ namespace Thornswood
                 // The news file the feed names, if any, here on the check's own
                 // thread, so the News tab has it (#1050, FeedNews.cs). Never throws.
                 Updater.FillNews(cfg, v);
-                win.Dispatcher.BeginInvoke(new Action(delegate { OnVersionDoc(v, loud); UpdateBySelf(); }));
+                win.Dispatcher.BeginInvoke(new Action(delegate { OnVersionDoc(v, loud); UpdateBySelf(); FixAfterVortex(); }));
                 // Whether the release's signed manifest vouches for every
                 // asset the feed names (#2163, FeedManifest.cs). Only said in
                 // launcher.log for now (phase C), once per manifest, on a
@@ -530,8 +530,7 @@ namespace Thornswood
                 // for it, and a press that slips in before the redraw
                 // must not send this copy to another revision.
                 if (collectionBarUp && CollectionProblem() == "ahead") return;
-                try { Process.Start(new ProcessStartInfo(CollectionLink()) { UseShellExecute = true }); }
-                catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
+                OpenCollection();
                 return;
             }
             UpdateNow();

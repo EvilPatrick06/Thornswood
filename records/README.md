@@ -191,6 +191,19 @@ names. No script reads them. `THIRD-PARTY.md` and
   running server loads, and only while the two name the same revision.
   Changed by hand in the pull request that moves the records to a new
   revision.
+- `collection.json`: the collection as it should be (issue #5189): each
+  Nexus file it installs with the plugins that file puts in Data, every
+  plugin in the collection's order with its load-after rule and what its
+  header says, and the plugins the servers load that a change takes out. A
+  mod change is a pull request to this file (`docs\COLLECTION-CHANGES.md`).
+  `scripts\release\Check-CollectionRecord.ps1` holds it to the load order,
+  `collection-permissions.json` and the servers' order with no key, and
+  `tests\test-5189-collection-record.ps1` runs it in the gate. Its merge runs
+  `.github\workflows\collection-record.yml`, which drafts the revision it
+  describes, holds the draft to it and publishes it
+  (`Publish-CollectionRecord.ps1`). Made from a laid out revision by
+  `New-CollectionRecord.ps1`, and its `revision` moves with the records
+  that follow a publish.
 - `asset-provenance.json`: the asset provenance register (issue #2177). Every picture, video, sound, font, mesh, texture, interface file and plugin Thornswood hands to people or shows them: where it came from, who made it, its licence or permission, the credit it asks for, who approved it and when, where it is published and its sha256, or which of those is not recorded and who can answer. Files that ship from the game folder but are not in the repository are in it by name, and gallery uploads and the collection's mods are dispositioned. Operator only: nothing that builds a pack, the installer, the launcher or the site reads it. A permission itself is never written in it; an entry says where it is kept. No script writes it: it is changed by hand in the pull request that adds or changes an asset, and `tests	est-asset-provenance.js` fails on a tracked asset with no entry or a changed hash.
 - `merchant-runtime-provenance.md`: the server module built for merchant
   settlement, and why the six client files kept their e6534129 bytes (fork

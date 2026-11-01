@@ -98,6 +98,29 @@
   commas, and runs those in place of a share. A name that is no harness here
   is refused before anything runs (exit 2), so a typo is never a green run.
 
+  ONE REPORT, A TEST CASE PER CHECK (#5295). With -Report it also writes a
+  JUnit file: a test suite for each harness, and in it a test case for each
+  line the harness printed starting PASS, FAIL, SKIP or NOT RUN, the
+  contract every harness keeps (tests\README.md). A harness that failed
+  with no FAIL line of its own (it threw, it timed out, it was not run, out
+  of time) gets one failing case saying so, with the end of what it
+  printed, so the report holds every failure the summary names.
+  scripts\dev\Merge-HarnessReports.ps1 merges every share's into one report
+  for the run and writes the failing checks, by name, to the run's summary.
+  Before this a red run named a file, and the reader looked through its log
+  for the line. Measured on 1 Nov 2026, the gate's 453 .js harnesses four
+  at once took 157 s under node --test and 156 s here, so the runner stays
+  and only the results gained a structure.
+
+  With -Summary (build.yml's gate, nightly.yml and harnesses.yml pass
+  GITHUB_STEP_SUMMARY) it also hands its report to
+  Merge-HarnessReports.ps1, which writes how many checks ran and every
+  failing one, by harness, on the run's page: one section a share, all on
+  the one page. Asked for by name, never read from the environment, since
+  harnesses that run this against stand-ins run inside a real run, and
+  their stand-in results must not reach its page. No artifact is kept: the
+  builds keep none (#3399), and the page is where a reader looks.
+
   tests\test-nightly-harnesses.ps1 runs this against stand-in harnesses.
 
 .PARAMETER Shard
@@ -144,6 +167,19 @@
 .PARAMETER OutDir
   Where each harness's output is kept while it runs. harness-out under the
   runner's temp folder, or under TEMP off a runner.
+
+.PARAMETER Report
+  A JUnit file to write when the run ends: a test case for each check every
+  harness printed, as above. None unless asked, or report.xml in -OutDir
+  with -Summary.
+
+.PARAMETER Summary
+  A Markdown file to add the run's checks to, as above: GITHUB_STEP_SUMMARY
+  on a runner. None unless asked.
+
+.PARAMETER Title
+  The heading of that section. "Harnesses, share n of m", or "Harnesses"
+  with -Only, unless asked.
 #>
 [CmdletBinding()]
 param(
@@ -156,7 +192,10 @@ param(
     [string]$OutDir = '',
     [int]$Share = 0,
     [string]$BusyFrom = '',
-    [string]$StartLog = ''
+    [string]$StartLog = '',
+    [string]$Report = '',
+    [string]$Summary = '',
+    [string]$Title = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -171,6 +210,10 @@ if (-not $OutDir) {
     $base = $(if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [IO.Path]::GetTempPath() })
     $OutDir = Join-Path $base ('harness-out-' + $Shard)
 }
+if ($Summary -and -not $Report) { $Report = Join-Path $OutDir 'report.xml' }
+if ($Report) { $Report = [IO.Path]::GetFullPath($Report) }
+if ($Summary) { $Summary = [IO.Path]::GetFullPath($Summary) }
+if (-not $Title) { $Title = $(if ($Only.Trim()) { 'Harnesses' } else { 'Harnesses, share {0} of {1}' -f $Shard, $Of }) }
 
 $PER_HARNESS = 300
 $MAX_CLOCK = 600
@@ -413,13 +456,75 @@ function Finish-One($r, [bool]$timedOut) {
     if ($null -ne $cpu) { $said += ('{0}s of processor in {1} process(es)' -f $cpu, $procs) }
     Write-Host ("--- {0}  ({1}s{2})" -f $t.Name, $secs, $(if ($said.Count) { ', ' + ($said -join ', ') } else { '' }))
     $skipped = $false
-    foreach ($f in $r.Out, $r.Err) { if (Test-Path $f) { $txt = Get-Content -Raw $f; if ($txt) { Write-Host $txt.TrimEnd(); if ($txt -match '(?m)^\s*(SKIP|NOT RUN)\b') { $skipped = $true } } } }
+    $printed = ''
+    foreach ($f in $r.Out, $r.Err) { if (Test-Path $f) { $txt = Get-Content -Raw $f; if ($txt) { Write-Host $txt.TrimEnd(); $printed += $txt.TrimEnd() + "`n"; if ($txt -match '(?m)^\s*(SKIP|NOT RUN)\b') { $skipped = $true } } } }
     Write-StartLog ([ordered]@{ name = $t.Name; end = [DateTime]::UtcNow.ToString('o'); code = $code; secs = $secs; skipped = $skipped })
     $path = $t.File.FullName
     if ($timedOut) { Write-Host ("::error file={0}::harness timed out after {1}s and was killed" -f $path, $t.Clock) }
     elseif ($code -ne 0) { Write-Host ("::error file={0}::harness failed (exit {1})" -f $path, $code) }
     if ($left.Count) { Write-Host ("::warning file={0}::harness left {1} process(es) running when it ended, now killed: {2}" -f $path, $left.Count, ($left -join ', ')) }
-    [pscustomobject]@{ Name = $t.Name; Path = $path; Code = $code; TimedOut = $timedOut; Secs = $secs; Cpu = $cpu; Procs = $procs }
+    [pscustomobject]@{ Name = $t.Name; Path = $path; Code = $code; TimedOut = $timedOut; Secs = $secs; Cpu = $cpu; Procs = $procs; Said = $printed; Clock = $t.Clock }
+}
+
+# -Report (#5295): the checks a harness printed, one for each line starting
+# PASS, FAIL, SKIP or NOT RUN, and when it failed with no FAIL line of its
+# own, one failing check saying how it ended.
+function Checks-Of($res) {
+    $checks = New-Object System.Collections.Generic.List[object]
+    foreach ($line in ($res.Said -split "`r?`n")) {
+        $m = [regex]::Match($line, '^\s*(PASS|FAIL|SKIP|NOT RUN)\b[\s:]*(.*)$')
+        if (-not $m.Success) { continue }
+        $what = $m.Groups[2].Value.Trim()
+        if (-not $what) { $what = '(a check with no name)' }
+        $checks.Add([pscustomobject]@{ What = $what; Is = $m.Groups[1].Value })
+    }
+    $failedOwn = @($checks | Where-Object { $_.Is -eq 'FAIL' }).Count
+    if ($res.Code -ne 0 -and -not $failedOwn) {
+        $how = $(if ($res.TimedOut) { 'timed out after ' + $res.Clock + ' s and was killed' } else { 'ended with exit ' + $res.Code + ' and no FAIL line' })
+        $tail = @($res.Said -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -Last 20) -join "`n"
+        $checks.Add([pscustomobject]@{ What = 'the harness ' + $how; Is = 'FAIL'; Tail = $tail })
+    }
+    $checks
+}
+# XML 1.0 has no place for most control characters, which a harness's
+# output can carry (a colour code, a stray byte), so they are left out.
+function Xml-Text([string]$s) {
+    [Security.SecurityElement]::Escape(([regex]::Replace($s, '[\x00-\x08\x0B\x0C\x0E-\x1F]', '')))
+}
+function Write-Report($results, $notRun) {
+    $sb = New-Object System.Text.StringBuilder
+    $all = 0; $bad = 0; $skip = 0; $time = 0.0
+    $suites = New-Object System.Text.StringBuilder
+    $rows = @(foreach ($res in $results) { $res }) + @(foreach ($n in $notRun) {
+        [pscustomobject]@{ Name = $n; Code = -2; TimedOut = $false; Secs = 0; Said = ''; Clock = 0; NotRun = $true }
+    })
+    foreach ($res in $rows) {
+        if ($res.PSObject.Properties['NotRun']) { $checks = @([pscustomobject]@{ What = 'the harness was not run, out of time'; Is = 'FAIL' }) }
+        else { $checks = @(Checks-Of $res) }
+        $f = @($checks | Where-Object { $_.Is -eq 'FAIL' }).Count
+        $k = @($checks | Where-Object { $_.Is -in 'SKIP', 'NOT RUN' }).Count
+        $all += $checks.Count; $bad += $f; $skip += $k; $time += [double]$res.Secs
+        [void]$suites.AppendFormat('  <testsuite name="{0}" tests="{1}" failures="{2}" skipped="{3}" time="{4}">', (Xml-Text $res.Name), $checks.Count, $f, $k, ([double]$res.Secs).ToString([Globalization.CultureInfo]::InvariantCulture)).Append("`n")
+        foreach ($c in $checks) {
+            $open = '    <testcase classname="{0}" name="{1}"' -f (Xml-Text $res.Name), (Xml-Text $c.What)
+            if ($c.Is -eq 'PASS') { [void]$suites.Append($open + ' />' + "`n"); continue }
+            if ($c.Is -eq 'FAIL') {
+                $body = $(if ($c.PSObject.Properties['Tail']) { Xml-Text $c.Tail } else { '' })
+                [void]$suites.Append($open + ">`n      <failure message=`"" + (Xml-Text $c.What) + "`">" + $body + "</failure>`n    </testcase>`n")
+                continue
+            }
+            [void]$suites.Append($open + ">`n      <skipped message=`"" + (Xml-Text $c.What) + "`" />`n    </testcase>`n")
+        }
+        [void]$suites.Append("  </testsuite>`n")
+    }
+    [void]$sb.Append('<?xml version="1.0" encoding="utf-8"?>' + "`n")
+    [void]$sb.AppendFormat('<testsuites name="harnesses" tests="{0}" failures="{1}" skipped="{2}" time="{3}">', $all, $bad, $skip, $time.ToString([Globalization.CultureInfo]::InvariantCulture)).Append("`n")
+    [void]$sb.Append($suites.ToString())
+    [void]$sb.Append("</testsuites>`n")
+    $dir = Split-Path -Parent $Report
+    if ($dir) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+    [IO.File]::WriteAllText($Report, $sb.ToString(), (New-Object System.Text.UTF8Encoding $false))
+    Write-Host ('report: {0} checks in {1} harnesses, {2} failed, {3} skipped, in {4}' -f $all, $rows.Count, $bad, $skip, $Report)
 }
 
 # Every harness, in one order every share agrees on.
@@ -553,6 +658,12 @@ if ($failed.Count) {
     Write-Host ''
     Write-Host ("{0} harness(es) failed: {1}" -f $failed.Count, ($failed -join ', '))
 }
-if ($failed.Count -or $notRun.Count) { exit 1 }
+$reportBad = $false
+if ($Report) { Write-Report $results $notRun }
+if ($Summary) {
+    & (Join-Path $PSScriptRoot 'Merge-HarnessReports.ps1') -Path $Report -Expect 1 -Summary $Summary -Title $Title
+    if ($LASTEXITCODE -ne 0) { $reportBad = $true; Write-Host '::error::the report could not be written to the run''s summary' }
+}
+if ($failed.Count -or $notRun.Count -or $reportBad) { exit 1 }
 Write-Host 'every harness passed'
 exit 0

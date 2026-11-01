@@ -513,12 +513,14 @@ namespace Thornswood
                     if (fail == null && !make && then != null) then();
                     else if (fail != null && failed != null) failed();
                     // The scan after an update that found the folder being
-                    // prepared (#3201). Fix's own refresh is "then", and Fix
-                    // under way turns this away.
+                    // prepared (#3201), or after Vortex finished (#5200).
+                    // Fix's own refresh is "then", and Fix under way turns
+                    // this away.
                     if (fixWhenFolderReady)
                     {
                         fixWhenFolderReady = false;
-                        RunFix(true);
+                        if (fixWhenFolderReadyAfterVortex) { fixWhenFolderReadyAfterVortex = false; RunFix(false, true); }
+                        else RunFix(true);
                     }
                 });
             }

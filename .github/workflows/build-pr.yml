@@ -182,8 +182,68 @@ jobs:
             Write-Host '::error::no node on this runner, so the .js gate harnesses were not run'
             exit 1
           }
-          .\scripts\dev\Run-Gate.ps1 -Shard $env:SHARD -Of $env:OF -Throttle 6 -BudgetSeconds 1200
+          # ONE REPORT (#5295): each share writes a test case for every check
+          # its harnesses printed, and the job "Gate report" merges the
+          # shares' into one and names the failing checks on the run's page.
+          .\scripts\dev\Run-Gate.ps1 -Shard $env:SHARD -Of $env:OF -Throttle 6 -BudgetSeconds 1200 -Report (Join-Path $env:RUNNER_TEMP 'gate-report\share.xml')
           exit $LASTEXITCODE
+
+      - name: Keep this share's report for the gate report
+        if: ${{ !cancelled() }}
+        # The share's verdict is its harnesses'. When this upload fails, the
+        # report job names this share as having left no report and is red,
+        # so the failure is said where the report is read.
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: gate-report-${{ matrix.shard }}
+          path: ${{ runner.temp }}/gate-report/share.xml
+          if-no-files-found: ignore
+          # Read by the report job of this run, minutes later, and by
+          # nothing after it.
+          retention-days: 1
+
+  # The gate's checks in one report (#5295). Each share above keeps a JUnit
+  # file with a test case for every PASS, FAIL and SKIP line its harnesses
+  # printed (scripts\dev\Nightly-Harnesses.ps1 -Report); this merges them
+  # into one, kept with the run, and lists every failing check by harness
+  # on the run's page, so a red gate says which check failed without anybody
+  # opening a share's log. A share that left no report is named, and turns
+  # this red: its checks are missing from the report. Failing checks alone
+  # do not, since the share that ran them is red already.
+  report:
+    name: Gate report
+    needs: [pick, gate]
+    if: ${{ !cancelled() && needs.gate.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          sparse-checkout: scripts/dev/Merge-HarnessReports.ps1
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: gate-report-*
+          path: ${{ runner.temp }}/gate-reports
+      - name: Merge the shares' reports into one
+        shell: pwsh
+        env:
+          SHARES: ${{ needs.pick.outputs.shares }}
+        run: |
+          $shares = @($env:SHARES | ConvertFrom-Json).Count
+          $in = Join-Path $env:RUNNER_TEMP 'gate-reports'
+          New-Item -ItemType Directory -Path $in -Force | Out-Null
+          .\scripts\dev\Merge-HarnessReports.ps1 -Path $in -Expect $shares -Out (Join-Path $env:RUNNER_TEMP 'gate-report.xml') -Title 'Gate harnesses'
+          exit $LASTEXITCODE
+      - name: Keep the merged report with the run
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: gate-report
+          path: ${{ runner.temp }}/gate-report.xml
+          if-no-files-found: ignore
+          retention-days: 14
 
   # The launcher build and every check, on GitHub's hosted windows-latest
   # (#1306; the only runner since #4983).
@@ -616,6 +676,12 @@ jobs:
       # of Actions storage, which Patrick's billing page read at 1.8 GB. The
       # pdb was never kept either (#1356 / #462): it carries absolute
       # build-machine source paths.
+      # The gate's reports are the only artifacts of a build (#5295): each
+      # share's, kept a day for the job "Gate report" of the same run, and
+      # the merged one, kept 14 days. #3399's failures were a private
+      # repository's storage allowance; since 30 Oct 2026 this repository is
+      # public, where GitHub bills no Actions storage, and gate-map.yml has
+      # kept its map as an artifact here since.
 
   # The one check main's ruleset requires (#3683): passes only when the
   # build and every share of the gate above succeeded. Written by

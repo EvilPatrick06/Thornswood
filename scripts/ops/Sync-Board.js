@@ -31,12 +31,16 @@
 // a comment, or a commit message, puts a cross-reference on the issue's
 // timeline too, but says nothing about which work the pull request does.
 //
-// WHAT DECIDES THE PRIORITY. Its label, P0 (breaks the game or a release
-// now), P1 (next), P2 (soon) or P3 (later). The board's Priority field shows
-// it so the board can sort by it; an issue with none has none on the board,
-// and scripts/ops/Check-Board.ps1 names it for the weekly review to give one.
-// Two at once: the more urgent one, and Check-Board.ps1 names that too. The
-// Order field this replaced is not read or written.
+// THE ORDER. Order is the board's one do-order, and every open issue carries
+// one (Patrick, 27 Oct 2026, #3534). An open issue whose card has no Order
+// gets 10000 plus its number: after every Order a person or a review gave,
+// in the order the issues were filed, and never the same as another card's
+// (what order-on-filing.yml did until #5185). Moving a card in the queue is
+// a label, `order: <number>` (`order: 52.5`): this sets the card's Order to
+// it and takes the label off, so a cloud thread, which cannot reach the
+// board, moves a card the same way a person does. A card's Order is never
+// changed otherwise. --copy-order carries every card's Order over from the
+// board this one replaced, Patrick's own account's, once.
 //
 // WHAT DECIDES THE TYPE. An issue filed from a form gets its type from the
 // form (.github/ISSUE_TEMPLATE). One with none gets Bug when it is labelled
@@ -48,8 +52,13 @@
 //   node scripts/ops/Sync-Board.js --pull 56             the issues pull request 56 names
 //   node scripts/ops/Sync-Board.js --all                 every open issue (a closed one
 //                                                        is put in Done by its closed event)
-//   node scripts/ops/Sync-Board.js --setup               makes the Priority field when the
+//   node scripts/ops/Sync-Board.js --setup               makes the Order field when the
 //                                                        board has none; changes nothing else
+//   node scripts/ops/Sync-Board.js --copy-order EvilPatrick06/1
+//                                                        each card's Order from that user
+//                                                        board, for the issues of this
+//                                                        repository; run once, with a token
+//                                                        that reads that board (Patrick's)
 //   --dry-run with any of them reads and says, and writes nothing.
 // It reads BOARD_TOKEN (the board App's installation token: the board, and
 // the repository's issues and pull requests), GITHUB_REPOSITORY,
@@ -60,14 +69,9 @@
 
 const API = 'https://api.github.com/';
 const STATUSES = ['Todo', 'In Progress', 'Done'];
-const PRIORITIES = ['P0', 'P1', 'P2', 'P3'];
-const PRIORITY_SAYS = {
-  P0: 'Breaks the game, a release or the servers now',
-  P1: 'Next up',
-  P2: 'Soon',
-  P3: 'Later',
-};
-const PRIORITY_COLOR = { P0: 'RED', P1: 'ORANGE', P2: 'YELLOW', P3: 'GRAY' };
+// Where a new issue goes until a review moves it (order-on-filing.yml's rule,
+// #3534): after the queue, which is below 10000, in the order of filing.
+const FILED_ORDER = 10000;
 
 // ------------------------------------------------------------- the rules
 
@@ -126,10 +130,25 @@ function statusFor(issue, pulls) {
   return { status: 'Todo', why: 'no open pull request names it and nobody has claimed it' };
 }
 
-// The priority its labels give, or null; and every one it carries.
-function priorityFor(labels) {
-  const have = PRIORITIES.filter(p => (labels || []).some(l => String(l).trim().toUpperCase() === p));
-  return { priority: have.length ? have[0] : null, all: have };
+// The Order an `order: <number>` label asks for, or null; and every such
+// label, which all come off once the card has it. Two that ask for different
+// numbers ask for nothing: neither is picked, and the line says so.
+function orderFor(labels) {
+  const found = [];
+  for (const l of labels || []) {
+    const m = /^\s*order:\s*(-?\d+(?:\.\d+)?)\s*$/i.exec(String(l));
+    if (m) { found.push({ label: String(l), value: Number(m[1]) }); }
+  }
+  const values = Array.from(new Set(found.map(f => f.value)));
+  return { order: values.length === 1 ? values[0] : null, labels: found.map(f => f.label), clash: values.length > 1 };
+}
+
+// A card's number field value as the REST item answers it.
+function numberOf(v) {
+  if (typeof v === 'number') { return v; }
+  if (typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v))) { return Number(v); }
+  if (v && typeof v === 'object') { return numberOf(v.number !== undefined ? v.number : v.raw !== undefined ? v.raw : v.value); }
+  return null;
 }
 
 // The type an issue with none gets, from its labels.
@@ -208,9 +227,9 @@ function client(token, fetchImpl) {
 
 function optionName(o) { return o && typeof o.name === 'object' && o.name ? String(o.name.raw || '') : String((o && o.name) || ''); }
 
-// The board's Status and Priority fields, with each option's id by name.
-async function readBoard(gh, owner, number) {
-  const fields = await gh.all('orgs/' + owner + '/projectsV2/' + number + '/fields');
+// The board's Status field, with each option's id by name, and its Order.
+async function readBoard(gh, owner, number, kind) {
+  const fields = await gh.all((kind || 'orgs') + '/' + owner + '/projectsV2/' + number + '/fields');
   const pick = name => fields.find(f => String(f.name).toLowerCase() === name.toLowerCase());
   const status = pick('Status');
   if (!status || String(status.data_type).toLowerCase() !== 'single_select') { throw new Error('the board has no single select field named Status'); }
@@ -218,32 +237,22 @@ async function readBoard(gh, owner, number) {
   for (const o of status.options || []) { so[optionName(o)] = o.id; }
   const missing = STATUSES.filter(s => !so[s]);
   if (missing.length) { throw new Error('the board\'s Status has no ' + missing.join(', ') + '; it has ' + Object.keys(so).join(', ') + ' (an option is never added from here: GitHub rewrites every option when one is added, which can clear every card\'s Status)'); }
-  const priority = pick('Priority');
-  let po = null;
-  if (priority) {
-    if (String(priority.data_type).toLowerCase() !== 'single_select') { throw new Error('the board\'s Priority field is not a single select'); }
-    po = {};
-    for (const o of priority.options || []) { po[optionName(o)] = o.id; }
-    const lack = PRIORITIES.filter(p => !po[p]);
-    if (lack.length) { throw new Error('the board\'s Priority has no ' + lack.join(', ') + '; it has ' + Object.keys(po).join(', ')); }
-  }
-  return { status: { id: status.id, options: so }, priority: priority ? { id: priority.id, options: po } : null };
+  const order = pick('Order');
+  if (order && String(order.data_type).toLowerCase() !== 'number') { throw new Error('the board\'s Order field is not a number'); }
+  return { status: { id: status.id, options: so }, order: order ? { id: order.id } : null };
 }
 
 async function setup(gh, owner, number, dry, say) {
   const fields = await gh.all('orgs/' + owner + '/projectsV2/' + number + '/fields');
-  if (fields.some(f => String(f.name).toLowerCase() === 'priority')) { say('the board has a Priority field; nothing to make'); return; }
-  if (dry) { say('would make the Priority field, ' + PRIORITIES.join(', ')); return; }
-  await gh.call('POST', 'orgs/' + owner + '/projectsV2/' + number + '/fields', {
-    name: 'Priority',
-    data_type: 'single_select',
-    single_select_options: PRIORITIES.map(p => ({ name: p, color: PRIORITY_COLOR[p], description: PRIORITY_SAYS[p] })),
-  });
-  say('made the Priority field, ' + PRIORITIES.join(', '));
+  if (fields.some(f => String(f.name).toLowerCase() === 'order')) { say('the board has an Order field; nothing to make'); return; }
+  if (dry) { say('would make the Order field, a number'); return; }
+  await gh.call('POST', 'orgs/' + owner + '/projectsV2/' + number + '/fields', { name: 'Order', data_type: 'number' });
+  say('made the Order field, a number');
 }
 
-// Puts one issue right: its type when it has none, its card, its Status and
-// its Priority. Returns the line to print.
+// Puts one issue right: its type when it has none, its card, its Status, and
+// its Order when an order: label asks for one or an open issue's card has
+// none. Returns the line to print.
 // fresh, when given, is the pull request this run is for, read just now: it
 // stands in for its own entry on the timeline, which GitHub may not have
 // written yet a few seconds after the pull request was opened.
@@ -254,20 +263,86 @@ async function syncIssue(gh, o, issue, board, fresh) {
   let pulls = pullsOnTimeline(events, o.repo);
   if (fresh) { pulls = pulls.filter(p => !(p.number === fresh.number && String(p.repo).toLowerCase() === String(fresh.repo).toLowerCase())).concat([fresh]); }
   const s = statusFor({ repo: o.repo, number: n, state: issue.state, labels: labels }, pulls);
-  const p = priorityFor(labels);
+  const ask = orderFor(labels);
   const typeNow = issue.type && issue.type.name ? String(issue.type.name) : '';
-  const parts = ['#' + n + ': ' + s.status + ' (' + s.why + ')', 'priority ' + (p.priority || 'none') + (p.all.length > 1 ? ' (it carries ' + p.all.join(' and ') + ')' : '')];
+  const parts = ['#' + n + ': ' + s.status + ' (' + s.why + ')'];
+  if (ask.clash) { parts.push('order labels disagree (' + ask.labels.join(', ') + '), so the Order is left as it is and the labels stay'); }
   let typeSet = '';
   if (!typeNow) { typeSet = typeFor(labels); parts.push('type ' + typeSet + ' (it had none)'); }
-  if (o.dry) { return parts.join(', ') + '; nothing written (dry run)'; }
+  if (o.dry) {
+    if (ask.order !== null) { parts.push('Order ' + ask.order + ' (asked by its label)'); }
+    return parts.join(', ') + '; nothing written (dry run)';
+  }
   if (typeSet) { await gh.call('PATCH', 'repos/' + o.repo + '/issues/' + n, { type: typeSet }); }
   const added = await gh.call('POST', 'orgs/' + o.owner + '/projectsV2/' + o.number + '/items', { type: 'Issue', owner: o.repo.split('/')[0], repo: o.repo.split('/')[1], number: n });
   const item = added.data && added.data.id;
   if (!item) { throw new Error('the board gave back no card for #' + n); }
+  const itemPath = 'orgs/' + o.owner + '/projectsV2/' + o.number + '/items/' + item;
   const fields = [{ id: board.status.id, value: board.status.options[s.status] }];
-  if (board.priority) { fields.push({ id: board.priority.id, value: p.priority ? board.priority.options[p.priority] : null }); }
-  await gh.call('PATCH', 'orgs/' + o.owner + '/projectsV2/' + o.number + '/items/' + item, { fields: fields });
+  if (board.order && ask.order !== null) {
+    fields.push({ id: board.order.id, value: ask.order });
+    parts.push('Order ' + ask.order + ' (asked by its label)');
+  } else if (board.order && !ask.clash && String(issue.state).toLowerCase() === 'open') {
+    const now = await gh.call('GET', itemPath + '?fields=' + board.order.id);
+    const has = (now.data && now.data.fields || []).find(f => String(f.id) === String(board.order.id));
+    if (numberOf(has && has.value) === null) {
+      fields.push({ id: board.order.id, value: FILED_ORDER + n });
+      parts.push('Order ' + (FILED_ORDER + n) + ' (it had none)');
+    }
+  }
+  await gh.call('PATCH', itemPath, { fields: fields });
+  if (board.order && ask.order !== null) {
+    // A label already gone (somebody took it off meanwhile) is what was wanted.
+    for (const l of ask.labels) {
+      try { await gh.call('DELETE', 'repos/' + o.repo + '/issues/' + n + '/labels/' + encodeURIComponent(l)); } catch (e) { if (e.status !== 404) { throw e; } }
+    }
+  }
   return parts.join(', ');
+}
+
+// Carries each card's Order over from the board this one replaced (a user's
+// board, read with a token that may read it), for the issues of o.repo, and
+// puts the card on this board if it is not there yet. Cards of other
+// repositories, and cards with no Order there, are left alone. Run once.
+async function copyOrder(gh, o, from, say) {
+  const m = /^([\w.-]+)\/(\d+)$/.exec(from);
+  if (!m) { say('--copy-order takes the old board as user/number, such as EvilPatrick06/1'); return 2; }
+  let old, board;
+  try {
+    old = await readBoard(gh, m[1], m[2], 'users');
+    board = await readBoard(gh, o.owner, o.number);
+  } catch (e) { say('stopped, nothing written: ' + e.message); return 1; }
+  if (!old.order) { say('stopped, nothing written: the board ' + from + ' has no Order field'); return 1; }
+  if (!board.order) { say('stopped, nothing written: this board has no Order field yet (--setup makes it)'); return 1; }
+  const name = o.repo.split('/')[1].toLowerCase();
+  const items = await gh.all('users/' + m[1] + '/projectsV2/' + m[2] + '/items?fields=' + old.order.id);
+  const found = [];
+  for (const it of items) {
+    const c = it.content || {};
+    const repoUrl = String(c.repository_url || '');
+    if (String(it.content_type || '') !== 'Issue' || !c.number || repoUrl.split('/').pop().toLowerCase() !== name) { continue; }
+    const f = (it.fields || []).find(x => String(x.id) === String(old.order.id));
+    const v = numberOf(f && f.value);
+    if (v !== null) { found.push({ number: Number(c.number), order: v }); }
+  }
+  say(items.length + ' cards on ' + from + ', ' + found.length + ' issues of ' + o.repo + ' with an Order');
+  const failed = [];
+  for (const f of found.sort((a, b) => a.number - b.number)) {
+    if (o.dry) { say('#' + f.number + ': Order ' + f.order + '; nothing written (dry run)'); continue; }
+    try {
+      const added = await gh.call('POST', 'orgs/' + o.owner + '/projectsV2/' + o.number + '/items', { type: 'Issue', owner: o.repo.split('/')[0], repo: o.repo.split('/')[1], number: f.number });
+      const item = added.data && added.data.id;
+      if (!item) { throw new Error('the board gave back no card'); }
+      await gh.call('PATCH', 'orgs/' + o.owner + '/projectsV2/' + o.number + '/items/' + item, { fields: [{ id: board.order.id, value: f.order }] });
+      say('#' + f.number + ': Order ' + f.order);
+    } catch (e) {
+      failed.push(f.number);
+      say('#' + f.number + ': not copied: ' + e.message);
+    }
+  }
+  say(gh.count() + ' calls to GitHub');
+  if (failed.length) { say('not copied: ' + failed.map(x => '#' + x).join(', ')); return 1; }
+  return 0;
 }
 
 async function run(argv, env, fetchImpl, say) {
@@ -285,6 +360,8 @@ async function run(argv, env, fetchImpl, say) {
   if (!env.BOARD_TOKEN) { say('BOARD_TOKEN is empty, so nothing can reach the board'); return 2; }
   const gh = client(env.BOARD_TOKEN, fetchImpl);
   if (argv.indexOf('--setup') >= 0) { await setup(gh, o.owner, o.number, o.dry, say); return 0; }
+  const from = arg('--copy-order');
+  if (from !== null) { return copyOrder(gh, o, from, say); }
 
   let numbers = [];
   let fresh = null;
@@ -312,13 +389,13 @@ async function run(argv, env, fetchImpl, say) {
     numbers = Array.from(listed.keys()).sort((a, b) => a - b);
     say(numbers.length + ' open issues');
   } else {
-    say('say which issues: --issues, --pull, --all or --setup');
+    say('say which issues: --issues, --pull, --all, --setup or --copy-order');
     return 2;
   }
 
   let board;
   try { board = await readBoard(gh, o.owner, o.number); } catch (e) { say('stopped, nothing written: ' + e.message); return 1; }
-  if (!board.priority) { say('the board has no Priority field yet, so priorities are not shown (--setup makes it)'); }
+  if (!board.order) { say('the board has no Order field yet, so no Order is set (--setup makes it)'); }
   const failed = [];
   for (const n of numbers) {
     try {
@@ -339,4 +416,4 @@ async function run(argv, env, fetchImpl, say) {
 if (require.main === module) {
   run(process.argv.slice(2), process.env).then(code => process.exit(code), e => { console.log('stopped: ' + (e && e.message || e)); process.exit(1); });
 }
-module.exports = { namedIn, tasksIn, statusFor, priorityFor, typeFor, pullsOnTimeline, readBoard, syncIssue, run, client, STATUSES, PRIORITIES };
+module.exports = { namedIn, tasksIn, statusFor, orderFor, numberOf, typeFor, pullsOnTimeline, readBoard, syncIssue, copyOrder, run, client, STATUSES, FILED_ORDER };

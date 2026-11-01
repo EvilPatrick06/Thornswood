@@ -8,14 +8,16 @@
 # move went through Patrick's personal token, because the board was his own
 # account's and no GitHub App can reach one. The board is the ThornswoodRP
 # organization's now, and this is the one workflow that writes it: every
-# card's Status, Priority and the issue's type follow from the issue and the
-# pull requests that name it (scripts/ops/Sync-Board.js has the rules).
-# Nobody moves a card by hand; a person or a Bot changes the facts instead
-# (opens a pull request, puts on a claim or a priority label, closes the
-# issue), and the card follows within a minute.
+# card's Status and the issue's type follow from the issue and the pull
+# requests that name it, and its Order, the one do-order (Patrick, 27 Oct,
+# #3534), is 10000 plus the issue's number until an order: label moves it
+# (scripts/ops/Sync-Board.js has the rules). Nobody moves a card by hand; a
+# person or a Bot changes the facts instead (opens a pull request, puts on a
+# claim or an order: label, closes the issue), and the card follows within a
+# minute.
 #
 # WHEN.
-#   an issue is opened, reopened or closed, or a claimed: or P0 to P3 label
+#   an issue is opened, reopened or closed, or a claimed: or order: label
 #     goes on or comes off it: that issue
 #   a pull request is opened, reopened, edited, closed or merged: every issue
 #     it names, and every one it named before an edit. A pull_request run
@@ -23,7 +25,7 @@
 #     request with nothing and this runs when it completes (its header says
 #     why)
 #   started by hand: the issues named, or every open issue (all), or the
-#     Priority field made (setup); with dry_run it writes nothing
+#     Order field made (setup); with dry_run it writes nothing
 #
 # THE TOKEN. The board App's (Thornswood board, a GitHub App of ThornswoodRP),
 # minted for the job by actions/create-github-app-token from its key in the
@@ -66,7 +68,7 @@ jobs:
     if: >-
       ${{ github.ref == 'refs/heads/main' && (
         (github.event_name == 'issues' && (github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'closed' ||
-          startsWith(github.event.label.name, 'claimed:') || contains(fromJSON('["P0","P1","P2","P3"]'), github.event.label.name))) ||
+          startsWith(github.event.label.name, 'claimed:') || startsWith(github.event.label.name, 'order:'))) ||
         (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
         github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest

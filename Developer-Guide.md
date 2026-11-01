@@ -1003,14 +1003,15 @@ How to use it:
   that part of the game, and name that page in the issue. An idea that
   goes against a decision there says so and asks for the decision to be
   changed, instead of quietly reopening it (#3192).
-- Priority is one of four labels, and every open issue carries one: `P0`
-  (it breaks the game, a release or the servers now), `P1` (next), `P2`
-  (soon) and `P3` (later). Give a new issue the one it deserves when you file
-  it. The board's Priority field shows the label, so the board sorts by it;
-  the weekly review gives one to any issue `scripts\ops\Check-Board.ps1`
-  names without, and re-ranks what nobody has touched for 30 days
-  (`scripts\ops\List-Untouched.ps1`), never closing it for that. Priority
-  replaced the Order field on 1 Nov 2026 (#5185).
+- Order is the do-order. A new issue gets the Order of where it belongs, not
+  the end; a number between two others (52.5) is fine. Every open issue
+  carries one (Patrick, 27 Oct, #3534): a new issue's card gets 10000 plus
+  its number by itself, and the label `order: <number>` (`order: 52.5`) moves
+  it to where it belongs, which is how a cloud thread moves one too
+  (`.github\workflows\board.yml` sets the Order and takes the label off).
+  The weekly review places what `scripts\ops\Check-Board.ps1` names without
+  one or sharing one, and looks again at what nobody has touched for 30 days
+  (`scripts\ops\List-Untouched.ps1`), never closing it for that.
 - Every issue has a type: Bug, Feature or Task. A form sets it; an issue
   filed through the API says it (`-f type=Bug`), and one with none gets Bug
   when it is labelled `bug` or a Findings label, Feature for `Suggestion`,
@@ -1040,9 +1041,9 @@ How to use it:
   `Suggestion` an idea somebody asked for, and `bug` something broken;
   nothing reads these three, they are for people sorting the board.
   `claimed: <name>` marks who is on an issue ("What this is" says how the
-  Bots use it). Assign yourself when you start one. The stage is Priority and
+  Bots use it). Assign yourself when you start one. The stage is Order and
   Status: the `wave:` labels and `needs: the live server` were retired on
-  22 Oct (#3192), because nothing read them.
+  22 Oct (#3192), because nothing read them and Order had replaced them.
 - Status: In Progress the moment work starts, Done when it is merged and only
   needs testing (Patrick, 19 Oct). Nobody moves a card: the Status follows
   what GitHub knows (#5185, `.github\workflows\board.yml` and
@@ -1054,10 +1055,10 @@ How to use it:
   pull request, put the claim on, or close the issue, and the card follows
   within a minute. The Status options are Todo, In Progress and Done; never
   add one through the API, which rewrites every option and can clear the
-  Status on every card. The `board:` and `order:` labels did this by hand
-  until #5185 and are gone. To see the cards, `pwsh scripts/ops/Read-Board.ps1`
-  starts `.github\workflows\board-read.yml`, which reads every card's Status
-  and Priority and changes nothing, and writes them to board.json (#3192).
+  Status on every card. The `board:` labels did this by hand until #5185 and
+  are gone. To see the cards, `pwsh scripts/ops/Read-Board.ps1` starts
+  `.github\workflows\board-read.yml`, which reads every card's Status and
+  Order and changes nothing, and writes them to board.json (#3192).
 - A pull request that finishes an issue says `Closes #N`, so merging closes
   it and its card goes to Done. Say in the pull request which issues moved.
 - A fix people would notice is the exception: its pull request says `Refs #N`,
