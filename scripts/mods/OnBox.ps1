@@ -12,7 +12,7 @@
   alike. A script that only needs its text run there sends it through
   Send-Script.ps1 instead, whose run deletes a long one's copy before it runs.
 
-  The far side runs under Windows PowerShell 5.1: ASCII, and .NET for the
+  The far side runs under PowerShell 7: ASCII, and .NET for the
   hashes, not Get-FileHash (ServerContent.ps1 says why).
 #>
 

@@ -5,7 +5,7 @@
 .DESCRIPTION
   Do not run this by hand. Set-SshScope.ps1 proves key login works first, from
   your machine, then sends this file's text on ssh's standard input and
-  Windows PowerShell 5.1 runs it from there, so nothing of it is ever
+  pwsh runs it from there, so nothing of it is ever
   written on the box (#3035).
 
   Issue #2182, decision 2 (Patrick, 11 Oct 2026): restrict the inbound rules on
