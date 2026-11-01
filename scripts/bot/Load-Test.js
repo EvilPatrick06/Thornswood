@@ -18,6 +18,15 @@
 //           (load-proxy.js), and on the wire with 28 bytes of IPv4 and UDP
 //           header on each.
 //
+// A person is also a chat socket on the voice service, which carries their
+// join pass (load-bots.js, step 5), so the load copy runs the voice service
+// from this checkout too (voice/voice-server.js, on the port the settings
+// name, with chat range on as Install-Voice.ps1 installs it), with the same
+// sampler in it, and a stand-in for the site that answers yes to every
+// token's ticket, as voice/load-voice.js does: the site is not what is
+// measured. The voice service's cores, memory and socket bytes are columns
+// of their own.
+//
 // Each step is first held until every bot of it is walking (load-bots.js
 // says what a bot does), then left to settle, then measured over a window.
 // Step 0 is the server with nobody on it, which the per person numbers are
@@ -49,6 +58,49 @@ function readJson(file) {
 }
 
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+// A stand-in for the site that answers yes to every question the voice
+// service asks it (voice/load-voice.js's siteThatSaysYes): whose a ticket's
+// profile is, is not what is measured here.
+function siteThatSaysYes() {
+  const http = require('http');
+  return new Promise((ok) => {
+    const server = http.createServer((req, res) => {
+      req.resume();
+      req.on('end', () => { res.writeHead(200, { 'content-type': 'application/json' }).end('{"ok":true}'); });
+    });
+    server.listen(0, '127.0.0.1', () => ok({ server, url: 'http://127.0.0.1:' + server.address().port }));
+  });
+}
+
+// The voice service from this checkout, in its own folder under the load
+// copy, with the sampler in it; resolves once it says it listens.
+function startVoice(root, port, site, sampler, sampleFile, log) {
+  const dir = path.join(root, 'voice-service');
+  fs.mkdirSync(dir, { recursive: true });
+  const voiceDir = path.join(__dirname, '..', '..', 'voice');
+  fs.copyFileSync(path.join(voiceDir, 'voice-server.js'), path.join(dir, 'voice-server.js'));
+  fs.copyFileSync(path.join(voiceDir, 'headlines.js'), path.join(dir, 'headlines.js'));
+  try { fs.unlinkSync(sampleFile); } catch (e) { if (e.code !== 'ENOENT') { throw e; } }
+  const env = Object.assign({}, process.env, {
+    THORNSWOOD_VOICE_PORT: String(port), THORNSWOOD_VOICE_BIND: '127.0.0.1', THORNSWOOD_SITE: site,
+    THORNSWOOD_CHAT_RANGE: 'on', THORNSWOOD_CHAT_DIR: path.join(dir, 'chat'), THORNSWOOD_LOAD_SAMPLES: sampleFile
+  });
+  delete env.THORNSWOOD_VOICE_MOST;
+  const proc = childProcess.spawn(process.execPath, ['-r', sampler, 'voice-server.js'], { cwd: dir, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  const logFile = path.join(root, 'load-test-voice.log');
+  let said = '';
+  const take = (d) => { said += String(d); try { fs.appendFileSync(logFile, String(d)); } catch (e) { log('the voice log could not be written: ' + e.message); } };
+  proc.stdout.on('data', take);
+  proc.stderr.on('data', take);
+  return new Promise((ok, bad) => {
+    const late = setTimeout(() => { clearInterval(look); bad(new Error('the voice service did not say it listens within 30 s:\n' + said.slice(-2000))); }, 30000);
+    const look = setInterval(() => {
+      if (new RegExp('listening on \\S+:' + port).test(said)) { clearTimeout(late); clearInterval(look); ok(proc); }
+    }, 50);
+    proc.on('exit', (c) => { clearTimeout(late); clearInterval(look); bad(new Error('the voice service stopped (exit ' + c + '):\n' + said.slice(-2000))); });
+  });
+}
 
 // The server process's private bytes and working set, from outside it, in
 // bytes: Windows only (Get-Process); elsewhere null, and the working set the
@@ -90,6 +142,10 @@ function machineCpu() {
 // end: { at, server (a sample), proxy (a report), cpu (machineCpu) }, and
 // bots the workers' reports over the window.
 function windowOf(a, b, bots, people) {
+  const vms = a.voice && b.voice ? b.voice.at - a.voice.at : 0;
+  const voiceCores = vms > 0 ? (b.voice.user + b.voice.system - a.voice.user - a.voice.system) / 1000 / vms : null;
+  const wsDown = bots.reduce((x, r) => x + (r.wsDown || 0), 0);
+  const wsUp = bots.reduce((x, r) => x + (r.wsUp || 0), 0);
   const ms = b.at - a.at;
   const s = (b.server.user + b.server.system - a.server.user - a.server.system) / 1000;  // ms of CPU
   const sms = b.server.at - a.server.at;
@@ -107,6 +163,10 @@ function windowOf(a, b, bots, people) {
     people,
     seconds: Math.round(sec * 10) / 10,
     serverCores: sms > 0 ? s / sms : 0,
+    voiceCores,
+    voicePrivateMB: b.voiceMemory ? b.voiceMemory.privateBytes / 1048576 : null,
+    voiceDownPerS: wsDown / ((b.at - a.at) / 1000),
+    voiceUpPerS: wsUp / ((b.at - a.at) / 1000),
     serverRssMB: b.server.rss / 1048576,
     serverPrivateMB: b.memory ? b.memory.privateBytes / 1048576 : null,
     serverPeakWorkingSetMB: b.memory ? b.memory.peakWorkingSet / 1048576 : null,
@@ -132,7 +192,11 @@ function perPerson(w, base) {
     memoryMB: w.serverPrivateMB !== null && base.serverPrivateMB !== null && w.serverPrivateMB !== undefined && base.serverPrivateMB !== undefined
       ? (w.serverPrivateMB - base.serverPrivateMB) / w.people : (w.serverRssMB - base.serverRssMB) / w.people,
     downKBps: w.downWirePerS / w.people / 1024,
-    upKBps: w.upWirePerS / w.people / 1024
+    upKBps: w.upWirePerS / w.people / 1024,
+    voiceCores: w.voiceCores !== null && w.voiceCores !== undefined && base.voiceCores !== null && base.voiceCores !== undefined ? (w.voiceCores - base.voiceCores) / w.people : null,
+    voiceMemoryMB: w.voicePrivateMB !== null && w.voicePrivateMB !== undefined && base.voicePrivateMB !== null && base.voicePrivateMB !== undefined ? (w.voicePrivateMB - base.voicePrivateMB) / w.people : null,
+    voiceDownKBps: (w.voiceDownPerS || 0) / w.people / 1024,
+    voiceUpKBps: (w.voiceUpPerS || 0) / w.people / 1024
   };
 }
 
@@ -155,6 +219,17 @@ function markdown(doc) {
     out.push('| ' + [w.people, fixed(w.serverCores, 3), fixed(w.serverPrivateMB === null || w.serverPrivateMB === undefined ? w.serverRssMB : w.serverPrivateMB, 0), fixed(w.downWirePerS / 1024, 1), fixed(w.upWirePerS / 1024, 1),
       fixed(p.cores, 4), fixed(p.memoryMB, 2), fixed(p.downKBps, 2), fixed(p.upKBps, 2), fixed(w.movesReadPerBotPerS, 1),
       fixed(w.machineBusy * 100, 0) + '%'].join(' | ') + ' |');
+  }
+  out.push('');
+  out.push('The voice service, which carries each person\'s chat socket and join pass (bytes are the socket\'s text, without TCP\'s own):');
+  out.push('');
+  out.push('| People | Voice cores | Voice memory MB | Per person: cores | MB | down KB/s | up KB/s |');
+  out.push('|---|---|---|---|---|---|---|');
+  for (const st of doc.steps) {
+    const w = st.window; const p = st.perPerson || {};
+    if (!w) { continue; }
+    out.push('| ' + [w.people, fixed(w.voiceCores, 3), fixed(w.voicePrivateMB, 0), fixed(p.voiceCores, 4), fixed(p.voiceMemoryMB, 2),
+      fixed(p.voiceDownKBps, 2), fixed(p.voiceUpKBps, 3)].join(' | ') + ' |');
   }
   out.push('');
   for (const st of doc.steps) { if (st.stopped) { out.push('Stopped at ' + st.people + ': ' + st.stopped); } }
@@ -219,8 +294,17 @@ async function run(o) {
     cwd: r, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, env: Object.assign({}, process.env, { THORNSWOOD_LOAD_SAMPLES: sampleFile })
   }), path.join(root, 'load-test-server.log'));
   let proxy = null;
+  let voice = null;
+  let site = null;
   const workers = [];
+  const voicePort = Number(settings.thornswoodVoicePort) || 0;
+  const voiceSamples = path.join(root, 'voice-samples.jsonl');
   try {
+    if (voicePort) {
+      site = await siteThatSaysYes();
+      voice = await startVoice(root, voicePort, site.url, sampler, voiceSamples, log);
+      log('the voice service listens on 127.0.0.1:' + voicePort);
+    }
     server.start();
     const why = await server.awaitLoad(blob, 600000);
     if (why) { doc.problem = why; return doc; }
@@ -229,14 +313,16 @@ async function run(o) {
     proxy = child(path.join(__dirname, 'load-proxy.js'), ['--target', '127.0.0.1:' + port], log);
     const proxyPort = await proxy.ask(null, 'listening', 10000);
     for (let i = 0; i < workerCount; i++) {
-      workers.push(child(path.join(__dirname, 'load-bots.js'), ['--root', root, '--port', String(proxyPort), '--password', password], log));
+      workers.push(child(path.join(__dirname, 'load-bots.js'), ['--root', root, '--port', String(proxyPort), '--password', password, '--voice', String(voicePort)], log));
     }
 
     const reading = async () => {
       const ss = samples(sampleFile);
       if (!ss.length) { throw new Error('the server wrote no samples to ' + sampleFile); }
       return { at: Date.now(), server: ss[ss.length - 1], proxy: await proxy.ask({ report: true }, 'report', 10000), cpu: machineCpu(),
-        memory: processMemory(server.child && server.child.pid) };
+        memory: processMemory(server.child && server.child.pid),
+        voice: voice ? (samples(voiceSamples).slice(-1)[0] || null) : null,
+        voiceMemory: voice ? processMemory(voice.pid) : null };
     };
     const botReports = () => Promise.all(workers.map((w) => w.ask({ report: true }, 'report', 10000)));
     // A window: settle, then read, wait, read. The server's samples come
@@ -272,11 +358,13 @@ async function run(o) {
       let reps = [];
       for (;;) {
         if (server.exited) { step.stopped = 'the server ended: ' + JSON.stringify(server.exited); break; }
+        if (voice && voice.exitCode !== null) { step.stopped = 'the voice service ended with exit ' + voice.exitCode; break; }
         reps = await botReports();
         const moving = reps.reduce((x, r) => x + (r.steps.moving || 0), 0);
         const failed = [].concat(...reps.map((r) => r.failed));
         if (failed.length) { step.failed = failed; step.stopped = failed.length + ' of the bots could not get in or were dropped; the first: ' + failed[0].why; break; }
-        if (moving >= people) { break; }
+        const inVoice = reps.reduce((x, r) => x + (r.inVoice || 0), 0);
+        if (moving >= people && (!voicePort || inVoice >= people)) { break; }
         if (Date.now() > fillEnd) { step.stopped = 'only ' + moving + ' of ' + people + ' bots were walking after ' + FILL_MS / 1000 + ' s: ' + JSON.stringify(reps.map((r) => r.steps)); break; }
         await sleep(1000);
       }
@@ -303,6 +391,8 @@ async function run(o) {
     for (const w of workers) { try { w.send({ stop: true }); } catch (e) { log('a bot process had ended already: ' + e.message); } }
     if (proxy) { try { proxy.send({ stop: true }); } catch (e) { log('the proxy had ended already: ' + e.message); } }
     await server.stop(60000);
+    if (voice) { voice.kill(); }
+    if (site) { site.server.close(); }
     doc.tail = server.tail.slice(-30);
     doc.ended = new Date().toISOString();
   }
@@ -329,4 +419,4 @@ if (require.main === module) {
   main().then((code) => process.exit(code), (e) => { console.log('LOAD TEST FAILED: ' + (e && e.stack || e)); process.exit(1); });
 }
 
-module.exports = { windowOf, perPerson, markdown, samples, run };
+module.exports = { windowOf, perPerson, markdown, samples, run, startVoice, siteThatSaysYes };

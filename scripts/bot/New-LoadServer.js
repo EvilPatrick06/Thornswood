@@ -175,7 +175,10 @@ async function build(o) {
     startPoints: startPoints(shape),
     thornswoodServer: 'dev',
     thornswoodRequirePass: true,
-    thornswoodChargen: false
+    thornswoodChargen: false,
+    // The voice service Load-Test.js starts beside it, as the box's is, on
+    // the live voice service's default port.
+    thornswoodVoicePort: 7778
   };
   fs.writeFileSync(path.join(out, 'server-settings.json'), JSON.stringify(settings, null, 2) + '\n');
   fs.mkdirSync(path.join(out, 'private'), { recursive: true });

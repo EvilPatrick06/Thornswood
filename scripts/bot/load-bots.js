@@ -21,7 +21,16 @@
 //      as the game's RemoteServer does. Moves keep to their 130 ms beat
 //      (the next is due 130 ms after the last was due), so Windows' timer
 //      steps of about 15.6 ms do not slow a bot below the game's rate.
+//   5. hold the game's chat socket on the voice service, as a person in the
+//      world does: a join token (POST /token, as the launcher asks for it),
+//      the socket with it, a join with voice off, and over it the join pass
+//      as "/joinpass <pass>" at once and every minute, a new pass each time,
+//      which is what the launcher's front plugin sends (gamemode.js, THE
+//      PASS). The gamemode takes the pass from the voice service's command
+//      queue, and ends a session with none three minutes in. The proof at
+//      the login is a different check (#1320).
 // Every message the server sends is read and counted, by type; none is kept.
+// What the chat socket carries is counted in bytes each way.
 //
 // Messages from Load-Test.js:
 //   { add: [profileId, ...] }   bots to start
@@ -30,6 +39,7 @@
 'use strict';
 const os = require('os');
 const fs = require('fs');
+const http = require('http');
 const path = require('path');
 const { Bot, MSG, loadAddon, mintPass, passLoginKey } = require('./bot.js');
 const { face } = require('./Bot-Pass.js');
@@ -39,6 +49,7 @@ const STEP_MS = 60000;         // how long each login step may take
 const WALK = 100;              // units a second, a walk
 const TELEPORT = 20;
 const TELEPORT2 = 31;
+const PASS_EVERY_MS = 60000;   // the front plugin sends the pass at once and every minute
 
 // A bot that reads what it is sent without keeping it: Bot.pump keeps every
 // message, which a load test cannot (a crowd of 60 is sent tens of
@@ -58,6 +69,55 @@ class LoadBot extends Bot {
     this.radius = 200 + Math.random() * 300;
     this.lastMove = 0;
     this.teleports = 0;
+    this.voicePort = 0;
+    this.ws = null;            // the chat socket on the voice service
+    this.wsDown = 0;           // bytes it read, since the last report
+    this.wsUp = 0;             // bytes it sent, since the last report
+    this.passSentAt = 0;
+    this.welcomed = false;
+  }
+
+  // The chat socket, once the character is in: a token, then the socket.
+  // Any failure fails the bot with what it was.
+  openVoice() {
+    const body = JSON.stringify({ profileId: Number(this.profileId), ticket: 'load-test' });
+    const req = http.request({ host: '127.0.0.1', port: this.voicePort, path: '/token', method: 'POST',
+      headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) } }, (res) => {
+      let text = '';
+      res.on('data', (d) => { text += d; });
+      res.on('end', () => {
+        if (res.statusCode !== 200) { this.fail('the voice service gave no token: HTTP ' + res.statusCode + ' ' + text.slice(0, 120)); return; }
+        let token = '';
+        try { token = String(JSON.parse(text).token || ''); } catch (e) { token = ''; }
+        if (!token) { this.fail('the voice service\'s token answer has no token: ' + text.slice(0, 120)); return; }
+        if (this.step === 'failed') { return; }
+        const ws = new WebSocket('ws://127.0.0.1:' + this.voicePort + '/', ['thornswood', token]);
+        this.ws = ws;
+        ws.onopen = () => { this.wsSend({ t: 'join', profileId: Number(this.profileId), name: 'Load ' + this.profileId, voice: false }); };
+        ws.onmessage = (ev) => {
+          const t = String(ev.data);
+          this.wsDown += Buffer.byteLength(t);
+          if (!this.welcomed && t.startsWith('{"t":"welcome"')) { this.welcomed = true; this.sendPass(Date.now()); }
+        };
+        ws.onerror = () => { if (this.step !== 'failed') { this.fail('the chat socket on the voice service failed'); } };
+        ws.onclose = (ev) => { if (this.step !== 'failed' && this.step !== 'closing') { this.fail('the voice service closed the chat socket with ' + ev.code); } };
+      });
+    });
+    req.on('error', (e) => this.fail('the voice service did not answer for a token: ' + e.message));
+    req.end(body);
+  }
+
+  wsSend(o) {
+    const t = JSON.stringify(o);
+    this.wsUp += Buffer.byteLength(t);
+    this.ws.send(t);
+  }
+
+  // A new pass, as the site signs one every minute, sent the front plugin's way.
+  sendPass(now) {
+    const pass = mintPass(this.passKey, { p: Number(this.profileId), s: this.server, v: 'load-test', d: 'load-' + this.profileId, i: now, x: now + 600000 });
+    this.wsSend({ t: 'chat', text: '/joinpass ' + pass });
+    this.passSentAt = now;
   }
 
   pump() {
@@ -87,11 +147,17 @@ class LoadBot extends Bot {
     }
   }
 
-  fail(why) { this.step = 'failed'; this.why = why; try { this.close(); } catch (e) { this.why += ' (and closing it said ' + e.message + ')'; } }
+  fail(why) {
+    if (this.step === 'failed') { return; }
+    this.step = 'failed'; this.why = why;
+    try { this.close(); } catch (e) { this.why += ' (and closing it said ' + e.message + ')'; }
+    if (this.ws) { this.ws.close(); }
+  }
 
   // One pass of this bot's steps; now is Date.now().
   advance(now) {
-    if (this.step === 'failed') { return; }
+    if (this.step === 'failed' || this.step === 'closing') { return; }
+    if (this.step === 'moving' && this.voicePort && !this.welcomed && now > this.voiceBy) { this.fail('the voice service did not welcome the chat socket in ' + STEP_MS / 1000 + ' s'); return; }
     if (this.state === 'refused') { this.fail('refused: ' + this.refusal); return; }
     if (this.state === 'closed' && this.step !== 'new') { this.fail('the server closed the connection at step ' + this.step); return; }
     if (this.step !== 'moving' && this.deadline && now > this.deadline) { this.fail('no answer at step ' + this.step + ' in ' + STEP_MS / 1000 + ' s'); return; }
@@ -113,8 +179,10 @@ class LoadBot extends Bot {
         this.send({ t: 4, idx: this.character.idx, data: face('Load ' + this.profileId) }, true);
       }
       this.step = 'moving'; this.deadline = 0; this.lastMove = now - Math.random() * MOVE_MS;
+      if (this.voicePort) { this.voiceBy = now + STEP_MS; this.openVoice(); }
       return;
     }
+    if (this.step === 'moving' && this.welcomed && now - this.passSentAt >= PASS_EVERY_MS) { this.sendPass(now); }
     if (this.step === 'moving' && now - this.lastMove >= MOVE_MS) {
       const dt = MOVE_MS / 1000;
       // On the beat, unless the bot fell a whole beat behind, which starts
@@ -152,7 +220,7 @@ function args(argv) {
 function main() {
   const a = args(process.argv.slice(2));
   if (!a.root || !a.port || !process.send) {
-    console.log('node load-bots.js --root <server folder> --port <proxy port> [--password <p>], started by Load-Test.js with IPC');
+    console.log('node load-bots.js --root <server folder> --port <proxy port> [--password <p>] [--voice <voice service port>], started by Load-Test.js with IPC');
     process.exit(2);
   }
   const addon = loadAddon(a.root);
@@ -164,7 +232,7 @@ function main() {
     if (msg && Array.isArray(msg.add)) {
       for (const id of msg.add) {
         const b = new LoadBot(addon, { host: '127.0.0.1', port: Number(a.port), password: a.password || '', name: 'load ' + id });
-        b.profileId = id; b.passKey = passKey; b.server = server;
+        b.profileId = id; b.passKey = passKey; b.server = server; b.voicePort = Number(a.voice) || 0;
         try {
           b.client = addon.createBotClient(b.host, b.port, b.password, b.timeoutMs);
           b.state = 'connecting'; b.step = 'connecting'; b.deadline = Date.now() + STEP_MS;
@@ -179,6 +247,7 @@ function main() {
       const counts = {};
       const failed = [];
       let teleports = 0;
+      let wsDown = 0; let wsUp = 0; let inVoice = 0;
       let all = 0;
       const perBot = [];
       for (const b of bots) {
@@ -188,12 +257,14 @@ function main() {
         if (b.step === 'moving') { perBot.push(b.counts[MSG.UpdateMovement] || 0); }
         b.counts = {};
         teleports += b.teleports; all += b.all;
+        wsDown += b.wsDown; wsUp += b.wsUp; b.wsDown = 0; b.wsUp = 0;
+        if (b.step === 'moving' && b.welcomed) { inVoice++; }
       }
-      process.send({ report: { ms: now - at0, cpuMs: (cpu.user + cpu.system) / 1000, steps, counts, failed, teleports, all, movesReadPerBot: perBot, cores: os.cpus().length } });
+      process.send({ report: { ms: now - at0, cpuMs: (cpu.user + cpu.system) / 1000, steps, counts, failed, teleports, all, movesReadPerBot: perBot, cores: os.cpus().length, wsDown, wsUp, inVoice } });
       cpu0 = process.cpuUsage(); at0 = now;
     }
     if (msg && msg.stop) {
-      for (const b of bots) { if (b.client) { b.close(); } }
+      for (const b of bots) { if (b.step !== 'failed') { b.step = 'closing'; } if (b.client) { b.close(); } if (b.ws) { b.ws.close(); } }
       process.exit(0);
     }
   });

@@ -15,8 +15,11 @@
 #   crowd   everybody at one spot, so everybody sees everybody: the most the
 #           server has to send;
 #   spread  new characters put at 36 spots over Tamriel, so few see each other.
+# A person is also a chat socket on the voice service, which carries their
+# join pass, so the voice service from this checkout runs beside the server.
 # The numbers are in the run's summary and in the load-test-<shape> artifact
-# (result.json and the server's log, nothing else), and go on #4623.
+# (result.json, the two services' logs and samples, nothing else), and go on
+# #4623.
 #
 # Why GitHub's runner: this repository is public, so its standard runners cost
 # nothing, and nothing here needs a secret, the box, or a real server. No job
@@ -133,5 +136,7 @@ jobs:
             ${{ runner.temp }}/server/result.json
             ${{ runner.temp }}/server/load-test-server.log
             ${{ runner.temp }}/server/load-samples.jsonl
+            ${{ runner.temp }}/server/load-test-voice.log
+            ${{ runner.temp }}/server/voice-samples.jsonl
           if-no-files-found: warn
           retention-days: 30

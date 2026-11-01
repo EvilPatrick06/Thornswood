@@ -16,13 +16,18 @@
 //  - Load-Test.js's arithmetic: cores over the samples' own times, bytes on
 //    the wire with 28 bytes of header a datagram, per person against step 0,
 //    and the summary table;
+//  - the chat socket against the real voice service from this checkout,
+//    started the way Load-Test.js starts it: a token, a socket, a join with
+//    voice off, and the join pass on the command queue the gamemode drains,
+//    under the bot's own profile, a fresh pass each time;
 //  - New-LoadServer.js: the start points of each shape, and its refusals of
 //    a server build whose record is not the checkout's, a file that is not
 //    the record's, and a master that is not the one the fork's build holds
 //    it to, or is not there.
 //
-// Read only, apart from a temp folder it deletes. The proxy test binds two
-// UDP sockets on 127.0.0.1; nothing else connects anywhere.
+// Read only, apart from temp folders it deletes. The proxy test binds UDP
+// sockets on 127.0.0.1 to 127.0.1.2, and the voice test a copy of the voice
+// service and a stand-in site on 127.0.0.1; nothing else connects anywhere.
 'use strict';
 const crypto = require('crypto');
 const dgram = require('dgram');
@@ -33,7 +38,9 @@ const ROOT = path.join(__dirname, '..');
 const BOT = path.join(ROOT, 'scripts', 'bot');
 const { makeProxy, addressFor } = require(path.join(BOT, 'load-proxy.js'));
 const { LoadBot, MOVE_MS } = require(path.join(BOT, 'load-bots.js'));
-const { windowOf, perPerson, markdown } = require(path.join(BOT, 'Load-Test.js'));
+const { windowOf, perPerson, markdown, startVoice, siteThatSaysYes } = require(path.join(BOT, 'Load-Test.js'));
+const http = require('http');
+const net = require('net');
 const server = require(path.join(BOT, 'New-LoadServer.js'));
 
 let pass = 0, fail = 0;
@@ -188,6 +195,50 @@ function mathChecks() {
   yes('the summary has a row a step and says where it stopped', /\| 10 \| 0\.500 \| 150 \|/.test(md) && /Stopped at 20: the runner was 95% busy/.test(md));
 }
 
+function freePort() {
+  return new Promise((ok, bad) => { const s = net.createServer(); s.on('error', bad); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => ok(p)); }); });
+}
+function get(port, p) {
+  return new Promise((ok, bad) => { http.get({ host: '127.0.0.1', port, path: p }, (res) => { let b = ''; res.on('data', (d) => { b += d; }); res.on('end', () => ok(b)); }).on('error', bad); });
+}
+
+async function voiceChecks() {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'test-4623-voice-'));
+  let voice = null; let site = null; const said = [];
+  try {
+    site = await siteThatSaysYes();
+    const port = await freePort();
+    voice = await startVoice(tmp, port, site.url, path.join(BOT, 'load-sampler.js'), path.join(tmp, 'voice-samples.jsonl'), (l) => said.push(l));
+    yes('the voice service from this checkout starts and listens', !!voice);
+    const addon = fakeAddon();
+    const b = new LoadBot(addon, { host: '127.0.0.1', port: 5000, name: 'v' });
+    b.profileId = 1900000777; b.passKey = 'p'.repeat(64); b.server = 'dev'; b.voicePort = port;
+    b.client = addon.createBotClient('127.0.0.1', 5000); b.step = 'moving'; b.voiceBy = Date.now() + 60000; b.character = { idx: 1 }; b.center = [0, 0, 0]; b.lastMove = Date.now();
+    b.openVoice();
+    for (let i = 0; i < 300 && !b.welcomed && b.step !== 'failed'; i++) { await sleep(20); }
+    yes('it gets a token and the voice service welcomes its chat socket', b.welcomed && b.step === 'moving');
+    let cmds = [];
+    for (let i = 0; i < 100 && !cmds.length; i++) { cmds = JSON.parse(await get(port, '/commands')).commands || []; if (!cmds.length) { await sleep(20); } }
+    const c = cmds[0] || {};
+    const pass = String(c.text || '').replace(/^\/joinpass /, '');
+    const parts = pass.split('.');
+    const body = parts.length === 3 ? JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8')) : {};
+    yes('the gamemode\'s command queue holds "/joinpass <pass>" under the bot\'s own profile, its pass signed for that profile and server',
+      cmds.length === 1 && /^\/joinpass jp1\./.test(c.text) && Number(c.profileId) === 1900000777 &&
+      parts[2] === crypto.createHmac('sha256', 'p'.repeat(64)).update('jp1.' + parts[1]).digest('base64url') && body.p === 1900000777 && body.s === 'dev');
+    yes('what the socket carried is counted both ways', b.wsUp > 0 && b.wsDown > 0);
+    b.advance(Date.now() + 61000);
+    let again = [];
+    for (let i = 0; i < 100 && !again.length; i++) { again = JSON.parse(await get(port, '/commands')).commands || []; if (!again.length) { await sleep(20); } }
+    yes('a minute on, a new pass goes the same way, as the front plugin sends one every minute', again.length === 1 && again[0].text !== c.text && /^\/joinpass jp1\./.test(again[0].text));
+    b.fail('done');
+  } finally {
+    if (voice) { voice.kill(); await new Promise((r) => voice.once('exit', r)); }
+    if (site) { site.server.close(); }
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
 async function serverChecks() {
   const crowd = server.startPoints('crowd');
   const spread = server.startPoints('spread');
@@ -231,6 +282,7 @@ async function serverChecks() {
   await proxyChecks();
   botChecks();
   mathChecks();
+  await voiceChecks();
   await serverChecks();
   done();
 })().catch((err) => { console.log('FAIL  ' + (err && err.stack || err)); fail++; done(); });
