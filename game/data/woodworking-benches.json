@@ -884,8 +884,8 @@
   },
   {
    "name": "Thornswood-Last.esp",
-   "sha256": "a3dfabe1d2fddd148f09b44548325728dfa65e9caa37a448f210e42356e8e3b6",
-   "size": 13398406
+   "sha256": "ab273429f04d39d94ace25990231eea2ec37dc8a8ce564431829603d40b086fa",
+   "size": 15481177
   }
  ],
  "builtBy": "scripts/dev/Build-WoodworkingBenches.py",
