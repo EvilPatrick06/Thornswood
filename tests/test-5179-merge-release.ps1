@@ -72,7 +72,9 @@ try {
     Yes '  a run number under 1 is refused' $threw
 
     # ---- the prints and what changed ------------------------------------------------
-    function M($parts) { [pscustomobject]@{ tag = 'build-1'; parts = [pscustomobject]$parts } }
+    # The launcher's print is the manifest's launcherVersion, its source
+    # number, not its files (#4825), so each stand-in manifest carries one.
+    function M($parts, [string]$lv = '2026.1031.1915') { [pscustomobject]@{ tag = 'build-1'; launcherVersion = $lv; parts = [pscustomobject]$parts } }
     function F($name, $sha) { [pscustomobject]@{ name = $name; sha256 = $sha; size = 1 } }
     $base = [ordered]@{
         gamemode = @((F 'gamemode.js' 'aa'), (F 'thornswood-build.json' 's1'))
@@ -103,10 +105,22 @@ try {
     $got = @(Get-MergeReleaseChanged -Manifest (M $c) -Previous $prev)
     Yes 'a new server record and new game files are changes' (($got -join ',') -eq 'server,game')
     $c = Copy-Parts $same; $c['launcher'] = @((F 'Thornswood.exe' 'ff')); $c['site'] = @((F 'site.zip' 'q'))
-    $got = @(Get-MergeReleaseChanged -Manifest (M $c) -Previous $prev)
+    $got = @(Get-MergeReleaseChanged -Manifest (M $c '2026.1101.1745') -Previous $prev)
     Yes '  so are a new launcher and a part the Release before did not carry' (($got -join ',') -eq 'launcher,site')
+    $c = Copy-Parts $same; $c['launcher'] = @((F 'Thornswood.exe' 'ff'))
+    $got = @(Get-MergeReleaseChanged -Manifest (M $c) -Previous $prev)
+    Yes '  but a launcher built again from the same sources is not, whatever its bytes' ($got.Count -eq 0)
+    $c = Copy-Parts $same
+    $got = @(Get-MergeReleaseChanged -Manifest (M $c '2026.1101.1745') -Previous $prev)
+    Yes '  and new launcher sources are a change with the same exe' (($got -join ',') -eq 'launcher')
     $got = @(Get-MergeReleaseChanged -Manifest $prev)
     Yes 'with no Release before, every part but velopack and main has changed' (($got -join ',') -eq 'gamemode,bot,server,launcher,game')
+    # Whether this merge makes a Velopack package and builds the launcher for
+    # it, from the same prints (ONE NUMBER in MergeRelease.ps1).
+    Yes 'a package is made when the launcher''s sources moved' (Test-MergeReleaseVelopack -LauncherVersion '2026.1101.1745' -GameZipSha256 'g1' -Previous $prev)
+    Yes '  or the game files did' (Test-MergeReleaseVelopack -LauncherVersion '2026.1031.1915' -GameZipSha256 'g2' -Previous $prev)
+    Yes '  or there is no Release before' (Test-MergeReleaseVelopack -LauncherVersion '2026.1031.1915' -GameZipSha256 'g1')
+    Yes '  and not when neither moved, so the launcher before is carried' (-not (Test-MergeReleaseVelopack -LauncherVersion '2026.1031.1915' -GameZipSha256 'G1' -Previous $prev))
 
     # ---- the Release before -----------------------------------------------------------
     $rd = Join-Path $tmp 'releases'
@@ -251,8 +265,14 @@ try {
     Yes '  in the release environment, on main only, one run at a time' ($wf -match '(?m)^\s+environment: release\s*$' -and $wf.Contains("if: `${{ github.ref == 'refs/heads/main' }}") -and $wf -match '(?m)^\s+cancel-in-progress: false\s*$')
     $notes = $wf.IndexOf('Collect-ReleaseNotes.ps1'); $build = $wf.IndexOf('Build-Launcher.ps1 -Root')
     Yes 'the notes are written before anything is built, and "none" from every pull request is the one line' ($notes -gt 0 -and $build -gt $notes -and $wf.Contains('if ($rc -eq 3)') -and $wf.Contains("NOTHING_TO_TELL: 'Nothing people would notice: every change in this release says none.'"))
-    Yes 'the launcher is carried when no package is made, held to the manifest and the signature check' ($wf.Contains('launcherVersion') -and $wf.Contains('Get-PublishSignRefusal') -and
-        $wf.Contains('Test-MergeReleaseVelopack -LauncherVersion $ver -GameZipSha256 $env:GAME_SHA -Previous $pm'))
+    # Whether the launcher moved is its source number against the one the
+    # Release before's manifest recorded (Test-MergeReleaseVelopack, checked
+    # above), so each manifest records the number for the next run.
+    Yes 'the launcher is carried when no package is made, held to the manifest and the signature check' (
+        $wf.Contains('try { $ver = Get-LauncherVersion -RepoDir . }') -and $wf.Contains('Get-PublishSignRefusal') -and
+        $wf.Contains('Test-MergeReleaseVelopack -LauncherVersion $ver -GameZipSha256 $env:GAME_SHA -Previous $pm') -and
+        ([regex]::Matches($wf, 'New-SignedManifest\.ps1 [^\n]*-LauncherVersion \$env:LAUNCHER_VERSION')).Count -eq 2 -and
+        $wf.Contains('LAUNCHER_VERSION: ${{ steps.launcher.outputs.version }}') -and $wf.Contains('Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("version=" + $ver)'))
     Yes '  and built with the package''s version when one is (#4825), then signed through Sign-OnRunner.ps1' ($wf.Contains('Build-Launcher.ps1 -Root $root -NoSign -NoPause -Version $env:VERSION') -and
         $wf.Contains('VERSION: ${{ steps.names.outputs.velopack }}') -and $wf.Contains('./scripts/release/Sign-OnRunner.ps1 -Path @(Get-ChildItem -LiteralPath $dir -File'))
     Yes '  and a launcher built for no package, or a package with a carried launcher, stops the run' ($wf.Contains('if ($velopack -ne $env:LAUNCHER_BUILT)'))
