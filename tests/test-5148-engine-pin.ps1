@@ -273,30 +273,16 @@ Yes '  push holds the pin to one commit on main with only a pin''s paths before 
 Yes '  push pushes the branch, then opens or updates the pull request' ($push.IndexOf('push --force') -ge 0 -and $push.IndexOf('push --force') -lt $push.IndexOf('Open-EnginePinPr.ps1'))
 # #5256: the robot's own App token pushes and opens, so the pull request
 # checks start by themselves and nobody approves them.
-$appStep = "(?m)^      - name: The pin robot's token
-        id: app
-        uses: actions/create-github-app-token@[0-9a-f]{40} # v\S+
-        with:
-          client-id: \$\{\{ vars\.PIN_APP_CLIENT_ID \}\}
-          private-key: \$\{\{ secrets\.PIN_APP_KEY \}\}
-          permission-contents: write
-          permission-pull-requests: write
-"
+$appStep = "(?m)^      - name: The pin robot's token\n        id: app\n        uses: actions/create-github-app-token@[0-9a-f]{40} # v\S+\n        with:\n          client-id: \$\{\{ vars\.PIN_APP_CLIENT_ID \}\}\n          private-key: \$\{\{ secrets\.PIN_APP_KEY \}\}\n          permission-contents: write\n          permission-pull-requests: write\n"
 Yes '  open and push mint the pin robot''s token in the engine-pin environment, and use it to push and open (#5256)' (
     $open -match $appStep -and $push -match $appStep -and
     $open -match '(?m)^    environment: engine-pin$' -and $push -match '(?m)^    environment: engine-pin$' -and
     $open -match 'GH_TOKEN: \$\{\{ steps\.app\.outputs\.token \}\}' -and $push -match 'GH_TOKEN: \$\{\{ steps\.app\.outputs\.token \}\}' -and
     $open -match 'Open-EnginePinPr\.ps1' -and $look -notmatch 'Open-EnginePinPr')
-Yes '  open runs only when look says the branch is ready and has no pull request' ($open -match "(?m)^    needs: look
-    if: needs\.look\.outputs\.open == 'yes'$" -and $look -match '(?m)^      open: \$\{\{ steps\.look\.outputs\.open \}\}$')
+Yes '  open runs only when look says the branch is ready and has no pull request' ($open -match "(?m)^    needs: look\n    if: needs\.look\.outputs\.open == 'yes'$" -and $look -match '(?m)^      open: \$\{\{ steps\.look\.outputs\.open \}\}$')
 Yes '  no check is started by hand: the robot''s push and pull request start them (#5256)' ($code -notmatch 'gh workflow run (build-pr|test-tasks|pr-body)\.yml')
 Yes '  the run''s own token writes nothing in open and push, and look may not write pull requests' (
-    $open -match '(?m)^    permissions:
-      contents: read
-(?!      )' -and $push -match '(?m)^    permissions:
-      contents: read
-      actions: read
-(?!      )' -and
+    $open -match '(?m)^    permissions:\n      contents: read\n(?!      )' -and $push -match '(?m)^    permissions:\n      contents: read\n      actions: read\n(?!      )' -and
     $look -notmatch 'pull-requests: write')
 $pb = [IO.File]::ReadAllText((Join-Path $root '.github/workflows/pr-body.yml')).Replace("`r`n", "`n")
 Yes '  pr-body.yml can be started by hand, and then reads the branch''s open pull request with a token that only reads' ($pb -match '(?m)^  workflow_dispatch:\s*$' -and $pb -match '(?m)^permissions:\n  contents: read\n  pull-requests: read\n(?!  )' -and $pb -match 'pulls\?state=open&head=')
