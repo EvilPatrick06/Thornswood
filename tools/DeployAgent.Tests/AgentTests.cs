@@ -232,7 +232,7 @@ sealed class FakeServer : IDisposable
                      (reads && Directory.Exists(dir) && Directory.GetFiles(dir).Any(f => File.ReadAllText(f).Contains("BROKEN")));
         if (broken) return $"SyntaxError: Unexpected token at 10.1.2.3:7787\n{EngineSays}\n";
         var tree = reads ? Tables.Tree(dir) : "";
-        return $"[thornswood] gamemode.js is git blob {Thornswood.DeployAgent.Files.GamemodeBlob(gm)}, {b.Length} bytes\n" +
+        return $"[thornswood] gamemode.js is git blob {Thornswood.DeployAgent.Files.GamemodeBlob(b)}, {b.Length} bytes\n" +
                (tree != "" ? $"[thornswood] gamemode tables are git tree {tree}, {Tables.Count(dir)} files, in {dir}\n" : "") +
                "[thornswood] gamemode client scripts abc (3), changed since the last load\n";
     }
@@ -240,8 +240,7 @@ sealed class FakeServer : IDisposable
     async Task Engine()
     {
         var gm = Path.Combine(Root, "gamemode.js");
-        var last = Thornswood.DeployAgent.Files.ReadShared(gm);
-        var lastWrite = File.GetLastWriteTimeUtc(gm);
+        var (last, lastWrite) = ReadOnce(gm);
         while (!stop.IsCancellationRequested)
         {
             try { await Task.Delay(5, stop.Token); } catch (OperationCanceledException) { return; }
@@ -250,15 +249,31 @@ sealed class FakeServer : IDisposable
 
         void Look()
         {
-            if (!Running) { try { last = Thornswood.DeployAgent.Files.ReadShared(gm); lastWrite = File.GetLastWriteTimeUtc(gm); } catch (IOException) { } return; }
             byte[] b;
             DateTime w;
-            try { b = Thornswood.DeployAgent.Files.ReadShared(gm); w = File.GetLastWriteTimeUtc(gm); } catch (IOException) { return; }
+            try { (b, w) = ReadOnce(gm); } catch (IOException) { return; }
+            if (!Running) { last = b; lastWrite = w; return; }
             if (b.AsSpan().SequenceEqual(last) && w == lastWrite) return;
             last = b;
             lastWrite = w;
             try { File.AppendAllText(Path.Combine(Root, "server.log"), LoadLines(gm, b)); } catch (IOException) { }
         }
+    }
+
+    /// <summary>The bytes and the write time of one file, from one handle,
+    /// as the engine loads what it was told changed. Read by path one after
+    /// the other, a rename between the two paired the old bytes with the new
+    /// time, and the load lines named the blob of whatever was there when
+    /// they were written: a load of bytes nobody judged. With a pause put
+    /// between the two reads, 21 of 25 runs of the put-back test across
+    /// #5191 met that load before the real one (1 Nov).</summary>
+    static (byte[] bytes, DateTime written) ReadOnce(string path)
+    {
+        using var f = Thornswood.DeployAgent.Files.OpenShared(path);
+        var w = File.GetLastWriteTimeUtc(f.SafeFileHandle);
+        using var ms = new MemoryStream();
+        f.CopyTo(ms);
+        return (ms.ToArray(), w);
     }
 
     void Looked() { lock (looked) { looks++; Monitor.PulseAll(looked); } }
@@ -957,7 +972,7 @@ public sealed class AgentTests : IDisposable
         var tree = Tables.Tree(Path.Combine(s.Root, Tables.Dir));
         GamemodeRelease(gh, "build-22", Reading("new gamemode"), new() { ["DATA.json"] = "BROKEN\n" });
         var outc = await a.DeployTag("dev", "build-22", default);
-        Assert.True(outc.State == "failure", outc.State + ": " + outc.Summary);
+        Assert.True(outc.State == "failure", outc.State + ": " + outc.Summary + "\n" + string.Join("\n", said));
         Assert.Contains("previous gamemode is back", outc.Summary);
         Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
         Assert.Equal(tree, Tables.Tree(Path.Combine(s.Root, Tables.Dir)));
