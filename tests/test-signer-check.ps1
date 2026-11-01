@@ -4,9 +4,9 @@
       pwsh -NoProfile -File .\tests\test-signer-check.ps1
       pwsh -NoProfile -File .\tests\test-signer-check.ps1 -Signed <a signed Thornswood.exe>
 
-  The check a launcher runs on a downloaded launcher before it swaps it in
-  (launcher\app\Signature.cs, called by Updater.CheckSigner), pointed at real
-  files.
+  The check a launcher runs on a downloaded launcher before it goes in
+  (launcher\app\Signature.cs, which the Velopack update asks in VeloPackage.cs
+  and VeloUpdate.cs since #4825), pointed at real files.
 
   WHY THIS EXISTS. Issue #912. Until then the check read the Subject of the
   embedded certificate (X509Certificate.CreateFromSignedFile) and looked for
@@ -111,7 +111,15 @@ Yes 'Signature.cs asks WinVerifyTrust with WINTRUST_ACTION_GENERIC_VERIFY_V2' (
 Yes 'Signature.Trust asks WinVerifyTrust with WTD_CHOICE_FILE, never a catalog' (
     $sigSrc -match 'WTD_CHOICE_FILE = 1' -and $sigSrc -match 'dwUnionChoice = WTD_CHOICE_FILE' -and
     $sigSrc -notmatch 'WTD_CHOICE_CATALOG')
-Yes 'Updater.CheckSigner goes through Signature.Refusal' ($upd -match 'Signature\.Refusal\(path, ExpectedSigner, out said\)')
+# Since #4825 the launcher's own update is Velopack's, and its checks ask
+# Signature.Refusal: every program in the package (VeloPackage.cs) and the
+# Update.exe that applies it (VeloUpdate.cs). Updater.CheckSigner went with
+# the self update.
+$velo = [IO.File]::ReadAllText((Join-Path $App 'VeloUpdate.cs'))
+$veloPkg = [IO.File]::ReadAllText((Join-Path $App 'VeloPackage.cs'))
+Yes 'the launcher update checks every program in the package and Velopack''s Update.exe through Signature.Refusal' (
+    $veloPkg -match 'Signature\.Refusal\(tmp, expectedSigner, out signerSaid\)' -and
+    $velo -match 'Signature\.Refusal\(updateExe, ExpectedSigner, out exeSaid\)')
 Yes 'nothing in the launcher decides a signer from CreateFromSignedFile any more' (
     -not (@(Get-ChildItem (Join-Path $App '*.cs') | Where-Object {
         [IO.File]::ReadAllText($_.FullName) -match 'CreateFromSignedFile\s*\(' }).Count))
