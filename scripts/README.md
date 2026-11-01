@@ -183,8 +183,9 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Build-Engine.ps1](release/Build-Engine.ps1) | Takes a machine from a fresh clone to a built engine: the SkyMP server and the client runtime, out of the fork in engine\skymp. |
 | [release/Build-Front.ps1](release/Build-Front.ps1) | Builds the front, the in-game page Data\Platform\UI comes from, from the fork at the pinned commit, into local\thornswood-front.zip. |
 | [release/Build-GameFiles.ps1](release/Build-GameFiles.ps1) | Builds the game files a merge release carries: dev's last release from the site, with this checkout's own files built over it, as one zip and the list of what is in it. |
-| [release/Build-Launcher.ps1](release/Build-Launcher.ps1) | Compiles the launcher into a real Thornswood.exe; the install is inside it (#4824). |
+| [release/Build-Launcher.ps1](release/Build-Launcher.ps1) | Publishes the launcher, Thornswood.exe and the native libraries beside it. |
 | [release/Build-Server.ps1](release/Build-Server.ps1) | Compiles the game server out of our fork and puts the result where Deploy-Server.ps1 and Publish-Server.ps1 expect to find it. |
+| [release/Build-SetupFiles.ps1](release/Build-SetupFiles.ps1) | Builds the files the launcher's Velopack package carries beside Game for the install's first start, and the list of them. |
 | [release/BuildStamp.ps1](release/BuildStamp.ps1) | What a server's gamemode is, written down beside it. |
 | [release/Check-Build.ps1](release/Check-Build.ps1) | The server does not check plugin names. It checks size and crc32 of every plugin it names, so the wrong version of a mod is the same to it as not having the mod. |
 | [release/Check-CollectionRecord.ps1](release/Check-CollectionRecord.ps1) | Holds records\collection.json, the collection as it should be, to the load order, each mod's page and the servers' order, from the repository alone (#5189). |
