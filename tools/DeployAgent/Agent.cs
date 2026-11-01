@@ -19,6 +19,12 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
     public ITasks Tasks { get; set; } = new WindowsTasks();
     /// <summary>Makes the bot pass for a server. A test stands in its ports.</summary>
     public Func<EnvConfig, BotPass>? MakeBotPass { get; set; }
+    /// <summary>The apps beside the servers the agent looks after, by the
+    /// environment's name: the site and the Discord bot (#5190, #5187).</summary>
+    public Dictionary<string, App> Apps { get; set; } = new();
+    /// <summary>Each server's voice service, by the server's environment
+    /// (#5187): a Release's voice part goes in with that server's Deployment.</summary>
+    public Dictionary<string, App> Voices { get; set; } = new();
     string StatePath => Path.Combine(cfg.Home, "state", "working.json");
     static readonly Regex BuildTag = new(@"^build-[A-Za-z0-9._-]{1,80}$");
     static readonly Regex AgentTag = new(@"^agent-v(\d+)\.(\d+)\.(\d+)$");
@@ -36,6 +42,7 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
     /// Every line goes to log.</summary>
     public async Task<Outcome> ApplyRelease(string env, string tag, string expectCommit, string workName, Action<string> logf, CancellationToken ct, bool botPass = false)
     {
+        if (Apps.ContainsKey(env)) return await ApplyAppRelease(env, tag, expectCommit, workName, logf, ct);
         if (!servers.TryGetValue(env, out var srv)) return new Outcome("failure", $"not applied: this agent does not look after {env}");
         if (!BuildTag.IsMatch(tag)) return new Outcome("failure", $"not applied: \"{tag}\" is not a build-<...> Release tag");
         Release rel;
@@ -50,7 +57,7 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
             string[] parts = pass ? ["gamemode", "bot"] : ["gamemode"];
             // The server build's zip is fetched only when dev does not run it
             // already: most Releases change the gamemode alone.
-            try { f = await ReleaseFetch.Fetch(gh, verify, rel, dir, parts, logf, ct, optional: ["server"], later: IsServerZip); }
+            try { f = await ReleaseFetch.Fetch(gh, verify, rel, dir, parts, logf, ct, optional: Voices.ContainsKey(env) ? ["server", AppKinds.Voice] : ["server"], later: IsServerZip); }
             catch (Exception e) when (e is InvalidDataException or IOException or HttpRequestException) { return new Outcome("failure", "not applied: " + e.Message); }
             var m = f.Manifest;
             // The name, not the owner: the repositories move to an
@@ -60,7 +67,7 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
                 return new Outcome("failure", $"not applied: the Release was built from {m.Repo}, not {cfg.Repo}");
             if (expectCommit != "" && m.Commit != expectCommit)
                 return new Outcome("failure", $"not applied: the Release is commit {Short(m.Commit)} and the Deployment is {Short(expectCommit)}");
-            var others = m.Parts.Keys.Where(k => !parts.Contains(k) && k != "server").OrderBy(k => k, StringComparer.Ordinal).ToList();
+            var others = m.Parts.Keys.Where(k => !parts.Contains(k) && k != "server" && !(k == AppKinds.Voice && Voices.ContainsKey(env))).OrderBy(k => k, StringComparer.Ordinal).ToList();
             if (others.Count > 0) logf($"the Release also carries {string.Join(", ", others)}, which this agent does not apply yet; left alone");
             logf($"release {rel.TagName}, commit {m.Commit}");
             var who = $"the deploy agent, {workName}";
@@ -107,10 +114,24 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
             {
                 logf("no bot pass: it is not set up on this box yet (Install-DeployAgent.ps1 sets it up)");
             }
+            // Voice goes in before the gamemode that pushes positions to it,
+            // after the bot pass, so a voice that does not answer leaves the
+            // server as it was.
+            var voiceIn = "";
+            if (m.Parts.TryGetValue(AppKinds.Voice, out var voicePart) && Voices.TryGetValue(env, out var voice))
+            {
+                var vzip = AppKinds.ZipName(AppKinds.Voice);
+                if (voicePart.Count != 1 || voicePart[0].Name != vzip || !f.Files.TryGetValue(vzip, out var vpath))
+                    return new Outcome("failure", $"not applied: the Release's voice part is not the one file {vzip}");
+                logf($"voice first, into {voice.Env.Root}");
+                var vo = await voice.Apply(vpath, rel.TagName, m.Commit, $"deploy agent {version} on {Host}", logf, ct);
+                if (vo.State != "success") return vo with { Summary = "voice: " + vo.Summary + "; the gamemode was not touched" };
+                voiceIn = "; voice runs it too";
+            }
             var outc = swapZip != null && swapRecord != null
                 ? await srv.ApplyServerBuild(swapZip, swapRecord, f.Files, who, logf, ct)
                 : await srv.ApplyGamemode(f.Files, who, logf, ct);
-            if (outc.State != "success") return outc;
+            if (outc.State != "success") return voiceIn == "" ? outc : outc with { Summary = outc.Summary + $"; voice already runs {rel.TagName}" };
             var gm = Path.Combine(srv.Env.Root, "gamemode.js");
             Records.Write(srv, new DeployRecord
             {
@@ -123,12 +144,58 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
                 DeployedUtc = Records.UtcNow(),
                 From = $"deploy agent {version} on {Host}",
             }, logf);
-            return outc with { Summary = rel.TagName + ": " + outc.Summary };
+            return outc with { Summary = rel.TagName + ": " + outc.Summary + voiceIn };
         }
         finally
         {
             try { if (Directory.Exists(dir)) Directory.Delete(dir, true); } catch (IOException) { }
         }
+    }
+
+    /// <summary>Fetches a build Release, holds it to its signature, and puts the
+    /// app's zip in (App.Apply): the site's or the Discord bot's part, one zip
+    /// each (scripts/release/App-Part.ps1). expectCommit, when given, is the
+    /// commit the Release must be (a Deployment's).</summary>
+    public async Task<Outcome> ApplyAppRelease(string env, string tag, string expectCommit, string workName, Action<string> logf, CancellationToken ct)
+    {
+        var app = Apps[env];
+        var kind = app.Env.Kind;
+        if (!BuildTag.IsMatch(tag)) return new Outcome("failure", $"not applied: \"{tag}\" is not a build-<...> Release tag");
+        Release rel;
+        try { rel = await gh.ReleaseByTag(tag, ct); }
+        catch (GitHubException e) when (e.Status == 404) { return new Outcome("failure", "not applied: there is no published Release " + tag); }
+        catch (Exception e) when (e is GitHubException or HttpRequestException or TaskCanceledException) { return new Outcome("error", "the Release could not be read: " + e.Message); }
+        var dir = Path.Combine(cfg.Home, "work", workName);
+        try
+        {
+            var part = AppKinds.Part(kind);
+            Fetched f;
+            try { f = await ReleaseFetch.Fetch(gh, verify, rel, dir, [part], logf, ct); }
+            catch (Exception e) when (e is InvalidDataException or IOException or HttpRequestException) { return new Outcome("failure", "not applied: " + e.Message); }
+            var m = f.Manifest;
+            if (!string.Equals(m.Repo.Split('/')[^1], cfg.Repo.Split('/')[^1], StringComparison.OrdinalIgnoreCase))
+                return new Outcome("failure", $"not applied: the Release was built from {m.Repo}, not {cfg.Repo}");
+            if (expectCommit != "" && m.Commit != expectCommit)
+                return new Outcome("failure", $"not applied: the Release is commit {Short(m.Commit)} and the Deployment is {Short(expectCommit)}");
+            var zipName = AppKinds.ZipName(kind);
+            if (m.Parts[part].Count != 1 || !f.Files.TryGetValue(zipName, out var zip))
+                return new Outcome("failure", $"not applied: the Release's {part} part is not the one file {zipName}");
+            logf($"release {rel.TagName}, commit {m.Commit}");
+            return await app.Apply(zip, rel.TagName, m.Commit, $"deploy agent {version} on {Host}", logf, ct);
+        }
+        finally
+        {
+            try { if (Directory.Exists(dir)) Directory.Delete(dir, true); } catch (IOException) { }
+        }
+    }
+
+    /// <summary>Leaves a deploy's log where the outside can read it and hands
+    /// back its address: a server's data folder, or an app's LogDir.</summary>
+    string PublishLog(string env, string id, List<string> lines)
+    {
+        if (servers.TryGetValue(env, out var srv)) return Records.PublishLog(srv, id, lines);
+        if (Apps.TryGetValue(env, out var app)) return Records.PublishLog(app.Env.LogDir, app.Env.LogBase, id, lines);
+        return "";
     }
 
     /// <summary>The gate's Deploy-Release verb: one Release by its tag, with no
@@ -143,11 +210,8 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
         Logf($"deploy agent {version} on {Host}: {tag} to {env}, by the deploy gate");
         var outc = await ApplyRelease(env, tag, "", "tag-" + id, Logf, ct);
         Logf(outc.State.ToUpperInvariant() + ": " + outc.Summary);
-        if (servers.TryGetValue(env, out var srv))
-        {
-            var url = Records.PublishLog(srv, id, lines);
-            if (url != "") log("the log: " + url);
-        }
+        var url = PublishLog(env, id, lines);
+        if (url != "") log("the log: " + url);
         return outc;
     }
 
@@ -243,9 +307,21 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
         return r.GetString()!;
     }
 
+    /// <summary>The part a Deployment to an app's environment names, beside
+    /// its Release (merge-release.yml); "" when it names none.</summary>
+    public static string PayloadPart(JsonElement payload)
+    {
+        var p = payload;
+        if (p.ValueKind == JsonValueKind.String)
+        {
+            using var d = JsonDocument.Parse(p.GetString() ?? "");
+            p = d.RootElement.Clone();
+        }
+        return p.ValueKind == JsonValueKind.Object && p.TryGetProperty("part", out var r) && r.ValueKind == JsonValueKind.String ? r.GetString()! : "";
+    }
+
     async Task Apply(string env, Deployment d, CancellationToken ct)
     {
-        var srv = servers[env];
         var lines = new List<string>();
         void Logf(string s) { lines.Add($"{DateTime.Now:h:mm:ss tt}  {s}"); log($"{env} deployment {d.Id}: {s}"); }
         Files.WriteWhole(StatePath, JsonSerializer.SerializeToUtf8Bytes(new Working(d.Id.ToString(), env, Records.UtcNow())));
@@ -254,18 +330,41 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
             await gh.SetStatus(d.Id, "in_progress", "the deploy agent on the box is applying this", "", ct);
             Logf($"deploy agent {version} on {Host}, deployment {d.Id} of {Short(d.Sha)} by {d.Creator?.Name}");
             Outcome outc;
+            var tag = "";
             if (d.Task != "" && d.Task != "deploy") outc = new Outcome("failure", $"not applied: the Deployment's task is {d.Task}, and the agent applies deploy only");
             else
             {
-                string tag;
-                try { tag = PayloadRelease(d.Payload); outc = await ApplyRelease(env, tag, d.Sha, $"deployment-{d.Id}", Logf, ct, botPass: true); }
+                try
+                {
+                    tag = PayloadRelease(d.Payload);
+                    var part = PayloadPart(d.Payload);
+                    if (Apps.TryGetValue(env, out var app) && part != "" && part != AppKinds.Part(app.Env.Kind))
+                        outc = new Outcome("failure", $"not applied: the Deployment asks for the {part} part, and {env} takes {AppKinds.Part(app.Env.Kind)}");
+                    else outc = await ApplyRelease(env, tag, d.Sha, $"deployment-{d.Id}", Logf, ct, botPass: true);
+                }
                 catch (Exception e) when (e is InvalidDataException or JsonException) { outc = new Outcome("failure", "not applied: " + e.Message); }
             }
             Logf(outc.State.ToUpperInvariant() + ": " + outc.Summary);
-            var url = Records.PublishLog(srv, d.Id.ToString(), lines);
+            var url = PublishLog(env, d.Id.ToString(), lines);
             await gh.SetStatus(d.Id, outc.State, outc.Summary, url, ct);
+            if (outc.State == "success") await LeaveNews(env, tag, d, ct);
         }
         finally { File.Delete(StatePath); }
+    }
+
+    /// <summary>The news of the Release a Deployment put in, for the bot
+    /// (News). Its notes are read again here: a Release's body is not part
+    /// of what is signed, and is what GitHub shows as its notes now. A
+    /// failure is said in the agent's log and changes nothing deployed.</summary>
+    async Task LeaveNews(string env, string tag, Deployment d, CancellationToken ct)
+    {
+        var store = servers.TryGetValue(env, out var srv) ? srv.Env.Store : Apps.TryGetValue(env, out var app) ? app.Env.Store : "";
+        void Logf(string s) => log($"{env} deployment {d.Id}: {s}");
+        try { News.Write(store, env, await gh.ReleaseByTag(tag, ct), d.Sha, Logf); }
+        catch (Exception e) when (e is GitHubException or HttpRequestException or TaskCanceledException or JsonException)
+        {
+            Logf($"THE NEWS OF {tag} WAS NOT LEFT FOR THE BOT: the Release could not be read again ({e.Message})");
+        }
     }
 
     static string Short(string s) => s.Length > 12 ? s[..12] : s;
@@ -368,9 +467,22 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
                     log($"{env}: newest Deployment {deps[0].Id} ({Short(deps[0].Sha)}), " + (sts.Count > 0 ? $"{sts[0].State}: {sts[0].Description}" : "no status yet"));
                 }
             }
+            if (Apps.TryGetValue(env, out var app))
+            {
+                var down = await app.Unhealthy(ct);
+                if (down != "") { log($"{env}: {down}"); ok = false; }
+                else log($"{env}: " + (e.Kind == AppKinds.Discord ? $"the service {e.Service} is running" : $"{e.Health} answers"));
+                continue;
+            }
             var sick = await servers[env].Unhealthy(ct);
             if (sick != "") { log($"{env}: {sick}"); ok = false; }
             else log($"{env}: {e.Health} answers 200");
+            if (Voices.TryGetValue(env, out var voice))
+            {
+                var hush = await voice.Unhealthy(ct);
+                if (hush != "") { log($"{env} voice: {hush}"); ok = false; }
+                else log($"{env} voice: {voice.Env.Health} answers with the build in {voice.Env.Root}");
+            }
         }
         return ok;
     }

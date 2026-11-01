@@ -20,7 +20,7 @@
 //   - the refusal's boxes name that page by its title and none of the pages
 //     #599 hid and #3146 cut, and never the Add-ons page (a tab of the cut
 //     Mods page);
-//   - the missing mods box offers the collection's page instead;
+//   - the missing mods box offers to open the collection instead;
 //   - the comment under the page arrays says where a blocked Play goes.
 //
 // Read only.
@@ -118,9 +118,9 @@ CUT.forEach(function (t) {
   yes('the refusal sends nobody to the ' + t + ' page, which is gone', !new RegExp('\\b' + t + ' page\\b').test(words));
 });
 yes('nor to the Add-ons page, a tab of the cut Mods page', words.indexOf('Add-ons') < 0);
-yes('the missing mods box offers to open the collection\'s page',
-    /MessageBoxButton\.YesNo/.test(block) && /Process\.Start\(new ProcessStartInfo\(CollectionLink\(\)\)/.test(block) &&
-    words.indexOf('press Yes to open its page') >= 0);
+yes('the missing mods box offers to open the collection (#5200: in Vortex where Vortex answers Nexus links)',
+    /MessageBoxButton\.YesNo/.test(block) && /OpenCollection\(\);/.test(block) &&
+    words.indexOf('press Yes to open it and install it in Vortex') >= 0);
 yes('and says Fix will not help with a mod that is not installed', words.indexOf('Pressing Fix will not help') >= 0);
 yes('no em dash and never the word the project does not use in the boxes', !/—/.test(words) && !/player/i.test(words));
 

@@ -489,7 +489,7 @@ public sealed class AgentTests : IDisposable
         var (newFiles, newRec) = Build(ForkB);
         PinRelease(gh, "build-7", "// gamemode for B\n", newFiles, newRec);
         File.WriteAllText(Path.Combine(s.Root, "data", "restart.json"), "{}");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-7\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-7\"}");
         await a.Pass("dev", default);
         var last = gh.Last(id)!;
         Assert.Equal("success", (string)last["state"]!);
@@ -625,7 +625,7 @@ public sealed class AgentTests : IDisposable
     {
         var (a, gh, s, _, _) = Make();
         GamemodeRelease(gh, "build-1", "// new gamemode\n");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
         HasStates(gh, s, id, "in_progress,success");
         Assert.Equal("// new gamemode\n", s.Read("gamemode.js"));
@@ -641,6 +641,93 @@ public sealed class AgentTests : IDisposable
         // Applied once: the next pass sees its status and does nothing.
         await a.Pass("dev", default);
         Assert.Equal(2, gh.States(id).Count);
+    }
+
+    // ---- voice, with dev's Deployment (#5187) -------------------------------
+
+    static readonly Dictionary<string, string> OldVoice = new()
+    {
+        ["voice-server.js"] = "const BUILD = 'old-1';\n", ["headlines.js"] = "// headlines\n", ["server-log.js"] = "// log writer\n",
+        ["token-key.txt"] = "the service's own key",
+    };
+
+    /// <summary>Dev with its voice service beside it, running OldVoice.</summary>
+    (Agent agent, FakeGitHub gh, FakeServer srv, FakeAppControl voice, string voiceRoot) MakeWithVoice()
+    {
+        var (a, gh, s, _, cfg) = Make();
+        var vroot = Temp();
+        foreach (var (n, t) in OldVoice) File.WriteAllText(Path.Combine(vroot, n), t);
+        var vc = new FakeAppControl(vroot);
+        var venv = Config.DefaultDevVoice();
+        venv.Root = vroot;
+        venv.Store = cfg.Environments["dev"].Store;
+        venv.Watch = cfg.Environments["dev"].Watch;
+        venv.Health = "https://voice.test/health";
+        venv.WaitSeconds = 1;
+        vc.Start(venv);
+        var server = gh.Other!;
+        gh.Other = r => r.RequestUri!.Host == "voice.test" ? vc.Health(r) : server(r);
+        a.Voices["dev"] = new App(venv, new HttpClient(gh), vc) { Tick = TimeSpan.FromMilliseconds(5) };
+        return (a, gh, s, vc, vroot);
+    }
+
+    static void VoiceRelease(FakeGitHub gh, string tag, string gamemode, string voiceServer)
+    {
+        var voice = TablesZip(new() { ["headlines.js"] = "// headlines\n", ["server-log.js"] = "// log writer\n", ["voice-server.js"] = voiceServer });
+        gh.AddRelease(tag, ReleaseFiles(tag, Commit, "", new()
+        {
+            ["gamemode"] = new() { ["gamemode.js"] = B(gamemode), ["thornswood-build.json"] = B("{\"commit\":\"new\"}") },
+            ["voice"] = new() { ["voice.zip"] = voice },
+        }));
+    }
+
+    [Fact]
+    public async Task VoiceGoesInWithDevsDeploymentAndAnswersWithItsNewBuild()
+    {
+        var (a, gh, s, vc, vroot) = MakeWithVoice();
+        VoiceRelease(gh, "build-21", "// new gamemode\n", "const BUILD = 'new-2';\n");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-21\"}");
+        await a.Pass("dev", default);
+        HasStates(gh, s, id, "in_progress,success");
+        Assert.Contains("voice runs it too", (string)gh.Last(id)!["description"]!);
+        Assert.Equal("const BUILD = 'new-2';\n", File.ReadAllText(Path.Combine(vroot, "voice-server.js")));
+        Assert.Equal("new-2", vc.RunningBuild);
+        Assert.Equal("the service's own key", File.ReadAllText(Path.Combine(vroot, "token-key.txt")));
+        Assert.Equal("// new gamemode\n", s.Read("gamemode.js"));
+        Assert.Contains("voice-server.js", vc.Parsed);
+        var rec = JsonSerializer.Deserialize<DeployRecord>(File.ReadAllText(Path.Combine(vroot, "thornswood-deploy.json")))!;
+        Assert.Equal(("build-21", Commit, "voice"), (rec.Name, rec.Commit, rec.Component));
+        var log = s.Read(Path.Combine("data", $"deploy-{id}.log"));
+        Assert.Contains("voice first", log);
+        Assert.DoesNotContain("voice, which this agent does not apply yet", log);
+    }
+
+    [Fact]
+    public async Task AVoiceThatKeepsAnsweringWithTheOldBuildIsPutBackAndTheGamemodeIsNotTouched()
+    {
+        var (a, gh, s, vc, vroot) = MakeWithVoice();
+        VoiceRelease(gh, "build-22", "// new gamemode\n", "const BUILD = 'new-3'; // DEAD\n");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-22\"}");
+        await a.Pass("dev", default);
+        HasStates(gh, s, id, "in_progress,failure");
+        var why = (string)gh.Last(id)!["description"]!;
+        Assert.StartsWith("voice: ", why);
+        Assert.Equal("const BUILD = 'old-1';\n", File.ReadAllText(Path.Combine(vroot, "voice-server.js")));
+        Assert.Equal("old-1", vc.RunningBuild);
+        Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
+        Assert.Contains("says build old-1, not the new-3 in the folder", s.Read(Path.Combine("data", $"deploy-{id}.log")));
+    }
+
+    [Fact]
+    public async Task AReleaseWithVoiceOnABoxWithNoVoiceNamedLeavesItAlone()
+    {
+        var (a, gh, s, _, _) = Make();
+        VoiceRelease(gh, "build-23", "// new gamemode\n", "const BUILD = 'new-4';\n");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-23\"}");
+        await a.Pass("dev", default);
+        HasStates(gh, s, id, "in_progress,success");
+        Assert.Contains("voice, which this agent does not apply yet; left alone", s.Read(Path.Combine("data", $"deploy-{id}.log")));
+        Assert.DoesNotContain("voice.zip", gh.Downloaded);
     }
 
     // ---- the gamemode's tables (#5191) --------------------------------------
@@ -659,7 +746,7 @@ public sealed class AgentTests : IDisposable
         var oldTree = Tables.Tree(Path.Combine(s.Root, Tables.Dir));
         // The same gamemode.js the server runs: only a table changed.
         GamemodeRelease(gh, "build-1", Reading("tables gamemode"), new() { ["DATA.json"] = "{\n\"a\":2\n}\n", ["WELLS.json"] = "[]\n" });
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
         HasStates(gh, s, id, "in_progress,success");
         Assert.Equal("{\n\"a\":2\n}\n", s.Read(Path.Combine(Tables.Dir, "DATA.json")));
@@ -685,7 +772,7 @@ public sealed class AgentTests : IDisposable
         s.WriteGamemode(Reading("old tables gamemode"));
         var oldTree = Tables.Tree(Path.Combine(s.Root, Tables.Dir));
         GamemodeRelease(gh, "build-2", Reading("new gamemode"), new() { ["DATA.json"] = "BROKEN\n", ["WELLS.json"] = "[]\n" });
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-2\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-2\"}");
         await a.Pass("dev", default);
         var last = gh.Last(id)!;
         Assert.Equal("failure", (string)last["state"]!);
@@ -814,7 +901,7 @@ public sealed class AgentTests : IDisposable
     {
         var (a, gh, s, _, _) = Make();
         GamemodeRelease(gh, "build-2", "BROKEN gamemode\n");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-2\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-2\"}");
         await a.Pass("dev", default);
         var last = gh.Last(id)!;
         Assert.Equal("failure", (string)last["state"]!);
@@ -831,7 +918,7 @@ public sealed class AgentTests : IDisposable
     {
         var (a, gh, s, server, _) = Make();
         GamemodeRelease(gh, "build-3", "// new but sick\n");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-3\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-3\"}");
         // Healthy for the check before, sick while the new gamemode is in.
         s.SickWhen = () => Encoding.UTF8.GetString(Thornswood.DeployAgent.Files.ReadShared(Path.Combine(s.Root, "gamemode.js"))).Contains("sick");
         server.Tick = TimeSpan.FromMilliseconds(20);
@@ -863,7 +950,7 @@ public sealed class AgentTests : IDisposable
             gh.Replace("build-1", "manifest.json", B(text.Replace("\"schema\":1", "\"schema\":1 ")));
         }
         if (sick) s.Healthy = false;
-        var id = gh.AddDeployment("Dev server", sha, payload);
+        var id = gh.AddDeployment("Dev", sha, payload);
         await a.Pass("dev", default);
         var last = gh.Last(id)!;
         Assert.Equal("failure", (string)last["state"]!);
@@ -872,24 +959,41 @@ public sealed class AgentTests : IDisposable
     }
 
     [Fact]
-    public async Task OnlyTheNewestIsAppliedAndRecordsAreLeftAlone()
+    public async Task OnlyTheNewestIsAppliedAndOtherEnvironmentsAreLeftAlone()
     {
         var (a, gh, _, _, _) = Make();
         GamemodeRelease(gh, "build-1", "// new gamemode\n");
-        var record = gh.AddDeployment("Dev", Commit, "{}");
-        var older = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
-        var newest = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var record = gh.AddDeployment("Dev server", Commit, "{}");
+        var older = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        var newest = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
         Assert.Equal("inactive", string.Join(",", gh.States(older)));
         Assert.Equal("in_progress,success", string.Join(",", gh.States(newest)));
         Assert.Empty(gh.States(record));
     }
 
+    // Record-Deployment.ps1 wrote Deployments to Dev with a success straight
+    // away (#5179 retired it). The newest of them is not applied again, and
+    // the unapplied older ones under it are left as they are.
+    [Fact]
+    public async Task AnOldRecordWithASuccessIsNotAppliedAgain()
+    {
+        var (a, gh, s, _, _) = Make();
+        GamemodeRelease(gh, "build-1", "// new gamemode\n");
+        var before = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        var record = gh.AddDeployment("Dev", Commit, "{}");
+        lock (gh.StatusesById) gh.StatusesById[record] = new() { new JsonObject { ["state"] = "success", ["description"] = "Live on the dev feed" } };
+        await a.Pass("dev", default);
+        Assert.Equal("success", string.Join(",", gh.States(record)));
+        Assert.Empty(gh.States(before));
+        Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
+    }
+
     [Fact]
     public async Task ADeploymentCutShortIsMarkedError()
     {
         var (a, gh, s, _, cfg) = Make();
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         var state = Path.Combine(cfg.Home, "state", "working.json");
         Directory.CreateDirectory(Path.GetDirectoryName(state)!);
         File.WriteAllText(state, $"{{\"Deployment\":\"{id}\",\"Env\":\"dev\",\"Started\":\"then\"}}");
@@ -1085,12 +1189,12 @@ public sealed class AgentTests : IDisposable
         var p = Path.Combine(Temp(), "agent.json");
         File.WriteAllText(p, "{\"repo\":\"O/R\",\"environments\":{\"dev\":{\"loadSeconds\":60}}}");
         var e = Config.Load(p).Environments["dev"];
-        Assert.Equal((60, @"C:\Thornswood-Server-Dev", "Dev server"), (e.LoadSeconds, e.Root, e.GitHubEnvironment));
+        Assert.Equal((60, @"C:\Thornswood-Server-Dev", "Dev"), (e.LoadSeconds, e.Root, e.GitHubEnvironment));
         foreach (var bad in new[]
         {
             "{\"environments\":{\"dev\":{}}}",
             "{\"repo\":\"O/R\",\"environments\":{\"main\":{}}}",
-            "{\"repo\":\"O/R\",\"environments\":{\"dev\":{\"githubEnvironment\":\"Dev\"}}}",
+            "{\"repo\":\"O/R\",\"environments\":{\"dev\":{\"githubEnvironment\":\"\"}}}",
             "{\"repo\":\"O/R\",\"environments\":{\"dev\":{\"githubEnvironment\":\"Main\"}}}",
             "{\"repo\":\"O/R\",\"api\":\"http://example.com\"}",
             "{\"repo\":\"O/R\",\"pollSeconds\":1}",
@@ -1189,7 +1293,7 @@ public sealed class AgentTests : IDisposable
             return WriteResult(bp, true);
         });
         BotRelease(gh, "build-1", "// new gamemode\n");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
         HasStates(gh, s, id, "in_progress,success");
         Assert.Equal("// new gamemode\n", s.Read("gamemode.js"));
@@ -1246,7 +1350,7 @@ public sealed class AgentTests : IDisposable
             ["bot"] = BotPart,
             ["server"] = new() { ["server-build.json"] = newRec, [zipName] = zip },
         }));
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-9\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-9\"}");
         await a.Pass("dev", default);
         HasStates(gh, s, id, "success", last: true);
         // The copy ran the build dev was about to get, with its own scripts
@@ -1274,7 +1378,7 @@ public sealed class AgentTests : IDisposable
             _ => WriteResult(bp, false, how),
         });
         BotRelease(gh, "build-1", "// new gamemode\n", withBot: how != "nobot");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
         var last = gh.Last(id)!;
         Assert.Equal("failure", (string)last["state"]!);
@@ -1302,7 +1406,7 @@ public sealed class AgentTests : IDisposable
     {
         var (a, gh, s, _, _) = Make();
         GamemodeRelease(gh, "build-1", "// new gamemode\n");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
         HasStates(gh, s, id, "success", last: true);
         Assert.Contains("no bot pass: it is not set up on this box yet", s.Read(Path.Combine("data", $"deploy-{id}.log")));
@@ -1325,7 +1429,7 @@ public sealed class AgentTests : IDisposable
         });
         PutTables(s, new() { ["FOODS.json"] = "[\"dev\"]" });
         BotRelease(gh, "build-1", Reading("new gamemode"), tables: inRelease ? new() { ["FOODS.json"] = "[\"new\"]", ["DATA.json"] = "{}" } : null);
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
         HasStates(gh, s, id, "success", last: true);
         Assert.NotNull(copied);

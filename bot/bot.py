@@ -4523,13 +4523,11 @@ TASK_TAG = 'Main'
 TASK_FORM = 4
 KNOWN_FORM = 5
 DEV_FORM = 3
-# The board's column for a fix that is merged and waits on main
-# (done-on-merge.yml puts it on, with the test task). The label is an
-# instruction, not a record: board-status.yml moves the card and takes it off
-# again within a minute (#2863), so a pass rarely sees it. What stays is
-# done-on-merge.yml's comment, written by the workflow and starting
-# "Pull request #N merged (", which Close-ShippedIssues.ps1 reads as well.
-BOARD_DONE = 'board: Done'
+# A fix that is merged and waits on main: done-on-merge.yml's comment,
+# written by the workflow and starting "Pull request #N merged (", which
+# Close-ShippedIssues.ps1 reads as well. Until #5185 a board: Done label went
+# on beside it for a minute; the card follows the merge by itself now
+# (board.yml), and the comment is the one mark.
 DONE_ON_MERGE = re.compile(r'^Pull request #\d+ merged \(')
 DONE_ON_MERGE_BY = 'github-actions[bot]'
 
@@ -5478,9 +5476,8 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
     Dev Findings or Main Findings whose fix has not landed (Patrick, 22 Oct,
     and #3140). Its fix has landed when the issue gets a "Test task:"
     comment or is in Done: done-on-merge.yml's comment on it (merged_fix),
-    or the board: Done label for the minute it is on (BOARD_DONE). A card
-    moved to Done by hand, with no merge, is not seen: the bot cannot read
-    the board. A closed or unlabelled issue is not a finding at all. Then its post goes: the fix is a test task, not
+    A card is never moved to Done by hand (#5185): it follows that same
+    merged test task. A closed or unlabelled issue is not a finding at all. Then its post goes: the fix is a test task, not
     a known issue. A merged pull request alone does not take it down: until
     26 Oct any one that named the issue did, and a measuring step on the
     scripts finding, a partial fix, and a Refs written by mistake each kept
@@ -5529,10 +5526,6 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
         key = str(num)
         issue = issues[num]
         have = rec.get(key)
-        if BOARD_DONE.lower() in [str(l.get('name', '')).lower()
-                                  for l in issue.get('labels') or []]:
-            why[key] = 'it is on the board as Done: its fix is merged'
-            continue                # fixed, waiting on main: not a known issue
         if (have and have.get('updated') == issue.get('updated_at')
                 and have.get('form') == KNOWN_FORM):
             listed.add(num)
@@ -6187,6 +6180,502 @@ async def watch_known_issues():
                     log('known issues: could not save %s after the failed '
                         'pass (%s)' % (KNOWN_STATE, type(e2).__name__))
         await asyncio.sleep(KNOWN_EVERY)
+
+
+# ------------------------------------------------ staff notices from issues --
+#
+# A staff notice can be an issue on the board labelled "notice: staff" (#5187):
+# its body is the notice. Each pass reads the open ones, says each in
+# #staff-updates through watch_send, the way the watchdog's outbox is said,
+# writes down the Discord message it became in staff-notices.json, and only
+# then comments on the issue and closes it. So a failed comment or close is
+# tried again next pass, and the notice is never said twice. A cloud thread
+# files one with Say-Staff.ps1, which needs no ssh, no runner and no key on
+# the box.
+#
+# Who may: GitHub lets only people with triage or more put a label on, and no
+# issue form here puts this one on. The bot also holds the issue's author to
+# the team (OWNER, MEMBER, COLLABORATOR) or one of the Apps installed on the
+# repository, so a team member labelling somebody else's issue does not say
+# it in the staff channel. The same limits as say-staff.ps1 on the box: 1800
+# characters, 30 an hour for each sender, mentions off; and like the
+# watchdog's outbox, a notice that waited a day is not said.
+#
+# Taking one back: the label "notice: take back" on its issue. The bot
+# deletes the message, or withholds a notice not said yet, comments what it
+# did once, and writes it down.
+#
+# Both lists are asked with the ETag of the last answer, so a pass where
+# nothing changed is answered 304, which GitHub does not count against the
+# bot's hourly limit (the bot's rereads used up the shared quota, #5260).
+STAFF_NOTICE_LABEL = os.environ.get('STAFF_NOTICE_LABEL', 'notice: staff').strip()
+STAFF_TAKE_BACK_LABEL = os.environ.get('STAFF_TAKE_BACK_LABEL', 'notice: take back').strip()
+STAFF_NOTICES = os.path.join(DATA_DIR, 'staff-notices.json')
+NOTICE_EVERY = max(30, _int_env('STAFF_NOTICE_EVERY', 60))
+NOTICE_MAX = 1800
+NOTICE_PER_HOUR = 30
+NOTICE_MAX_AGE = 24 * 3600
+NOTICE_TEAM = ('OWNER', 'MEMBER', 'COLLABORATOR')
+# Say-Staff.ps1's title, which names who the notice is from: its -From.
+NOTICE_FROM = re.compile(r'^\s*staff notice from ([a-z][a-z0-9-]{0,30})\s*$', re.I)
+# A said notice is remembered this long, for taking it back and the hourly limit.
+NOTICE_KEEP = 30 * 24 * 3600
+
+
+def _github_time(text):
+    """A GitHub time (2026-11-01T19:12:00Z) in unix seconds, or None."""
+    try:
+        return datetime.datetime.strptime(str(text or ''), '%Y-%m-%dT%H:%M:%SZ').replace(
+            tzinfo=datetime.timezone.utc).timestamp()
+    except ValueError:
+        return None
+
+
+def _github_get_cached(url, cache, opener=None):
+    """_github_get, asked with the ETag of the answer last kept in cache for
+       url: a 304 gives that answer again. A failure raises, as there."""
+    token = github_token()
+    headers = {'Accept': 'application/vnd.github+json',
+               'Authorization': 'Bearer ' + token,
+               'User-Agent': 'thornswood-bot',
+               'X-GitHub-Api-Version': '2022-11-28'}
+    held = cache.get(url)
+    if held:
+        headers['If-None-Match'] = held[0]
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with (opener or urllib.request.urlopen)(req, timeout=20) as r:
+            got = json.loads(r.read().decode('utf-8'))
+            etag = r.headers.get('ETag')
+    except urllib.error.HTTPError as e:
+        if e.code == 304 and held:
+            return held[1]
+        raise
+    if etag:
+        cache[url] = (etag, got)
+    else:
+        cache.pop(url, None)
+    return got
+
+
+def github_close(number, reason='completed'):
+    """Closes the issue with reason (completed or not_planned)."""
+    token = github_token()
+    req = urllib.request.Request(
+        '%s/repos/%s/issues/%d' % (GITHUB_API, known_repo_now(), int(number)),
+        data=json.dumps({'state': 'closed', 'state_reason': reason}).encode('utf-8'),
+        method='PATCH',
+        headers={'Accept': 'application/vnd.github+json',
+                 'Authorization': 'Bearer ' + token,
+                 'User-Agent': 'thornswood-bot',
+                 'X-GitHub-Api-Version': '2022-11-28'})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        return json.loads(r.read().decode('utf-8'))
+
+
+def notice_sender(issue):
+    """Who the notice is from: the word Say-Staff.ps1's title names, else the
+       author's login, lower case and without [bot]."""
+    m = NOTICE_FROM.match(str(issue.get('title') or ''))
+    if m:
+        return m.group(1).lower()
+    login = str((issue.get('user') or {}).get('login') or 'unknown').lower()
+    return re.sub(r'\[bot\]$', '', login) or 'unknown'
+
+
+def notice_of(issue, now):
+    """(sender, text, problems) for the issue's notice. problems is empty when
+       it may be said; each one is a sentence for the refusal comment."""
+    sender = notice_sender(issue)
+    text = strip_footer(str(issue.get('body') or '').replace('\r\n', '\n')).strip()
+    problems = []
+    user = issue.get('user') or {}
+    if (str(issue.get('author_association') or '') not in NOTICE_TEAM
+            and str(user.get('type') or '') != 'Bot'):
+        problems.append('The issue was filed by %s, who is not on the team. A '
+                        'notice is said only from an issue the team or one of '
+                        "the repository's Apps filed."
+                        % (user.get('login') or 'somebody unknown'))
+    if not text:
+        problems.append('The issue has no body, and the body is the notice.')
+    elif len(text) > NOTICE_MAX:
+        problems.append('The notice is %d characters and %d is the most. '
+                        'Nothing was cut.' % (len(text), NOTICE_MAX))
+    made = _github_time(issue.get('created_at'))
+    if made is not None and now - made > NOTICE_MAX_AGE:
+        problems.append('The issue was filed more than a day ago, and a notice '
+                        'a day late is noise, not news.')
+    return sender, text, problems
+
+
+def notices_this_hour(state, sender, now):
+    return sum(1 for r in (state.get('said') or {}).values()
+               if isinstance(r, dict) and r.get('from') == sender
+               and now - (r.get('at') or 0) < 3600)
+
+
+async def staff_notices_once(state, notices, take_backs, send, delete,
+                             comment, close, save, now=None):
+    """
+    One pass. notices are the open issues labelled STAFF_NOTICE_LABEL and
+    take_backs every issue labelled STAFF_TAKE_BACK_LABEL, by number. send
+    says a text in the staff channel and gives the message or None; delete
+    takes a message id away and gives 'deleted' or 'gone'; comment and close
+    (number, reason) write to GitHub and raise on failure. state is
+    staff-notices.json's dict, changed in place and saved with save(state)
+    after every message said, before anything else is done. Returns the
+    numbers said, the numbers taken back and the numbers refused.
+    """
+    now = time.time() if now is None else now
+    said = state.setdefault('said', {})
+    refused = state.setdefault('refused', {})
+    unsaid = state.setdefault('unsaid', {})
+    out_said, out_back, out_refused = [], [], []
+
+    def finish(num, rec):
+        # Each step written down as it is done, so a failed one is the only
+        # one tried again.
+        if not rec.get('told'):
+            comment(num, 'Said in #staff-updates. The label "%s" on this issue '
+                    'takes it out again.' % STAFF_TAKE_BACK_LABEL)
+            rec['told'] = True
+            save(state)
+        if not rec.get('closed'):
+            close(num, 'completed')
+            rec['closed'] = True
+            save(state)
+
+    for num in sorted(take_backs):
+        key = str(num)
+        if key in unsaid:
+            continue
+        rec = said.get(key)
+        if rec:
+            result = await delete(rec.get('message'))
+            words = ('The notice is taken out of #staff-updates.' if result == 'deleted'
+                     else 'The notice was already gone from #staff-updates.')
+        elif num in notices:
+            result = 'withheld'
+            words = 'The notice was not said yet, and now it never is.'
+        else:
+            result = 'unknown'
+            words = ('The bot has no notice from this issue to take back, so '
+                     'nothing was done.')
+        unsaid[key] = result
+        save(state)
+        out_back.append(num)
+        try:
+            comment(num, words)
+            if result == 'withheld':
+                close(num, 'not_planned')
+        except Exception as e:
+            log('notices: took back #%s (%s), and the comment or close failed: %s'
+                % (num, result, pass_failure(e)))
+
+    for num in sorted(notices):
+        key = str(num)
+        if key in unsaid:
+            continue
+        if key in said:
+            finish(num, said[key])
+            continue
+        sender, text, problems = notice_of(notices[num], now)
+        if problems:
+            sig = '\n'.join(problems)
+            if refused.get(key) != sig:
+                comment(num, 'The bot did not say this notice in #staff-updates:\n\n'
+                        + '\n'.join('- ' + p for p in problems)
+                        + '\n\nFix the issue and the bot tries again on its next pass.')
+                refused[key] = sig
+                save(state)
+                out_refused.append(num)
+            continue
+        if notices_this_hour(state, sender, now) >= NOTICE_PER_HOUR:
+            # Left open, in order: it goes when the hour has room.
+            break
+        msg = await send('[%s] %s' % (sender, text))
+        if msg is None:
+            # Left for the next pass, and the rest after it, so they stay in order.
+            break
+        said[key] = {'message': getattr(msg, 'id', None), 'at': int(now),
+                     'from': sender, 'told': False, 'closed': False}
+        refused.pop(key, None)
+        save(state)
+        out_said.append(num)
+        finish(num, said[key])
+
+    for key in [k for k, r in said.items()
+                if isinstance(r, dict) and r.get('closed') and now - (r.get('at') or 0) > NOTICE_KEEP]:
+        said.pop(key, None)
+        unsaid.pop(key, None)
+    return out_said, out_back, out_refused
+
+
+async def _notice_delete(message_id):
+    ch = client.get_channel(WATCH_ID) if WATCH_ID else None
+    if ch is None or not message_id:
+        return 'gone'
+    try:
+        await ch.get_partial_message(int(message_id)).delete()
+        return 'deleted'
+    except discord.NotFound:
+        return 'gone'
+
+
+async def watch_staff_notices():
+    await client.wait_until_ready()
+    if not github_token():
+        log('notices: no GitHub token (GITHUB_TOKEN_FILE or GITHUB_TOKEN), so '
+            'issues labelled "%s" are not said' % STAFF_NOTICE_LABEL)
+        return
+    state = _state_read(STAFF_NOTICES)
+    if state is None:
+        log('notices: %s will not read, so no notice is said until it is fixed '
+            'by hand (saying from empty could say one twice)' % STAFF_NOTICES)
+        return
+    loop = asyncio.get_running_loop()
+    cache = {}
+
+    def get(url):
+        return _github_get_cached(url, cache)
+
+    async def send(text):
+        _ok, msg = await watch_send(text)
+        return msg
+
+    def save(s):
+        _state_write(STAFF_NOTICES, s)
+
+    while not client.is_closed():
+        try:
+            notices = await loop.run_in_executor(
+                None, github_labelled, STAFF_NOTICE_LABEL, 'open', get)
+            take_backs = await loop.run_in_executor(
+                None, github_labelled, STAFF_TAKE_BACK_LABEL, 'all', get)
+            said, back, refused = await staff_notices_once(
+                state, notices, take_backs, send, _notice_delete,
+                github_say, github_close, save)
+            if said or back or refused:
+                log('notices: said %s, took back %s, refused %s'
+                    % (said or 'none', back or 'none', refused or 'none'))
+        except Exception as e:
+            log('notices: a pass failed: %s' % pass_failure(e))
+        await asyncio.sleep(NOTICE_EVERY)
+
+
+# ------------------------------------------------------ release news (#5187) --
+#
+# A release's news is posted when it is deployed, not when somebody remembers
+# to run a step after a Ship. The box's deploy agent, once it has set a
+# Deployment to success, leaves that Release's tag, name and notes in
+# NEWS_DIR as news-<environment>.json (tools\DeployAgent\News.cs), a folder
+# only SYSTEM, Administrators and this bot's account read. Each pass reads
+# them and posts each tag not said yet: a dev release (every merge, to Dev,
+# Site or Discord bot) in the dev updates channel, by the id in
+# dev-channel.txt, and a main release in #news, by the id in news-channel.txt
+# (by id and never by name: there are two channels called news). One post a
+# tag, however many environments it reached, written down in news-said.json.
+# A release whose notes say nothing people would notice (merge-release.yml's
+# NOTHING_TO_TELL line) and one deployed over a day ago are written down
+# without a post. With no news-said.json yet, what is there already is
+# written down unposted: a first start must not announce old releases again.
+NEWS_DIR = os.environ.get('THORNSWOOD_NEWS_DIR', r'C:\Thornswood-Deploys\for-bot')
+NEWS_SAID = os.path.join(DATA_DIR, 'news-said.json')
+NEWS_EVERY = max(30, _int_env('NEWS_EVERY', 60))
+NEWS_MAX_AGE = 24 * 3600
+NEWS_NOTHING = re.compile(r'^\s*nothing people would notice\b', re.I)
+NEWS_KEEP = 200
+
+
+def _channel_file_id(name):
+    """The channel id in name beside this file. 0 without."""
+    try:
+        with open(os.path.join(HERE, name)) as f:
+            return int(f.read().strip())
+    except Exception:
+        return 0
+
+
+DEV_NEWS_ID = _int_env('DEV_NEWS_CHANNEL_ID', _channel_file_id('dev-channel.txt'))
+MAIN_NEWS_ID = _int_env('NEWS_CHANNEL_ID', _channel_file_id('news-channel.txt'))
+
+
+def news_channel_of(env):
+    """Which news a deployed environment's release is: main for main, dev
+       for everything a merge deploys."""
+    return 'main' if str(env or '').lower() == 'main' else 'dev'
+
+
+def news_docs(folder=None):
+    """Every news-*.json in the folder as a dict, [] when there is no
+       folder, and None when it is there and cannot be read, so an unreadable
+       folder is never taken for no news. A file that does not read as news
+       is left out."""
+    folder = NEWS_DIR if folder is None else folder
+    try:
+        names = sorted(n for n in os.listdir(folder)
+                       if n.startswith('news-') and n.endswith('.json'))
+    except FileNotFoundError:
+        return []
+    except OSError:
+        return None
+    out = []
+    for n in names:
+        try:
+            with open(os.path.join(folder, n), encoding='utf-8-sig') as f:
+                doc = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if isinstance(doc, dict) and str(doc.get('tag') or '').strip():
+            out.append(doc)
+    return out
+
+
+def news_plan(docs, state, now):
+    """(channel, doc, how) for each release not written down yet, oldest
+       deployment first, each tag once. how is 'post', 'nothing' (its notes
+       say nothing people would notice) or 'old' (deployed over a day ago)."""
+    said = state.get('said') or {}
+    out, seen = [], set()
+    for doc in sorted(docs, key=lambda d: str(d.get('deployedUtc') or '')):
+        channel = news_channel_of(doc.get('environment'))
+        tag = str(doc.get('tag')).strip()
+        if tag in (said.get(channel) or {}) or (channel, tag) in seen:
+            continue
+        seen.add((channel, tag))
+        body = strip_footer(str(doc.get('body') or '')).strip()
+        at = _github_time(doc.get('deployedUtc'))
+        if not body or NEWS_NOTHING.match(body):
+            how = 'nothing'
+        elif at is not None and now - at > NEWS_MAX_AGE:
+            how = 'old'
+        else:
+            how = 'post'
+        out.append((channel, doc, how))
+    return out
+
+
+def news_post_parts(channel, doc):
+    """The embed's title, description, footer and colour, in
+       Publish-Discord.ps1's shape: the dev build's title says so, blue for
+       dev and gold for main."""
+    dev = channel == 'dev'
+    tag = str(doc.get('tag')).strip()
+    title = str(doc.get('name') or '').strip() or tag
+    if dev:
+        title = 'Dev build: ' + title
+    if len(title) > 250:
+        title = title[:247] + '...'
+    body = strip_footer(str(doc.get('body') or '')).strip()
+    if len(body) > 4000:
+        cut = body[:4000].rsplit('\n', 1)[0]
+        body = (cut if cut else body[:4000]).rstrip() + '\n...'
+    return {'title': title, 'description': body,
+            'footer': ('dev build ' if dev else '') + tag,
+            'color': 5477574 if dev else 13214795,
+            'author': 'Thornswood dev' if dev else 'Thornswood'}
+
+
+async def news_once(state, docs, send, save, now=None):
+    """
+    One pass. send(channel, parts) posts and gives the message or None.
+    state is news-said.json's dict, changed in place; save(state) after each
+    release written down. Returns the (channel, tag, how) done this pass. A
+    release that could not be posted is left for the next pass, and the ones
+    after it in that channel wait, so they stay in order.
+    """
+    now = time.time() if now is None else now
+    said = state.setdefault('said', {})
+    done, stuck = [], set()
+    for channel, doc, how in news_plan(docs, state, now):
+        if channel in stuck:
+            continue
+        tag = str(doc.get('tag')).strip()
+        rec = {'at': int(now), 'how': how}
+        if how == 'post':
+            msg = await send(channel, news_post_parts(channel, doc))
+            if msg is None:
+                stuck.add(channel)
+                continue
+            rec['message'] = getattr(msg, 'id', None)
+        mine = said.setdefault(channel, {})
+        mine[tag] = rec
+        for old in sorted(mine, key=lambda t: mine[t].get('at') or 0)[:-NEWS_KEEP]:
+            mine.pop(old, None)
+        save(state)
+        done.append((channel, tag, how))
+    return done
+
+
+async def _news_send(channel, parts, said_once):
+    cid = DEV_NEWS_ID if channel == 'dev' else MAIN_NEWS_ID
+    where = 'the dev updates channel' if channel == 'dev' else '#news'
+    ch = client.get_channel(cid) if cid else None
+    if ch is None:
+        if channel not in said_once:
+            log('news: %s is %s, so its releases wait unposted'
+                % (where, ('channel %d, which this bot cannot see' % cid) if cid else
+                   'named by no id (%s beside bot.py)'
+                   % ('dev-channel.txt' if channel == 'dev' else 'news-channel.txt')))
+            said_once.add(channel)
+        return None
+    logo = SITE + '/logo.png'
+    e = discord.Embed(title=parts['title'], url=SITE + '/news',
+                      description=parts['description'], color=parts['color'])
+    e.set_author(name=parts['author'], url=SITE, icon_url=logo)
+    e.set_thumbnail(url=logo)
+    e.set_footer(text=parts['footer'], icon_url=logo)
+    try:
+        msg = await ch.send(embed=e, allowed_mentions=discord.AllowedMentions.none())
+    except Exception as ex:
+        if channel not in said_once:
+            log('news: could not post in %s: %s' % (where, type(ex).__name__))
+            said_once.add(channel)
+        return None
+    said_once.discard(channel)
+    return msg
+
+
+async def watch_release_news():
+    await client.wait_until_ready()
+    loop = asyncio.get_running_loop()
+    state = _state_read(NEWS_SAID)
+    if state is None:
+        log('news: %s will not read, so no release news is posted until it is '
+            'fixed by hand (posting from empty would say old releases again)'
+            % NEWS_SAID)
+        return
+    said_once = set()
+    first = not os.path.exists(NEWS_SAID)
+    while not client.is_closed():
+        try:
+            docs = await loop.run_in_executor(None, news_docs)
+            if docs is None:
+                if 'folder' not in said_once:
+                    log('news: %s will not read, so no release news is posted'
+                        % NEWS_DIR)
+                    said_once.add('folder')
+            elif first:
+                # What was deployed before this bot kept a record is written
+                # down unposted, once.
+                for channel, doc, _how in news_plan(docs, state, time.time()):
+                    state.setdefault('said', {}).setdefault(channel, {})[
+                        str(doc.get('tag')).strip()] = {'at': int(time.time()), 'how': 'before'}
+                _state_write(NEWS_SAID, state)
+                first = False
+                log('news: started a record in %s; releases deployed from now are posted'
+                    % NEWS_SAID)
+            else:
+                said_once.discard('folder')
+                done = await news_once(
+                    state, docs, lambda c, p: _news_send(c, p, said_once),
+                    lambda s: _state_write(NEWS_SAID, s))
+                for channel, tag, how in done:
+                    log('news: %s %s (%s)' % (tag, 'posted' if how == 'post' else
+                                              'not posted: ' + how, channel))
+        except Exception as e:
+            log('news: a pass failed: %s' % type(e).__name__)
+        await asyncio.sleep(NEWS_EVERY)
 
 
 # ----------------------------------------------------- the staff channel --
@@ -7939,6 +8428,8 @@ async def on_ready():
         asyncio.create_task(watch_problems())
         asyncio.create_task(watch_moderation())
         asyncio.create_task(watch_known_issues())
+        asyncio.create_task(watch_staff_notices())
+        asyncio.create_task(watch_release_news())
         asyncio.create_task(watch_join_numbers())
         asyncio.create_task(watch_closed_tickets())
         asyncio.create_task(watch_lines())

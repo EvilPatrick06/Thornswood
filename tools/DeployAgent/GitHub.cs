@@ -31,6 +31,9 @@ public sealed class DeploymentStatus
 public sealed class Release
 {
     [JsonPropertyName("tag_name")] public string TagName { get; set; } = "";
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
+    [JsonPropertyName("body")] public string Body { get; set; } = "";
+    [JsonPropertyName("html_url")] public string HtmlUrl { get; set; } = "";
     [JsonPropertyName("draft")] public bool Draft { get; set; }
     [JsonPropertyName("assets")] public List<Asset> Assets { get; set; } = new();
     public Asset? Asset(string name) => Assets.FirstOrDefault(a => a.Name == name);

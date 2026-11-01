@@ -2,7 +2,8 @@
 # change build.yml and run  node scripts/dev/Build-PrWorkflow.js
 #
 # Every pull request runs the same checks as build.yml, on GitHub's hosted
-# windows-latest runner (#1306, #4983). No secrets, no live folders: every
+# windows-latest runner (#1306, #4983), and again on the merge queue's
+# merge of it onto the newest main (#5182). No secrets, no live folders: every
 # scratch path is under RUNNER_TEMP. The job keeps the name "Launcher builds",
 # and the gate runs beside it in shares, "Gate harnesses (n of 5)", after
 # the job "Pick the gate harnesses" says what each runs, and the harnesses
@@ -10,6 +11,8 @@
 name: Build check (pull requests)
 on:
   pull_request:
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 permissions:
   contents: read
@@ -54,9 +57,22 @@ jobs:
   # SHARES below, and nowhere else: at most that many, one for each harness
   # when the change reaches fewer, and none when it reaches none, and then
   # the job "gate" is skipped and starts no Windows runner (#5292).
+  #
+  # ON ARM64 (the plan's runner part, 1 Nov 2026). The pick, main's "tested"
+  # job and the pull request's "Build check result" only read files and ask
+  # GitHub, so they run on GitHub's arm64 Linux runner, free on a public
+  # repository like the x64 one, and leave the x64 Linux pool to CodeQL and
+  # the pull request body and test task checks. Every job of the
+  # organisation, either kind, counts toward the one limit of 20 at once
+  # (GitHub's Actions limits page), so this is held to what it measures. In
+  # the 60 pull request runs before it (31 Oct to 1 Nov 2026) the result job
+  # waited 2 s for a runner (median; 397 s at most, all in the #5250 hour)
+  # and ran 3 s, and the pick, in the 14 of them that had one, waited 2 s
+  # (median, 28 s at most) and ran 15 s. Its own pull request's runs say
+  # what arm64 changes.
   pick:
     name: Pick the gate harnesses
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     permissions:
       contents: read
@@ -93,6 +109,10 @@ jobs:
         id: reach
         shell: pwsh
         env:
+          # A pull request's base only. The merge queue's run (#5296) gets
+          # none, so it always builds the launcher and writes the note
+          # main's "tested" job reads; skipped there, main would build
+          # everything again after the merge.
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           ./scripts/dev/Launcher-Reach.ps1 -Base $env:BASE
@@ -186,8 +206,26 @@ jobs:
             Write-Host '::error::no node on this runner, so the .js gate harnesses were not run'
             exit 1
           }
-          .\scripts\dev\Run-Gate.ps1 -Shard $env:SHARD -Of $env:OF -Throttle 6 -BudgetSeconds 1200
+          # ONE REPORT (#5295): each share writes a test case for every check
+          # its harnesses printed, and the job "Gate report" merges the
+          # shares' into one and names the failing checks on the run's page.
+          .\scripts\dev\Run-Gate.ps1 -Shard $env:SHARD -Of $env:OF -Throttle 6 -BudgetSeconds 1200 -Report (Join-Path $env:RUNNER_TEMP 'gate-report\share.xml')
           exit $LASTEXITCODE
+
+      - name: Keep this share's report for the gate report
+        if: ${{ !cancelled() }}
+        # The share's verdict is its harnesses'. When this upload fails, the
+        # report job names this share as having left no report and is red,
+        # so the failure is said where the report is read.
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: gate-report-${{ matrix.shard }}
+          path: ${{ runner.temp }}/gate-report/share.xml
+          if-no-files-found: ignore
+          # Read by the report job of this run, minutes later, and by
+          # nothing after it.
+          retention-days: 1
 
   # THE LINUX SHARES (#5293). The gate harnesses the nightly map says need
   # nothing from Windows: each ran on both platforms the night the map was
@@ -229,9 +267,70 @@ jobs:
           GATE_PLAN: ${{ needs.pick.outputs.plan }}
         run: |
           # This share's part of the plan's Linux shares, as the Windows
-          # shares run theirs (the job above says how and why).
-          ./scripts/dev/Run-Gate.ps1 -Shard $env:SHARD -Of $env:OF -Platform Linux -Throttle 6 -BudgetSeconds 1200
+          # shares run theirs, report and all (the job above says how and why).
+          ./scripts/dev/Run-Gate.ps1 -Shard $env:SHARD -Of $env:OF -Platform Linux -Throttle 6 -BudgetSeconds 1200 -Report (Join-Path $env:RUNNER_TEMP 'gate-report/share.xml')
           exit $LASTEXITCODE
+
+      - name: Keep this share's report for the gate report
+        if: ${{ !cancelled() }}
+        # The share's verdict is its harnesses'. When this upload fails, the
+        # report job names this share as having left no report and is red,
+        # so the failure is said where the report is read.
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: gate-report-linux-${{ matrix.shard }}
+          path: ${{ runner.temp }}/gate-report/share.xml
+          if-no-files-found: ignore
+          # Read by the report job of this run, minutes later, and by
+          # nothing after it.
+          retention-days: 1
+
+
+  # The gate's checks in one report (#5295). Each share above keeps a JUnit
+  # file with a test case for every PASS, FAIL and SKIP line its harnesses
+  # printed (scripts\dev\Nightly-Harnesses.ps1 -Report); this merges them
+  # into one, kept with the run, and lists every failing check by harness
+  # on the run's page, so a red gate says which check failed without anybody
+  # opening a share's log. The Linux shares (#5293) keep theirs as
+  # gate-report-linux-<n>, which the same pattern reads. A share that left no report is named, and turns
+  # this red: its checks are missing from the report. Failing checks alone
+  # do not, since the share that ran them is red already.
+  report:
+    name: Gate report
+    needs: [pick, gate, gate-linux]
+    if: ${{ !cancelled() && (needs.gate.result != 'skipped' || needs['gate-linux'].result != 'skipped') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          sparse-checkout: scripts/dev/Merge-HarnessReports.ps1
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: gate-report-*
+          path: ${{ runner.temp }}/gate-reports
+      - name: Merge the shares' reports into one
+        shell: pwsh
+        env:
+          SHARES: ${{ needs.pick.outputs.shares }}
+          LINUX_SHARES: ${{ needs.pick.outputs.linux_shares }}
+        run: |
+          # One report from each share that ran, Windows and Linux.
+          $shares = @($env:SHARES | ConvertFrom-Json).Count + @($env:LINUX_SHARES | ConvertFrom-Json).Count
+          $in = Join-Path $env:RUNNER_TEMP 'gate-reports'
+          New-Item -ItemType Directory -Path $in -Force | Out-Null
+          .\scripts\dev\Merge-HarnessReports.ps1 -Path $in -Expect $shares -Out (Join-Path $env:RUNNER_TEMP 'gate-report.xml') -Title 'Gate harnesses'
+          exit $LASTEXITCODE
+      - name: Keep the merged report with the run
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: gate-report
+          path: ${{ runner.temp }}/gate-report.xml
+          if-no-files-found: ignore
+          retention-days: 14
 
   # THE TREE CHECKS (#5292). Every check of the whole tree that needs
   # nothing from Windows, on GitHub's ubuntu-latest, which starts sooner than
@@ -547,15 +646,16 @@ jobs:
         # PSScriptAnalyzer into RUNNER_TEMP on every job and linted every
         # file, 35 s a build on average. Lint.ps1 keeps each pinned tool in
         # the runner account's own folder, named by its version, and a pull
-        # request lints only the files it changed against its base; main
-        # and a manual run lint everything, and so does the nightly. The
+        # request lints only the files it changed against its base, and so
+        # does its run in the merge queue, against the queue's base (#5182);
+        # main and a manual run lint everything, and so does the nightly. The
         # last step of its job, because it fetches the base commit: no check
         # after it reads git history.
         continue-on-error: true
         timeout-minutes: 8
         shell: pwsh
         env:
-          BASE: ${{ github.event.pull_request.base.sha }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: |
           if ($env:BASE -match '^[0-9a-f]{40}$') {
             git fetch -q --depth=1 --no-tags origin $env:BASE
@@ -680,8 +780,10 @@ jobs:
       # October's whole allowance by 23 Oct 2026, and from then the note's
       # upload failed and took every pull request's build red. A log costs no
       # storage and is kept 90 days; scripts\dev\Tested-Tree.js reads it.
+      # In the merge queue (#5182) the checkout is the queue's own merge, the
+      # very commit that lands on main, so the note is written there too.
       - name: Write down the tree these checks passed on
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         shell: pwsh
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -698,6 +800,12 @@ jobs:
       # of Actions storage, which Patrick's billing page read at 1.8 GB. The
       # pdb was never kept either (#1356 / #462): it carries absolute
       # build-machine source paths.
+      # The gate's reports are the only artifacts of a build (#5295): each
+      # share's, kept a day for the job "Gate report" of the same run, and
+      # the merged one, kept 14 days. #3399's failures were a private
+      # repository's storage allowance; since 30 Oct 2026 this repository is
+      # public, where GitHub bills no Actions storage, and gate-map.yml has
+      # kept its map as an artifact here since.
 
   # The one check main's ruleset requires (#3683): passes only when the
   # build and every share of the gate above succeeded. Written by
@@ -706,7 +814,7 @@ jobs:
     name: Build check result
     needs: [pick, checks, launcher, gate, gate-linux]
     if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     steps:
       - name: The tree checks, the launcher build and the gate passed

@@ -88,4 +88,4 @@ jobs:
           }
           $throttle = 0
           if (-not [int]::TryParse($env:THROTTLE, [ref]$throttle)) { Write-Host ('::error::throttle is not a number: ' + $env:THROTTLE); exit 2 }
-          .\scripts\dev\Nightly-Harnesses.ps1 -Only $env:HARNESSES -Throttle $throttle -BudgetSeconds 2400
+          .\scripts\dev\Nightly-Harnesses.ps1 -Only $env:HARNESSES -Throttle $throttle -BudgetSeconds 2400 -Summary $env:GITHUB_STEP_SUMMARY

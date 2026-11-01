@@ -20,9 +20,10 @@
   goes on the board"):
     no order      an open issue with no Order. "Order is the do-order. A new
                   issue gets the Order of where it belongs." Every open issue
-                  carries one (Patrick, 27 Oct 2026, #3534): order-on-filing.yml
-                  gives a new issue 10000 plus its number, and the board
-                  review moves it to where it belongs in the queue.
+                  carries one (Patrick, 27 Oct 2026, #3534): board.yml gives a
+                  new issue 10000 plus its number (scripts/ops/Sync-Board.js),
+                  and the board review moves it to where it belongs in the
+                  queue with an order: label.
     shared order  two open cards with the same Order, so neither is first.
     no status     an open card with no Status. The options are Todo, In
                   Progress and Done.
@@ -31,9 +32,10 @@
                   is one it missed.
     statuses      the Status options are Todo, In Progress and Done, in that
                   order ("never add one through the API").
-    workflows     Auto-add to project on, so every issue gets a card;
-                  Auto-close issue off, since a Done issue still waits on its
-                  test (#3076).
+    workflows     Auto-close issue off, since a Done issue still waits on its
+                  test (#3076). Every issue gets its card from board.yml
+                  (#5185), so Auto-add to project is neither needed nor
+                  checked.
     no card       an open issue of the repository, made before the board was
                   read, with no card, when the open issues are read too
                   (-Issues, or gh; -NoIssues skips).
@@ -92,7 +94,7 @@ function Find-BoardDrift($board, [string]$repo, $open) {
         $out['statuses'].Add(('the Status options are {0}, not {1}' -f ($(if ($statuses.Count) { $statuses -join ', ' } else { 'none' })), ($StatusOptions -join ', ')))
     }
     $flows = @(Get-Prop $board 'workflows')
-    foreach ($want in @(@{ n = 'Auto-add to project'; on = $true }, @{ n = 'Auto-close issue'; on = $false })) {
+    foreach ($want in @(@{ n = 'Auto-close issue'; on = $false })) {
         $f = @($flows | Where-Object { (Get-Prop $_ 'name') -eq $want.n })
         if (-not $f.Count) { $out['workflows'].Add(('the board has no "{0}" workflow' -f $want.n)); continue }
         if ([bool](Get-Prop $f[0] 'enabled') -ne $want.on) { $out['workflows'].Add(('"{0}" is {1}, and should be {2}' -f $want.n, $(if ($want.on) { 'off' } else { 'on' }), $(if ($want.on) { 'on' } else { 'off' }))) }

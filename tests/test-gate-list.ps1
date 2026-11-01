@@ -165,7 +165,7 @@ Yes 'build.yml has a step that runs Run-Gate.ps1 (#3114)' ($null -ne $gate)
 if ($null -eq $gate) { Done }
 $g = Get-Named $gate
 Yes 'the gate step parses' ($g.Errors -eq 0)
-Yes 'it runs its share through Run-Gate.ps1 with a throttle and a budget and fails when that does' ($gate -match "(?m)^\.\\scripts\\dev\\Run-Gate\.ps1 -Shard \`$env:SHARD -Of \`$env:OF -Throttle [1-9]\d* -BudgetSeconds \d+\s*\r?\nexit \`$LASTEXITCODE\s*$")
+Yes 'it runs its share through Run-Gate.ps1 with a throttle and a budget, its checks into its report (#5295), and fails when that does' ($gate -match "(?m)^\.\\scripts\\dev\\Run-Gate\.ps1 -Shard \`$env:SHARD -Of \`$env:OF -Throttle [1-9]\d* -BudgetSeconds \d+ -Report \(Join-Path \`$env:RUNNER_TEMP 'gate-report\\share\.xml'\)\s*\r?\nexit \`$LASTEXITCODE\s*$")
 Yes 'the pick runs Run-Gate.ps1 -Pick before it and fails when that does (#5183)' ([IO.File]::ReadAllText($Workflow) -match "(?m)^          \./scripts/dev/Run-Gate\.ps1 -Pick \(\[int\]\`$env:SHARES\) -LinuxShares \(\[int\]\`$env:LINUX_SHARES\)\r?\n          exit \`$LASTEXITCODE\r?\n")
 Yes ('the step names no harness itself' + $(if ($g.Named.Count) { ' (' + ($g.Named -join ', ') + ')' } else { '' })) ($g.Named.Count -eq 0)
 

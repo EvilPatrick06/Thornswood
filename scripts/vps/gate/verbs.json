@@ -73,9 +73,10 @@
     "Deploy-Release": {
       "script": "scripts/deploy/Deploy-Release.ps1",
       "timeoutMinutes": 40,
-      "fixed": ["-NoPause", "-Environment", "dev"],
+      "fixed": ["-NoPause"],
       "params": {
-        "Tag": "^build-[A-Za-z0-9._-]{1,80}$"
+        "Tag": "^build-[A-Za-z0-9._-]{1,80}$",
+        "Environment": "^(dev|site|discord)$"
       }
     },
     "Install-DeployAgent": {
