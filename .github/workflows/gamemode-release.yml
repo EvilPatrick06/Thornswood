@@ -1,5 +1,5 @@
 # A signed gamemode Release and a Deployment to "Dev server" for every merge
-# that changes game/gamemode.js (#5180). The box deploy agent sees the
+# that changes game/gamemode.js or one of its tables (#5180, #5191). The box deploy agent sees the
 # Deployment within a minute, holds the Release to its signature and
 # manifest, reloads the dev server's gamemode with nobody dropped, and says
 # how it went on the Deployment. docs/DEPLOY-AGENT.md says how.
@@ -29,6 +29,14 @@
 # commit does not record. Before this, a pin waited for Publish-Server and
 # then Deploy-DevGamemode, by hand, in that order.
 #
+# THE TABLES (#5191). Every table a builder reads out of the load order is its
+# own file, game/gamemode-tables/<NAME>.json, which the gamemode reads where it
+# runs. The Release carries the folder as gamemode-tables.zip in its gamemode
+# part, each table at the top of the zip, held to the manifest like the rest.
+# The agent swaps the folder in before gamemode.js and holds the reload to the
+# folder's git tree id, which the gamemode logs as it loads. So a content
+# change, which changes tables and not gamemode.js, reaches dev the same way.
+#
 # HOW IT IS SIGNED. In the "release" environment, main only (#3930): the
 # manifest lists gamemode.js, thornswood-build.json, the bot's files, the
 # server zip and its record with their sha256, a
@@ -50,6 +58,7 @@ on:
     branches: [main]
     paths:
       - 'game/gamemode.js'
+      - 'game/gamemode-tables/**'
       - 'scripts/bot/Bot-Pass.js'
       - 'scripts/bot/bot.js'
       - 'scripts/bot/character.js'
@@ -111,12 +120,18 @@ jobs:
           $stamp = Join-Path $out 'thornswood-build.json'
           $s = Save-ThornswoodBuildStamp -Gamemode $gm -Channel dev -RepoDir . -Path $stamp
           Write-Host (Format-ThornswoodBuildStamp $s)
+          # The tables as the commit holds them, each at the top of the zip.
+          $tables = Join-Path $out 'gamemode-tables.zip'
+          $names = @(Get-ChildItem -LiteralPath 'game\gamemode-tables' -File -Filter '*.json' | Where-Object { $_.Name -cmatch '^[A-Z][A-Z0-9_]*\.json$' })
+          if (-not $names.Count) { Write-Host '::error::game/gamemode-tables holds no tables'; exit 1 }
+          Compress-Archive -LiteralPath $names.FullName -DestinationPath $tables
+          Write-Host ("gamemode-tables.zip: {0} tables, git tree {1}" -f $names.Count, (git rev-parse "$($env:GITHUB_SHA):game/gamemode-tables"))
           $tag = 'build-' + (Get-Date).ToUniversalTime().ToString('yyyyMMdd') + '.' + $env:GITHUB_RUN_NUMBER
           $rel = Join-Path $env:RUNNER_TEMP 'gamemode-release'
           # The bot pass the Deployment waits on (#5196) rides in the same
           # signed Release, so dev is checked by the bot of the same commit.
           $bot = @('Bot-Pass.js', 'bot.js', 'character.js') | ForEach-Object { Join-Path 'scripts\bot' $_ }
-          ./scripts/release/New-SignedManifest.ps1 -Out $rel -Tag $tag -Commit $env:GITHUB_SHA -Part gamemode -Files $gm, $stamp -BotFiles $bot -ServerZip $env:SERVER_ZIP
+          ./scripts/release/New-SignedManifest.ps1 -Out $rel -Tag $tag -Commit $env:GITHUB_SHA -Part gamemode -Files $gm, $stamp, $tables -BotFiles $bot -ServerZip $env:SERVER_ZIP
           if ($LASTEXITCODE -ne 0) { exit 1 }
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("tag=" + $tag)
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("dir=" + $rel)

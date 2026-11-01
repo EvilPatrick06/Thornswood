@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  80,
-    "callCount":  318,
+    "callCount":  320,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -154,6 +154,15 @@
                       "script":  "scripts/deploy/Deploy-DevGamemode.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "scp",
+                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh @($tableFiles | ForEach-Object { $_.FullName }) \"$User@${Vps}:$stageFar/gamemode-tables/\" }",
+                      "does":  "writes the gamemode's tables into a stage folder (#5191)",
+                      "class":  "stage",
+                      "reason":  "writes or checks a stage folder or file"
+                  },
+                  {
+                      "script":  "scripts/deploy/Deploy-DevGamemode.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "scp",
                       "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $send[$rel] \"$User@${Vps}:$stageFar/$rel\" }",
                       "does":  "writes or checks a stage folder",
                       "class":  "stage",
@@ -199,7 +208,7 @@
                       "script":  "scripts/deploy/Deploy-DevGamemode.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "$reloadOut = @(Remote ((ReloadVars $Root $Task $stageName $prevName $Wait $hashes $newBlob) + $reloadBlock) |",
+                      "anchor":  "$reloadOut = @(Remote ((ReloadVars $Root $Task $stageName $prevName $Wait $hashes $newBlob $newTree) + $reloadBlock) |",
                       "does":  "puts a gamemode-only stage in while the dev server runs and confirms the load from server.log, or puts the old one back (#3196)",
                       "class":  "swap",
                       "reason":  "reload block; replaces gamemode.js and the stamp in the server folder, stops nothing"
@@ -482,6 +491,15 @@
                       "does":  "removes old .stage folders",
                       "class":  "stage",
                       "reason":  "stage tidy"
+                  },
+                  {
+                      "script":  "scripts/deploy/Deploy-Server.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "scp",
+                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh @($tableSend.Values) \"$User@${Vps}:$stageFar/gamemode-tables/\" }",
+                      "does":  "writes the gamemode's tables into a stage folder (#5191)",
+                      "class":  "stage",
+                      "reason":  "writes or checks a stage folder or file"
                   },
                   {
                       "script":  "scripts/deploy/Deploy-Server.ps1",
