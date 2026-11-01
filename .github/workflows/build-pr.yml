@@ -54,9 +54,22 @@ jobs:
   # would run twice or not at all. With no map the pull request runs the
   # whole gate, split by place in the list. How many shares there are is
   # SHARES below, and nowhere else.
+  #
+  # ON ARM64 (the plan's runner part, 1 Nov 2026). The pick, main's "tested"
+  # job and the pull request's "Build check result" only read files and ask
+  # GitHub, so they run on GitHub's arm64 Linux runner, free on a public
+  # repository like the x64 one, and leave the x64 Linux pool to CodeQL and
+  # the pull request body and test task checks. Every job of the
+  # organisation, either kind, counts toward the one limit of 20 at once
+  # (GitHub's Actions limits page), so this is held to what it measures. In
+  # the 60 pull request runs before it (31 Oct to 1 Nov 2026) the result job
+  # waited 2 s for a runner (median; 397 s at most, all in the #5250 hour)
+  # and ran 3 s, and the pick, in the 14 of them that had one, waited 2 s
+  # (median, 28 s at most) and ran 15 s. Its own pull request's runs say
+  # what arm64 changes.
   pick:
     name: Pick the gate harnesses
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     permissions:
       contents: read
@@ -611,7 +624,7 @@ jobs:
     name: Build check result
     needs: [launcher, gate]
     if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     steps:
       - name: The launcher build and the gate passed

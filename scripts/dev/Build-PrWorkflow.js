@@ -93,7 +93,8 @@ function build(src) {
     this needs both: a matrix job's result is success only when every share
     succeeded.
 
-    It runs on GitHub's ubuntu-latest: it is a pull request's job, and a
+    It runs on GitHub's arm64 Linux runner, ubuntu-24.04-arm, as the pick
+    does (build.yml's pick says why): it is a pull request's job, and a
     fork's pull request brings its own copy of this file.
   */
   if (/\n  result:\n/.test(body)) { fail('build.yml already has a job named result'); }
@@ -106,7 +107,7 @@ function build(src) {
     '    name: Build check result',
     '    needs: [launcher, gate]',
     '    if: ${{ !cancelled() }}',
-    '    runs-on: ubuntu-latest',
+    '    runs-on: ubuntu-24.04-arm',
     '    timeout-minutes: 5',
     '    steps:',
     '      - name: The launcher build and the gate passed',
