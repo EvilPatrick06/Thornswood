@@ -527,7 +527,12 @@ exit $LASTEXITCODE
         return {
             param([string]$Url, [hashtable]$Headers, [string]$File)
             $asked.Add($Url + ' ' + [string]$Headers['Authorization'])
-            if ($Url -like 'https://reg.test/token?*') { [IO.File]::WriteAllText($File, '{"token":"anon"}'); return 200 }
+            # As ghcr.io: no anonymous token for a package it has no public
+            # copy of (#5184).
+            if ($Url -like 'https://reg.test/token?*') {
+                if ($Url -notlike "*scope=repository:$Ns/thornswood-engine:pull*") { [IO.File]::WriteAllText($File, '{"errors":[{"code":"DENIED"}]}'); return 403 }
+                [IO.File]::WriteAllText($File, '{"token":"anon"}'); return 200
+            }
             if ($Url -eq "https://reg.test/v2/$Ns/thornswood-engine/manifests/$commit") { if ($over.ContainsKey('gone')) { return 404 }; [IO.File]::WriteAllText($File, $mText); return 200 }
             if ($Url -eq "https://reg.test/v2/$Ns/thornswood-engine/blobs/sha256:$sum") { Copy-Item -LiteralPath $zipPath -Destination $File; return 200 }
             return 404
@@ -546,8 +551,13 @@ exit $LASTEXITCODE
     Remove-Item -LiteralPath $into -Recurse -Force
 
     $old = Get-EnginePackageBuild -Commit $commit -Registry 'https://reg.test' -Http (New-Registry -Ns 'evilpatrick06') -Look
-    Yes '7. a build from before the fork moved is found under evilpatrick06, asked after thornswoodrp (#5184)' ($old.State -eq 'found' -and $old.Artifact.name -eq "reg.test/evilpatrick06/thornswood-engine:$commit" -and
-        @($script:asked | Where-Object { $_ -match '/manifests/' })[0] -match '/v2/thornswoodrp/' -and @($script:asked | Where-Object { $_ -match '/manifests/' })[1] -match '/v2/evilpatrick06/')
+    Yes '7. a build from before the fork moved is found under evilpatrick06, asked after thornswoodrp, whose refused token is no package there (#5184)' ($old.State -eq 'found' -and $old.Artifact.name -eq "reg.test/evilpatrick06/thornswood-engine:$commit" -and
+        @($script:asked | Where-Object { $_ -like '*/token?*' })[0] -match 'repository:thornswoodrp/' -and @($script:asked | Where-Object { $_ -like '*/token?*' })[1] -match 'repository:evilpatrick06/' -and
+        @($script:asked | Where-Object { $_ -match '/manifests/' }).Count -eq 1 -and @($script:asked | Where-Object { $_ -match '/manifests/' })[0] -match '/v2/evilpatrick06/')
+    $none = Get-EnginePackageBuild -Commit $commit -Registry 'https://reg.test' -Http (New-Registry -Ns 'someone-else') -Look
+    Yes '7. a package neither owner lets anyone read: none, naming both refusals' ($none.State -eq 'none' -and $none.Why -match 'no package thornswoodrp/thornswood-engine that can be read without an account \(HTTP 403' -and $none.Why -match 'evilpatrick06/thornswood-engine')
+    $e = Threw { Get-EnginePackageBuild -Commit $commit -Registry 'https://reg.test' -Http { param($u, $h, $f) return 500 } -Look }
+    Yes '7. any other refusal of the token still throws' ($e -match 'gave no pull token for thornswoodrp/thornswood-engine \(HTTP 500\)')
     $g = Get-EnginePackageBuild -Commit $commit -Registry 'https://reg.test' -Http (New-Registry @{ gone = { param($m) } }) -Look
     Yes '7. no package (a pin from before fork #131): none, saying so' ($g.State -eq 'none' -and $g.Why -match 'keeps no package')
     $e = Threw { Get-EnginePackageBuild -Commit $commit -Registry 'https://reg.test' -Http (New-Registry @{ rev = { param($m) $m.annotations['org.opencontainers.image.revision'] = ('e' * 40) } }) -Look }
