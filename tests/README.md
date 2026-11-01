@@ -108,26 +108,28 @@ Windows it says SKIP for the part that needs Windows, with why, and checks
 the rest. A path it builds from a name written with `\` splits the name
 first (`path.join.apply(path, [dir].concat(rel.split('\\')))`), and a script
 that reads the game folder matches each folder and file in any case, as
-Windows does (`Check-SkyUIMenus.js` `looseFile`). The C# compiler is
-`tests\launcher-csc.js`, whose `onWindows` is asked before its `csc`; the
-bot's Python is `tests\bot-python.js` (#3005).
+Windows does (`Check-SkyUIMenus.js` `looseFile`). Launcher C# is built by
+`tests\launcher-csc.js` (`build`, `run`, `buildProject`), which works on any
+machine with the .NET SDK; the bot's Python is `tests\bot-python.js` (#3005).
 
 ## A harness that compiles launcher code
 
-A `.ps1` harness that compiles C# out of `launcher\app` or `installer\setup`
-dot-sources `tests\Launcher-Csc.ps1` and hands the source to
-`Add-LauncherType`, which compiles it the way the build does: the Roslyn csc
-beside MSBuild, the project's `LangVersion`, the .NET Framework 4.8.1
-reference assemblies. It returns the loaded assembly and throws with the
-compiler's words when the code does not compile. Off Windows that compiler is
-not there, so the harness says SKIP for the compiled part:
+A `.ps1` harness that compiles C# out of `launcher\app` dot-sources
+`tests\Launcher-Csc.ps1`, which builds it the way
+`launcher\app\Thornswood.csproj` does: the .NET 10 SDK, the project's target
+framework, `LangVersion` and packages (#4823). That works on Linux as well as
+on Windows, so the harness builds and runs the code everywhere, and says SKIP
+only for a part where the code under test itself does something only Windows
+has (a kernel32 call, an NTFS hard link). `Add-LauncherType` loads a library
+into this PowerShell, which runs on .NET 10 too; `Build-LauncherCode -Exe`
+with `Invoke-LauncherExe` runs a driver as a program; `-Launcher` builds the
+whole launcher beside it; `Add-LauncherAssembly` builds the project itself.
+The file's header has every switch. A build throws with the compiler's words
+when the code does not build:
 
 ```
 . (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')
-if (-not $OnWindows) {
-    Write-Host 'SKIP  Updater.IsNewer, compiled and run: its compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has'
-    Done
-}
+Yes ('the .NET SDK the launcher builds with is on this machine (' + $LauncherDotnet + ')') (Test-Path -LiteralPath $LauncherDotnet)
 $asm = Add-LauncherType -Source $configSrc, $stub
 $T = $asm.GetType('Thornswood.Updater')
 ```
