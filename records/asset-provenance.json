@@ -362,6 +362,20 @@
       "status": "ours"
     },
     {
+      "path": "launcher/launcher-header.webp",
+      "sha256": "96612371f57c4780be9f7aec444801361cef9280d76581f53052a81eb59e6088",
+      "what": "The moving header as an animated WebP, which the launcher decodes itself since it moved to Avalonia (#4823); the same frames as launcher/launcher-header.mp4.",
+      "published": "The launcher, through the update feed and the installer",
+      "source": "Made from launcher/launcher-header.mp4 for the Avalonia launcher (#4823)",
+      "creator": "As its source video",
+      "licence": "As its source video",
+      "attribution": "As its source video",
+      "approved": "As its source video",
+      "evidence": "launcher/README.md and THIRD-PARTY.md say it is made from launcher-header.mp4; launcher/app/Thornswood.csproj embeds it.",
+      "status": "derived",
+      "from": "launcher/launcher-header.mp4"
+    },
+    {
       "path": "launcher/app.ico",
       "sha256": "be99a5cd8ef3c1d025702ac3fb9a73824928f3320b8b0d75bd2e428d50526e60",
       "what": "The launcher's icon, the badge at every size: Thornswood at 128 and 256, TW at 32 to 64, the crest and scene alone at 16 and 24 (Djinn, 27 Oct, #3319; tests\\test-launcher-icons.js).",
