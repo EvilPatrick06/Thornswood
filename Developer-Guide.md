@@ -797,7 +797,7 @@ git switch main
 git pull
 ```
 
-Auto-merge is on for the repository (#5182, Patrick's A on 31 Oct). Turn it on for your pull request as soon as it is open and you are confident in the change: GitHub squash-merges it by itself the moment `Build check result` is green, and main's ruleset refuses a merge past red for everybody. On the website the button is **Enable auto-merge**. A merge gets no line in #staff-updates, and neither does the release that carries it. GitHub deletes the branch after a squash merge. Turn auto-merge on only for a pull request you understand. Leave one you do not.
+Auto-merge is on for the repository (#5182, Patrick's A on 31 Oct). Turn it on for your pull request as soon as it is open and you are confident in the change: the moment `Build check result` is green, GitHub puts it in the merge queue (#5296), and main's ruleset refuses a merge past red for everybody. The queue runs the build and the test task check again on its merge of your pull request onto the newest main, with the whole gate, and squash-merges it when they pass; main's own build then finds that run and builds nothing again. A pull request that fails there leaves the queue: fix it on the same branch and push, and auto-merge puts it back. `gh pr merge` cannot delete the branch while the queue is on, and does not need to: GitHub deletes it after the merge. On the website the button is **Enable auto-merge**. A merge gets no line in #staff-updates, and neither does the release that carries it. GitHub deletes the branch after a squash merge. Turn auto-merge on only for a pull request you understand. Leave one you do not.
 
 What you run after the merge depends on what the pull request touched. A dev release is [section 3](#3-how-to-release-to-dev). A main release is [section 4](#4-how-to-release-to-main).
 
@@ -1436,8 +1436,10 @@ The short form of the rules. The same decisions, with the dates they were made, 
   admin account too, whatever `enforce_admins` says, so GitHub refuses a
   merge past red for everybody. And since 31 Oct auto-merge is on (#5182,
   Patrick's A): turn it on when the pull request opens, with
-  `gh pr merge --auto --squash`, and GitHub squash-merges it the moment
-  `Build check result` is green, so nobody waits to press merge. Turning it on
+  `gh pr merge --auto --squash`, and GitHub puts it in the merge queue the
+  moment `Build check result` is green, so nobody waits to press merge. The
+  queue (#5296, the redesign's part 5) checks it once more on the newest
+  main, with the whole gate, and squash-merges it. Turning it on
   is the moment you say you are confident in the change. The last classic
   setting, "require branches to be up to date" with no check listed, was
   removed on 27 Sep at Patrick's word ("we use the VPS's build checker").
