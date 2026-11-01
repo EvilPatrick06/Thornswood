@@ -28,7 +28,7 @@ public sealed class WindowsAppControl : IAppControl
         try
         {
             var said = Ps("if (Get-ScheduledTask -TaskName $env:TW_TASK -ErrorAction SilentlyContinue) { 'yes' } else { 'no' }", new() { ["TW_TASK"] = e.Task });
-            if (said != "yes") return $"the task {e.Task} is not on this box; Deploy-Docs.ps1 sets the site up once, and the agent swaps its app after that";
+            if (said != "yes") return $"the task {e.Task} is not on this box; " + (e.Kind == AppKinds.Voice ? "Install-Voice.ps1 sets voice up once" : "Deploy-Docs.ps1 sets the site up once") + ", and the agent swaps its files after that";
         }
         catch (ControlException x) { return $"the task {e.Task} could not be looked up: {x.Message}"; }
         return "";

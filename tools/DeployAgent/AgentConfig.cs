@@ -85,6 +85,22 @@ public sealed class Config
         WaitSeconds = 90,
     };
 
+    /// <summary>Dev voice (#5187): the task Install-Voice.ps1 registers for
+    /// C:\Thornswood-Voice-Dev, answering on loopback port 7789 behind
+    /// Caddy's /voice-dev. It goes in with dev's Deployment when the Release
+    /// carries a voice part.</summary>
+    public static EnvConfig DefaultDevVoice() => new()
+    {
+        Kind = AppKinds.Voice,
+        Root = @"C:\Thornswood-Voice-Dev",
+        Store = @"C:\Thornswood-Deploys",
+        Task = "Thornswood Dev Voice",
+        Health = "http://127.0.0.1:7789/health",
+        Watch = @"C:\Thornswood-Watch",
+        // Install-Voice.ps1's -Wait.
+        WaitSeconds = 30,
+    };
+
     /// <summary>The environment a name in agent.json starts from.</summary>
     public static EnvConfig DefaultFor(string name) => name switch
     {
@@ -155,6 +171,12 @@ public sealed class Config
                 continue;
             }
             if (e.Health == "") throw new ConfigException($"environment {name}: no health address");
+            if (e.Voice is { } v)
+            {
+                if (v.Root == "" || !(Path.IsPathRooted(v.Root) || v.Root.Contains(@":\"))) throw new ConfigException($"environment {name}: voice root \"{v.Root}\" is not a full path");
+                if (v.Task == "" || !Uri.TryCreate(v.Health, UriKind.Absolute, out _)) throw new ConfigException($"environment {name}: voice needs its task and its health address");
+                if (v.WaitSeconds < 10) throw new ConfigException($"environment {name}: voice waitSeconds must be 10 or more");
+            }
             if (e.LoadSeconds < 10 || e.TurnSeconds < 10 || e.StartSeconds < 10) throw new ConfigException($"environment {name}: loadSeconds, turnSeconds and startSeconds must be 10 or more");
             if (e.BotPassRoot != "")
             {
@@ -176,6 +198,9 @@ public sealed class EnvConfig
     /// the Discord bot ("discord"). Set by the environment's name; agent.json
     /// does not change it.</summary>
     public string Kind { get; set; } = ServerKind;
+    /// <summary>A server's voice service, which goes in with its Deployments
+    /// (#5187). null when agent.json names none for it.</summary>
+    public EnvConfig? Voice { get; set; }
     /// <summary>The Windows service an app runs as (the bot's ThornswoodBot).</summary>
     public string Service { get; set; } = "";
     /// <summary>How long a started app has to answer before its old files go back.</summary>
@@ -247,6 +272,13 @@ public sealed class EnvConfig
         Service = S("service", Service);
         WaitSeconds = I("waitSeconds", WaitSeconds);
         LogDir = S("logDir", LogDir);
+        if (e.TryGetProperty("voice", out var vo) && vo.ValueKind == JsonValueKind.Object)
+        {
+            var v = (Voice ?? Config.DefaultDevVoice()).Overlay(vo);
+            v.Store = Store;
+            v.Watch = Watch;
+            Voice = v;
+        }
         return this;
     }
 }

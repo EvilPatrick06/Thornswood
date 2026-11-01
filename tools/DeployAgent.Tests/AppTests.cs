@@ -12,10 +12,13 @@ namespace Thornswood.DeployAgent.Tests;
 /// answers its front page while it runs, with 500 when its server.js says
 /// BROKEN. The bot writes to its log as it starts: "watching 1 server", or
 /// "stopped within" when its bot.py says BROKEN, or nothing when it says
-/// SILENT.</summary>
+/// SILENT. Voice answers /health at voice.test with the build its
+/// voice-server.js named when it was started, and a voice-server.js that
+/// says DEAD never starts, so the copy before it goes on answering.</summary>
 sealed class FakeAppControl(string root) : IAppControl
 {
     public bool Up = true;
+    public string RunningBuild = "";
     public int Stops, Starts, Libs;
     public string Missing = "";
     public string LibsSay = "";
@@ -35,6 +38,12 @@ sealed class FakeAppControl(string root) : IAppControl
     {
         Starts++;
         Up = true;
+        if (e.Kind == AppKinds.Voice)
+        {
+            var vs = Path.Combine(root, "voice-server.js");
+            if (!File.ReadAllText(vs).Contains("DEAD")) RunningBuild = App.BuildOf(vs);
+            return;
+        }
         if (e.Kind != AppKinds.Discord) return;
         var bot = File.ReadAllText(Path.Combine(root, "bot.py"));
         if (bot.Contains("SILENT")) return;
@@ -61,6 +70,8 @@ sealed class FakeAppControl(string root) : IAppControl
     public HttpResponseMessage Health(HttpRequestMessage r)
     {
         if (!Up) throw new HttpRequestException("connection refused");
+        if (r.RequestUri!.Host == "voice.test")
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(new { ok = true, build = RunningBuild })) };
         var broken = File.ReadAllText(Path.Combine(root, "server.js")).Contains("BROKEN");
         return new HttpResponseMessage(broken ? HttpStatusCode.InternalServerError : HttpStatusCode.OK);
     }
@@ -509,6 +520,18 @@ public sealed class AppTests : IDisposable
     // ---- the config --------------------------------------------------------
 
     [Fact]
+    public void ConfigReadsDevsVoiceOnlyWhereItIsNamed()
+    {
+        var p = Path.Combine(Temp(), "agent.json");
+        File.WriteAllText(p, "{\"repo\":\"O/R\",\"environments\":{\"dev\":{\"store\":\"D:\\\\Deploys\"}}}");
+        Assert.Null(Config.Load(p).Environments["dev"].Voice);
+        File.WriteAllText(p, "{\"repo\":\"O/R\",\"environments\":{\"dev\":{\"store\":\"D:\\\\Deploys\",\"voice\":{\"waitSeconds\":45}}}}");
+        var v = Config.Load(p).Environments["dev"].Voice!;
+        Assert.Equal((AppKinds.Voice, @"C:\Thornswood-Voice-Dev", "Thornswood Dev Voice", "http://127.0.0.1:7789/health", 45, @"D:\Deploys"),
+            (v.Kind, v.Root, v.Task, v.Health, v.WaitSeconds, v.Store));
+    }
+
+    [Fact]
     public void ConfigReadsTheSiteAndTheBot()
     {
         var p = Path.Combine(Temp(), "agent.json");
@@ -526,6 +549,8 @@ public sealed class AppTests : IDisposable
             "{\"repo\":\"O/R\",\"environments\":{\"discord\":{\"service\":\"\"}}}",
             "{\"repo\":\"O/R\",\"environments\":{\"discord\":{\"waitSeconds\":1}}}",
             "{\"repo\":\"O/R\",\"environments\":{\"site\":{\"logDir\":\"logs\"}}}",
+            "{\"repo\":\"O/R\",\"environments\":{\"dev\":{\"voice\":{\"root\":\"voice\"}}}}",
+            "{\"repo\":\"O/R\",\"environments\":{\"dev\":{\"voice\":{\"task\":\"\"}}}}",
         })
         {
             File.WriteAllText(p, bad);

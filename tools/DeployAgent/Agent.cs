@@ -22,6 +22,9 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
     /// <summary>The apps beside the servers the agent looks after, by the
     /// environment's name: the site and the Discord bot (#5190, #5187).</summary>
     public Dictionary<string, App> Apps { get; set; } = new();
+    /// <summary>Each server's voice service, by the server's environment
+    /// (#5187): a Release's voice part goes in with that server's Deployment.</summary>
+    public Dictionary<string, App> Voices { get; set; } = new();
     string StatePath => Path.Combine(cfg.Home, "state", "working.json");
     static readonly Regex BuildTag = new(@"^build-[A-Za-z0-9._-]{1,80}$");
     static readonly Regex AgentTag = new(@"^agent-v(\d+)\.(\d+)\.(\d+)$");
@@ -54,7 +57,7 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
             string[] parts = pass ? ["gamemode", "bot"] : ["gamemode"];
             // The server build's zip is fetched only when dev does not run it
             // already: most Releases change the gamemode alone.
-            try { f = await ReleaseFetch.Fetch(gh, verify, rel, dir, parts, logf, ct, optional: ["server"], later: IsServerZip); }
+            try { f = await ReleaseFetch.Fetch(gh, verify, rel, dir, parts, logf, ct, optional: Voices.ContainsKey(env) ? ["server", AppKinds.Voice] : ["server"], later: IsServerZip); }
             catch (Exception e) when (e is InvalidDataException or IOException or HttpRequestException) { return new Outcome("failure", "not applied: " + e.Message); }
             var m = f.Manifest;
             // The name, not the owner: the repositories move to an
@@ -64,7 +67,7 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
                 return new Outcome("failure", $"not applied: the Release was built from {m.Repo}, not {cfg.Repo}");
             if (expectCommit != "" && m.Commit != expectCommit)
                 return new Outcome("failure", $"not applied: the Release is commit {Short(m.Commit)} and the Deployment is {Short(expectCommit)}");
-            var others = m.Parts.Keys.Where(k => !parts.Contains(k) && k != "server").OrderBy(k => k, StringComparer.Ordinal).ToList();
+            var others = m.Parts.Keys.Where(k => !parts.Contains(k) && k != "server" && !(k == AppKinds.Voice && Voices.ContainsKey(env))).OrderBy(k => k, StringComparer.Ordinal).ToList();
             if (others.Count > 0) logf($"the Release also carries {string.Join(", ", others)}, which this agent does not apply yet; left alone");
             logf($"release {rel.TagName}, commit {m.Commit}");
             var who = $"the deploy agent, {workName}";
@@ -111,10 +114,24 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
             {
                 logf("no bot pass: it is not set up on this box yet (Install-DeployAgent.ps1 sets it up)");
             }
+            // Voice goes in before the gamemode that pushes positions to it,
+            // after the bot pass, so a voice that does not answer leaves the
+            // server as it was.
+            var voiceIn = "";
+            if (m.Parts.TryGetValue(AppKinds.Voice, out var voicePart) && Voices.TryGetValue(env, out var voice))
+            {
+                var vzip = AppKinds.ZipName(AppKinds.Voice);
+                if (voicePart.Count != 1 || voicePart[0].Name != vzip || !f.Files.TryGetValue(vzip, out var vpath))
+                    return new Outcome("failure", $"not applied: the Release's voice part is not the one file {vzip}");
+                logf($"voice first, into {voice.Env.Root}");
+                var vo = await voice.Apply(vpath, rel.TagName, m.Commit, $"deploy agent {version} on {Host}", logf, ct);
+                if (vo.State != "success") return vo with { Summary = "voice: " + vo.Summary + "; the gamemode was not touched" };
+                voiceIn = "; voice runs it too";
+            }
             var outc = swapZip != null && swapRecord != null
                 ? await srv.ApplyServerBuild(swapZip, swapRecord, f.Files, who, logf, ct)
                 : await srv.ApplyGamemode(f.Files, who, logf, ct);
-            if (outc.State != "success") return outc;
+            if (outc.State != "success") return voiceIn == "" ? outc : outc with { Summary = outc.Summary + $"; voice already runs {rel.TagName}" };
             var gm = Path.Combine(srv.Env.Root, "gamemode.js");
             Records.Write(srv, new DeployRecord
             {
@@ -127,7 +144,7 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
                 DeployedUtc = Records.UtcNow(),
                 From = $"deploy agent {version} on {Host}",
             }, logf);
-            return outc with { Summary = rel.TagName + ": " + outc.Summary };
+            return outc with { Summary = rel.TagName + ": " + outc.Summary + voiceIn };
         }
         finally
         {
@@ -460,6 +477,12 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
             var sick = await servers[env].Unhealthy(ct);
             if (sick != "") { log($"{env}: {sick}"); ok = false; }
             else log($"{env}: {e.Health} answers 200");
+            if (Voices.TryGetValue(env, out var voice))
+            {
+                var hush = await voice.Unhealthy(ct);
+                if (hush != "") { log($"{env} voice: {hush}"); ok = false; }
+                else log($"{env} voice: {voice.Env.Health} answers with the build in {voice.Env.Root}");
+            }
         }
         return ok;
     }

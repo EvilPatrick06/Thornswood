@@ -62,7 +62,9 @@
   the logs in the dev server's data folder. Where the bot is, it also makes
   C:\Thornswood-Deploys\for-bot, which only SYSTEM, Administrators and the
   bot's account read, for the release news the agent leaves after each
-  Deployment and the bot posts.
+  Deployment and the bot posts. Where dev voice is set up (the task
+  Thornswood Dev Voice, Install-Voice.ps1), a Release's voice goes in with
+  dev's Deployment, before the gamemode that pushes positions to it.
 
   WHAT IT CANNOT DO YET. Until the box admin App holds Deployments: Read and
   write (its permissions page, then Accept on its installation, an owner's
@@ -298,6 +300,14 @@ foreach (`$app in @(
   `$cfg.environments | Add-Member -NotePropertyName `$app.name -NotePropertyValue `$e -Force
   'apps: ' + `$app.name + ' named; the agent applies its Deployments'
 }
+
+# Dev voice (#5187): a Release's voice part goes in with dev's Deployment,
+# into the folder Install-Voice.ps1 set up, under its task.
+`$cfg.environments.dev.PSObject.Properties.Remove('voice')
+if (Get-ScheduledTask -TaskName 'Thornswood Dev Voice' -ErrorAction SilentlyContinue) {
+  `$cfg.environments.dev | Add-Member -NotePropertyName voice -NotePropertyValue (New-Object PSObject) -Force
+  'voice: dev voice named; a Release''s voice goes in with dev''s Deployment'
+} else { 'voice: dev voice left out, its task Thornswood Dev Voice is not on this box' }
 
 # The release news (#5187): after a Deployment goes in, the agent leaves its
 # Release's notes in for-bot for the bot to post (tools\DeployAgent\News.cs).

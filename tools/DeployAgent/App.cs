@@ -16,13 +16,17 @@ public static class AppKinds
 {
     public const string Site = "site";
     public const string Discord = "discord";
+    /// <summary>The voice service, which has no Deployment of its own: the
+    /// gamemode pushes positions to it, so it goes in with dev's (and later
+    /// main's), from the same Release.</summary>
+    public const string Voice = "voice";
 
     /// <summary>The Release part that carries the kind's zip, and its file name.</summary>
     public static string Part(string kind) => kind;
     public static string ZipName(string kind) => kind + ".zip";
 
     /// <summary>Whether the agent knows how to put this kind in.</summary>
-    public static bool Known(string kind) => kind is Site or Discord;
+    public static bool Known(string kind) => kind is Site or Discord or Voice;
 }
 
 /// <summary>Stopping, starting and checking an app, the ways Swap.ps1's
@@ -99,13 +103,60 @@ public sealed class App(EnvConfig env, HttpClient http, IAppControl control)
     /// carry goes aside (Swap.ps1's $Gone, #2572).</summary>
     static readonly string[] SiteHeld = ["public", "data/site"];
 
+    /// <summary>What a Release carries for voice, the files Install-Voice.ps1
+    /// sends: its program, the headlines it reads, and the log writer its
+    /// task runs it under. Its keys, logs and chat records are never touched.</summary>
+    static readonly string[] VoiceFiles = ["voice-server.js", "headlines.js", "server-log.js"];
+
     /// <summary>Says once whether the app answers, for the agent's check.</summary>
     public async Task<string> Unhealthy(CancellationToken ct)
     {
         var why = control.NotInstalled(env);
         if (why != "") return why;
         if (env.Kind == AppKinds.Discord) return control.Running(env) ? "" : $"the service {env.Service} is not running";
+        if (env.Kind == AppKinds.Voice) return await VoiceUnhealthy(ct);
         return await HttpUnhealthy(ct);
+    }
+
+    static readonly Regex VoiceBuild = new(@"const\s+BUILD\s*=\s*'([^']+)'");
+
+    /// <summary>The build voice-server.js in the folder names (its const
+    /// BUILD), or "" when it names none.</summary>
+    public static string BuildOf(string file)
+    {
+        try { var m = VoiceBuild.Match(File.ReadAllText(file)); return m.Success ? m.Groups[1].Value : ""; }
+        catch (IOException) { return ""; }
+    }
+
+    /// <summary>Voice answers only when /health, asked on the box, says the
+    /// build of the voice-server.js in its folder: an old process still on
+    /// the port answers too, so "it answers" alone proves nothing
+    /// (Install-Voice.ps1, #2711). After a swap that is the new file; after a
+    /// put back, the old one.</summary>
+    async Task<string> VoiceUnhealthy(CancellationToken ct)
+    {
+        var want = BuildOf(Path.Combine(Root, "voice-server.js"));
+        if (want == "") return $"{Path.Combine(Root, "voice-server.js")} names no const BUILD to check the service by";
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            using var res = await http.GetAsync(env.Health, cts.Token);
+            if ((int)res.StatusCode != 200) return $"{env.Health} answered HTTP {(int)res.StatusCode}";
+            var got = "";
+            try
+            {
+                using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync(cts.Token));
+                if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("build", out var b) && b.ValueKind == JsonValueKind.String) got = b.GetString()!;
+            }
+            catch (JsonException) { return $"{env.Health} did not answer JSON"; }
+            if (got == want) return "";
+            return got == "" ? $"{env.Health} names no build" : $"{env.Health} says build {Trim(got)}, not the {Trim(want)} in the folder, so it is another copy";
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+        {
+            return $"{env.Health} did not answer: {e.Message}";
+        }
     }
 
     async Task<string> HttpUnhealthy(CancellationToken ct)
@@ -282,13 +333,18 @@ public sealed class App(EnvConfig env, HttpClient http, IAppControl control)
             }
             else log($"what it replaced is still in {prevName} and what it could not take out is in {stageName}");
             if (clean && back == "") return new Outcome("failure", Trim(why) + $"; the previous {Name} is back and answering");
-            var fix = env.Kind == AppKinds.Discord ? "Install-Bot.ps1 -PutBack" : "Deploy-Docs.ps1 -PutBack";
+            var fix = env.Kind switch
+            {
+                AppKinds.Discord => "Install-Bot.ps1 -PutBack",
+                AppKinds.Voice => $"Install-Voice.ps1 -Root {Root} -TaskName '{env.Task}' -PutBack",
+                _ => "Deploy-Docs.ps1 -PutBack",
+            };
             return new Outcome("error", Trim(why) + $"; putting the old one back did not take either, so the {Name} needs {fix}", Prev: prevName);
         }
         finally { Hold.Clear(env.Watch, hold, log); }
     }
 
-    string Name => env.Kind == AppKinds.Discord ? "Discord bot" : env.Kind;
+    string Name => env.Kind switch { AppKinds.Discord => "Discord bot", AppKinds.Voice => "voice service", _ => env.Kind };
 
     static bool IsProgram(string rel) => rel.EndsWith(".js", StringComparison.OrdinalIgnoreCase) || rel.EndsWith(".py", StringComparison.OrdinalIgnoreCase);
 
@@ -319,7 +375,7 @@ public sealed class App(EnvConfig env, HttpClient http, IAppControl control)
         var last = "";
         while (true)
         {
-            last = await HttpUnhealthy(ct);
+            last = env.Kind == AppKinds.Voice ? await VoiceUnhealthy(ct) : await HttpUnhealthy(ct);
             if (last == "") { log($"health: {env.Health} answers"); return ""; }
             if (Now() > until) return $"it did not answer within {env.WaitSeconds} seconds ({last})";
             await Task.Delay(Tick, ct);
@@ -439,6 +495,7 @@ public sealed class App(EnvConfig env, HttpClient http, IAppControl control)
             if (BotOwned.Any(o => Like(top, o))) return false;
             return rel.Count(c => c == '/') == 0 || (top == "assets" && rel.Count(c => c == '/') == 1);
         }
+        if (env.Kind == AppKinds.Voice) return VoiceFiles.Contains(rel);
         return false;
     }
 

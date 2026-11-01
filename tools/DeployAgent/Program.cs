@@ -69,7 +69,8 @@ public static class Program
         var servers = cfg.Environments.Where(kv => kv.Value.Kind == EnvConfig.ServerKind).ToDictionary(kv => kv.Key, kv => new Server(kv.Value, http));
         var control = new WindowsAppControl();
         var apps = cfg.Environments.Where(kv => kv.Value.Kind != EnvConfig.ServerKind).ToDictionary(kv => kv.Key, kv => new App(kv.Value, http, control));
-        var agent = new Agent(cfg, gh, new WindowsVerifier(WindowsVerifier.BuiltInSigner), servers, Version, exe, Log) { Apps = apps };
+        var voices = cfg.Environments.Where(kv => kv.Value.Kind == EnvConfig.ServerKind && kv.Value.Voice != null).ToDictionary(kv => kv.Key, kv => new App(kv.Value.Voice!, http, control));
+        var agent = new Agent(cfg, gh, new WindowsVerifier(WindowsVerifier.BuiltInSigner), servers, Version, exe, Log) { Apps = apps, Voices = voices };
 
         switch (verb)
         {
