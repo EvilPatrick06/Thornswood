@@ -70,6 +70,23 @@
         "Wait": "^[0-9]{1,4}$"
       }
     },
+    "Deploy-Release": {
+      "script": "scripts/deploy/Deploy-Release.ps1",
+      "timeoutMinutes": 40,
+      "fixed": ["-NoPause", "-Environment", "dev"],
+      "params": {
+        "Tag": "^build-[A-Za-z0-9._-]{1,80}$"
+      }
+    },
+    "Install-DeployAgent": {
+      "script": "scripts/deploy/Install-DeployAgent.ps1",
+      "timeoutMinutes": 15,
+      "fixed": ["-NoPause"],
+      "params": {
+        "Status": "switch",
+        "Tag": "^agent-v[0-9]{1,4}\\.[0-9]{1,4}\\.[0-9]{1,6}$"
+      }
+    },
     "Install-Voice": {
       "script": "scripts/deploy/Install-Voice.ps1",
       "timeoutMinutes": 30,
