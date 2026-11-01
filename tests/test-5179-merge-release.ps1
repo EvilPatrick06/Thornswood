@@ -11,22 +11,27 @@
       run number; the print of each part, leaving out the gamemode's stamp,
       the server zip and the game files' list, which differ on every merge;
       the parts that changed since the Release before (all of them when there
-      is none, never velopack); and the Release before read from a planted
-      list: drafts and other tags skipped, a manifest that names another tag
-      refused.
+      is none, never velopack or main, the two Velopack packages); and the
+      Release before read from a planted list: drafts and other tags skipped,
+      a manifest that names another tag refused.
     - New-SignedManifest.ps1 -Add and -LauncherVersion: the parts it may add,
       each a list, refused for an unknown part, a missing file, two files of
-      one name in a part, an agent Release, or a launcher number with no
-      launcher.
+      one name in a part or across parts, an agent Release, or a launcher
+      number with no launcher; the part main listed in the manifest and held
+      in held\, never in the Release's assets (#5181).
     - Build-GameFiles.ps1 -SkipStage: game.zip and game-files.json, the same
       bytes when built twice and when the files' times differ, sorted by
-      path, every *.pdb left out.
+      path, every *.pdb left out; and its gone list (#4825) from the record
+      staged and the Release before's list, a path it ships never gone.
     - merge-release.yml: what starts it, signing and the draft in the release
-      environment, the notes before anything is built, Velopack on the one
-      dev channel with no installer, the attestation on every file, the
-      site, the Discord bot and voice zipped as parts (#5190, #5187), and the
-      Deployments: Dev when a part dev runs changed, Site and Discord bot when
-      theirs did. No other workflow makes one.
+      environment, the notes before anything is built, the launcher built
+      with the package's version, the game files built against the Release
+      before's list, the setup files and a Velopack package for each of dev
+      and main, dev's published with its installer and main's held as an
+      attested artifact for the approval (#5181), the attestation on every
+      file, the site, the Discord bot and voice zipped as parts (#5190,
+      #5187), and the Deployments: Dev when a part dev runs changed, Site and
+      Discord bot when theirs did. No other workflow makes one.
 
   Writes only under its own folder in TEMP, which it removes. Exit 1 when
   any check fails.
@@ -76,6 +81,7 @@ try {
         launcher = @((F 'Thornswood.exe' 'ee'))
         game     = @((F 'game.zip' 'g1'), (F 'game-files.json' 'l1'))
         velopack = @((F 'releases.dev.json' 'v1'))
+        main     = @((F 'releases.main.json' 'w1'))
     }
     $same = [ordered]@{
         gamemode = @((F 'thornswood-build.json' 's2'), (F 'gamemode.js' 'AA'))
@@ -84,13 +90,14 @@ try {
         launcher = @((F 'Thornswood.exe' 'ee'))
         game     = @((F 'game.zip' 'g1'), (F 'game-files.json' 'l2'))
         velopack = @((F 'releases.dev.json' 'v2'))
+        main     = @((F 'releases.main.json' 'w2'))
     }
     function Copy-Parts($h) { $o = [ordered]@{}; foreach ($k in $h.Keys) { $o[$k] = $h[$k] }; return $o }
     $prev = M $base
     Yes 'a print is the files'' names and sha256, sorted, in lower case' ((Get-MergeReleasePrint (M $same) 'gamemode') -eq 'gamemode.js:aa' -and (Get-MergeReleasePrint $prev 'bot') -eq 'bot.js:bb')
     Yes '  and a part the manifest lacks prints as nothing' ((Get-MergeReleasePrint $prev 'site') -eq '')
     $none = @(Get-MergeReleaseChanged -Manifest (M $same) -Previous $prev)
-    Yes 'nothing changed when only the stamp, the server zip, the game list and velopack differ' ($none.Count -eq 0)
+    Yes 'nothing changed when only the stamp, the server zip, the game list and the two packages differ' ($none.Count -eq 0)
     $c = Copy-Parts $same; $c['server'] = @((F 'server-x.zip' 'z3'), (F 'server-build.json' 'r2'))
     $c['game'] = @((F 'game.zip' 'g2'), (F 'game-files.json' 'l3'))
     $got = @(Get-MergeReleaseChanged -Manifest (M $c) -Previous $prev)
@@ -99,7 +106,7 @@ try {
     $got = @(Get-MergeReleaseChanged -Manifest (M $c) -Previous $prev)
     Yes '  so are a new launcher and a part the Release before did not carry' (($got -join ',') -eq 'launcher,site')
     $got = @(Get-MergeReleaseChanged -Manifest $prev)
-    Yes 'with no Release before, every part but velopack has changed' (($got -join ',') -eq 'gamemode,bot,server,launcher,game')
+    Yes 'with no Release before, every part but velopack and main has changed' (($got -join ',') -eq 'gamemode,bot,server,launcher,game')
 
     # ---- the Release before -----------------------------------------------------------
     $rd = Join-Path $tmp 'releases'
@@ -147,7 +154,21 @@ try {
     $rc = Run-Nsm $o2 @("-Zip 'velopack=$gz'")
     $m2 = if ($rc -eq 0) { [IO.File]::ReadAllText((Join-Path $o2 'files/manifest.json')) | ConvertFrom-Json } else { $null }
     Yes '  -Zip is the same switch, and one file is still a list' ($null -ne $m2 -and $m2.parts.velopack -is [array] -and -not $m2.PSObject.Properties['launcherVersion'])
-    Yes '  an unknown part is refused' ((Run-Nsm (Join-Path $tmp 'm3') @("-Add 'agent=$gz'")) -ne 0)
+    # Main's package (#5181): listed in the one signed record, held back.
+    $mf = Join-Path $tmp 'in3/releases.main.json'; Put $mf '{}'
+    $o10 = Join-Path $tmp 'm10'
+    $rc = Run-Nsm $o10 @("-Add 'velopack=$gz','main=$mf'")
+    $m10 = if ($rc -eq 0) { [IO.File]::ReadAllText((Join-Path $o10 'files/manifest.json')) | ConvertFrom-Json } else { $null }
+    Yes 'the part main is listed in the manifest with its sha256, beside velopack' ($null -ne $m10 -and
+        (@($m10.parts.main | ForEach-Object { $_.name }) -join ',') -eq 'releases.main.json' -and @($m10.parts.main)[0].sha256 -eq (Sha $mf) -and
+        (@($m10.parts.velopack | ForEach-Object { $_.name }) -join ',') -eq 'game.zip')
+    Yes '  and its files are held in held\, never among the Release''s assets' ((Test-Path -LiteralPath (Join-Path $o10 'held/releases.main.json')) -and
+        -not (Test-Path -LiteralPath (Join-Path $o10 'assets/releases.main.json')) -and (Test-Path -LiteralPath (Join-Path $o10 'assets/game.zip')))
+    Yes '  a held file may not share a name with a published one' ((Run-Nsm (Join-Path $tmp 'm11') @("-Add 'velopack=$gz','main=$other'")) -ne 0)
+    $o12 = Join-Path $tmp 'm12'
+    $null = Run-Nsm $o12 @("-Add 'velopack=$gz'")
+    Yes '  and a Release with no main part has no held folder' ((Test-Path -LiteralPath (Join-Path $o12 'assets/game.zip')) -and -not (Test-Path -LiteralPath (Join-Path $o12 'held')))
+    Yes 'New-SignedManifest.ps1 refuses an unknown part' ((Run-Nsm (Join-Path $tmp 'm3') @("-Add 'agent=$gz'")) -ne 0)
     Yes '  so is a pair that is not part=path' ((Run-Nsm (Join-Path $tmp 'm4') @("-Add '$gz'")) -ne 0)
     Yes '  so is a file that is not there' ((Run-Nsm (Join-Path $tmp 'm5') @("-Add 'game=$tmp/nothing.zip'")) -ne 0)
     Yes '  so are two files of one name in one part' ((Run-Nsm (Join-Path $tmp 'm6') @("-Add 'game=$gz','game=$other'")) -ne 0)
@@ -186,21 +207,73 @@ try {
     Yes '  a root with no game folder stops it' ($LASTEXITCODE -ne 0)
     $null = & pwsh -NoProfile -File $bg -Out (Join-Path $tmp 'g4') -Root $root -Commit 'abc' -SkipStage 2>&1
     Yes '  and so does a commit that is not 40 hex' ($LASTEXITCODE -ne 0)
+    Yes '  with no record staged and no Release before, nothing is gone' ($list.PSObject.Properties['gone'] -and @($list.gone).Count -eq 0)
+
+    # What the release no longer ships (#4825; Build-GameFiles.ps1, WHAT IS
+    # GONE): the record's :gone: as it says it, files the Release before
+    # listed and this one does not by the sha256 they had, and the sha256
+    # entries the Release before carried, unless the record has a word on
+    # the path. A path the list ships is never gone.
+    $shaA = 'a' * 64; $shaB = 'b' * 64; $shaC = 'c' * 64; $shaD = 'd' * 64
+    Put (Join-Path $root 'record/record.json') (([ordered]@{
+        'Data\a.esp' = '1:' + (Sha (Join-Path $root 'Game/Data/a.esp'))
+        ':gone:Data\old.esp' = 'always'
+        ':gone:Data\b.esp' = 'removed'
+        ':gone:Data\named.esp' = 'removed'
+    }) | ConvertTo-Json)
+    $prevList = Join-Path $tmp 'prev/game-files.json'
+    Put $prevList (([ordered]@{ schema = 1; commit = $commit; channel = 'dev'; from = 'r1'
+        files = @([ordered]@{ path = 'Data/a.esp'; size = 1; sha256 = $shaA }, [ordered]@{ path = 'Data/dropped.esp'; size = 1; sha256 = $shaB },
+                  [ordered]@{ path = 'Data/old.esp'; size = 1; sha256 = $shaC })
+        gone = @([ordered]@{ path = 'Data/carried.esp'; value = $shaD }, [ordered]@{ path = 'Data/word.esp'; value = 'removed' },
+                 [ordered]@{ path = 'Data/named.esp'; value = $shaD })
+    }) | ConvertTo-Json -Depth 4)
+    $null = & pwsh -NoProfile -File $bg -Out (Join-Path $tmp 'g5') -Root $root -Commit $commit -SkipStage -PreviousList $prevList 2>&1
+    $rc5 = $LASTEXITCODE
+    $g5 = if ($rc5 -eq 0) { [IO.File]::ReadAllText((Join-Path $tmp 'g5/game-files.json')) | ConvertFrom-Json } else { $null }
+    $gone = if ($null -ne $g5) { @($g5.gone | ForEach-Object { $_.path + '=' + $_.value }) -join ',' } else { '' }
+    Yes ('Build-GameFiles.ps1 lists what is gone, sorted by path: ' + $gone) ($rc5 -eq 0 -and
+        $gone -eq ("Data/carried.esp=$shaD,Data/dropped.esp=$shaB,Data/named.esp=removed,Data/old.esp=always"))
+    Yes '  and the game zip is the same bytes, the gone list being only in the list' ($rc5 -eq 0 -and (Sha (Join-Path $tmp 'g5/game.zip')) -eq (Sha $z1))
+    $badList = Join-Path $tmp 'prev/bad.json'
+    Put $badList (([ordered]@{ schema = 1; files = @([ordered]@{ path = 'Data/x.esp'; size = 1; sha256 = 'nope' }) }) | ConvertTo-Json -Depth 4)
+    $null = & pwsh -NoProfile -File $bg -Out (Join-Path $tmp 'g6') -Root $root -Commit $commit -SkipStage -PreviousList $badList 2>&1
+    Yes '  a list before that names a file without a sha256 stops it' ($LASTEXITCODE -ne 0)
+    $null = & pwsh -NoProfile -File $bg -Out (Join-Path $tmp 'g7') -Root $root -Commit $commit -SkipStage -PreviousList (Join-Path $tmp 'prev/none.json') 2>&1
+    Yes '  and so does a list before that is not there' ($LASTEXITCODE -ne 0)
 
     # ---- the workflow ----------------------------------------------------------------------
     $wf = [IO.File]::ReadAllText((Join-Path $Repo '.github/workflows/merge-release.yml'))
     Yes 'merge-release.yml runs on main for the game, the launcher, the records and the bot pass' ($wf -match "(?m)^\s+branches: \[main\]\s*$" -and
         $wf -match "(?m)^\s+- 'game/\*\*'\s*$" -and $wf -match "(?m)^\s+- 'launcher/\*\*'\s*$" -and $wf -match "(?m)^\s+- 'records/\*\*'\s*$" -and $wf -match "(?m)^\s+- 'scripts/bot/Bot-Pass\.js'\s*$")
-    $self = @('Build-GameFiles.ps1', 'MergeRelease.ps1', 'New-SignedManifest.ps1', 'Build-Launcher.ps1', 'Go.ps1', 'Build-Front.ps1') | Where-Object { $wf -notmatch ("(?m)^\s+- 'scripts/release/" + [regex]::Escape($_) + "'\s*$") }
+    $self = @('Build-GameFiles.ps1', 'Build-SetupFiles.ps1', 'Source-Notice.ps1', 'MergeRelease.ps1', 'New-SignedManifest.ps1', 'Build-Launcher.ps1', 'Go.ps1', 'Build-Front.ps1') | Where-Object { $wf -notmatch ("(?m)^\s+- 'scripts/release/" + [regex]::Escape($_) + "'\s*$") }
     Yes ('  and for the scripts it runs that decide what is built' + $(if ($self) { ': not ' + ($self -join ', ') } else { '' })) (-not $self)
     Yes '  in the release environment, on main only, one run at a time' ($wf -match '(?m)^\s+environment: release\s*$' -and $wf.Contains("if: `${{ github.ref == 'refs/heads/main' }}") -and $wf -match '(?m)^\s+cancel-in-progress: false\s*$')
     $notes = $wf.IndexOf('Collect-ReleaseNotes.ps1'); $build = $wf.IndexOf('Build-Launcher.ps1 -Root')
     Yes 'the notes are written before anything is built, and "none" from every pull request is the one line' ($notes -gt 0 -and $build -gt $notes -and $wf.Contains('if ($rc -eq 3)') -and $wf.Contains("NOTHING_TO_TELL: 'Nothing people would notice: every change in this release says none.'"))
-    Yes 'the launcher is carried when its number is unchanged, held to the manifest and the signature check' ($wf.Contains('launcherVersion') -and $wf.Contains('Get-PublishSignRefusal') -and $wf.Contains('Build-Launcher.ps1 -Root $root -NoSign -NoPause -Version $ver'))
-    Yes '  and signed through Sign-OnRunner.ps1 when built' ($wf.Contains('./scripts/release/Sign-OnRunner.ps1 -Path $exe'))
-    Yes 'Velopack is pinned, on the one dev channel, with no installer, and signs its programs only' ($wf -match "VPK_VERSION: '\d+\.\d+\.\d+'" -and $wf.Contains('--channel dev') -and $wf.Contains('--noInst') -and
-        $wf.Contains("--signExclude '[\\/]Game[\\/]'") -and $wf.Contains('Sign-OnRunner.ps1') -and $wf.Contains('--signParallel 1'))
+    Yes 'the launcher is carried when no package is made, held to the manifest and the signature check' ($wf.Contains('launcherVersion') -and $wf.Contains('Get-PublishSignRefusal') -and
+        $wf.Contains('Test-MergeReleaseVelopack -LauncherVersion $ver -GameZipSha256 $env:GAME_SHA -Previous $pm'))
+    Yes '  and built with the package''s version when one is (#4825), then signed through Sign-OnRunner.ps1' ($wf.Contains('Build-Launcher.ps1 -Root $root -NoSign -NoPause -Version $env:VERSION') -and
+        $wf.Contains('VERSION: ${{ steps.names.outputs.velopack }}') -and $wf.Contains('./scripts/release/Sign-OnRunner.ps1 -Path @(Get-ChildItem -LiteralPath $dir -File'))
+    Yes '  and a launcher built for no package, or a package with a carried launcher, stops the run' ($wf.Contains('if ($velopack -ne $env:LAUNCHER_BUILT)'))
+    $gameAt = $wf.IndexOf('- name: Build the game files over dev''s last release'); $launcherAt = $wf.IndexOf('- name: The launcher, built and signed or carried')
+    Yes 'the game files are built first, against the Release before''s list held to its manifest (#4825)' ($gameAt -gt 0 -and $launcherAt -gt $gameAt -and
+        $wf.Contains("gh release download `$env:PREVIOUS -R `$env:GITHUB_REPOSITORY -p 'game-files.json'") -and $wf.Contains("`$a['PreviousList'] = `$plist") -and
+        $wf.Contains('is not the one its manifest names'))
+    Yes 'the setup files are built for dev and for main' ($wf.Contains("foreach (`$ch in 'dev', 'main')") -and
+        $wf.Contains("Build-SetupFiles.ps1 -Out `$out -GameRoot (Join-Path `$env:RUNNER_TEMP 'game-root') -Channel `$ch") -and $wf.Contains('"setup-files.$ch.json"'))
+    Yes 'Velopack is pinned and packs both channels from the same files, signing its programs only' ($wf -match "VPK_VERSION: '\d+\.\d+\.\d+'" -and $wf.Contains('--channel $ch') -and
+        -not $wf.Contains('--noInst') -and $wf.Contains("--signExclude '[\\/]Game[\\/]'") -and $wf.Contains('Sign-OnRunner.ps1') -and $wf.Contains('--signParallel 1'))
+    Yes '  dev with a delta from the Velopack release before, main whole' ($wf.Contains("--channel dev --pre --token `$env:GH_TOKEN") -and $wf.Contains("`$delta = 'BestSpeed'") -and
+        $wf.Contains("`$delta = 'None'") -and $wf.Contains('--delta $delta'))
+    Yes '  dev''s installer published as Thornswood-Dev-Setup.exe, main''s held as Thornswood-Setup.exe' ($wf.Contains("'Thornswood-Dev-Setup.exe'") -and $wf.Contains("'Thornswood-Setup.exe'") -and
+        $wf.Contains("'velopack=' + `$_.FullName") -and $wf.Contains("'main=' + `$_.FullName"))
     Yes '  and runs only when the launcher or the game files changed' ($wf.Contains("if: `${{ steps.changed.outputs.velopack == 'yes' }}") -and $wf.Contains("`$changed -contains 'launcher' -or `$changed -contains 'game'"))
+    $publishAt = $wf.IndexOf('- name: Publish the Release'); $keepAt = $wf.IndexOf('- name: Keep main''s package for the approval')
+    Yes 'main''s package is attested and kept with the run for the approval, once the Release is out, never published here (#5181)' ($keepAt -gt $publishAt -and $publishAt -gt 0 -and
+        $wf.Contains('subject-path: ${{ steps.files.outputs.held_subjects }}') -and $wf -match 'uses: actions/upload-artifact@[0-9a-f]{40} # v' -and
+        $wf.Contains('name: main-${{ steps.names.outputs.tag }}') -and $wf.Contains('path: ${{ steps.files.outputs.held }}') -and
+        $wf.Contains("Get-ChildItem -LiteralPath (Join-Path `$env:DIR 'assets') -File"))
     Yes 'every file of the Release is attested, by a pinned action' ($wf -match 'uses: actions/attest-build-provenance@[0-9a-f]{40} # v' -and $wf.Contains('subject-path: ${{ steps.files.outputs.subjects }}') -and
         $wf -match '(?m)^\s+id-token: write\s*$' -and $wf -match '(?m)^\s+attestations: write\s*$')
     Yes 'a merge that changed nothing publishes nothing' ($wf.Contains("release=") -and ([regex]::Matches($wf, [regex]::Escape("if: `${{ steps.changed.outputs.release == 'yes' }}"))).Count -ge 4)
