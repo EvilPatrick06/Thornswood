@@ -879,8 +879,9 @@ jobs:
         shell: pwsh
         run: |
           # Issue #2019. Every Ship builds Thornswood-ShipRoot.exe from
-          # scripts\release\ShipRoot\ShipRoot.csproj, which compiles all of
-          # launcher\app with its own entry point, and runs it on the folder
+          # scripts\release\ShipRoot\ShipRoot.csproj, which compiles OwnGame
+          # and the launcher files it calls, none of the window's, with its own
+          # entry point, and runs it on the folder
           # the release is built from before anything is packed. A launcher
           # change that stops it compiling would stop every Ship, so it is
           # built here with the same .NET 10 SDK, as Update-ShipRoot.ps1
