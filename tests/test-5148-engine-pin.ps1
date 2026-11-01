@@ -109,7 +109,7 @@ try {
 # ---- 3. the step, over stand-in answers --------------------------------------
 $H = '1111111111111111111111111111111111111111'
 $P = '2222222222222222222222222222222222222222'
-function New-World { return @{ head = $H; prs = @(); files = @{}; branchPin = $null; forkRuns = @(); arts = @{}; engineRuns = @() } }
+function New-World { return @{ head = $H; prs = @(); files = @{}; branchPin = $null; forkRuns = @(); arts = @{}; engineRuns = @(); compare = @{} } }
 function Get-Answer($w) {
     return {
         param([string]$path)
@@ -120,6 +120,10 @@ function Get-Answer($w) {
         if ($path -like 'repos/EvilPatrick06/skymp/actions/workflows/*') { return [pscustomobject]@{ workflow_runs = @($w.forkRuns) } }
         if ($path -match '^repos/EvilPatrick06/skymp/actions/runs/(\d+)/artifacts') { return [pscustomobject]@{ artifacts = @($w.arts[[long]$Matches[1]]) } }
         if ($path -like 'repos/EvilPatrick06/Thornswood/actions/workflows/engine.yml/runs*') { return [pscustomobject]@{ workflow_runs = @($w.engineRuns) } }
+        if ($path -match '^repos/EvilPatrick06/skymp/compare/([0-9a-f]{40})\.\.\.([0-9a-f]{40})$') {
+            $k = $Matches[1] + '...' + $Matches[2]
+            if ($w.compare.ContainsKey($k)) { return [pscustomobject]@{ status = $w.compare[$k] } }
+        }
         throw "the stand-in has no answer for $path"
     }.GetNewClosure()
 }
@@ -152,6 +156,43 @@ Yes 'building: the fork is still building the head' ((Step $w).Step -eq 'buildin
 
 $w = New-World
 Yes 'no-build: the fork has no build of the head' ((Step $w).Step -eq 'no-build')
+
+# While the head builds, the newest earlier head since the pin that the fork
+# built green goes first (1 Nov 2026: b8666ff was built and waiting when
+# 2cfff29 merged, and the pin waited again).
+$E = '4444444444444444444444444444444444444444'
+$O = '5555555555555555555555555555555555555555'
+function Fork-Run([long]$id, [string]$sha, [string]$status, $conclusion) {
+    return [pscustomobject]@{ id = $id; status = $status; conclusion = $conclusion; head_sha = $sha; head_branch = 'thornswood/engine-changes'; event = 'push'; html_url = "https://example/$id"; repository = [pscustomobject]@{ full_name = 'EvilPatrick06/skymp' }; head_repository = [pscustomobject]@{ full_name = 'EvilPatrick06/skymp' } }
+}
+function New-Building {
+    $w = New-World
+    $w.forkRuns = @((Fork-Run 12 $H 'in_progress' $null), (Fork-Run 11 $E 'completed' 'success'), (Fork-Run 10 $O 'completed' 'success'))
+    $w.arts[[long]11] = [pscustomobject]@{ name = "thornswood-engine-$E"; expired = $false }
+    $w.arts[[long]10] = [pscustomobject]@{ name = "thornswood-engine-$O"; expired = $false }
+    $w.compare["$E...$H"] = 'ahead'; $w.compare["$P...$E"] = 'ahead'
+    $w.compare["$O...$H"] = 'ahead'; $w.compare["$P...$O"] = 'behind'
+    return $w
+}
+$w = New-Building
+$s = Step $w
+Yes 'record: while the head builds, the newest earlier head the fork built is the one recorded' ($s.Step -eq 'record' -and $s.Head -eq $E -and $s.ForkHead -eq $H)
+$w.engineRuns = @([pscustomobject]@{ id = 94; status = 'completed'; conclusion = 'success'; display_title = "Engine build of $E"; html_url = 'u' })
+$s = Step $w
+Yes '  pin: and once engine.yml recorded it, it is the commit pinned' ($s.Step -eq 'pin' -and $s.Head -eq $E -and $s.Run -eq 94)
+$w.branchPin = $E
+$s = Step $w
+Yes '  ready: engine-pin/next pinning it already is nothing more to do until the head is built' ($s.Step -eq 'ready' -and $s.Head -eq $E -and $s.Why -match 'still building')
+$w = New-Building
+$w.compare["$E...$H"] = 'diverged'
+$s = Step $w
+Yes '  a build of a commit the head is not ahead of (lost to a force push) is passed over' ($s.Step -eq 'building' -and $s.Head -eq $H)
+$w = New-Building
+$w.compare["$P...$E"] = 'behind'
+Yes '  a build the pin is ahead of is never the target, nor any older one' ((Step $w).Step -eq 'building')
+$w = New-Building
+$w.forkRuns = @((Fork-Run 12 $H 'in_progress' $null), (Fork-Run 11 $E 'completed' 'failure'))
+Yes '  an earlier head whose build ended red is not one' ((Step $w).Step -eq 'building')
 
 $w = New-World
 $w.forkRuns = @($green); $w.arts[[long]7] = $art
