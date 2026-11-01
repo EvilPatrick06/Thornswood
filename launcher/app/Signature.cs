@@ -272,15 +272,20 @@ namespace Thornswood
             public IntPtr pChainContext;
         }
 
+        // DllImport and not LibraryImport: tools\DeployAgent compiles this file
+        // too, without unsafe code, and the generated calls need it for the
+        // two ref arguments. Every argument here is plain memory (the BOOL is
+        // an int), so the native build calls these directly with no
+        // marshalling made at run time.
         [DllImport("wintrust.dll", ExactSpelling = true)]
-        static extern uint WinVerifyTrust(IntPtr hwnd, [In] ref Guid action, ref WINTRUST_DATA data);
+        static extern uint WinVerifyTrust(IntPtr hwnd, ref Guid action, ref WINTRUST_DATA data);
 
         [DllImport("wintrust.dll", ExactSpelling = true)]
         static extern IntPtr WTHelperProvDataFromStateData(IntPtr state);
 
         [DllImport("wintrust.dll", ExactSpelling = true)]
         static extern IntPtr WTHelperGetProvSignerFromChain(IntPtr provData, uint signer,
-            [MarshalAs(UnmanagedType.Bool)] bool counterSigner, uint counterSignerIndex);
+            int counterSigner, uint counterSignerIndex);
 
         [DllImport("wintrust.dll", ExactSpelling = true)]
         static extern IntPtr WTHelperGetProvCertFromChain(IntPtr sgnr, uint cert);
@@ -302,13 +307,13 @@ namespace Thornswood
             try
             {
                 var fi = new WINTRUST_FILE_INFO();
-                fi.cbStruct = (uint)Marshal.SizeOf(typeof(WINTRUST_FILE_INFO));
+                fi.cbStruct = (uint)Marshal.SizeOf<WINTRUST_FILE_INFO>();
                 fi.pcwszFilePath = name;
                 fi.hFile = fs.SafeFileHandle.DangerousGetHandle();
-                info = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(WINTRUST_FILE_INFO)));
+                info = Marshal.AllocHGlobal(Marshal.SizeOf<WINTRUST_FILE_INFO>());
                 Marshal.StructureToPtr(fi, info, false);
 
-                data.cbStruct = (uint)Marshal.SizeOf(typeof(WINTRUST_DATA));
+                data.cbStruct = (uint)Marshal.SizeOf<WINTRUST_DATA>();
                 data.dwUIChoice = WTD_UI_NONE;
                 data.fdwRevocationChecks = revocation ? WTD_REVOKE_WHOLECHAIN : WTD_REVOKE_NONE;
                 data.dwProvFlags = revocation ? WTD_REVOCATION_CHECK_CHAIN_EXCLUDE_ROOT : WTD_REVOCATION_CHECK_NONE;
@@ -321,9 +326,9 @@ namespace Thornswood
                 if (rc != 0) return rc;
 
                 IntPtr prov = WTHelperProvDataFromStateData(data.hWVTStateData);
-                IntPtr sgnr = prov == IntPtr.Zero ? IntPtr.Zero : WTHelperGetProvSignerFromChain(prov, 0, false, 0);
+                IntPtr sgnr = prov == IntPtr.Zero ? IntPtr.Zero : WTHelperGetProvSignerFromChain(prov, 0, 0, 0);
                 if (sgnr == IntPtr.Zero) return TRUST_E_NOSIGNATURE;
-                var s = (CRYPT_PROVIDER_SGNR)Marshal.PtrToStructure(sgnr, typeof(CRYPT_PROVIDER_SGNR));
+                var s = Marshal.PtrToStructure<CRYPT_PROVIDER_SGNR>(sgnr);
                 stamped = s.csCounterSigners > 0;
                 for (uint i = 0; i < s.csCertChain; i++)
                 {
@@ -346,7 +351,7 @@ namespace Thornswood
                 }
                 if (info != IntPtr.Zero)
                 {
-                    Marshal.DestroyStructure(info, typeof(WINTRUST_FILE_INFO));
+                    Marshal.DestroyStructure<WINTRUST_FILE_INFO>(info);
                     Marshal.FreeHGlobal(info);
                 }
                 Marshal.FreeHGlobal(name);

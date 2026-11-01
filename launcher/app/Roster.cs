@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Net;
 using System.Text.RegularExpressions;
 
 namespace Thornswood
@@ -281,19 +280,6 @@ namespace Thornswood
             return m.Groups[1].Value
                     .Replace("\\\"", "\"")
                     .Replace("\\\\", "\\");
-        }
-
-        // WebClient has no timeout worth the name, and the default is long
-        // enough that a server which is merely slow looks like a hung launcher.
-        class Quick : WebClient
-        {
-            public int Ms = 2500;
-            protected override WebRequest GetWebRequest(Uri address)
-            {
-                var r = base.GetWebRequest(address);
-                if (r != null) { r.Timeout = Ms; }
-                return r;
-            }
         }
 
         /// <summary>

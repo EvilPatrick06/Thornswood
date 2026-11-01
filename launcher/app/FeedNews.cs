@@ -1,9 +1,9 @@
 using System;
 using System.IO;
-using System.Net;
-using System.Runtime.Serialization.Json;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Thornswood
 {
@@ -53,7 +53,6 @@ namespace Thornswood
             try
             {
                 CheckUrl(v.newsRef.url);
-                ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // Tls12 added, never replaced (#1360)
                 v.news = MergeNews(v.news, NewsFile(cfg, v.newsRef));
             }
             catch (Exception ex) { Swallow.Note("Updater.FillNews, " + v.newsRef.url, ex); }
@@ -107,11 +106,8 @@ namespace Thornswood
         {
             int at = 0;
             if (raw.Length >= 3 && raw[0] == 0xEF && raw[1] == 0xBB && raw[2] == 0xBF) at = 3;
-            using (var ms = new MemoryStream(raw, at, raw.Length - at))
-            {
-                var items = (NewsItem[])new DataContractJsonSerializer(typeof(NewsItem[])).ReadObject(ms);
-                return items ?? new NewsItem[0];
-            }
+            var items = JsonSerializer.Deserialize(new ReadOnlySpan<byte>(raw, at, raw.Length - at), FeedNewsJson.Default.NewsItemArray);
+            return items ?? new NewsItem[0];
         }
 
         /// <summary>
@@ -148,4 +144,12 @@ namespace Thornswood
             }
         }
     }
+
+    /// <summary>
+    /// The news file, a JSON list of notes, for System.Text.Json with its
+    /// code made at build time (#4823). Strings read loosely (LooseString).
+    /// </summary>
+    [JsonSourceGenerationOptions(Converters = new[] { typeof(LooseString) })]
+    [JsonSerializable(typeof(NewsItem[]))]
+    partial class FeedNewsJson : JsonSerializerContext { }
 }

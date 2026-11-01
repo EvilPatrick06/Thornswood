@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
 
 namespace Thornswood
@@ -233,7 +235,6 @@ namespace Thornswood
             // plus 64 hex characters, so it cannot be anywhere else.
             CheckUrl(r.url);
             string at = AssetFolder(r);
-            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // Tls12 added, never replaced (#1360)
             if (Sync(cfg, at, r, v, log)) return;
 
             List<Pack> packs = Pending(v);
@@ -264,7 +265,6 @@ namespace Thornswood
             if (r == null) return false;
             CheckUrl(r.url);
             string at = AssetFolder(r);
-            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // Tls12 added, never replaced (#1360)
             return Sync(cfg, at, r, v, log);
         }
 
@@ -292,7 +292,6 @@ namespace Thornswood
                 if (at == null)
                 {
                     CheckUrl(r.url);
-                    ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // Tls12 added, never replaced (#1360)
                     at = ReleaseCopyAt(AssetFolder(r), r);
                 }
                 return at(plugin);
@@ -403,7 +402,6 @@ namespace Thornswood
         {
             CheckUrl(r.url);
             string at = AssetFolder(r);
-            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // Tls12 added, never replaced (#1360)
             return PrepareSync(cfg, at, r, v, log);
         }
 
@@ -780,28 +778,24 @@ namespace Thornswood
 
         static void Transfer(string url, string part, long from, Action<long> onBytes)
         {
-            var req = (HttpWebRequest)WebRequest.Create(url);
-            req.Timeout = 10000;
-            req.ReadWriteTimeout = 60000;
-            req.UserAgent = "ThornswoodLauncher/" + Version;
-            req.Accept = "application/octet-stream";
-            if (from > 0) req.AddRange(from);
-            using (var resp = (HttpWebResponse)req.GetResponse())
+            using (var req = new HttpRequestMessage(HttpMethod.Get, url))
             {
-                // A server that ignores the Range answers 200 with the whole
-                // file, and then the part starts again from nothing.
-                bool carryOn = from > 0 && resp.StatusCode == HttpStatusCode.PartialContent;
-                using (Stream s = resp.GetResponseStream())
-                using (var f = new FileStream(part, carryOn ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.None))
+                req.Headers.TryAddWithoutValidation("User-Agent", "ThornswoodLauncher/" + Version);
+                req.Headers.TryAddWithoutValidation("Accept", "application/octet-stream");
+                if (from > 0) req.Headers.Range = new RangeHeaderValue(from, null);
+                // Ten seconds for the answer to start, a minute for each read
+                // of it (Http), as the request had them before.
+                using (HttpResponseMessage resp = Http.Send(req, 10000))
                 {
-                    byte[] buf = new byte[81920];
-                    int n;
-                    long had = carryOn ? from : 0;
-                    while ((n = s.Read(buf, 0, buf.Length)) > 0)
+                    // Anything but a 2xx is an exception, as it was.
+                    resp.EnsureSuccessStatusCode();
+                    // A server that ignores the Range answers 200 with the whole
+                    // file, and then the part starts again from nothing.
+                    bool carryOn = from > 0 && resp.StatusCode == HttpStatusCode.PartialContent;
+                    using (var f = new FileStream(part, carryOn ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.None))
                     {
-                        f.Write(buf, 0, n);
-                        had += n;
-                        if (onBytes != null) onBytes(had);
+                        long had = carryOn ? from : 0;
+                        Http.CopyBody(resp, f, 60000, onBytes == null ? (Action<long>)null : n => onBytes(had + n));
                     }
                 }
             }
