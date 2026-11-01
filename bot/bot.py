@@ -73,10 +73,17 @@ Everything it needs is in env:
   DEV_TASKS_CHANNEL   the staff forum of dev test tasks, default dev-test-tasks
   DEV_TASKS_CATEGORY  id of the category it is made in, default the Staff
                       category, 1549254990110134374
-  GITHUB_TOKEN     token for the repository's issues, read and write: the
-                   rule comments and Report a problem (#3155) write. A
-                   secret, set only in bot.env.json. Not set means no
-                   #known-issues posts and no problems filed
+  GITHUB_TOKEN_FILE  where the box admin service writes the bot's GitHub
+                   token, issues write on KNOWN_ISSUES_REPO, made by its App
+                   every half hour (#5184), default
+                   C:\Thornswood-Admin\for-bot\github-token.json. Read at
+                   each call; while it holds a token that has not ended, that
+                   is the token
+  GITHUB_TOKEN     the token used when that file has none: for the
+                   repository's issues, read and write: the rule comments and
+                   Report a problem (#3155) write. A secret, set only in
+                   bot.env.json. With neither, no #known-issues posts and no
+                   problems filed
   PROBLEM_LABELS   labels a filed problem gets, default Tester report,area: triage
   PROBLEM_CHANNEL  channel the Report a problem panel lives in, default
                    TEST_FINDINGS_CHANNEL
@@ -4490,8 +4497,9 @@ async def test_task_cmd(interaction: discord.Interaction, title: str,
 # written straight after each post, so a restart never posts twice; a post
 # made just before a crash is found again by its title among the bot's own.
 #
-# GitHub: GITHUB_TOKEN in bot.env.json, a token for the issues of
-# KNOWN_ISSUES_REPO (read, and write for the comments and filed problems). No token means neither forum is kept, said once.
+# GitHub: the token github_token() gives, for the issues of KNOWN_ISSUES_REPO
+# (read, and write for the comments and filed problems). No token means
+# neither forum is kept, said once.
 KNOWN_REPO = os.environ.get('KNOWN_ISSUES_REPO', 'ThornswoodRP/Thornswood').strip()
 KNOWN_LABELS = [l.strip() for l in
                 os.environ.get('KNOWN_ISSUES_LABELS',
@@ -4536,8 +4544,64 @@ def merged_fix(comments):
     return False
 
 
+# The token the box admin service's App makes for the bot (#5184, Patrick's A
+# of 1 Nov 2026): issues write on KNOWN_REPO alone, for the hour GitHub gives
+# it, written by scripts\vps\admin\admin.js every half hour into a folder
+# only SYSTEM, Administrators, that service and this bot's own account may
+# read. It replaces GITHUB_TOKEN, a fine-grained token of Patrick's bound to
+# EvilPatrick06, which writes nothing once the repository is ThornswoodRP's.
+GITHUB_TOKEN_FILE = os.environ.get(
+    'GITHUB_TOKEN_FILE', r'C:\Thornswood-Admin\for-bot\github-token.json').strip()
+_TOKEN_SAID = {'line': ''}
+
+
+def _token_from_file(path=None, now=None):
+    """(token, why): the App's token in GITHUB_TOKEN_FILE while it has more
+       than two minutes left, else ('', why there is none). Never the token
+       in why."""
+    path = GITHUB_TOKEN_FILE if path is None else path
+    now = time.time() if now is None else now
+    if not path:
+        return '', 'no GITHUB_TOKEN_FILE'
+    try:
+        with open(path, encoding='utf-8') as f:
+            doc = json.load(f)
+    except FileNotFoundError:
+        return '', '%s is not there' % path
+    except (OSError, ValueError) as e:
+        return '', '%s will not read (%s)' % (path, type(e).__name__)
+    token = str((doc or {}).get('token') or '').strip() if isinstance(doc, dict) else ''
+    ends = str((doc or {}).get('expires_at') or '') if isinstance(doc, dict) else ''
+    if not token:
+        return '', '%s holds no token' % path
+    try:
+        left = datetime.datetime.strptime(ends, '%Y-%m-%dT%H:%M:%SZ').replace(
+            tzinfo=datetime.timezone.utc).timestamp() - now
+    except ValueError:
+        return '', '%s says no time it ends' % path
+    if left < 120:
+        return '', 'the token in %s ended at %s' % (path, ends)
+    return token, ''
+
+
+def github_token(path=None, now=None):
+    """The token for KNOWN_REPO's issues: the App's from GITHUB_TOKEN_FILE
+       while it has one, else GITHUB_TOKEN. Says in the log each time the
+       one it uses changes, and why, never the token."""
+    token, why = _token_from_file(path, now)
+    if token:
+        line = 'github: the App\'s token from %s' % (GITHUB_TOKEN_FILE if path is None else path)
+    else:
+        token = os.environ.get('GITHUB_TOKEN', '').strip()
+        line = 'github: %s, so %s' % (why, 'GITHUB_TOKEN from bot.env.json' if token else 'no token')
+    if line != _TOKEN_SAID['line']:
+        _TOKEN_SAID['line'] = line
+        log(line)
+    return token
+
+
 def _github_get(url):
-    token = os.environ.get('GITHUB_TOKEN', '').strip()
+    token = github_token()
     req = urllib.request.Request(url, headers={
         'Accept': 'application/vnd.github+json',
         'Authorization': 'Bearer ' + token,
@@ -4659,11 +4723,11 @@ def is_known_repo(name, get=None):
 
 
 def github_token_kind(token=None):
-    """What kind of token GITHUB_TOKEN is, by its prefix, never the token.
-       A fine-grained token is bound to one owner and reaches nothing of the
-       repository once it moves to another (#5184), so the bot says the kind
-       at start, where Get-Logs reads it."""
-    token = os.environ.get('GITHUB_TOKEN', '') if token is None else token
+    """What kind of token github_token() gives, by its prefix, never the
+       token. A fine-grained token is bound to one owner and reaches nothing
+       of the repository once it moves to another (#5184), so the bot says
+       the kind at start, where Get-Logs reads it."""
+    token = github_token() if token is None else token
     token = str(token).strip()
     for prefix, kind in (('github_pat_', 'fine-grained'), ('ghp_', 'classic'),
                          ('ghs_', 'app installation'), ('gho_', 'oauth')):
@@ -5137,9 +5201,9 @@ def post_problems(channel, title, body, *, server=None, issue=None,
 
 
 def github_say(number, text):
-    """Comments text on the issue. The bot's GITHUB_TOKEN needs issues
-       write for this; when it cannot, the refusal is only logged."""
-    token = os.environ.get('GITHUB_TOKEN', '').strip()
+    """Comments text on the issue. The bot's token needs issues write for
+       this; when it cannot, the refusal is only logged."""
+    token = github_token()
     req = urllib.request.Request(
         '%s/repos/%s/issues/%d/comments' % (GITHUB_API, known_repo_now(), int(number)),
         data=json.dumps({'body': text}).encode('utf-8'), method='POST',
@@ -5976,8 +6040,8 @@ def _known_save(state, path=None):
 
 async def watch_known_issues():
     await client.wait_until_ready()
-    if not os.environ.get('GITHUB_TOKEN', '').strip():
-        log('known issues: no GITHUB_TOKEN in bot.env.json, so #%s, #%s and '
+    if not github_token():
+        log('known issues: no GitHub token (GITHUB_TOKEN_FILE or GITHUB_TOKEN), so #%s, #%s and '
             '#%s are not kept' % (KNOWN_NAME, TASKS_NAME, DEV_TASKS_NAME))
         return
     state = _state_read(KNOWN_STATE)
@@ -6985,11 +7049,11 @@ def problem_issue_discord(name, discord_id, what, doing, server, at_ms):
 
 
 def github_file(title, body, labels):
-    """Files an issue on the board. The bot's GITHUB_TOKEN needs issues
-       write for this, as for github_say. Returns the issue's number."""
-    token = os.environ.get('GITHUB_TOKEN', '').strip()
+    """Files an issue on the board. The bot's token needs issues write for
+       this, as for github_say. Returns the issue's number."""
+    token = github_token()
     if not token:
-        raise RuntimeError('no GITHUB_TOKEN in bot.env.json')
+        raise RuntimeError('no GitHub token: none in GITHUB_TOKEN_FILE and no GITHUB_TOKEN in bot.env.json')
     req = urllib.request.Request(
         '%s/repos/%s/issues' % (GITHUB_API, known_repo_now()),
         data=json.dumps({'title': title, 'body': body, 'labels': labels}).encode('utf-8'),

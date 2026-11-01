@@ -132,8 +132,11 @@ open under the same title is handed back rather than made twice.
 **Known issues and test tasks, from the board** (Patrick, 11 Oct: "it is
 supposed to be automatic as we add things and fix things"). Three forums are
 kept from `ThornswoodRP/Thornswood`, every five minutes (`KNOWN_ISSUES_EVERY`,
-never under a minute), with `GITHUB_TOKEN` from `bot.env.json`, a token for
-that repository's issues. Reading them is all these forums need; the token
+never under a minute), with a token for that repository's issues: the one
+the box admin service's App makes every half hour into
+`C:\Thornswood-Admin\for-bot\github-token.json` (`GITHUB_TOKEN_FILE`), issues
+write on Thornswood alone (#5184), or while that has none, `GITHUB_TOKEN` from
+`bot.env.json`. Reading them is all these forums need; the token
 also needs issues write, for the comments the bot leaves on an issue and for
 Report a problem below, which files new ones. No token, none is kept, said
 once in the log.
