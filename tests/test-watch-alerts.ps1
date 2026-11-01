@@ -492,13 +492,13 @@ try {
     $script:backupWhy = ''
     Step 2
     Yes 'working again is said once' ((Said 'The nightly backup is working again') -eq 1 -and $script:said.Count -eq 2)
-    # The copy off the box (#2755): judged here from what Fetch-Backups.ps1
-    # on One writes, so a One that is off is told about.
+    # The copy off the box (#2755): judged here from what Send-Backups.ps1
+    # writes after each backup the Oracle VM took (#2862).
     Box 'offbox'
-    $script:offboxWhy = 'the newest copy One has checked is thornswood-20260926-031500.zip.enc, 56 hours old, and the line is 26'
+    $script:offboxWhy = 'the newest copy sent off this box is thornswood-20260926-031500.zip.enc, 56 hours old, and the line is 26'
     Step 1
-    Yes 'an off-box copy out of date is told once, in words' ((Said '^\*\*The copy of the backups off the VPS is out of date\.\*\* The newest copy One has checked is thornswood-20260926-031500\.zip\.enc, 56 hours old') -eq 1)
-    Yes '  saying what to run on One, not that nothing restarts it' ("$($script:said[0].Text)" -match 'Run \.\\scripts\\vps\\Fetch-Backups\.ps1 there' -and "$($script:said[0].Text)" -notmatch 'Nothing restarts')
+    Yes 'an off-box copy out of date is told once, in words' ((Said '^\*\*The copy of the backups off the VPS is out of date\.\*\* The newest copy sent off this box is thornswood-20260926-031500\.zip\.enc, 56 hours old') -eq 1)
+    Yes '  saying which task sends it and where its record is, not that nothing restarts it, and nothing about One' ("$($script:said[0].Text)" -match 'Thornswood Send Backups task' -and "$($script:said[0].Text)" -match 'Send-Backups -Status' -and "$($script:said[0].Text)" -notmatch 'Nothing restarts' -and "$($script:said[0].Text)" -notmatch '\bOne\b')
     Yes '  asking about offbox.txt in the watchdog''s own folder' ($script:offboxFile -eq (Join-Path $script:boxRoot 'offbox.txt'))
     Step 10
     Yes '  and not again while it stays behind' ($script:said.Count -eq 1)
@@ -510,11 +510,11 @@ try {
     $ob = [scriptblock]::Create('param($f, $n) $now = $n' + "`n" + $fns['OffBoxProblem'].Extent.Text + "`n" + 'OffBoxProblem $f 26')
     $obFile = Join-Path $script:boxRoot 'offbox.txt'
     $obNow = New-Object DateTime (2026, 9, 28, 12, 0, 0)
-    Yes 'OffBoxProblem: no offbox.txt says One has not said it holds a copy' ((& $ob $obFile $obNow) -match '^One has not said it holds a copy: there is no .*offbox\.txt')
+    Yes 'OffBoxProblem: no offbox.txt says no copy has been sent off the box' ((& $ob $obFile $obNow) -match '^no copy has been sent off this box: there is no .*offbox\.txt')
     Set-Content -LiteralPath $obFile -Value 'notes' -Encoding ASCII
     Yes 'OffBoxProblem: a file that names no backup says so' ((& $ob $obFile $obNow) -match 'does not name a backup')
     Set-Content -LiteralPath $obFile -Value 'thornswood-20260927-031500.zip.enc' -Encoding ASCII
-    Yes 'OffBoxProblem: a copy taken 32 hours ago is out of date, with its name and the line' ((& $ob $obFile $obNow) -eq 'the newest copy One has checked is thornswood-20260927-031500.zip.enc, 32 hours old, and the line is 26')
+    Yes 'OffBoxProblem: a copy taken 32 hours ago is out of date, with its name and the line' ((& $ob $obFile $obNow) -eq 'the newest copy sent off this box is thornswood-20260927-031500.zip.enc, 32 hours old, and the line is 26')
     Set-Content -LiteralPath $obFile -Value 'thornswood-20260928-031500.zip.enc' -Encoding ASCII
     Yes 'OffBoxProblem: one taken this morning is fine' ((& $ob $obFile $obNow) -eq '')
     Set-Content -LiteralPath $obFile -Value 'thornswood-20260927-110000.zip' -Encoding ASCII

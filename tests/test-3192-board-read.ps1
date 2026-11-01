@@ -280,7 +280,7 @@ if (Test-Path -LiteralPath $Reader) {
     Yes '  and reads the one job''s log, not an artifact (#3410)' (
         $rt -match [regex]::Escape('(Get-GitHub "$runPath/jobs").jobs') -and $rt -match [regex]::Escape('gh api "repos/$GitHubRepo/actions/jobs/$($jobs[0].id)/logs"') -and $rt -notmatch 'gh run download' -and $rt -notmatch '/artifacts')
     Yes '  it passes --allow-escape-sequences for the log when gh''s help names it, so gh 2.92 and newer hand the log over (27 Oct 2026)' (
-        $rt -match [regex]::Escape('-match ''--allow-escape-sequences'') { $escFlag = @(''--allow-escape-sequences'') }') -and $rt -match [regex]::Escape('/logs" @escFlag 2>&1'))
+        $rt -match [regex]::Escape(". (Join-Path `$PSScriptRoot '..\release\LogHandBack.ps1')") -and $rt -match [regex]::Escape('$flags = @(Get-GhLogFlags)') -and $rt -match [regex]::Escape('/logs" @flags 2>&1'))
     Yes '  and a refusal prints the log''s last lines with ESC taken out' ($rt -match [regex]::Escape('-join '' '') -replace "`e", '''')'))
     Yes '  holding it to the length and sha256 the log gives, and writing those bytes as they are' (
         $rt -match [regex]::Escape('$bytes = Read-BoardFromLog $log') -and $rt -match [regex]::Escape('[IO.File]::WriteAllBytes($OutFile, $bytes)'))
