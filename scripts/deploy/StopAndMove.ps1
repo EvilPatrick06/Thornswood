@@ -567,7 +567,9 @@ function Read-ThornswoodOpenTrace($Trace, [string]$Path) {
   try {
     $leaf = '\' + (Split-Path -Leaf ([IO.Path]::GetFullPath($Path)))
     $names = @{}
-    try { foreach ($r in [ThornswoodOpeners]::Running()) { $names[[int]$r[0]] = [string]$r[3] } } catch { }
+    $namesWhy = ''
+    try { foreach ($r in [ThornswoodOpeners]::Running()) { $names[[int]$r[0]] = [string]$r[3] } }
+    catch { $namesWhy = '; the processes running now could not be listed for their names (' + $_.Exception.Message + '), so only those the trace saw start are named' }
     $events = @(Get-WinEvent -Path $Trace.Etl -Oldest -ErrorAction Stop)
     $opens = 0
     $procs = @()
@@ -592,7 +594,8 @@ function Read-ThornswoodOpenTrace($Trace, [string]$Path) {
       foreach ($x in @(([xml]$e.ToXml()).Event.EventData.Data)) { $d[[string]$x.Name] = [string]$x.'#text' }
       $raw = [string]$d['ShareAccess']
       $share = -1
-      try { $share = if ($raw -like '0x*') { [Convert]::ToInt32($raw.Substring(2), 16) } else { [int]$raw } } catch { }
+      try { $share = if ($raw -like '0x*') { [Convert]::ToInt32($raw.Substring(2), 16) } else { [int]$raw } }
+      catch { $share = -1 <# not a number: the line below gives the field as Windows wrote it #> }
       $shares = if ($share -lt 0) { 'shares ' + $raw } else {
         'shares ' + $(@(@(1, 'read'), @(2, 'write'), @(4, 'delete')) | Where-Object { $share -band $_[0] } | ForEach-Object { $_[1] }) -join ', ' +
         $(if (-not ($share -band 4)) { ' (NOT delete: a rename is refused while it is open)' } else { '' }) }
@@ -608,7 +611,7 @@ function Read-ThornswoodOpenTrace($Trace, [string]$Path) {
     }
     $lines += ('the trace holds ' + $opens + ' open(s) on the box, ' + $procs.Count + ' process start(s) and end(s), from ' +
       $(if ($events.Count) { $events[0].TimeCreated.ToString('h:mm:ss.fff tt') + ' to ' + $events[$events.Count - 1].TimeCreated.ToString('h:mm:ss.fff tt') } else { 'nothing' }) +
-      '; this process is ' + $PID + ', and its last open of the folder, the refused one, was at ' + $(if ($anchor) { $anchor.ToString('h:mm:ss.fff tt') } else { '(not in the trace)' }))
+      '; this process is ' + $PID + ', and its last open of the folder, the refused one, was at ' + $(if ($anchor) { $anchor.ToString('h:mm:ss.fff tt') } else { '(not in the trace)' }) + $namesWhy)
     foreach ($f in @($found | Sort-Object { $_[0] })) {
       $id = [int]$f[1]
       $who = 'process ' + $id + ' ' + $(if ($names.ContainsKey($id)) { $names[$id] } elseif ($id -eq 4) { 'System' } else { '?' })
