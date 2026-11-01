@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
-  <!-- The version here is a placeholder. Build-Launcher.ps1 writes the
-       launcher's own version (Updater.cs Version, four parts) into a copy of
-       this file and embeds that copy, so it can never drift from the version
-       the updater compares (issue #463). tests\test-app-manifest.ps1 reads it
-       back out of the built exe. -->
+  <!-- The version here is a placeholder. The ThornswoodManifest target in
+       Thornswood.csproj writes the build's own version ($(Version), four
+       parts, the same number Updater.Version reads from the assembly) into a
+       copy of this file in obj and embeds that copy, on every build, so it
+       can never drift from the version the updater compares (issue #463).
+       tests\test-app-manifest.ps1 reads it back out of the built exe. -->
   <assemblyIdentity
     type="win32"
     name="Thornswood.Launcher.Thornswood"
