@@ -1884,6 +1884,12 @@ A new server build, or a change to the live settings, from a machine with the fo
 
 The gamemode command, then the server command, is the live pair. `-GamemodeOnly` refuses, with nothing sent, when the live server runs another server build than the one your commit records; then the live pair is the way. What each one sends is in [What any developer may do](#what-any-developer-may-do). The full list, including the site, the bot, and voice, is [After a pull request is merged](#after-a-pull-request-is-merged).
 
+Once the box deploy agent looks after main (`Install-DeployAgent -Main`, docs/DEPLOY-AGENT.md "Main"), the gamemode and the server build reach the live server another way: the Release dev ran is promoted, and goes out when Patrick approves it on GitHub, which is his word for that exact build (#5181):
+
+```powershell
+gh workflow run promote-main.yml --ref main -f tag=build-<yyyyMMdd>.<run>
+```
+
 ### A hotfix
 
 A hotfix is the one live release that does not come off `main`. The branch starts from the tag of the release that is live, carries only the fix, and is pushed. Ship runs from a checkout of that branch. When the installer has to be rebuilt for it, `Package-Thornswood.ps1 -OneFile` runs from the same checkout: it and `Publish-Installer.ps1` accept a clean `hotfix/` branch that matches GitHub by the same rule Ship uses (#2436), with no `-AllowStaleCheckout`. The dev feed stays as it is. The fix also goes to `main` through its own pull request, or the next main release loses it. The long form is in [How a release goes out](#how-a-release-goes-out).
