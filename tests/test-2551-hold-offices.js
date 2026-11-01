@@ -9,7 +9,7 @@
     - If two accounts hold the same Jarl role, neither acts as Jarl until staff
       fix it, and staff are told which accounts clash.
     - Each hold has "<Hold> Court", "Steward of <Hold>" and "Guard of <Hold>"
-      (bot/Build-Discord.py; bot/test-2551-hold-offices.py holds the roles and
+      (bot/Build-Discord.py; bot/tests/test-2551-hold-offices.py holds the roles and
       the bot's panel).
     - That hold's Jarl gives and takes those three. In the game the Office
       page asks the site, and the bot's account sets the role, so the role

@@ -5,7 +5,7 @@
 
   #3155. Patrick, 21 Oct: testers get a button that files an issue on the
   board with their log and where they are, in the game and in Discord. This
-  is the game's half, end to end; bot\test-3155-problems.py holds the bot's.
+  is the game's half, end to end; bot\tests\test-3155-problems.py holds the bot's.
 
   1. THE BUTTON. thornswood-help.js in a stand-in document: Getting help ends
      with Report a problem, a box and Send; Send says 'help:problem <words>'

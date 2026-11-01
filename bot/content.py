@@ -99,7 +99,7 @@ _JOIN_BODY = re.sub(r'\A# [^\n]*\n+', '', JOIN)
 # "What you need" is four paragraphs, and the one about your own Skyrim is
 # the answer to a question of its own. Picked by what it says rather than
 # where it sits, and refused if it has gone, because the welcome would
-# otherwise quietly lose it. bot\test-read-channels.py runs on
+# otherwise quietly lose it. bot\tests\test-read-channels.py runs on
 # every pull request, so an edit to join.md that does this goes red there.
 _NEED = section(JOIN, 'What you need').split('\n\n')
 _YOURS = [p for p in _NEED if 'the Skyrim you already have' in p]

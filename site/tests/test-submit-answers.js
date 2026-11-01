@@ -15,7 +15,7 @@
 
   The Discord bot's ticket form had the same shape and was fixed on
   24 September (bot/bot.py, the push to the site is no longer awaited before
-  the reply; bot/test-ticket.py holds it). This is the site's half.
+  the reply; bot/tests/test-ticket.py holds it). This is the site's half.
 
   The real site\server.js is copied into a scratch folder and run on a spare
   port. Discord is a small server in this process that the site is pointed at

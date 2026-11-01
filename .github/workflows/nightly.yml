@@ -486,7 +486,7 @@ jobs:
           $env:DISCORD_TOKEN = 'not-a-real-token'
           $PER_HARNESS = 300
           $bad = 0
-          foreach ($t in (Get-ChildItem bot -Filter 'test-*.py' -File | Sort-Object Name)) {
+          foreach ($t in (Get-ChildItem bot/tests -Filter 'test-*.py' -File | Sort-Object Name)) {
             Write-Host ("--- {0}" -f $t.Name)
             $p = Start-Process -FilePath $py -ArgumentList ('"' + $t.FullName + '"') -NoNewWindow -PassThru
             $null = $p.Handle

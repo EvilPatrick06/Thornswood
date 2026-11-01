@@ -41,9 +41,9 @@
   Not read: node_modules (somebody else's packages), a .min.js (a vendored
   library, minified onto one line, such as site\public\marked-12.0.2.min.js),
   __pycache__ and a venv or .venv (the bot's installed packages), and the
-  harnesses kept beside the code, test-*.js in voice\tests\ and test-*.py in bot\,
-  and everything in a product's own tests folder (installer\tests\, plan
-  line 42), for the same reason tests\ is not read.
+  harnesses: everything in a product's own tests folder (voice\tests\,
+  bot\tests\, installer\tests\, plan line 42) and any test-* file still
+  beside the code, for the same reason tests\ is not read.
 
   WHY. Entry 239 on the To Do List. Measured on 24 Sep: 386 of the 618 catch
   clauses in launcher\app\*.cs had nothing between their braces, so a failure in
