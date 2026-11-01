@@ -156,6 +156,30 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   yes('nor one whose Tree checks failed (#5292): ' + r.why, r.run === '' && /its Tree checks job did not pass/.test(r.why));
   r = await ask({ pulls: [pull()], runs: [run(18)], jobs: { 18: jobs(18, 'Launcher builds', 'success', 'success', null, null) }, logs: { 180: jobLog(TREE) } });
   yes('nor one with no Tree checks job at all: ' + r.why, r.run === '' && /its Tree checks job did not pass/.test(r.why));
+  // #5293: the harnesses that need nothing from Windows run in shares on
+  // Linux, counted as the Windows ones are, and the run's Build check result
+  // has to have passed, since it is what says no share was skipped for a
+  // reason the pick did not give.
+  const lin = (fix) => [1, 2, 3, 4].map(n => ({ name: 'Gate harnesses on Linux (' + n + ' of 4)', conclusion: 'success' })).map(fix || (g => g));
+  const both = (w, l) => ({ pulls: [pull()], runs: [run(22)], jobs: { 22: jobs(22, 'Launcher builds', 'success', 'success', w.concat(l)) }, logs: { 220: jobLog(TREE) } });
+  r = await ask(both(shares(g => g), lin()));
+  yes('a run whose Windows and Linux shares all passed counts (#5293): ' + r.why, r.run.endsWith('/22'));
+  r = await ask(both(shares(g => g), lin((g, i) => i === 1 ? Object.assign(g, { conclusion: 'failure' }) : g)));
+  yes('  not one whose Linux share failed: ' + r.why, r.run === '' && /gate share 2 of 4 on Linux did not pass/.test(r.why));
+  r = await ask(both(shares(g => g), lin().slice(1)));
+  yes('  nor one missing a Linux share: ' + r.why, r.run === '' && /gate share 1 of 4 on Linux is not in it/.test(r.why));
+  r = await ask(both(shares(g => g), lin(g => Object.assign(g, { name: g.name.replace(')', ', what the change reaches)') }))));
+  yes('  nor one whose Linux shares ran only what its change reaches: ' + r.why, r.run === '' && /only what its change can reach/.test(r.why));
+  r = await ask(both([], lin()));
+  yes('  a run of Linux shares alone counts, the Windows ones being none: ' + r.why, r.run.endsWith('/22'));
+  const noResult = both(shares(g => g), lin());
+  noResult.jobs[22] = noResult.jobs[22].map(x => x.name === T.RESULT ? Object.assign({}, x, { conclusion: 'failure' }) : x);
+  r = await ask(noResult);
+  yes('  nor one whose Build check result failed: ' + r.why, r.run === '' && /its Build check result job did not pass/.test(r.why));
+  noResult.jobs[22] = noResult.jobs[22].filter(x => x.name !== T.RESULT);
+  r = await ask(noResult);
+  yes('  nor one with no Build check result: ' + r.why, r.run === '' && /its Build check result job did not pass/.test(r.why));
+  yes('  the Linux shares are read by the name build.yml gives them', T.GATE_LINUX.test('Gate harnesses on Linux (3 of 4)') && !T.GATE.test('Gate harnesses on Linux (3 of 4)') && !T.GATE_LINUX.test('Gate harnesses (3 of 4)'));
   r = await ask({ pulls: [pull()], runs: [run(16), run(11)], jobs: { 16: jobs(16, 'Launcher builds', 'failure'), 11: good.jobs[11] }, logs: good.logs });
   yes('a failed build of the head beside a green one: the green one counts', r.run.endsWith('/11'));
   r = await ask({ pulls: [pull()], runs: [run(11), run(20)], jobs: { 11: good.jobs[11], 20: jobs(20, 'Launcher builds', 'success') }, logs: { 110: jobLog(TREE), 200: jobLog(OTHER) } });
@@ -234,7 +258,9 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   const gj = build.indexOf('\n  gate:\n');
   const pj = build.indexOf('\n  pick:\n');
   const pickJob = pj < 0 ? '' : build.slice(pj, gj > pj ? gj : undefined);
-  const gateJob = gj < 0 ? '' : build.slice(gj, cj > gj ? cj : undefined);
+  const glj = build.indexOf('\n  gate-linux:\n');
+  const gateJob = gj < 0 ? '' : build.slice(gj, glj > gj ? glj : (cj > gj ? cj : undefined));
+  const linuxJob = glj < 0 ? '' : build.slice(glj, cj > glj ? cj : undefined);
   const gateStep = (gateJob.split(/\n(?=      - )/).find(x => /^      - name: Run the gate harnesses\n/.test(x)) || '');
   const rg = read(path.join(REPO, 'scripts', 'dev', 'Run-Gate.ps1'));
   const part = "${{ needs.pick.outputs.whole != 'true' && ', what the change reaches' || '' }}";
@@ -245,13 +271,27 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
       /\n    needs: tested\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' \}\}\n/.test(pickJob) &&
       /\n    needs: \[tested, pick\]\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && needs\.pick\.result == 'success' && needs\.pick\.outputs\.shares != '\[\]' \}\}\n/.test(gateJob));
   yes('  the pick runs Run-Gate.ps1 -Pick on Linux, with the token, and hands on its plan',
-      /\n    runs-on: ubuntu-latest\n/.test(pickJob) && /\.\/scripts\/dev\/Run-Gate\.ps1 -Pick \(\[int\]\$env:SHARES\)\n/.test(pickJob) &&
+      /\n    runs-on: ubuntu-latest\n/.test(pickJob) && /\.\/scripts\/dev\/Run-Gate\.ps1 -Pick \(\[int\]\$env:SHARES\) -LinuxShares \(\[int\]\$env:LINUX_SHARES\)\n/.test(pickJob) &&
       /\n          GATE_MAP_TOKEN: \$\{\{ github\.token \}\}\n/.test(pickJob) && /\n      whole: \$\{\{ steps\.pick\.outputs\.whole \}\}\n/.test(pickJob));
   yes('the gate step is "gate", and runs its share of the plan through Run-Gate.ps1', /\n        id: gate\n/.test(gateStep) &&
       /\.\\scripts\\dev\\Run-Gate\.ps1 -Shard \$env:SHARD -Of \$env:OF /.test(gateStep) &&
       /\n          SHARD: \$\{\{ matrix\.shard \}\}\n          OF: \$\{\{ strategy\.job-total \}\}\n          GATE_PLAN: \$\{\{ needs\.pick\.outputs\.plan \}\}\n/.test(gateStep) &&
       /\n        shard: \$\{\{ fromJSON\(needs\.pick\.outputs\.shares\) \}\}\n/.test(gateJob));
   yes('  with no token: a share fetches no map', !/GATE_MAP_TOKEN|github\.token/.test(gateJob));
+  const linuxStep = (linuxJob.split(/\n(?=      - )/).find(x => /^      - name: Run the gate harnesses\n/.test(x)) || '');
+  yes('the Linux shares are the job "gate-linux" after it, on Linux, named as the script reads them (#5293)',
+      glj > gj && glj < cj && /\n    runs-on: ubuntu-latest\n/.test(linuxJob) &&
+      linuxJob.indexOf('\n    name: Gate harnesses on Linux (${{ matrix.shard }} of ${{ strategy.job-total }}' + part + ')\n') >= 0 &&
+      /\n      fail-fast: false\n/.test(linuxJob) && /\n          LINUX_SHARES: '\d+'\n/.test(pickJob) &&
+      /\n      linux_shares: \$\{\{ steps\.pick\.outputs\.linux_shares \}\}\n/.test(pickJob));
+  yes('  waiting as the Windows shares do, skipped when the pick gave none',
+      /\n    needs: \[tested, pick\]\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && needs\.pick\.result == 'success' && needs\.pick\.outputs\.linux_shares != '\[\]' \}\}\n/.test(linuxJob) &&
+      /\n        shard: \$\{\{ fromJSON\(needs\.pick\.outputs\.linux_shares\) \}\}\n/.test(linuxJob));
+  yes('  and running its part of the same plan through Run-Gate.ps1 -Platform Linux, with no token',
+      /\.\/scripts\/dev\/Run-Gate\.ps1 -Shard \$env:SHARD -Of \$env:OF -Platform Linux /.test(linuxStep) &&
+      /\n          SHARD: \$\{\{ matrix\.shard \}\}\n          OF: \$\{\{ strategy\.job-total \}\}\n          GATE_PLAN: \$\{\{ needs\.pick\.outputs\.plan \}\}\n/.test(linuxStep) &&
+      !/GATE_MAP_TOKEN|github\.token/.test(linuxJob));
+
   yes('  and the plan says whole only when it holds every gate harness',
       (rg.match(/Set-StepOutput 'whole'/g) || []).length === 2 && /\nif \(\$whole\) \{ Set-StepOutput 'whole' 'true' \}\n/.test(rg) &&
       /Set-StepOutput 'whole' \$\(if \(\$whole\) \{ 'true' \} else \{ 'false' \}\)/.test(rg) &&

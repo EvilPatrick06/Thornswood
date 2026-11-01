@@ -19,8 +19,9 @@
        and with a base git cannot find, each saying why;
     2. "Build check result"'s own script, run with bash for each result and
        output it can be given, passes only when the pick and the tree checks
-       passed and the launcher build and the gate each passed or were
-       skipped because the pick said they had nothing to do;
+       passed and the launcher build and the gate, its Windows shares and
+       since #5293 its Linux shares, each passed or were skipped because
+       the pick said they had nothing to do;
     3. read from this repository: the Windows job's steps are exactly the
        launcher window, the ship root tool, the MSBuild launcher, the
        writing check's Windows PowerShell 5.1 comparison and the note, and
@@ -78,7 +79,7 @@ $code = ($checks -split "`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n"
 Yes '  and none of its steps needs Windows: no Windows PowerShell, no MSBuild, no backslash path handed to node' ($code -notmatch 'shell: powershell|Find-MSBuild|\bmsbuild\b|node\s+\S*\\|Scripts\\python\.exe')
 Yes 'the pick runs Launcher-Reach.ps1 with the base, and hands on launcher=' ($pick -match '(?m)^      launcher: \$\{\{ steps\.reach\.outputs\.launcher \}\}$' -and $pick -match '(?m)^          ./scripts/dev/Launcher-Reach\.ps1 -Base \$env:BASE$' -and $pick -match '(?m)^          BASE: \$\{\{ github\.event\.pull_request\.base\.sha \}\}$')
 $prResult = Get-Job $pr 'result'
-Yes 'Build check result needs the pick, the tree checks, the launcher build and the gate' ($prResult -match '(?m)^    needs: \[pick, checks, launcher, gate\]$')
+Yes 'Build check result needs the pick, the tree checks, the launcher build and the gate on both platforms' ($prResult -match '(?m)^    needs: \[pick, checks, launcher, gate, gate-linux\]$')
 
 # ---- 2. Build check result's script, run --------------------------------------
 $script = ''
@@ -94,27 +95,33 @@ else {
         $file = Join-Path $scratch0 'result.sh'
         [IO.File]::WriteAllText($file, $script + "`n")
         $cases = @(
-            @('everything passed', 'success', 'success', 'success', 'success', 'true', '[1,2]', 0),
-            @('the launcher build skipped because the pick said the change cannot reach it', 'success', 'success', 'skipped', 'success', 'false', '[1]', 0),
-            @('the gate skipped because the pick gave it no share', 'success', 'success', 'success', 'skipped', 'true', '[]', 0),
-            @('both skipped, a change to a doc no harness reads', 'success', 'success', 'skipped', 'skipped', 'false', '[]', 0),
-            @('the launcher build skipped though the pick said it reaches it', 'success', 'success', 'skipped', 'success', 'true', '[1]', 1),
-            @('the launcher build skipped and the pick said nothing', 'success', 'success', 'skipped', 'success', '', '[1]', 1),
-            @('the launcher build skipped beside a failed pick', 'failure', 'success', 'skipped', 'skipped', 'false', '[]', 1),
-            @('the gate skipped though the pick gave it shares', 'success', 'success', 'success', 'skipped', 'true', '[1,2]', 1),
-            @('the tree checks failed', 'success', 'failure', 'success', 'success', 'true', '[1]', 1),
-            @('the tree checks skipped', 'success', 'skipped', 'success', 'success', 'true', '[1]', 1),
-            @('the launcher build failed', 'success', 'success', 'failure', 'success', 'true', '[1]', 1),
-            @('the launcher build was cancelled', 'success', 'success', 'cancelled', 'success', 'true', '[1]', 1),
-            @('a share of the gate failed', 'success', 'success', 'success', 'failure', 'true', '[1]', 1))
+            @('everything passed', 'success', 'success', 'success', 'success', 'true', '[1,2]', 'success', '[1]', 0),
+            @('the launcher build skipped because the pick said the change cannot reach it', 'success', 'success', 'skipped', 'success', 'false', '[1]', 'success', '[1]', 0),
+            @('the gate skipped because the pick gave it no share', 'success', 'success', 'success', 'skipped', 'true', '[]', 'success', '[1]', 0),
+            @('both skipped, a change to a doc no harness reads', 'success', 'success', 'skipped', 'skipped', 'false', '[]', 'success', '[1]', 0),
+            @('the launcher build skipped though the pick said it reaches it', 'success', 'success', 'skipped', 'success', 'true', '[1]', 'success', '[1]', 1),
+            @('the launcher build skipped and the pick said nothing', 'success', 'success', 'skipped', 'success', '', '[1]', 'success', '[1]', 1),
+            @('the launcher build skipped beside a failed pick', 'failure', 'success', 'skipped', 'skipped', 'false', '[]', 'success', '[1]', 1),
+            @('the gate skipped though the pick gave it shares', 'success', 'success', 'success', 'skipped', 'true', '[1,2]', 'success', '[1]', 1),
+            @('the tree checks failed', 'success', 'failure', 'success', 'success', 'true', '[1]', 'success', '[1]', 1),
+            @('the tree checks skipped', 'success', 'skipped', 'success', 'success', 'true', '[1]', 'success', '[1]', 1),
+            @('the launcher build failed', 'success', 'success', 'failure', 'success', 'true', '[1]', 'success', '[1]', 1),
+            @('the launcher build was cancelled', 'success', 'success', 'cancelled', 'success', 'true', '[1]', 'success', '[1]', 1),
+            @('a share of the gate failed', 'success', 'success', 'success', 'failure', 'true', '[1]', 'success', '[1]', 1),
+            @('the Linux shares skipped because the pick gave them none (#5293)', 'success', 'success', 'success', 'success', 'true', '[1]', 'skipped', '[]', 0),
+            @('every gate skipped, a change to a doc no harness reads', 'success', 'success', 'skipped', 'skipped', 'false', '[]', 'skipped', '[]', 0),
+            @('the Linux shares skipped though the pick gave them some', 'success', 'success', 'success', 'success', 'true', '[1]', 'skipped', '[1,2]', 1),
+            @('the Linux shares skipped and the pick said nothing', 'success', 'success', 'success', 'success', 'true', '[1]', 'skipped', '', 1),
+            @('a Linux share failed', 'success', 'success', 'success', 'success', 'true', '[1]', 'failure', '[1]', 1),
+            @('a Linux share was cancelled', 'success', 'success', 'success', 'success', 'true', '[1]', 'cancelled', '[1]', 1))
         foreach ($c in $cases) {
-            $env:PICK = $c[1]; $env:CHECKS = $c[2]; $env:BUILD = $c[3]; $env:GATE = $c[4]; $env:REACHES_LAUNCHER = $c[5]; $env:SHARES = $c[6]
+            $env:PICK = $c[1]; $env:CHECKS = $c[2]; $env:BUILD = $c[3]; $env:GATE = $c[4]; $env:REACHES_LAUNCHER = $c[5]; $env:SHARES = $c[6]; $env:GATE_LINUX = $c[7]; $env:LINUX_SHARES = $c[8]
             $null = & bash $file 2>&1
             $rc = $LASTEXITCODE
-            Yes ("Build check result: {0}: {1}" -f $c[0], $(if ($c[7] -eq 0) { 'passes' } else { 'fails' })) ($rc -eq $c[7])
+            Yes ("Build check result: {0}: {1}" -f $c[0], $(if ($c[9] -eq 0) { 'passes' } else { 'fails' })) ($rc -eq $c[9])
         }
     } finally {
-        foreach ($n in 'PICK', 'CHECKS', 'BUILD', 'GATE', 'REACHES_LAUNCHER', 'SHARES') { Remove-Item -LiteralPath "Env:$n" -ErrorAction SilentlyContinue }
+        foreach ($n in 'PICK', 'CHECKS', 'BUILD', 'GATE', 'REACHES_LAUNCHER', 'SHARES', 'GATE_LINUX', 'LINUX_SHARES') { Remove-Item -LiteralPath "Env:$n" -ErrorAction SilentlyContinue }
         Remove-Item -LiteralPath $scratch0 -Recurse -Force -ErrorAction SilentlyContinue
     }
 }

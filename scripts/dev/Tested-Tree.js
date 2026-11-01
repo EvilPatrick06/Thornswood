@@ -20,7 +20,11 @@
 // map, and then each says so in its name ("Gate harnesses (n of N, what the
 // change reaches)"), and main builds and runs the whole gate. Since #5292
 // the checks that need no Windows run in the job "Tree checks" on Linux, and
-// the note counts only when that job passed in the same run too. Until then
+// the note counts only when that job passed in the same run too. Since
+// #5293 the gate harnesses that need nothing from Windows run in shares on
+// Linux ("Gate harnesses on Linux (n of N)"), counted the same way, and the
+// run's "Build check result" job has to have passed as well, because it is
+// what says no share was skipped for a reason the pick did not give. Until then
 // it was
 // written only when the gate step ran every gate harness (#3114: a pull
 // request built on the VPS could run only those its change could reach, and
@@ -76,20 +80,40 @@ const CHECKS = 'Tree checks';
 // shares only that (#5183).
 const GATE = /^Gate harnesses \((\d+) of (\d+)(, what the change reaches)?\)$/;
 
-// '' when the run's jobs hold every share of the gate, each passed, or why not.
-function gateShares(jobs) {
-  const shares = jobs.map(x => ({ m: GATE.exec(String(x && x.name || '')), x: x })).filter(s => s.m);
-  if (shares.length === 0) { return 'no share of the gate ran in it'; }
+// The gate's Linux shares since #5293 (build.yml, the job "gate-linux"):
+// "Gate harnesses on Linux (n of N)", the same way, for the harnesses the
+// nightly map says need nothing from Windows.
+const GATE_LINUX = /^Gate harnesses on Linux \((\d+) of (\d+)(, what the change reaches)?\)$/;
+// The one check main's ruleset requires, written into build-pr.yml by
+// scripts/dev/Build-PrWorkflow.js. It passes only when every job above it
+// passed or was skipped for the reason the pick gave, so its success is what
+// says a run's Linux shares were not skipped for any other reason: a matrix
+// job that never started leaves no "(n of N)" job to read (#5293).
+const RESULT = 'Build check result';
+
+// '' when one platform's shares are all there and passed, or why not; none
+// at all is '' here, and gateShares says whether that is enough.
+function platformShares(jobs, re, where) {
+  const shares = jobs.map(x => ({ m: re.exec(String(x && x.name || '')), x: x })).filter(s => s.m);
+  if (shares.length === 0) { return ''; }
   const of = Number(shares[0].m[2]);
   const seen = new Set();
   for (const s of shares) {
-    if (Number(s.m[2]) !== of) { return 'its gate shares do not agree how many there are'; }
-    if (s.x.conclusion !== 'success') { return 'gate share ' + s.m[1] + ' of ' + of + ' did not pass'; }
+    if (Number(s.m[2]) !== of) { return 'its gate shares' + where + ' do not agree how many there are'; }
+    if (s.x.conclusion !== 'success') { return 'gate share ' + s.m[1] + ' of ' + of + where + ' did not pass'; }
     if (s.m[3]) { return 'its gate ran only what its change can reach, so main runs the whole gate'; }
     seen.add(Number(s.m[1]));
   }
-  for (let n = 1; n <= of; n++) { if (!seen.has(n)) { return 'gate share ' + n + ' of ' + of + ' is not in it'; } }
-  return shares.length === of ? '' : 'a share of its gate ran twice';
+  for (let n = 1; n <= of; n++) { if (!seen.has(n)) { return 'gate share ' + n + ' of ' + of + where + ' is not in it'; } }
+  return shares.length === of ? '' : 'a share of its gate' + where + ' ran twice';
+}
+
+// '' when the run's jobs hold every share of the gate, on Windows and on
+// Linux, each passed, or why not.
+function gateShares(jobs) {
+  const any = jobs.some(x => GATE.test(String(x && x.name || '')) || GATE_LINUX.test(String(x && x.name || '')));
+  if (!any) { return 'no share of the gate ran in it'; }
+  return platformShares(jobs, GATE, '') || platformShares(jobs, GATE_LINUX, ' on Linux');
 }
 const MARK = 'TESTED-TREE';
 const SHA = /^[0-9a-f]{40}$/;
@@ -139,6 +163,7 @@ async function find(o) {
         (Array.isArray(x.steps) ? x.steps : []).some(s => s.name === STEP && s.conclusion === 'success'));
       if (!job) { whys.push('run ' + id + ': no Launcher builds job passed through to its last step'); continue; }
       if (!all.some(x => x && x.name === CHECKS && x.conclusion === 'success')) { whys.push('run ' + id + ': its ' + CHECKS + ' job did not pass'); continue; }
+      if (!all.some(x => x && x.name === RESULT && x.conclusion === 'success')) { whys.push('run ' + id + ': its ' + RESULT + ' job did not pass'); continue; }
       const gate = gateShares(all);
       if (gate) { whys.push('run ' + id + ': ' + gate); continue; }
       const trees = treesInLog(await o.getText('repos/' + o.repo + '/actions/jobs/' + job.id + '/logs'));
@@ -181,4 +206,4 @@ async function main(argv, env, get) {
 }
 
 if (require.main === module) { main(process.argv.slice(2), process.env).then(() => process.exit(0), () => process.exit(0)); }
-module.exports = { find: find, main: main, treesInLog: treesInLog, gateShares: gateShares, WORKFLOW: WORKFLOW, JOBS: JOBS, STEP: STEP, CHECKS: CHECKS, MARK: MARK, GATE: GATE };
+module.exports = { find: find, main: main, treesInLog: treesInLog, gateShares: gateShares, RESULT: RESULT, GATE_LINUX: GATE_LINUX, WORKFLOW: WORKFLOW, JOBS: JOBS, STEP: STEP, CHECKS: CHECKS, MARK: MARK, GATE: GATE };

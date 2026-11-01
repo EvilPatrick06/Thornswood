@@ -73,6 +73,10 @@ function build(src) {
   const shareWaits = "    needs: [tested, pick]\n    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.pick.result == 'success' && needs.pick.outputs.shares != '[]' }}\n";
   if (body.split(shareWaits).length !== 2) { fail('build.yml no longer has the gate\'s shares waiting for the tested and pick jobs, and skipped when the pick gave none'); }
   body = body.replace(shareWaits, "    needs: pick\n    if: ${{ needs.pick.outputs.shares != '[]' }}\n");
+  // The gate's Linux shares the same way (#5293).
+  const linuxWaits = "    needs: [tested, pick]\n    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.pick.result == 'success' && needs.pick.outputs.linux_shares != '[]' }}\n";
+  if (body.split(linuxWaits).length !== 2) { fail('build.yml no longer has the gate\'s Linux shares waiting for the tested and pick jobs, and skipped when the pick gave none'); }
+  body = body.replace(linuxWaits, "    needs: pick\n    if: ${{ needs.pick.outputs.linux_shares != '[]' }}\n");
   const launcherWaits = "    needs: [tested, pick]\n    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.pick.outputs.launcher != 'false' }}\n";
   if (body.split(launcherWaits).length !== 2) { fail('build.yml no longer has the launcher job waiting for the tested job and the pick\'s path rule'); }
   body = body.replace(launcherWaits, "    needs: pick\n    if: ${{ !cancelled() && needs.pick.outputs.launcher != 'false' }}\n");
@@ -96,7 +100,8 @@ function build(src) {
     when the change reaches no harness (shares=[]). A skip counts as passed
     only when the pick said exactly that and the pick itself passed; any
     other skip, a failure or a cancel cannot merge. The tree checks always
-    run and always have to pass.
+    run and always have to pass. The gate's Linux shares (#5293) the same
+    way: skipped counts only when the pick gave none (linux_shares=[]).
   */
   if (/\n  result:\n/.test(body)) { fail('build.yml already has a job named result'); }
   body = body.replace(/\n*$/, '\n') + [
@@ -106,7 +111,7 @@ function build(src) {
     '  # Build-PrWorkflow.js, which says why.',
     '  result:',
     '    name: Build check result',
-    '    needs: [pick, checks, launcher, gate]',
+    '    needs: [pick, checks, launcher, gate, gate-linux]',
     '    if: ${{ !cancelled() }}',
     '    runs-on: ubuntu-latest',
     '    timeout-minutes: 5',
@@ -117,13 +122,16 @@ function build(src) {
     '          CHECKS: ${{ needs.checks.result }}',
     '          BUILD: ${{ needs.launcher.result }}',
     '          GATE: ${{ needs.gate.result }}',
+    "          GATE_LINUX: ${{ needs['gate-linux'].result }}",
     '          REACHES_LAUNCHER: ${{ needs.pick.outputs.launcher }}',
     '          SHARES: ${{ needs.pick.outputs.shares }}',
+    '          LINUX_SHARES: ${{ needs.pick.outputs.linux_shares }}',
     '        run: |',
     '          echo "Pick the gate harnesses: $PICK"',
     '          echo "Tree checks: $CHECKS"',
     '          echo "Launcher builds: $BUILD (the change reaches it: $REACHES_LAUNCHER)"',
     '          echo "Gate harnesses, every share: $GATE (shares: $SHARES)"',
+    '          echo "Gate harnesses on Linux, every share: $GATE_LINUX (shares: $LINUX_SHARES)"',
     '          ok=1',
     '          [ "$PICK" = success ] || ok=0',
     '          [ "$CHECKS" = success ] || ok=0',
@@ -132,6 +140,9 @@ function build(src) {
     '          fi',
     '          if [ "$GATE" != success ]; then',
     '            if [ "$GATE" = skipped ] && [ "$PICK" = success ] && [ "$SHARES" = "[]" ]; then echo "The gate was skipped: the change reaches no gate harness (#5292)"; else ok=0; fi',
+    '          fi',
+    '          if [ "$GATE_LINUX" != success ]; then',
+    '            if [ "$GATE_LINUX" = skipped ] && [ "$PICK" = success ] && [ "$LINUX_SHARES" = "[]" ]; then echo "The gate on Linux was skipped: the change reaches no harness that runs there (#5293)"; else ok=0; fi',
     '          fi',
     '          if [ "$ok" = 1 ]; then exit 0; fi',
     '          echo "::error::the pick, the tree checks, the launcher build or a share of the gate did not pass, so this pull request may not merge"',
@@ -148,7 +159,8 @@ function build(src) {
     '# windows-latest runner (#1306, #4983). No secrets, no live folders: every\n' +
     '# scratch path is under RUNNER_TEMP. The job keeps the name "Launcher builds",\n' +
     '# and the gate runs beside it in shares, "Gate harnesses (n of 5)", after\n' +
-    '# the job "Pick the gate harnesses" says what each runs.\n';
+    '# the job "Pick the gate harnesses" says what each runs, and the harnesses\n' +
+    '# that need nothing from Windows in "Gate harnesses on Linux (n of 4)".\n';
 
   return head + body;
 }

@@ -5,7 +5,8 @@
 # windows-latest runner (#1306, #4983). No secrets, no live folders: every
 # scratch path is under RUNNER_TEMP. The job keeps the name "Launcher builds",
 # and the gate runs beside it in shares, "Gate harnesses (n of 5)", after
-# the job "Pick the gate harnesses" says what each runs.
+# the job "Pick the gate harnesses" says what each runs, and the harnesses
+# that need nothing from Windows in "Gate harnesses on Linux (n of 4)".
 name: Build check (pull requests)
 on:
   pull_request:
@@ -63,6 +64,7 @@ jobs:
     outputs:
       plan: ${{ steps.pick.outputs.plan }}
       shares: ${{ steps.pick.outputs.shares }}
+      linux_shares: ${{ steps.pick.outputs.linux_shares }}
       whole: ${{ steps.pick.outputs.whole }}
       launcher: ${{ steps.reach.outputs.launcher }}
     steps:
@@ -77,9 +79,12 @@ jobs:
         shell: pwsh
         env:
           SHARES: '5'
+          # #5293: the harnesses the nightly map says run as fully on Linux
+          # as on Windows go to this many shares on ubuntu-latest instead.
+          LINUX_SHARES: '4'
           GATE_MAP_TOKEN: ${{ github.token }}
         run: |
-          ./scripts/dev/Run-Gate.ps1 -Pick ([int]$env:SHARES)
+          ./scripts/dev/Run-Gate.ps1 -Pick ([int]$env:SHARES) -LinuxShares ([int]$env:LINUX_SHARES)
           exit $LASTEXITCODE
       # THE PATH RULE (#5292): whether the job "Launcher builds" has anything
       # to check, from the files the pull request changes against its base.
@@ -182,6 +187,50 @@ jobs:
             exit 1
           }
           .\scripts\dev\Run-Gate.ps1 -Shard $env:SHARD -Of $env:OF -Throttle 6 -BudgetSeconds 1200
+          exit $LASTEXITCODE
+
+  # THE LINUX SHARES (#5293). The gate harnesses the nightly map says need
+  # nothing from Windows: each ran on both platforms the night the map was
+  # made, passed on both, and skipped nothing on Linux that it ran on
+  # Windows (scripts\dev\Affected-Harnesses.js, platforms). They run here, on
+  # GitHub's ubuntu-latest, which starts sooner than its Windows runner; every
+  # other harness, and every one when the map has no platforms file for its
+  # commit, runs in the job above. Tested-Tree.js counts these shares with
+  # the Windows ones.
+  gate-linux:
+    name: Gate harnesses on Linux (${{ matrix.shard }} of ${{ strategy.job-total }}${{ needs.pick.outputs.whole != 'true' && ', what the change reaches' || '' }})
+    needs: pick
+    if: ${{ needs.pick.outputs.linux_shares != '[]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.pick.outputs.linux_shares) }}
+    steps:
+      # A full history for the same reason as the Windows shares.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          filter: blob:none
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Run the gate harnesses
+        id: gate
+        shell: pwsh
+        env:
+          SHARD: ${{ matrix.shard }}
+          OF: ${{ strategy.job-total }}
+          GATE_PLAN: ${{ needs.pick.outputs.plan }}
+        run: |
+          # This share's part of the plan's Linux shares, as the Windows
+          # shares run theirs (the job above says how and why).
+          ./scripts/dev/Run-Gate.ps1 -Shard $env:SHARD -Of $env:OF -Platform Linux -Throttle 6 -BudgetSeconds 1200
           exit $LASTEXITCODE
 
   # THE TREE CHECKS (#5292). Every check of the whole tree that needs
@@ -655,7 +704,7 @@ jobs:
   # Build-PrWorkflow.js, which says why.
   result:
     name: Build check result
-    needs: [pick, checks, launcher, gate]
+    needs: [pick, checks, launcher, gate, gate-linux]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -666,13 +715,16 @@ jobs:
           CHECKS: ${{ needs.checks.result }}
           BUILD: ${{ needs.launcher.result }}
           GATE: ${{ needs.gate.result }}
+          GATE_LINUX: ${{ needs['gate-linux'].result }}
           REACHES_LAUNCHER: ${{ needs.pick.outputs.launcher }}
           SHARES: ${{ needs.pick.outputs.shares }}
+          LINUX_SHARES: ${{ needs.pick.outputs.linux_shares }}
         run: |
           echo "Pick the gate harnesses: $PICK"
           echo "Tree checks: $CHECKS"
           echo "Launcher builds: $BUILD (the change reaches it: $REACHES_LAUNCHER)"
           echo "Gate harnesses, every share: $GATE (shares: $SHARES)"
+          echo "Gate harnesses on Linux, every share: $GATE_LINUX (shares: $LINUX_SHARES)"
           ok=1
           [ "$PICK" = success ] || ok=0
           [ "$CHECKS" = success ] || ok=0
@@ -681,6 +733,9 @@ jobs:
           fi
           if [ "$GATE" != success ]; then
             if [ "$GATE" = skipped ] && [ "$PICK" = success ] && [ "$SHARES" = "[]" ]; then echo "The gate was skipped: the change reaches no gate harness (#5292)"; else ok=0; fi
+          fi
+          if [ "$GATE_LINUX" != success ]; then
+            if [ "$GATE_LINUX" = skipped ] && [ "$PICK" = success ] && [ "$LINUX_SHARES" = "[]" ]; then echo "The gate on Linux was skipped: the change reaches no harness that runs there (#5293)"; else ok=0; fi
           fi
           if [ "$ok" = 1 ]; then exit 0; fi
           echo "::error::the pick, the tree checks, the launcher build or a share of the gate did not pass, so this pull request may not merge"

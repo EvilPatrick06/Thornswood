@@ -53,12 +53,13 @@ yes('no workflow runs a pull request on the VPS (' + (others.join(', ') || 'none
 // repository is public since 30 Oct, so it no longer waits for that.
 const result = /\n  result:\n([\s\S]*)$/.exec(code(pr));
 const rj = result ? result[1] : '';
-yes('a "Build check result" job needs the pick, the tree checks, the build and the gate\'s shares (#3683, #5292)', /^    name: Build check result\n    needs: \[pick, checks, launcher, gate\]\n/.test(rj));
+yes('a "Build check result" job needs the pick, the tree checks, the build and the gate\'s shares on both platforms (#3683, #5292, #5293)', /^    name: Build check result\n    needs: \[pick, checks, launcher, gate, gate-linux\]\n/.test(rj));
 yes('  runs unless cancelled', /\n    if: \$\{\{ !cancelled\(\) \}\}\n/.test(rj));
 yes('  on GitHub\'s ubuntu-latest, never the box', /\n    runs-on: ubuntu-latest\n/.test(rj) && !/self-hosted|thornswood/.test(rj));
 yes('  with no checkout, action or secret: it reads only their results', !/uses:|secrets\.|checkout/.test(rj) &&
     /BUILD: \$\{\{ needs\.launcher\.result \}\}/.test(rj) && /GATE: \$\{\{ needs\.gate\.result \}\}/.test(rj) &&
-    /CHECKS: \$\{\{ needs\.checks\.result \}\}/.test(rj) && /PICK: \$\{\{ needs\.pick\.result \}\}/.test(rj));
+    /CHECKS: \$\{\{ needs\.checks\.result \}\}/.test(rj) && /PICK: \$\{\{ needs\.pick\.result \}\}/.test(rj) &&
+    /GATE_LINUX: \$\{\{ needs\['gate-linux'\]\.result \}\}/.test(rj) && /LINUX_SHARES: \$\{\{ needs\.pick\.outputs\.linux_shares \}\}/.test(rj));
 // Which results pass is run, not read: tests\test-5292-path-rule.ps1 runs
 // this step's script for every result and output it can be given.
 yes('  and passes only when the tree checks passed, and the build and the gate passed or the pick skipped them (#5292)',
