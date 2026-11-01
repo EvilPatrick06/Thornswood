@@ -201,6 +201,7 @@ winget install --id Git.Git -e --accept-package-agreements --accept-source-agree
 winget install --id GitHub.cli -e --accept-package-agreements --accept-source-agreements
 winget install --id OpenJS.NodeJS.LTS -e --accept-package-agreements --accept-source-agreements
 winget install --id Microsoft.PowerShell -e --accept-package-agreements --accept-source-agreements
+winget install --id Microsoft.DotNet.SDK.10 -e --accept-package-agreements --accept-source-agreements
 winget install --id Microsoft.VisualStudioCode -e --accept-package-agreements --accept-source-agreements
 ```
 
@@ -212,6 +213,7 @@ winget install --id Microsoft.VisualStudioCode -e --accept-package-agreements --
 | GitHub CLI (`gh`) | Pull requests from the terminal. [A. GitHub](#a-github) |
 | Node | The website, voice, and the test command. [J. Node](#j-node) |
 | PowerShell 7 | The terminal the scripts run in. [C. PowerShell](#c-powershell) |
+| .NET 10 SDK (`dotnet`) | Builds and runs the tools written in C#, under `tools`: the release note check `Check-Change.ps1 -Body` runs, and the deploy agent. |
 | Visual Studio Code | The window you edit in. [D. Visual Studio Code](#d-visual-studio-code) |
 
 #### Check that the tools open
@@ -222,6 +224,7 @@ Close that window and open **PowerShell 7** from the Start menu. A new window is
 git --version
 gh --version
 node --version
+dotnet --version
 ssh -V
 code --version
 ```

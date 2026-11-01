@@ -88,7 +88,6 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [dev/Check-Controls.ps1](dev/Check-Controls.ps1) | Every control in the launcher is found at runtime by name. |
 | [dev/Check-Outside.ps1](dev/Check-Outside.ps1) | Walks the path a first install takes through the things this project does not run itself, and says which of them is broken or has moved. |
 | [dev/Check-Parse.ps1](dev/Check-Parse.ps1) | Says whether every PowerShell script and every game script parses (#5291). |
-| [dev/Check-PrBody.ps1](dev/Check-PrBody.ps1) | The parts of a pull request's body that a release reads, checked while the pull request is open (#5179). .github\workflows\pr-body.yml runs it on every pull request when it is opened, pushed to or its body is edited, so fixing the body is enough to turn it green. |
 | [dev/Check-Push.ps1](dev/Check-Push.ps1) | The pre-push hook's checks (#5291): every script parses and the writing rules hold, in the commit being pushed, before it leaves the machine. |
 | [dev/Check-Secrets.ps1](dev/Check-Secrets.ps1) | Read only. Looks for anything that must never leave a machine: in the files this repository tracks, in a pack or installer zip, in the installer's staged folder, or in a built program. |
 | [dev/Check-Serena.ps1](dev/Check-Serena.ps1) | Read only. Says how Claude Code on this machine starts Serena, and times one start the way Claude Code makes it: from the repo folder, over stdin and stdout, until Serena answers initialize and lists its tools. |
