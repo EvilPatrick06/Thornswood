@@ -4,8 +4,9 @@
 //
 // #4623. The load test's own parts, without a game server:
 //  - load-proxy.js passes datagrams both ways unchanged, gives each bot a
-//    socket of its own towards the server (so the server sees one address a
-//    bot, as it does a game), and counts every byte and datagram each way;
+//    socket of its own towards the server on a loopback address of its own
+//    (so the server sees one address a bot, as it sees one a person), and
+//    counts every byte and datagram each way;
 //  - load-bots.js's bot, against a stand-in for createBotClient: it logs in
 //    once connected, sends one face when the race menu is open, then a move
 //    every 130 ms, unreliable, walking; a Teleport2 moves it and its
@@ -29,7 +30,7 @@ const os = require('os');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const BOT = path.join(ROOT, 'scripts', 'bot');
-const { makeProxy } = require(path.join(BOT, 'load-proxy.js'));
+const { makeProxy, addressFor } = require(path.join(BOT, 'load-proxy.js'));
 const { LoadBot, MOVE_MS } = require(path.join(BOT, 'load-bots.js'));
 const { windowOf, perPerson, markdown } = require(path.join(BOT, 'Load-Test.js'));
 const server = require(path.join(BOT, 'New-LoadServer.js'));
@@ -67,12 +68,16 @@ async function proxyChecks() {
   for (let i = 0; i < 200 && (got.a.length < 2 || got.b.length < 1); i++) { await sleep(10); }
   yes('each bot gets the server\'s answers to its own datagrams, unchanged', got.a.join(',') === 're:hello,re:again' && got.b.join(',') === 're:xyz');
   yes('the server sees one address a bot, not the proxy\'s one', seen.size === 2);
+  const ips = [...seen].map((k) => k.split(':')[0]).sort();
+  yes('each bot comes from a loopback address of its own, as each person from theirs (SLikeNet refuses a second connection from one address within 100 ms)',
+    ips.join(',') === '127.0.1.1,127.0.1.2');
   const r = p.report();
   yes('two bots are two clients', r.clients === 2);
   yes('up counts every byte and datagram the bots sent (5+5+3, 3)', r.up === 13 && r.upDatagrams === 3);
   yes('down counts every byte and datagram the server sent (8+8+6, 3)', r.down === 22 && r.downDatagrams === 3);
   yes('no socket had a problem', r.problems.length === 0);
   p.close(); a.close(); b.close(); srv.close();
+  yes('addresses go 127.0.1.1 to 127.0.1.250, then 127.0.2.1', addressFor(0) === '127.0.1.1' && addressFor(249) === '127.0.1.250' && addressFor(250) === '127.0.2.1');
 }
 
 // A stand-in for createBotClient: what tick() hands over is queued by the
