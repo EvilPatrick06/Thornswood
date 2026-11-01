@@ -42,6 +42,17 @@
       ],
       "variables": []
     },
+    "engine-pin": {
+      "deploy_from": [
+        "branch main"
+      ],
+      "secrets": [
+        "PIN_APP_KEY"
+      ],
+      "variables": [
+        "PIN_APP_CLIENT_ID"
+      ]
+    },
     "release": {
       "deploy_from": [
         "branch main"
