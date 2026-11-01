@@ -164,6 +164,25 @@ Yes '  and its stop opens the server''s processes before the task stops and wait
     $stopServer.IndexOf('Get-ThornswoodProcessHeld') -lt $stopServer.IndexOf('Stop-ScheduledTask') -and
     $stopServer.IndexOf('Stop-ThornswoodProcessHeld') -gt $stopServer.IndexOf('Stop-ScheduledTask'))
 
+# Windows's own record of who opened the folder (#5211): started before the
+# stage, stopped right after the move, read only when the move was refused
+# and only once the old server is starting again, and stopped on every way
+# out. It only records: it stops, moves and retries nothing.
+$finish = FunctionText $inst 'Finish'
+$swapAt = $inst.IndexOf("Say 'stopping the server' 'Cyan'`n    StopServer `$Root`n    `$movedAside")
+Yes 'the installer records Windows''s open trace from before the stage to just after the move' (
+    $inst.IndexOf("Start-ThornswoodOpenTrace ('thornswood-install-' + `$PID)") -gt 0 -and
+    $inst.IndexOf("Start-ThornswoodOpenTrace ('thornswood-install-' + `$PID)") -lt $inst.IndexOf('# ---- the stage: nothing running is touched') -and
+    $swapAt -gt 0 -and $inst.IndexOf('Stop-ThornswoodOpenTrace $script:openTrace', $swapAt) -gt $inst.IndexOf('$movedAside = MoveDir $Root $aside', $swapAt))
+$refused = $inst.Substring($swapAt, $inst.IndexOf("Finish 'INSTALL REFUSED' 1", $swapAt) - $swapAt)
+Yes '  reads it only when the move was refused, after the old server is started again' (
+    $refused.IndexOf('Read-ThornswoodOpenTrace $script:openTrace $Root') -gt $refused.IndexOf('Start-ScheduledTask -TaskName $TaskName'))
+Yes '  and Finish stops it and removes its file on every way out' ($finish.Contains('Remove-ThornswoodOpenTrace $script:openTrace'))
+$traceText = $lib.Substring($lib.IndexOf('# ---- who opened a folder itself'))
+Yes '  the trace is opens and process starts and ends, and it neither sleeps, retries, stops nor moves anything' (
+    $traceText.Contains('"Microsoft-Windows-Kernel-File" 0x80 0x5') -and $traceText.Contains('"Microsoft-Windows-Kernel-Process" 0x10 0x5') -and
+    (($traceText -split "`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n") -cnotmatch 'Start-Sleep|Stop-Process|\.Kill\(|Move-ThornswoodPath|ThornswoodRename|Move-Item|while \(')
+
 $bot = Text (P 'scripts', 'vps', 'Bot-Service.ps1')
 $installBot = FunctionText $bot 'Install-ThornswoodBotService'
 Yes 'the bot''s service program is replaced once, after the service has exited, with no sleep' (

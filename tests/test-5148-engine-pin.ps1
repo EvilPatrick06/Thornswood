@@ -179,22 +179,40 @@ $fake = {
     }
     if ($path -eq 'repos/EvilPatrick06/skymp/pulls/133') {
         return [pscustomobject]@{ number = 133; title = 'The loading screen is cleared (Thornswood #3130)'
-            body = "Fixes the flash.`r`n`r`nTest task for Thornswood #3130: No flash before the loading screen`r`nServer: Main`r`n`r`n1. Load in.`r`nWhat should happen: no flash.`r`n`r`n---`r`nfooter" }
+            body = "Fixes the flash.`r`n`r`nRelease note: The loading screen shows no flash`r`n- The screen stays dark until the picture is up.`r`n`r`nTest task for Thornswood #3130: No flash before the loading screen`r`nServer: Main`r`n`r`n1. Load in.`r`nWhat should happen: no flash.`r`n`r`n---`r`nfooter" }
     }
-    if ($path -eq 'repos/EvilPatrick06/skymp/pulls/81') { return [pscustomobject]@{ number = 81; title = 'An equipped form is not drunk'; body = 'Refs Thornswood #1649 and thornswood #1383.' } }
+    if ($path -eq 'repos/EvilPatrick06/skymp/pulls/81') { return [pscustomobject]@{ number = 81; title = 'An equipped form is not drunk'; body = $script:body81 } }
     throw "no answer for $path"
 }
+$script:body81 = 'Refs Thornswood #1649 and thornswood #1383.'
 $n = Get-EnginePinNotes $P $H $fake
 Yes 'the fork pull requests come from merge commits alone' ($n.Count -eq 2 -and $n.PullRequests[0] -like '- fork #133: *')
 Yes 'the Thornswood issues they name, in order' (($n.Issues -join ',') -eq '1383,1649,3130')
 Yes 'a Test task comes over as done-on-merge.yml reads it, ending at the rule' ($n.TestTasks.Count -eq 1 -and $n.TestTasks[0].StartsWith('Test task for #3130: No flash before the loading screen') -and $n.TestTasks[0].Contains('What should happen: no flash.') -and -not $n.TestTasks[0].Contains('footer'))
+# The release note (plan part 8): the fork pull requests' own lines joined,
+# and the ones with no line named, never taken as none.
+Yes 'the release note is the fork pull requests'' own lines, and one with no line is named' (
+    $n.ReleaseNote -eq "The loading screen shows no flash`n- The screen stays dark until the picture is up." -and (@($n.NoNote) -join ',') -eq '81')
+$script:body81 = "Refs Thornswood #1649.`n`nRelease note: none"
+$n = Get-EnginePinNotes $P $H $fake
+Yes '  a fork pull request that says none adds nothing and is not named' ($n.ReleaseNote -eq "The loading screen shows no flash`n- The screen stays dark until the picture is up." -and @($n.NoNote).Count -eq 0)
+$script:body81 = "Refs Thornswood #1649.`n`nRelease note: An equipped form stays on`n- A worn piece is never drunk by mistake."
+$n = Get-EnginePinNotes $P $H $fake
+Yes '  two notes join into one, the second headline as a line under the first' ($n.ReleaseNote -eq "The loading screen shows no flash`n- The screen stays dark until the picture is up.`n- An equipped form stays on`n- A worn piece is never drunk by mistake.")
+$pin = [IO.File]::ReadAllText((Join-Path $root 'scripts/release/Update-EnginePin.ps1'))
+Yes '  the pin body writes the joined note, none, or names the fork pull requests with no line' ($pin -match "'Release note: ' \+ \`$nl\[0\]" -and $pin -match "'Release note: none'" -and $pin -match 'carry no "Release note:" line')
 
 # ---- 5. engine-pin.yml ----------------------------------------------------------
 $wf = [IO.File]::ReadAllText((Join-Path $root '.github/workflows/engine-pin.yml')).Replace("`r`n", "`n")
 $code = (@($wf -split "`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n")
-function Get-Job([string]$name) { return [regex]::Match($code, "(?ms)^  ${name}:\n.*?(?=^  \S|\z)").Value }
+# A job by name, read after "jobs:" alone: "push" is a trigger under "on:" too.
+$jobsText = $code.Substring([Math]::Max(0, $code.IndexOf("`njobs:")))
+function Get-Job([string]$name) { return [regex]::Match($jobsText, "(?ms)^  ${name}:\n.*?(?=^  \S|\z)").Value }
 $look = Get-Job 'look'; $make = Get-Job 'make'; $push = Get-Job 'push'
 Yes 'engine-pin.yml ticks on a schedule and runs by hand' ($code -match "(?m)^  schedule:\n    - cron: '[^']+'" -and $code -match '(?m)^  workflow_dispatch:')
+Yes '  a push to main that moves engine/skymp starts a look (plan part 8)' ($code -match '(?m)^  push:\n    branches: \[main\]\n    paths: \[engine/skymp\]$')
+$eng0 = [IO.File]::ReadAllText((Join-Path $root '.github/workflows/engine.yml')).Replace("`r`n", "`n")
+Yes '  engine.yml starts a look when a record run on main ends (plan part 8)' ($eng0 -match 'gh workflow run engine-pin\.yml --repo \$env:GITHUB_REPOSITORY --ref main')
 Yes '  one tick at a time, never cancelling the one before' ($code -match '(?m)^  group: engine-pin\n  cancel-in-progress: false')
 Yes '  the workflow''s own token reads only' ($code -match '(?m)^permissions:\n  contents: read\n(?!  )')
 Yes '  three jobs, look, make and push' ($look -and $make -and $push)
@@ -202,6 +220,11 @@ Yes '  make holds a token that only reads' ($make -match '(?m)^    permissions:\
 Yes '  the npm build (Update-EnginePin.ps1, which runs Build-Front.ps1) is in make alone' ($make -match 'Update-EnginePin\.ps1' -and $look -notmatch 'Update-EnginePin|Build-Front|setup-node|yarn|npx' -and $push -notmatch 'Update-EnginePin|Build-Front|setup-node|yarn|npx')
 Yes '  push holds the pin to one commit on main with only a pin''s paths before it pushes' ($push -match 'is not one commit on main' -and $push -match 'changes more than a pin' -and $push.IndexOf('changes more than a pin') -lt $push.IndexOf('push --force'))
 Yes '  push starts the build check on the branch, then opens or updates the pull request' ($push -match 'gh workflow run build-pr\.yml --repo \$env:GITHUB_REPOSITORY --ref engine-pin/next' -and $push.IndexOf('build-pr.yml') -lt $push.IndexOf('Open-EnginePinPr.ps1'))
+Yes '  both places that open the pull request then start the release note check on the branch (plan part 8)' (
+    @([regex]::Matches($look + $push, 'gh workflow run pr-body\.yml --repo \$env:GITHUB_REPOSITORY --ref engine-pin/next')).Count -eq 2 -and
+    $push.IndexOf('Open-EnginePinPr.ps1') -lt $push.IndexOf('pr-body.yml') -and $look.IndexOf('Open-EnginePinPr.ps1') -lt $look.IndexOf('pr-body.yml'))
+$pb = [IO.File]::ReadAllText((Join-Path $root '.github/workflows/pr-body.yml')).Replace("`r`n", "`n")
+Yes '  pr-body.yml can be started by hand, and then reads the branch''s open pull request with a token that only reads' ($pb -match '(?m)^  workflow_dispatch:\s*$' -and $pb -match '(?m)^permissions:\n  contents: read\n  pull-requests: read\n(?!  )' -and $pb -match 'pulls\?state=open&head=')
 Yes '  both places that open the pull request then start the test task check on the branch, whose result main requires (#5199)' (
     $push.IndexOf('Open-EnginePinPr.ps1') -lt $push.IndexOf('gh workflow run test-tasks.yml --repo $env:GITHUB_REPOSITORY --ref engine-pin/next') -and
     $look.IndexOf('Open-EnginePinPr.ps1') -ge 0 -and $look.IndexOf('Open-EnginePinPr.ps1') -lt $look.IndexOf('gh workflow run test-tasks.yml --repo $env:GITHUB_REPOSITORY --ref engine-pin/next'))

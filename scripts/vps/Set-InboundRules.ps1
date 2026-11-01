@@ -116,7 +116,7 @@ $ErrorActionPreference = 'Stop'   # before any file loads, so one that is missin
 . (Join-Path $Here 'Send-Script.ps1')
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 if (-not $User) { $User = Get-ThornswoodVpsUser }
-if (-not $KnownHosts) { $KnownHosts = Get-ThornswoodKnownHostsPath }
+if (-not $KnownHosts) { $KnownHosts = Get-ThornswoodKnownHostsPath -Address $Vps }
 if (-not $Record) { $Record = [IO.Path]::Combine((Split-Path -Parent (Split-Path -Parent $Here)), 'records', 'prod-parity.json') }
 
 $BoxScript = Join-Path $Here $(if ($Own) { 'vps-firewall-policy.ps1' } else { 'vps-inbound-rules.ps1' })

@@ -20,7 +20,8 @@
                             that differ, so a hand edit inside one is caught
     Get-EnginePinStep       what engine-pin.yml does next, from GitHub's answers
     Get-EnginePinNotes      the fork pull requests a pin brings in, the
-                            Thornswood issues they name and their Test tasks
+                            Thornswood issues they name, their Test tasks
+                            and their Release note lines
 
   THE MARKED BLOCKS. A block is the lines between
       <!-- engine-pin:<name> -->   and   <!-- /engine-pin:<name> -->
@@ -32,6 +33,10 @@
   Reads only what it is given: GitHub through the $Get script block the caller
   passes (a path in, the answer as objects out), files through the checkout.
 #>
+
+# The release note rules a pull request's "Release note:" line is held to
+# (#5179); a fork pull request carries one too (plan part 8).
+. (Join-Path $PSScriptRoot 'Note-Rules.ps1')
 
 $EnginePinBranch = 'engine-pin/next'
 $EnginePinThornswood = 'EvilPatrick06/Thornswood'
@@ -236,7 +241,14 @@ function Get-EnginePinStep([string]$Pin, [scriptblock]$Get) {
 # ($New), the Thornswood issues they name ("Thornswood #N"), and the Test
 # task blocks in their bodies ("Test task for Thornswood #N: <title>" and the
 # steps under it, ending where done-on-merge.yml ends one), turned into the
-# shape done-on-merge.yml reads in a pull request here.
+# shape done-on-merge.yml reads in a pull request here. And the release note
+# the pin carries (plan part 8): each fork pull request has its own
+# "Release note:" line, held to Note-Rules.ps1 by the fork's own check, and
+# the pin's is those joined (Join-PrReleaseNotes), so Collect-ReleaseNotes.ps1
+# reads an engine fix in a release the way it reads any other change.
+# ReleaseNote is that joined note, '' when every one says none; NoNote names
+# the fork pull requests with no line, which the pin's body says so a person
+# writes the line there, rather than any being taken as none.
 function Get-EnginePinNotes([string]$Old, [string]$New, [scriptblock]$Get) {
     $c = & $Get ("repos/{0}/compare/{1}...{2}" -f $ForkEngineRepo, $Old, $New)
     $prs = New-Object System.Collections.Generic.List[object]
@@ -254,7 +266,11 @@ function Get-EnginePinNotes([string]$Old, [string]$New, [scriptblock]$Get) {
     $issues = New-Object System.Collections.Generic.SortedSet[int]
     $tasks = New-Object System.Collections.Generic.List[string]
     $lines = New-Object System.Collections.Generic.List[string]
+    $noted = New-Object System.Collections.Generic.List[object]
+    $noNote = New-Object System.Collections.Generic.List[int]
     foreach ($p in $prs) {
+        if ((Get-PrReleaseNote ([string]$p.body)).Found) { $noted.Add([pscustomobject]@{ Number = [int]$p.number; Body = [string]$p.body }) }
+        else { $noNote.Add([int]$p.number) }
         $text = (([string]$p.title) + "`n" + ([string]$p.body)) -replace "`r`n", "`n"
         $named = @([regex]::Matches($text, '(?i)\bThornswood\s+#(\d+)') | ForEach-Object { [int]$_.Groups[1].Value })
         foreach ($i in $named) { [void]$issues.Add($i) }
@@ -274,5 +290,6 @@ function Get-EnginePinNotes([string]$Old, [string]$New, [scriptblock]$Get) {
         }
         if ($cur) { $tasks.Add(($cur -join "`n").TrimEnd()) }
     }
-    return [pscustomobject]@{ PullRequests = $lines.ToArray(); Issues = @($issues); TestTasks = $tasks.ToArray(); Count = $prs.Count }
+    return [pscustomobject]@{ PullRequests = $lines.ToArray(); Issues = @($issues); TestTasks = $tasks.ToArray(); Count = $prs.Count
+                              ReleaseNote = (Join-PrReleaseNotes $noted.ToArray()); NoNote = $noNote.ToArray() }
 }

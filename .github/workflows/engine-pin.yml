@@ -10,10 +10,10 @@
 # efficient, faster, safer, more accurate, streamlined, and more dynamic"
 # way. Every step was already a script; this runs them in order.
 #
-# HOW, ONE TICK EVERY TEN MINUTES. Nothing in the fork can start a run here
-# without holding a token of this repository, and the public fork holds no
-# secret, so this looks instead. Each tick the job "look" asks GitHub what
-# the next step is (scripts\release\EnginePin.ps1, Get-EnginePinStep):
+# HOW, ONE LOOK AT A TIME. Nothing in the fork can start a run here without
+# holding a token of this repository, so until plan part 8 this looked every
+# ten minutes; now it is woken too (WOKEN, NOT ONLY TICKING, below). Each
+# look, the job "look" asks GitHub what the next step is (scripts\release\EnginePin.ps1, Get-EnginePinStep):
 #   pinned, building, no-build, recording: nothing to do this tick;
 #   aside: another open pull request moves engine/skymp (a pin made by hand,
 #          or a change that needs the pin with it), so this waits for it;
@@ -26,7 +26,19 @@
 #          at its cause, so this run goes red with its link and never starts
 #          engine.yml again for that commit (no re-runs, #5148's rules).
 # From a fork merge: the fork's push build (20 to 45 minutes), a tick, the
-# record (about 3), a tick, the pin (about 4) and the build check (about 5).
+# record (about 3), the pin (about 4) and the build check (about 5).
+#
+# WOKEN, NOT ONLY TICKING (plan part 8, Patrick's yes of 31 Oct 2026). Three
+# things start a look the moment they happen, so a step waits for no tick:
+#   - engine.yml's "wake" job, when a record run on main ends, green or red;
+#   - a push to main that moves engine/skymp, so a look that stood aside for
+#     another pin pull request moves on once that one merges;
+#   - the fork, when its push build of thornswood/engine-changes ends green
+#     (the fork's thornswood-wake-pin.yml, with the one secret the fork
+#     holds: a fine-grained token that may start workflows here and do
+#     nothing else, THORNSWOOD_PIN_WAKE).
+# The ten-minute tick stays until the fork's wake has run once for real;
+# then it goes, in its own pull request.
 #
 # THREE JOBS, BECAUSE OF THE TOKEN. "make" runs the front's npm build
 # (Build-Front.ps1), which is code from the npm registry, so its token can
@@ -57,6 +69,11 @@ on:
   schedule:
     - cron: '3-59/10 * * * *'
   workflow_dispatch:
+  # A pin made by another pull request has merged: the look that stood aside
+  # for it moves on now, not at the next tick.
+  push:
+    branches: [main]
+    paths: [engine/skymp]
 permissions:
   contents: read
 # One tick at a time. A tick never cancels the one before it, which may be
@@ -130,6 +147,9 @@ jobs:
           # once the pull request has it; its result is required (#5199).
           gh workflow run test-tasks.yml --repo $env:GITHUB_REPOSITORY --ref engine-pin/next
           if ($LASTEXITCODE -ne 0) { Write-Host '::error::the test task check could not be started on engine-pin/next'; exit 1 }
+          # And the release note check, for the same reason (plan part 8).
+          gh workflow run pr-body.yml --repo $env:GITHUB_REPOSITORY --ref engine-pin/next
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::the release note check could not be started on engine-pin/next'; exit 1 }
 
   make:
     name: Make the pin
@@ -247,3 +267,6 @@ jobs:
           # once the pull request has it; its result is required (#5199).
           gh workflow run test-tasks.yml --repo $env:GITHUB_REPOSITORY --ref engine-pin/next
           if ($LASTEXITCODE -ne 0) { Write-Host '::error::the test task check could not be started on engine-pin/next'; exit 1 }
+          # And the release note check, for the same reason (plan part 8).
+          gh workflow run pr-body.yml --repo $env:GITHUB_REPOSITORY --ref engine-pin/next
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::the release note check could not be started on engine-pin/next'; exit 1 }
