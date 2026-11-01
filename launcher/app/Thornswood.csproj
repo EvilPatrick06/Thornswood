@@ -41,8 +41,9 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- Turns on the trim and native-code analyzers in every build, so code
          that would break in the native exe (reflection, a serializer that
-         reads types at run time, the runtime's own COM) is a warning on a
-         plain `dotnet build` too, not only when Build-Launcher.ps1 publishes. -->
+         reads types at run time, marshalling made at run time) is a warning
+         on a plain `dotnet build` too, not only when Build-Launcher.ps1
+         publishes. -->
     <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
 
