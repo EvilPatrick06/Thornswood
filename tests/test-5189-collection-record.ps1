@@ -79,7 +79,10 @@ try {
         $rr = Read-CollectionRecord $real
         $cp = Read-CollectionRecord (Join-Path $Repo 'records/collection-plugins.json')
         Yes 'R2 it names the collection and revision collection-plugins.json does' ([string]$rr.collection -eq [string]$cp.collection -and [int]$rr.revision -eq [int]$cp.revision)
-        $text = [IO.File]::ReadAllText($real)
+        # The line ends are the checkout's: a Windows runner with
+        # core.autocrlf true checks the record out CRLF, and git stores it
+        # LF as the writer writes it. The layout is what is held here.
+        $text = [IO.File]::ReadAllText($real).Replace("`r`n", "`n")
         Yes 'R3 it is written in the record''s own layout, a mod and a plugin to a line' ($text -ceq (ConvertTo-CollectionRecordText $rr)) 'write it with ConvertTo-CollectionRecordText (New-CollectionRecord.ps1 does)'
         $cpNames = @(@($cp.plugins) | Where-Object { -not (Test-CollectionName $script:CollectionGameOwn $_.name) } | ForEach-Object { ([string]$_.name).ToLowerInvariant() } | Sort-Object)
         $rrNames = @(@($rr.plugins) | Where-Object { -not (Test-CollectionName $script:CollectionOurs $_.name) } | ForEach-Object { ([string]$_.name).ToLowerInvariant() } | Sort-Object)
