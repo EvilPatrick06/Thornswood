@@ -45,6 +45,9 @@
 //     node New-LoadServer.js --build <unpacked server zip> --masters <folder>
 //         --out <server folder> [--shape crowd|spread] [--seats 100]
 //         [--download yes]
+//     node New-LoadServer.js --from <server installed on the box> --out <folder>
+//         --port <n> --voice-port <n> [--shape crowd|spread] [--seats 100]
+// The second lays out the collection's world on the box (fromInstalled).
 'use strict';
 const crypto = require('crypto');
 const fs = require('fs');
@@ -187,12 +190,96 @@ async function build(o) {
   return { out, commit, settings };
 }
 
+// THE COLLECTION ON THE BOX. The collection's plugins are other people's and
+// are only where the game servers are, so a load of the collection's world
+// (its NPCs, the gamemode's NPC runtime, merchants and quests) is laid out on
+// the box, from a server installed there, and never leaves it. From that
+// server, read and never written: its program (dist_back, scam_native.node,
+// package.json), its gamemode.js, the plugins its loadOrder names (by their
+// full paths, not copied), whether the engine keeps NPCs alive (npcEnabled,
+// npcSettings) and the gameplay switches below. Nothing else of its settings
+// is taken, so the copy has no site, no Discord, no ports and no keys of the
+// server's: its own port, its own voice service on 127.0.0.1, its own world
+// folder, and a pass key made here. Its world starts empty, as the runner's.
+const GAMEPLAY_KEYS = ['thornswoodCalendar', 'thornswoodPlotLine', 'thornswoodLook', 'thornswoodFurnitureLine',
+  'thornswoodDoorLine', 'thornswoodCatchFire', 'thornswoodTradeShips', 'thornswoodTradeCarts', 'thornswoodPreserveLine',
+  'thornswoodPartyAt', 'thornswoodNear', 'thornswoodHurtCare', 'thornswoodHideAllNames', 'thornswoodBrokenLimbs',
+  'thornswoodBodyReset', 'thornswoodLoadOrderRefuse'];
+const PROGRAM = ['dist_back', 'scam_native.node', 'package.json', 'gamemode.js'];
+
+function plain(v) {
+  if (typeof v === 'boolean' || typeof v === 'number') { return true; }
+  if (typeof v === 'string') { return v.length <= 200 && !/[:\\/]/.test(v); }
+  return false;
+}
+
+function fromInstalled(o) {
+  const shape = o.shape || 'crowd';
+  if (!['crowd', 'spread'].includes(shape)) { throw new Error('--shape is crowd or spread, not ' + shape); }
+  const seats = Number(o.seats) || 100;
+  const port = Number(o.port) || 0;
+  const voicePort = Number(o['voice-port']) || 0;
+  if (!port || !voicePort) { throw new Error('--port and --voice-port are needed on the box, so the copy keeps off the servers\' own'); }
+  const from = path.resolve(o.from);
+  const out = path.resolve(o.out);
+  if (fs.existsSync(out)) { throw new Error(out + ' is there already'); }
+  const theirs = readJson(path.join(from, 'server-settings.json'));
+  const taken = [Number(theirs.port) || 7777];
+  taken.push(taken[0] === 7777 ? 3000 : taken[0] + 1);
+  for (const p of [port, port === 7777 ? 3000 : port + 1, voicePort]) {
+    if (taken.includes(p)) { throw new Error('port ' + p + ' is one ' + from + ' uses. Nothing was laid out.'); }
+  }
+  const dataDir = path.resolve(from, String(theirs.dataDir || 'data'));
+  const order = [];
+  for (const entry of theirs.loadOrder || []) {
+    const f = path.isAbsolute(String(entry)) ? String(entry) : path.join(dataDir, String(entry));
+    if (!fs.existsSync(f)) { throw new Error(from + ' names ' + entry + ' in its loadOrder, and there is no ' + f); }
+    order.push(f.replace(/\\/g, '/'));
+  }
+  if (!order.length) { throw new Error(from + '\\server-settings.json has no loadOrder'); }
+  fs.mkdirSync(out, { recursive: true });
+  for (const name of PROGRAM) {
+    const a = path.join(from, name);
+    if (!fs.existsSync(a)) { throw new Error(from + ' has no ' + name); }
+    if (fs.statSync(a).isDirectory()) { copyTree(a, path.join(out, name)); } else { fs.copyFileSync(a, path.join(out, name)); }
+  }
+  const settings = {
+    dataDir: 'data',
+    loadOrder: order,
+    master: '',
+    name: 'Thornswood load test',
+    offlineMode: true,
+    port,
+    maxPlayers: seats,
+    npcEnabled: theirs.npcEnabled === true,
+    npcSettings: theirs.npcSettings && typeof theirs.npcSettings === 'object' ? theirs.npcSettings : {},
+    startPoints: startPoints(shape),
+    thornswoodServer: 'dev',
+    thornswoodRequirePass: true,
+    thornswoodChargen: false,
+    thornswoodVoicePort: voicePort
+  };
+  const kept = [];
+  for (const k of GAMEPLAY_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(theirs, k) && plain(theirs[k])) { settings[k] = theirs[k]; kept.push(k); }
+  }
+  fs.writeFileSync(path.join(out, 'server-settings.json'), JSON.stringify(settings, null, 2) + '\n');
+  fs.mkdirSync(path.join(out, 'private'), { recursive: true });
+  fs.writeFileSync(path.join(out, 'private', 'door.json'), JSON.stringify({ passKey: crypto.randomBytes(32).toString('hex') }) + '\n');
+  const engine = sha256(path.join(out, 'scam_native.node'));
+  console.log('the load server is in ' + out + ': from ' + from + ', scam_native.node ' + engine + ', ' + shape + ', ' + seats +
+    ' seats, ' + order.length + ' plugins, engine NPCs ' + (settings.npcEnabled ? 'on' : 'off') + (kept.length ? ', ' + kept.join(' ') : ''));
+  return { out, engine, settings };
+}
+
 async function main() {
   const o = {};
   const argv = process.argv.slice(2);
   for (let i = 0; i < argv.length; i += 2) { o[String(argv[i]).replace(/^--/, '')] = argv[i + 1]; }
+  if (o.from && o.out) { fromInstalled(o); return 0; }
   if (!o.build || !o.masters || !o.out) {
     console.log('node New-LoadServer.js --build <unpacked server zip> --masters <folder> --out <server folder> [--shape crowd|spread] [--seats 100] [--download yes]');
+    console.log('node New-LoadServer.js --from <server installed on the box> --out <folder> --port <n> --voice-port <n> [--shape crowd|spread] [--seats 100]');
     return 2;
   }
   await build(o);
@@ -203,4 +290,4 @@ if (require.main === module) {
   main().then((c) => process.exit(c), (e) => { console.log('NEW LOAD SERVER FAILED: ' + (e && e.message || e)); process.exit(1); });
 }
 
-module.exports = { build, startPoints, checkMaster, MASTERS, WHITERUN };
+module.exports = { build, fromInstalled, startPoints, checkMaster, MASTERS, WHITERUN, GAMEPLAY_KEYS };

@@ -32,6 +32,24 @@
 // Every message the server sends is read and counted, by type; none is kept.
 // What the chat socket carries is counted in bytes each way.
 //
+// WHAT ELSE A PERSON DOES (--play, any of fight, host and trade). Each bot
+// keeps where the actors it is sent are (CreateActor, their moves,
+// DestroyActor), and:
+//   fight  every 2 to 3 s swings at another person in its cell within
+//          FIGHT_REACH: an attack animation (UpdateAnimation, attackStart)
+//          and the hit (OnHit, unarmed, 0x1f4, the engine's IsUnarmedAttack),
+//          both reliable, as skymp5-client sends them. What the server makes
+//          of it (ChangeValues, death, respawn) shows in the message counts;
+//   host   carries out HostStart: the actor it is handed (an NPC near it,
+//          whose AI a game runs and the server only passes on) is sent an
+//          UpdateMovement on the same 130 ms beat as its own character,
+//          standing where the server put it, until HostStop. Without this the
+//          bots would leave every NPC's moves out of the load;
+//   trade  every 30 s asks, over the chat socket as a person types it, to
+//          trade with the nearest NPC within TRADE_REACH: "/merchant <id>",
+//          the guild trader command the panel's E press is (gamemode.js,
+//          createMerchantTrading). The answers are counted by what they say.
+//
 // Messages from Load-Test.js:
 //   { add: [profileId, ...] }   bots to start
 //   { report: true }            answered with { report: {...} }
@@ -50,6 +68,20 @@ const WALK = 100;              // units a second, a walk
 const TELEPORT = 20;
 const TELEPORT2 = 31;
 const PASS_EVERY_MS = 60000;   // the front plugin sends the pass at once and every minute
+const UPDATE_ANIMATION = 3;
+const ON_HIT = 17;
+const HOST_START = 26;
+const HOST_STOP = 27;
+const UNARMED = 0x1f4;         // ActionListener.cpp IsUnarmedAttack
+const FIGHT_REACH = 1000;      // units: who a bot swings at
+const TRADE_REACH = 600;       // units: which NPC a bot asks to trade with
+const TRADE_EVERY_MS = 30000;
+const PLAYER_IDS = 0xff000000; // a person's character; an NPC's refrId is its form id plus 2^32 (PartOne.cpp)
+
+function distance(a, b) {
+  const dx = a[0] - b[0]; const dy = a[1] - b[1]; const dz = a[2] - b[2];
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
 
 // A bot that reads what it is sent without keeping it: Bot.pump keeps every
 // message, which a load test cannot (a crowd of 60 is sent tens of
@@ -75,6 +107,64 @@ class LoadBot extends Bot {
     this.wsUp = 0;             // bytes it sent, since the last report
     this.passSentAt = 0;
     this.welcomed = false;
+    this.play = [];            // what it does besides walking: fight, host, trade
+    this.others = new Map();   // idx -> { refrId, pos, cell }, the actors it was sent
+    this.hosted = new Map();   // idx -> { pos, rot, cell }, the NPCs it carries out
+    this.played = {};          // what it did and what came back, since the last report
+    this.nextHit = 0;
+    this.nextTrade = 0;
+    this.anim = 0;
+  }
+
+  did(what, n) { this.played[what] = (this.played[what] || 0) + (n === undefined ? 1 : n); }
+
+  // The position the bot's own character is at now.
+  here() {
+    const c = this.center || [0, 0, 0];
+    return [c[0] + Math.cos(this.angle) * this.radius, c[1] + Math.sin(this.angle) * this.radius, c[2]];
+  }
+
+  // The nearest actor it knows that keep(actor) holds for, within reach.
+  nearest(reach, keep) {
+    const me = this.here();
+    let best = null; let bestD = reach;
+    for (const [idx, o] of this.others) {
+      if (o.cell !== this.cell || !keep(o)) { continue; }
+      const d = distance(me, o.pos);
+      if (d <= bestD) { best = Object.assign({ idx }, o); bestD = d; }
+    }
+    return best;
+  }
+
+  // A swing at another person near it, as the game sends one.
+  swing(now) {
+    const people = [];
+    const me = this.here();
+    for (const [, o] of this.others) {
+      if (o.cell === this.cell && o.refrId >= PLAYER_IDS && o.refrId < 0x100000000 && distance(me, o.pos) <= FIGHT_REACH) { people.push(o); }
+    }
+    this.nextHit = now + 2000 + Math.random() * 1000;
+    if (!people.length) { this.did('noOneToHit'); return; }
+    const target = people[Math.floor(Math.random() * people.length)];
+    this.send({ t: UPDATE_ANIMATION, idx: this.character.idx, data: { animEventName: 'attackStart', numChanges: ++this.anim } }, true);
+    this.send({ t: ON_HIT, data: { aggressor: 0x14, isBashAttack: false, isHitBlocked: false, isPowerAttack: false, isSneakAttack: false,
+      projectile: 0, source: UNARMED, target: target.refrId } }, true);
+    this.did('hits');
+  }
+
+  // "/merchant <id>" to the nearest NPC, over the chat socket.
+  askTrade(now) {
+    this.nextTrade = now + TRADE_EVERY_MS;
+    const npc = this.nearest(TRADE_REACH, (o) => o.refrId >= 0x100000000);
+    if (!npc) { this.did('noTraderNear'); return; }
+    this.wsSend({ t: 'chat', text: '/merchant ' + (npc.refrId - 0x100000000).toString(16) });
+    this.did('tradeAsks');
+  }
+
+  // What the chat socket brought that answers a trade ask.
+  heard(text) {
+    if (this.play.indexOf('trade') < 0 || text.indexOf('"t":"chat"') < 0) { return; }
+    if (/Trading with/.test(text)) { this.did('tradeOpened'); } else if (/not a guild trader/.test(text)) { this.did('notATrader'); } else if (/trade|trader/i.test(text)) { this.did('tradeOtherAnswer'); }
   }
 
   // The chat socket, once the character is in: a token, then the socket.
@@ -98,6 +188,7 @@ class LoadBot extends Bot {
           const t = String(ev.data);
           this.wsDown += Buffer.byteLength(t);
           if (!this.welcomed && t.startsWith('{"t":"welcome"')) { this.welcomed = true; this.sendPass(Date.now()); }
+          this.heard(t);
         };
         ws.onerror = () => { if (this.step !== 'failed') { this.fail('the chat socket on the voice service failed'); } };
         ws.onclose = (ev) => { if (this.step !== 'failed' && this.step !== 'closing') { this.fail('the voice service closed the chat socket with ' + ev.code); } };
@@ -133,6 +224,26 @@ class LoadBot extends Bot {
       this.counts[t] = (this.counts[t] || 0) + 1;
       if (!m) { continue; }
       if (m.t === MSG.CreateActor && m.isMe && !this.character) { this.character = m; }
+      if (m.t === MSG.CreateActor && !m.isMe && this.play.length) {
+        const tr = m.transform || {};
+        if (Array.isArray(tr.pos)) { this.others.set(m.idx, { refrId: Number(m.refrId) || 0, pos: tr.pos.map(Number), rot: Array.isArray(tr.rot) ? tr.rot.map(Number) : [0, 0, 0], cell: Number(tr.worldOrCell) || 0 }); }
+      }
+      if (m.t === MSG.UpdateMovement && this.play.length && m.data && Array.isArray(m.data.pos)) {
+        const o = this.others.get(m.idx);
+        if (o) { o.pos = m.data.pos.map(Number); if (typeof m.data.worldOrCell === 'number') { o.cell = m.data.worldOrCell; } }
+      }
+      if (m.t === MSG.DestroyActor && this.play.length) { this.others.delete(m.idx); this.hosted.delete(m.idx); }
+      if (m.t === HOST_START && this.play.indexOf('host') >= 0) {
+        let found = false;
+        for (const [idx, o] of this.others) {
+          if (o.refrId === Number(m.target)) { this.hosted.set(idx, { pos: o.pos.slice(), rot: o.rot.slice(), cell: o.cell }); found = true; break; }
+        }
+        this.did(found ? 'hostStarts' : 'hostStartsNotSeen');
+      }
+      if (m.t === HOST_STOP && this.play.indexOf('host') >= 0) {
+        for (const [idx, o] of this.others) { if (o.refrId === Number(m.target)) { this.hosted.delete(idx); } }
+        this.did('hostStops');
+      }
       if (m.t === MSG.CustomPacket && typeof m.contentJsonDump === 'string' && m.contentJsonDump.indexOf('thornswoodLoginChallenge') >= 0) {
         let c = null;
         try { c = JSON.parse(m.contentJsonDump); } catch (err) { this.fail('a login challenge that does not read as JSON'); return; }
@@ -179,6 +290,7 @@ class LoadBot extends Bot {
         this.send({ t: 4, idx: this.character.idx, data: face('Load ' + this.profileId) }, true);
       }
       this.step = 'moving'; this.deadline = 0; this.lastMove = now - Math.random() * MOVE_MS;
+      this.nextHit = now + 5000 + Math.random() * 3000; this.nextTrade = now + 10000 + Math.random() * TRADE_EVERY_MS;
       if (this.voicePort) { this.voiceBy = now + STEP_MS; this.openVoice(); }
       return;
     }
@@ -194,10 +306,19 @@ class LoadBot extends Bot {
       const heading = ((this.angle * 180 / Math.PI) + 90) % 360;
       this.send({ t: MSG.UpdateMovement, idx: this.character.idx, data: {
         worldOrCell: this.cell, pos, rot: [0, 0, heading], direction: 0, healthPercentage: 1, speed: WALK,
-        runMode: 'Walking', isInJumpState: false, isSneaking: false, isBlocking: false, isWeapDrawn: false, isDead: false,
+        runMode: 'Walking', isInJumpState: false, isSneaking: false, isBlocking: false, isWeapDrawn: this.play.indexOf('fight') >= 0, isDead: false,
         teleportSeq: this.seq
       } }, false);
+      for (const [idx, h] of this.hosted) {
+        this.send({ t: MSG.UpdateMovement, idx, data: {
+          worldOrCell: h.cell, pos: h.pos, rot: h.rot, direction: 0, healthPercentage: 1, speed: 0,
+          runMode: 'Standing', isInJumpState: false, isSneaking: false, isBlocking: false, isWeapDrawn: false, isDead: false
+        } }, false);
+        this.did('hostMoves');
+      }
     }
+    if (this.step === 'moving' && this.play.indexOf('fight') >= 0 && now >= this.nextHit) { this.swing(now); }
+    if (this.step === 'moving' && this.welcomed && this.play.indexOf('trade') >= 0 && now >= this.nextTrade) { this.askTrade(now); }
   }
 }
 
@@ -220,10 +341,11 @@ function args(argv) {
 function main() {
   const a = args(process.argv.slice(2));
   if (!a.root || !a.port || !process.send) {
-    console.log('node load-bots.js --root <server folder> --port <proxy port> [--password <p>] [--voice <voice service port>], started by Load-Test.js with IPC');
+    console.log('node load-bots.js --root <server folder> --port <proxy port> [--password <p>] [--voice <voice service port>] [--play fight,host,trade], started by Load-Test.js with IPC');
     process.exit(2);
   }
   const addon = loadAddon(a.root);
+  const playing = String(a.play || '').split(',').filter(Boolean);
   const { passKey, server } = passKeyOf(a.root);
   const bots = [];
   let cpu0 = process.cpuUsage();
@@ -232,7 +354,7 @@ function main() {
     if (msg && Array.isArray(msg.add)) {
       for (const id of msg.add) {
         const b = new LoadBot(addon, { host: '127.0.0.1', port: Number(a.port), password: a.password || '', name: 'load ' + id });
-        b.profileId = id; b.passKey = passKey; b.server = server; b.voicePort = Number(a.voice) || 0;
+        b.profileId = id; b.passKey = passKey; b.server = server; b.voicePort = Number(a.voice) || 0; b.play = playing;
         try {
           b.client = addon.createBotClient(b.host, b.port, b.password, b.timeoutMs);
           b.state = 'connecting'; b.step = 'connecting'; b.deadline = Date.now() + STEP_MS;
@@ -250,6 +372,8 @@ function main() {
       let wsDown = 0; let wsUp = 0; let inVoice = 0;
       let all = 0;
       const perBot = [];
+      const play = {};
+      let hostedNow = 0;
       for (const b of bots) {
         steps[b.step] = (steps[b.step] || 0) + 1;
         if (b.step === 'failed') { failed.push({ profileId: b.profileId, why: b.why }); }
@@ -259,8 +383,11 @@ function main() {
         teleports += b.teleports; all += b.all;
         wsDown += b.wsDown; wsUp += b.wsUp; b.wsDown = 0; b.wsUp = 0;
         if (b.step === 'moving' && b.welcomed) { inVoice++; }
+        for (const k of Object.keys(b.played)) { play[k] = (play[k] || 0) + b.played[k]; }
+        b.played = {};
+        hostedNow += b.hosted.size;
       }
-      process.send({ report: { ms: now - at0, cpuMs: (cpu.user + cpu.system) / 1000, steps, counts, failed, teleports, all, movesReadPerBot: perBot, cores: os.cpus().length, wsDown, wsUp, inVoice } });
+      process.send({ report: { ms: now - at0, cpuMs: (cpu.user + cpu.system) / 1000, steps, counts, failed, teleports, all, movesReadPerBot: perBot, cores: os.cpus().length, wsDown, wsUp, inVoice, play: Object.assign(play, playing.length ? { hostedNow } : {}) } });
       cpu0 = process.cpuUsage(); at0 = now;
     }
     if (msg && msg.stop) {
@@ -282,4 +409,4 @@ function main() {
 
 if (require.main === module) { main(); }
 
-module.exports = { LoadBot, MOVE_MS, passKeyOf };
+module.exports = { LoadBot, MOVE_MS, passKeyOf, UNARMED, FIGHT_REACH, TRADE_REACH };
