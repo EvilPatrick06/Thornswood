@@ -316,8 +316,14 @@ async function room(list) {
     members.push({ l: l, peer: i + 1, n: 0, opts: list[i] });
   }
   function sayTo(m, msg) { return m.n ? m.l.send({ do: 'say', n: m.n, msg: msg }) : Promise.resolve(); }
+  // Set as quit begins. Until then a command to a driver is answered before
+  // anything written after it, so one sent here always settles; after it, a
+  // candidate passed on to a launcher that has already quit would wait on a
+  // driver that is gone, and nothing would be there to hear it fail.
+  let closing = false;
   for (const m of members) {
     m.l.listeners.push((e) => {
+      if (closing) { return; }
       if (e.ev === 'dial') {
         m.n = e.n;
         m.welcomed = m.l.send({ do: 'admit', n: e.n }).then(() => m.l.send({ do: 'say', n: e.n, msg: { t: 'welcome', peer: m.peer, profileId: m.opts.profileId } }));
@@ -344,7 +350,7 @@ async function room(list) {
     rows: function () { return members.map((m) => ({ peer: m.peer, profileId: m.opts.profileId, name: m.opts.name || '', mode: m.opts.mode || 'local' })); },
     say: function (i, msg) { return sayTo(members[i], msg); },
     all: function (msg) { return Promise.all(members.map((m) => sayTo(m, msg))); },
-    quit: async function () { for (const m of members) { await m.l.quit(); } }
+    quit: async function () { closing = true; for (const m of members) { await m.l.quit(); } }
   };
 }
 
