@@ -34,9 +34,19 @@
 # whatever the gate did, and the job is red after if the gate was. A trace
 # that lost an event is refused and keeps no map.
 #
-# WHERE IT RUNS. GitHub's hosted windows-latest, free on a public
-# repository; about twenty minutes. No secret. The run's own token is not
-# given to any harness.
+# WHERE IT RUNS. GitHub's hosted windows-2022, free on a public repository;
+# about twenty minutes. No secret. The run's own token is not given to any
+# harness. Not windows-latest, measured on 1 Nov 2026 (run 41261388357):
+# there, on Windows Server 2025, the trace's self-test saw every open but
+# node's: fs.statSync on a file that is there and one that is not left no
+# Kernel-File create event at all, so a .js harness's stats would be missing
+# from the map and a change to what it stats would not run it. Server 2025
+# has GetFileInformationByName, which reads a file's details by its name
+# without opening it, and node's libuv (and Python 3.12's os.stat) use it
+# where it exists; that is the likely cause, not yet proven (#5183 says
+# what is left to measure). Server 2022 has no such call, so every stat is
+# an open the trace sees, as on the box. Which files a harness touches does
+# not depend on that, so the map holds for the shares on windows-latest.
 #
 # Every action is named by a full length commit SHA with its tag in the
 # comment, for the reason build.yml gives.
@@ -59,7 +69,7 @@ concurrency:
 jobs:
   trace:
     name: Trace the gate and keep its map
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -82,6 +92,7 @@ jobs:
           exit $LASTEXITCODE
 
       - name: Start the trace
+        id: start
         shell: pwsh
         run: |
           .\scripts\dev\Trace-Gate-Here.ps1 -Mode start
@@ -100,7 +111,7 @@ jobs:
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ('code=' + $LASTEXITCODE)
 
       - name: Stop the trace
-        if: always()
+        if: always() && steps.start.outcome == 'success'
         shell: pwsh
         run: |
           # A trace that lost an event is refused here, and no map is kept.
