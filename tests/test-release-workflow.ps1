@@ -143,7 +143,8 @@ $iDraft = $wf.IndexOf('- name: Draft a release')
 Yes 'order: number, SDK, build, fetch the client, sign, SHA256SUMS, draft, clean up (sums name the signed bytes)' ($iNum -gt 0 -and $iNum -lt $iDotnet -and $iDotnet -lt $iBuild -and $iBuild -lt $iFetch -and $iFetch -lt $iSign -and $iSign -lt $iSums -and $iSums -lt $iDraft -and $iDraft -lt $iClean)
 
 $collect = Get-Step $wf 'Collect the launcher''s programs'
-Yes 'the collect step takes every .exe and .dll of the launcher folder, by name, and refuses one with no Thornswood.exe' ($collect.Contains("Where-Object { `$_.Extension -in '.exe', '.dll' } | Sort-Object Name") -and $collect.Contains("`$_.Name -eq 'Thornswood.exe'"))
+Yes 'the collect step takes every .exe and .dll of the launcher folder, by name, and refuses one with no Thornswood.exe' ($collect.Contains("Where-Object { `$_.Extension -in '.exe', '.dll' -or `$_.Name -in 'app.ico', 'app-dev.ico' } | Sort-Object Name") -and $collect.Contains("`$_.Name -eq 'Thornswood.exe'"))
+Yes '  and the two icons the exe embeds, refusing a folder without either, so Install-Launcher names the icon file after the exe''s art (#887)' ($collect.Contains("`$noIcon = @('app.ico', 'app-dev.ico' | Where-Object { `$programs.Name -notcontains `$_ })") -and $collect -match 'if \(\$noIcon\.Count\) \{[^}]*exit 1 \}')
 Yes '  and writes a SHA256SUMS line for each of them' ($collect -match '(?s)foreach \(\$f in \$programs\) \{\s*\$hash = .*?\$lines \+= \("\$hash  " \+ \$f\.Name\)')
 
 # ---- one draft per tag --------------------------------------------------------

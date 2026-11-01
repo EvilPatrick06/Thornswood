@@ -18,6 +18,13 @@
   refuses an update with a program in it that Thornswood did not sign
   (launcher\app\VeloPackage.cs).
 
+  THE TWO ICONS IT EMBEDS GO BESIDE IT (#887). app.ico and app-dev.ico, the
+  files the project embeds under those names, byte for byte, for
+  Install-Launcher.ps1: it names the shortcuts' icon file after the art the
+  exe carries, as the launcher does (Icons.IconFile), and a native exe's
+  resources cannot be read back out of it. Nothing packs them; the launcher
+  reads its own copies.
+
   Nothing here needs MSBuild or the .NET Framework any more: the setup stub,
   the last thing built with them, went with #4824. Your friends never compile
   anything - they get the finished program from Setup.exe.
@@ -61,7 +68,7 @@ param(
     [switch]$NoPause,
     # Leaves the launcher unsigned even on a machine with records\signing\signing.json.
     # For a test build that never ships, so it spends no signing; Ship never
-    # passes it, and Ship and Publish-Installer refuse an unsigned exe.
+    # passes it, and Ship refuses an unsigned exe.
     [switch]$NoSign,
     # The number the exe carries, passed to the compile as -p:Version and
     # read back by the launcher from its own file (Updater.Version, #4825).
@@ -195,14 +202,28 @@ foreach ($f in @(Get-ChildItem -LiteralPath $pubDir -File)) {
     Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $outDir $f.Name) -Force
 }
 Remove-Item -LiteralPath $pubDir -Recurse -Force
+# The icons the project embeds, named by their LogicalName, read off the
+# project itself so the file beside the exe is the one compiled into it
+# (header). A project that embeds either under another name, or not at all,
+# stops the build: Install-Launcher could not name the shortcuts' icon.
+$projXml = [xml](Get-Content -LiteralPath $proj -Raw)
+$embedded = @($projXml.SelectNodes("//*[local-name()='EmbeddedResource']"))
+foreach ($want in 'app.ico', 'app-dev.ico') {
+    $items = @($embedded | Where-Object { $n = $_.SelectSingleNode("*[local-name()='LogicalName']"); $n -and $n.InnerText.Trim() -eq $want })
+    if ($items.Count -ne 1) { Die "Thornswood.csproj embeds $($items.Count) resources named $want, not one, so the icon beside the exe cannot be the one inside it. Nothing more was put in $outDir." }
+    $icoSrc = Join-Path (Split-Path -Parent $proj) $items[0].GetAttribute('Include')
+    if (-not (Test-Path -LiteralPath $icoSrc)) { Die "$icoSrc, which Thornswood.csproj embeds as $want, is not there." }
+    Copy-Item -LiteralPath $icoSrc -Destination (Join-Path $outDir $want) -Force
+}
 $programs = @(Get-ChildItem -LiteralPath $outDir -File | Where-Object { $_.Extension -in '.exe', '.dll' })
 foreach ($p in $programs) { Say ("  {0}  {1:n0} KB" -f $p.Name, ($p.Length / 1KB)) 'Green' }
 $pdb = [IO.Path]::ChangeExtension($exe, '.pdb')
 if (Test-Path -LiteralPath $pdb) {
-    Say ("  Thornswood.pdb  {0:n0} KB (kept beside the exe; packs and the installer leave it out)" -f ((Get-Item $pdb).Length / 1KB)) 'DarkGray'
+    Say ("  Thornswood.pdb  {0:n0} KB (kept beside the exe; nothing packs it)" -f ((Get-Item $pdb).Length / 1KB)) 'DarkGray'
 } else {
     Say '  Thornswood.pdb did not appear beside the exe' 'Yellow'
 }
+Say '  app.ico, app-dev.ico (the icons it embeds, for Install-Launcher.ps1)' 'DarkGray'
 
 # ------------------------------------------------------------ signing
 #

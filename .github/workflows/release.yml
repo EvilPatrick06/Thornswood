@@ -16,7 +16,12 @@
 # THE LAUNCHER IS A FOLDER (#4823). Compiled to native code, Thornswood.exe
 # needs the native libraries Avalonia draws with beside it, so every .exe and
 # .dll the publish leaves goes on the draft, signed, each with its own line
-# in SHA256SUMS; Thornswood.pdb, the symbols, does not. The setup program
+# in SHA256SUMS; Thornswood.pdb, the symbols, does not. So do app.ico and
+# app-dev.ico, the icons the exe embeds, which Build-Launcher.ps1 writes
+# beside it: Install-Launcher.ps1 names the shortcuts' icon file after the
+# art the exe carries (#887), and a native exe's resources cannot be read
+# back out of it. They are not programs, so they are not signed; their
+# lines in SHA256SUMS hold them. The setup program
 # this build also made until #4824 (setup-stub.exe) went with the old
 # installer: the download is Velopack's Setup.exe, which merge-release.yml
 # makes.
@@ -363,9 +368,12 @@ jobs:
           $out = Join-Path $env:RUNNER_TEMP 'release'
           New-Item -ItemType Directory -Force -Path $out | Out-Null
           # Every .exe and .dll the publish left (header, THE LAUNCHER IS A
-          # FOLDER), by name, so the order is the same on every run.
-          $programs = @(Get-ChildItem -LiteralPath (Join-Path $root 'Launcher') -File | Where-Object { $_.Extension -in '.exe', '.dll' } | Sort-Object Name)
+          # FOLDER), and the two icons the exe embeds, by name, so the order
+          # is the same on every run.
+          $programs = @(Get-ChildItem -LiteralPath (Join-Path $root 'Launcher') -File | Where-Object { $_.Extension -in '.exe', '.dll' -or $_.Name -in 'app.ico', 'app-dev.ico' } | Sort-Object Name)
           if (-not ($programs | Where-Object { $_.Name -eq 'Thornswood.exe' })) { Write-Host '::error::the launcher folder has no Thornswood.exe'; exit 1 }
+          $noIcon = @('app.ico', 'app-dev.ico' | Where-Object { $programs.Name -notcontains $_ })
+          if ($noIcon.Count) { Write-Host ("::error::the launcher folder has no " + ($noIcon -join ' or ') + ", which Build-Launcher.ps1 writes beside the exe"); exit 1 }
           foreach ($f in $programs) { Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $out $f.Name) -Force }
           # The sha256sum shape, "<hash>  <name>" with two spaces, one line
           # each, so both `sha256sum -c` and Ship read the same file. Written
