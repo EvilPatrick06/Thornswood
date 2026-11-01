@@ -393,6 +393,12 @@ function checkRulesets(repo, list) {
     // and never a branch one (the redesign's part 20, 1 Nov 2026): a branch
     // is changed only through a pull request with its checks, whoever pushes.
     for (const b of r.bypass_actors) {
+      // GitHub Actions, the identity of a run's own token, is refused as a
+      // bypass actor: 422 Validation Failed on 31 Oct 2026 in a personal
+      // repository and on 1 Nov 2026 in the organization (#5296).
+      if (b && b.actor_type === 'Integration' && b.actor_id === 15368) {
+        throw new Error(at + ': ' + name + ' lets GitHub Actions (15368) bypass it, which GitHub refuses (422); a run that must bypass a ruleset uses an App of its own');
+      }
       if (MACHINE_ACTORS.indexOf(b && b.actor_type) >= 0 && r.target !== 'tag') {
         throw new Error(at + ': ' + name + ' lets ' + (b.actor_type === 'Integration' ? 'the App ' + b.actor_id : 'a deploy key') + ' bypass a branch ruleset; an App or a deploy key may bypass only a tag ruleset');
       }
