@@ -32,6 +32,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $root = Split-Path -Parent $Here
 . (Join-Path $root 'scripts\deploy\Swap.ps1')
 . (Join-Path $root 'scripts\vps\Vps.ps1')
+. (Join-Path $Here 'Windows.ps1')
 
 $script:pass = 0; $script:fail = 0
 function Check([string]$what, [bool]$ok) {
@@ -97,7 +98,7 @@ try {
     $null = New-Item -ItemType Directory -Path $bin -Force
     $gateFile = [IO.Path]::GetFullPath((Join-Path $scratch 'gate/keys/box_known_hosts'))
     function Set-StandInSsh([string]$line) {
-        if ($IsWindows -or $env:OS -eq 'Windows_NT') { [IO.File]::WriteAllText((Join-Path $bin 'ssh.cmd'), "@echo off`r`necho host x`r`necho $line`r`n") }
+        if ($OnWindows) { [IO.File]::WriteAllText((Join-Path $bin 'ssh.cmd'), "@echo off`r`necho host x`r`necho $line`r`n") }
         else { [IO.File]::WriteAllText((Join-Path $bin 'ssh'), "#!/bin/sh`necho 'host x'`necho '$line'`n"); & chmod +x (Join-Path $bin 'ssh') }
     }
     $savedPath = $env:PATH
