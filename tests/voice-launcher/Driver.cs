@@ -45,7 +45,7 @@ namespace Thornswood
         static ManualClock clock;
         static ManualLoop loop;
         static VoiceSession session;
-        static readonly Dictionary<int, FakeSocket> sockets = new Dictionary<int, FakeSocket>();
+        static readonly ConcurrentDictionary<int, FakeSocket> sockets = new ConcurrentDictionary<int, FakeSocket>();
         static int dialled;
 
         // The launcher's side of a token ask, when the harness hands it here.
@@ -53,7 +53,7 @@ namespace Thornswood
         static int tokensDelay, minted;
         static string tokensPrefix = "fresh-", tokensWhy = "";
         // Every dial fails, as on a network that is down.
-        static bool dialsFail;
+        static volatile bool dialsFail;
 
         public static void Emit(Action<Utf8JsonWriter> write)
         {
@@ -206,7 +206,7 @@ namespace Thornswood
 
         static Task<WebSocket> FakeDial(Uri url, IReadOnlyList<string> protocols, CancellationToken stop)
         {
-            int n = ++dialled;
+            int n = Interlocked.Increment(ref dialled);
             var s = new FakeSocket(n);
             sockets[n] = s;
             Emit(w =>
@@ -335,11 +335,14 @@ namespace Thornswood
     /// <summary>
     /// A socket the harness answers for the voice service: its handshake is
     /// waiting until admitted or refused, what the session sends is an event,
-    /// and what the service says is handed in.
+    /// and what the service says is handed in. The harness's commands come on
+    /// the driver's thread and the session reads on its own, so everything it
+    /// holds is behind one lock, and a waiting read is woken outside it.
     /// </summary>
     sealed class FakeSocket : WebSocket
     {
         readonly int n;
+        readonly object gate = new object();
         public readonly TaskCompletionSource<WebSocket> Dialling = new TaskCompletionSource<WebSocket>();
         readonly Queue<byte[]> inbox = new Queue<byte[]>();
         TaskCompletionSource<bool> waiting;
@@ -348,51 +351,48 @@ namespace Thornswood
 
         public FakeSocket(int n) { this.n = n; }
 
-        public void Admit() { state = WebSocketState.Open; Dialling.TrySetResult(this); }
+        public void Admit()
+        {
+            lock (gate) state = WebSocketState.Open;
+            Dialling.TrySetResult(this);
+        }
 
         public void Refuse()
         {
-            state = WebSocketState.Closed;
+            lock (gate) state = WebSocketState.Closed;
             Dialling.TrySetException(new WebSocketException("refused by the harness's service"));
         }
 
         public void Say(string json)
         {
-            inbox.Enqueue(Encoding.UTF8.GetBytes(json));
-            Wake();
+            TaskCompletionSource<bool> w;
+            lock (gate) { inbox.Enqueue(Encoding.UTF8.GetBytes(json)); w = waiting; waiting = null; }
+            if (w != null) w.TrySetResult(true);
         }
 
         public void CloseFromService()
         {
-            closedByService = true;
-            Wake();
-        }
-
-        void Wake()
-        {
-            TaskCompletionSource<bool> w = waiting;
-            waiting = null;
+            TaskCompletionSource<bool> w;
+            lock (gate) { closedByService = true; w = waiting; waiting = null; }
             if (w != null) w.TrySetResult(true);
         }
 
         void Gone()
         {
-            if (said) return;
-            said = true;
+            lock (gate) { if (said) return; said = true; }
             Driver.Emit(w => { w.WriteString("ev", "closed"); w.WriteNumber("n", n); });
         }
 
         public override WebSocketCloseStatus? CloseStatus { get { return null; } }
         public override string CloseStatusDescription { get { return null; } }
-        public override WebSocketState State { get { return state; } }
+        public override WebSocketState State { get { lock (gate) return state; } }
         public override string SubProtocol { get { return "thornswood"; } }
 
         public override void Abort()
         {
-            state = WebSocketState.Aborted;
+            TaskCompletionSource<bool> w;
+            lock (gate) { state = WebSocketState.Aborted; w = waiting; waiting = null; }
             Dialling.TrySetCanceled();
-            TaskCompletionSource<bool> w = waiting;
-            waiting = null;
             if (w != null) w.TrySetException(new WebSocketException("aborted"));
             Gone();
         }
@@ -409,34 +409,39 @@ namespace Thornswood
             return Task.CompletedTask;
         }
 
-        public override void Dispose() { if (state != WebSocketState.Aborted) Abort(); }
+        public override void Dispose() { if (State != WebSocketState.Aborted) Abort(); }
 
         public override async Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken cancellationToken)
         {
             while (true)
             {
-                if (state == WebSocketState.Aborted) throw new WebSocketException("aborted");
-                if (inbox.Count > 0)
+                Task wait;
+                bool closing = false;
+                lock (gate)
                 {
-                    byte[] m = inbox.Dequeue();
-                    if (m.Length > buffer.Count) throw new InvalidDataException("a harness message longer than the session's buffer");
-                    Array.Copy(m, 0, buffer.Array, buffer.Offset, m.Length);
-                    return new WebSocketReceiveResult(m.Length, WebSocketMessageType.Text, true);
+                    if (state == WebSocketState.Aborted) throw new WebSocketException("aborted");
+                    if (inbox.Count > 0)
+                    {
+                        byte[] m = inbox.Dequeue();
+                        if (m.Length > buffer.Count) throw new InvalidDataException("a harness message longer than the session's buffer");
+                        Array.Copy(m, 0, buffer.Array, buffer.Offset, m.Length);
+                        return new WebSocketReceiveResult(m.Length, WebSocketMessageType.Text, true);
+                    }
+                    if (closedByService) { state = WebSocketState.Closed; closing = true; wait = null; }
+                    else { waiting = new TaskCompletionSource<bool>(); wait = waiting.Task; }
                 }
-                if (closedByService)
+                if (closing)
                 {
-                    state = WebSocketState.Closed;
                     Gone();
                     return new WebSocketReceiveResult(0, WebSocketMessageType.Close, true, WebSocketCloseStatus.NormalClosure, "");
                 }
-                waiting = new TaskCompletionSource<bool>();
-                await waiting.Task;
+                await wait;
             }
         }
 
         public override Task SendAsync(ArraySegment<byte> buffer, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken)
         {
-            if (state != WebSocketState.Open) throw new WebSocketException("not open");
+            if (State != WebSocketState.Open) throw new WebSocketException("not open");
             string text = Encoding.UTF8.GetString(buffer.Array, buffer.Offset, buffer.Count);
             Driver.Emit(w => { w.WriteString("ev", "sent"); w.WriteNumber("n", n); w.WritePropertyName("msg"); w.WriteRawValue(text); });
             return Task.CompletedTask;

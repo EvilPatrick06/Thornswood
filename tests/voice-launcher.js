@@ -17,6 +17,7 @@
 //   a.sent(n)           what it wrote to socket n
 //   a.host(kind)        what it told the launcher, by kind (log, status, ...)
 //   await a.until(fn, ms, what)   real clock: waits for fn(a) to hold
+//   a.listeners.push(fn)          fn(event) as each line comes
 //   await a.quit()
 //
 // With clock 'manual' every send resolves once the session has nothing left
@@ -103,6 +104,7 @@ function start(opts) {
     child: child,
     seq: 0,
     waiters: [],
+    listeners: [],
     exited: null,
     swallowed: function () { try { return fs.readFileSync(log, 'utf8'); } catch (e) { return ''; } },
     stderr: function () { return err; }
@@ -112,6 +114,7 @@ function start(opts) {
     let e;
     try { e = JSON.parse(l); } catch (x) { e = { ev: 'unreadable', line: l }; }
     me.events.push(e);
+    for (const f of me.listeners) { f(e); }
     for (const w of me.waiters.slice()) { w(); }
   });
   child.on('exit', (code) => { me.exited = code; for (const w of me.waiters.slice()) { w(); } });
@@ -158,4 +161,184 @@ function start(opts) {
   return me.until(() => me.events.some((e) => e.ev === 'ready'), 60000, 'start').then(() => me);
 }
 
-module.exports = { build: build, start: start, findDotnet: findDotnet };
+// ------------------------------------------------------------ the service
+/*
+  The real voice service for a launcher to join: voice\voice-server.js copied
+  into a temp folder and started on a port of this run's own (#1703), with a
+  stand-in for the site that says every ticket owns its profile, so the
+  service mints each join token itself, on its own clock (#1867, #1963).
+  Nothing is asked of the port until the service has said it listens there.
+
+    const svc = await VL.service({ env: { THORNSWOOD_TURN_URL: ... } });
+    svc.base            the https address a launcher is configured with; the
+                        driver dials its wss as ws on loopback, which the
+                        service takes as this machine, as from Caddy
+    await svc.token(pid)
+    await svc.feed([{ profileId, pos, angleZ, cell, name }])
+    svc.log()           what it printed
+    await svc.stop()
+*/
+function freePort() {
+  return new Promise((ok, bad) => {
+    const s = require('net').createServer();
+    s.on('error', bad);
+    s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => ok(p)); });
+  });
+}
+
+function siteThatSaysYes() {
+  return new Promise((ok) => {
+    const site = require('http').createServer((req, res) => {
+      req.resume();
+      req.on('end', () => {
+        if (req.method === 'POST' && req.url === '/api/play/owns') { res.writeHead(200, { 'content-type': 'application/json' }).end('{"ok":true}'); }
+        else { res.writeHead(404).end(); }
+      });
+    });
+    site.listen(0, '127.0.0.1', () => { site.unref(); ok({ url: 'http://127.0.0.1:' + site.address().port, server: site }); });
+  });
+}
+
+async function service(opts) {
+  opts = opts || {};
+  const server = opts.server || process.env.VOICE || path.join(REPO, 'voice', 'voice-server.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-voice-svc-'));
+  fs.copyFileSync(server, path.join(dir, 'voice-server.js'));
+  fs.copyFileSync(path.join(REPO, 'voice', 'headlines.js'), path.join(dir, 'headlines.js'));
+  const site = await siteThatSaysYes();
+  const port = await freePort();
+  let out = '';
+  const srv = cp.spawn(process.execPath, ['voice-server.js'], {
+    cwd: dir,
+    env: Object.assign({}, process.env, {
+      THORNSWOOD_VOICE_PORT: String(port),
+      THORNSWOOD_VOICE_BIND: '127.0.0.1',
+      THORNSWOOD_SITE: site.url,
+      THORNSWOOD_CHAT_DIR: path.join(dir, 'chat')
+    }, opts.env || {})
+  });
+  srv.stdout.on('data', (d) => { out += d; });
+  srv.stderr.on('data', (d) => { out += d; });
+  await new Promise((ok, bad) => {
+    const late = setTimeout(() => end(new Error('the voice service did not say it was listening on ' + port + ' within fifteen seconds. It printed:\n' + out)), 15000);
+    const look = () => { const m = /\[voice\] listening on \S+:(\d+)/.exec(out); if (m && Number(m[1]) === port) { end(null); } };
+    const gone = (code) => end(new Error((/EADDRINUSE/.test(out) ? 'something else already holds port ' + port + ', so ' : '') +
+                                         'the voice service stopped (exit ' + code + ') before it was listening. It printed:\n' + out));
+    function end(err) { clearTimeout(late); srv.stdout.removeListener('data', look); srv.removeListener('exit', gone); if (err) { bad(err); } else { ok(); } }
+    srv.stdout.on('data', look);
+    srv.on('exit', gone);
+    look();
+  });
+  const http = require('http');
+  function post(where, body) {
+    return new Promise((ok, bad) => {
+      const text = JSON.stringify(body);
+      const req = http.request({ host: '127.0.0.1', port: port, path: where, method: 'POST', agent: false,
+                                 headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(text) } }, (res) => {
+        let b = '';
+        res.on('data', (d) => { b += d; });
+        res.on('end', () => ok({ status: res.statusCode, body: b }));
+      });
+      req.on('error', bad);
+      req.end(text);
+    });
+  }
+  return {
+    port: port,
+    dir: dir,
+    base: 'https://127.0.0.1:' + port,
+    log: function () { return out; },
+    post: post,
+    token: async function (pid) {
+      const r = await post('/token', { profileId: pid, ticket: 'a ticket the stand-in site takes' });
+      let doc = null;
+      try { doc = JSON.parse(r.body); } catch (e) { doc = null; }
+      if (r.status !== 200 || !doc || typeof doc.token !== 'string') { throw new Error('the service minted no token for profile ' + pid + ': ' + r.status + ' ' + r.body.slice(0, 200)); }
+      return doc.token;
+    },
+    feed: async function (who) {
+      const r = await post('/positions', { who: who });
+      if (r.status !== 204) { throw new Error('the service did not take the positions: ' + r.status + ' ' + r.body.slice(0, 200)); }
+    },
+    stop: function () {
+      return new Promise((ok) => {
+        site.server.close();
+        const rm = () => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* a file the service still held; the temp folder keeps it */ } ok(); };
+        if (srv.exitCode !== null) { rm(); return; }
+        srv.once('exit', rm);
+        srv.kill();
+      });
+    }
+  };
+}
+
+/*
+  A launcher in the service's room, as Voice.cs runs one: configured with the
+  service's address and a join token for its profile, and every later ask for
+  a token answered with a fresh one from the service, as Voice.cs fetches it.
+*/
+async function join(svc, opts) {
+  const l = await start({ clock: 'real', wire: 'ws', tone: opts.tone, name: opts.name });
+  let seen = 0;
+  l.child.stdout.on('data', () => {
+    const asks = l.events.filter((e) => e.ev === 'host' && e.kind === 'token' && e.text === 'need').length;
+    for (; seen < asks; seen++) {
+      svc.token(opts.profileId).then((t) => l.send({ do: 'token', token: t }), (e) => l.send({ do: 'token', token: '', why: String(e.message) }));
+    }
+  });
+  await l.send({ do: 'configure', profileId: opts.profileId, name: opts.name || '', token: await svc.token(opts.profileId), base: svc.base });
+  return l;
+}
+
+/*
+  A room this file answers in the service's place, for what the real service
+  never sends but a session must still get right (a position table without
+  your own row, a message from somebody who left): launchers on fake sockets
+  with the real clock and real connections between them. Each socket is
+  admitted and welcomed as that launcher's peer id (1, 2, ... in the order
+  given), every token ask is answered, and each sdp and ice message is passed
+  to the launcher it names, from its sender, as the service passes it. The
+  roster, the positions and anything else are the harness's to say.
+
+    const r = await VL.room([{ profileId: 1, name: 'Me', tone: 440 }, ...]);
+    await r.say(0, { t: 'peers', peers: r.rows() });   // to the first
+    await r.all({ t: 'pos', who: ... });                // to every one
+    r.at(0)             that launcher
+    await r.quit()
+*/
+async function room(list) {
+  const members = [];
+  for (let i = 0; i < list.length; i++) {
+    const l = await start({ clock: 'real', wire: 'fake', tone: list[i].tone, name: list[i].name });
+    members.push({ l: l, peer: i + 1, n: 0, opts: list[i] });
+  }
+  function sayTo(m, msg) { return m.n ? m.l.send({ do: 'say', n: m.n, msg: msg }) : Promise.resolve(); }
+  for (const m of members) {
+    m.l.listeners.push((e) => {
+      if (e.ev === 'dial') {
+        m.n = e.n;
+        m.l.send({ do: 'admit', n: e.n }).then(() => m.l.send({ do: 'say', n: e.n, msg: { t: 'welcome', peer: m.peer, profileId: m.opts.profileId } }));
+      } else if (e.ev === 'host' && e.kind === 'token' && e.text === 'need') {
+        m.l.send({ do: 'token', token: 'room-' + m.peer });
+      } else if (e.ev === 'sent' && e.msg && (e.msg.t === 'sdp' || e.msg.t === 'ice')) {
+        const to = members.filter((x) => x.peer === e.msg.to)[0];
+        if (!to) { return; }
+        const fwd = { t: e.msg.t, from: m.peer };
+        if (e.msg.t === 'sdp') { fwd.sdp = e.msg.sdp; } else { fwd.candidate = e.msg.candidate; }
+        sayTo(to, fwd);
+      }
+    });
+    await m.l.send({ do: 'configure', profileId: m.opts.profileId, name: m.opts.name || '', token: 'room-' + m.peer, base: 'https://room.invalid/voice' });
+  }
+  await Promise.all(members.map((m) => m.l.until(() => m.l.sent(m.n).some((x) => x.t === 'join'), 15000, 'join')));
+  return {
+    at: function (i) { return members[i].l; },
+    peer: function (i) { return members[i].peer; },
+    rows: function () { return members.map((m) => ({ peer: m.peer, profileId: m.opts.profileId, name: m.opts.name || '', mode: m.opts.mode || 'local' })); },
+    say: function (i, msg) { return sayTo(members[i], msg); },
+    all: function (msg) { return Promise.all(members.map((m) => sayTo(m, msg))); },
+    quit: async function () { for (const m of members) { await m.l.quit(); } }
+  };
+}
+
+module.exports = { build: build, start: start, findDotnet: findDotnet, service: service, join: join, room: room };

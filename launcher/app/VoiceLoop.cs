@@ -49,7 +49,9 @@ namespace Thornswood
     sealed class VoiceThread : VoiceLoop
     {
         readonly BlockingCollection<Action> jobs = new BlockingCollection<Action>();
-        bool ended;   // read and written on the loop's thread only
+        readonly object gate = new object();
+        bool finished;   // under gate: Finish has queued the last job
+        bool ended;      // on the loop's thread only: the last job has run
 
         public VoiceThread()
         {
@@ -60,10 +62,18 @@ namespace Thornswood
             }.Start();
         }
 
+        /// <summary>
+        /// Queues a job, unless the last one has been queued: a connection or
+        /// the microphone can still report in while the session closes, and
+        /// what it says is for a session that is gone.
+        /// </summary>
         public override void Add(Action job)
         {
-            try { jobs.Add(job); }
-            catch (InvalidOperationException ex) { Swallow.Note("VoiceThread.Add, after the end", ex); }
+            lock (gate)
+            {
+                if (finished) return;
+                jobs.Add(job);
+            }
         }
 
         /// <summary>
@@ -74,9 +84,14 @@ namespace Thornswood
         public override void Finish(Action last)
         {
             var done = new ManualResetEventSlim(false);
-            Add(delegate { try { last(); } finally { ended = true; done.Set(); } });
+            lock (gate)
+            {
+                if (finished) return;
+                jobs.Add(delegate { try { last(); } finally { ended = true; done.Set(); } });
+                finished = true;
+                jobs.CompleteAdding();
+            }
             done.Wait(2000);
-            jobs.CompleteAdding();
         }
     }
 }
