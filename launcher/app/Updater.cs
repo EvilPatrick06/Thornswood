@@ -10,11 +10,28 @@ namespace Thornswood
 {
     static partial class Updater
     {
-        // The launcher's number. Git holds 0.0.0 here and never another: the
-        // build writes the real one in for the compile and puts this back
-        // (scripts\release\LauncherVersion.ps1 says how it is worked out,
-        // Build-Launcher.ps1 and Ship.ps1 write it, #5179).
-        public const string Version = "0.0.0";
+        // The launcher's number, the one the build gave the exe (#4825): the
+        // build passes it as -p:Version (scripts\release\Build-Launcher.ps1),
+        // and in a merge release it is the version of the Velopack package
+        // the exe goes out in (merge-release.yml, MergeRelease.ps1), so the
+        // launcher, the package and the signed release record say the same
+        // number. A bare build says 0.0.0. Until #4825 the build wrote the
+        // number into this line and put it back afterwards; nothing writes a
+        // source file for the build any more.
+        public static readonly string Version = BuiltVersion();
+
+        /// <summary>
+        /// The exe's own version, three parts, or four when the build gave
+        /// four (a dev Ship's number, Ship.ps1). Read from the assembly's name,
+        /// which the native build keeps.
+        /// </summary>
+        static string BuiltVersion()
+        {
+            System.Version v = typeof(Updater).Assembly.GetName().Version;
+            if (v == null) return "0.0.0";
+            string three = v.Major + "." + v.Minor + "." + Math.Max(0, v.Build);
+            return v.Revision > 0 ? three + "." + v.Revision : three;
+        }
 
         /// <summary>
         /// The collection revision the last feed named, or 0 when it named
@@ -248,7 +265,11 @@ namespace Thornswood
         /// </summary>
         public static VersionDoc Check(Config cfg)
         {
-            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // Tls12 added, never replaced (#1360)
+            // No ServicePointManager.SecurityProtocol line any more (#4825). On
+            // the .NET Framework it added TLS 1.2 to an old default (#1360). On
+            // .NET 10 the default is whatever Windows allows, TLS 1.3 included,
+            // and adding TLS 1.2 to that default would have turned it into TLS
+            // 1.2 alone.
             LastNotModified = false;
 
             string feedUrl = FeedUrl(cfg);
@@ -289,7 +310,6 @@ namespace Thornswood
         /// </summary>
         public static bool WaitForFeedChange(Config cfg)
         {
-            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // Tls12 added, never replaced (#1360)
             string tip = WatchUrl(cfg);
             CheckUrl(tip);
 
@@ -769,7 +789,6 @@ namespace Thornswood
             if (string.IsNullOrEmpty(expectSha))
                 throw new Exception("That update arrived without a checksum, so it has not been downloaded. This is a publishing mistake, not something wrong with your install.");
 
-            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // Tls12 added, never replaced (#1360)
             string tmp = Path.Combine(Path.GetTempPath(), "thornswood-" + Guid.NewGuid().ToString("N") + ".bin");
             // Read in pieces rather than DownloadFile, so the Play button can
             // show the bytes as they come (#1145, PlayProgress.Part).
@@ -1241,120 +1260,32 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Who the downloaded launcher has to be signed by.
+        /// Who every program of an update has to be signed by: the launcher,
+        /// the libraries beside it and Velopack's own programs in the package
+        /// (VeloPackage.cs), Velopack's Update.exe, and the catalog of each
+        /// release record (VeloRecord.cs, FeedManifest.cs).
         ///
-        /// Empty means the check is skipped, and that is deliberate. Every
-        /// release before signing begins is unsigned, so a launcher that
-        /// refused them would strand everybody on whatever they already have.
-        ///
-        /// Fill this in with a distinctive part of the certificate's Subject
-        /// line, in the same release that first ships a signed exe, and never
-        /// before. Match on a fragment rather than the whole Subject, because
-        /// certificate authorities add and reorder fields between renewals and
-        /// an exact-match check would refuse a perfectly good update the day
-        /// the certificate is renewed.
+        /// Match on a distinctive part of the certificate's Subject line rather
+        /// than the whole of it, because certificate authorities add and
+        /// reorder fields between renewals and an exact-match check would
+        /// refuse a perfectly good update the day the certificate is renewed.
         ///
         /// Since #912 this is the last of five checks, not the only one:
         /// Signature.cs first has Windows verify the signature and pins
         /// Microsoft's Artifact Signing and Thornswood's durable identity.
         /// scripts\release\Assert-PublishSigned.ps1 reads this line.
         ///
-        /// This is a third layer, not the only one. The host allow list at
-        /// AllowedHosts decides where a byte may come from, the SHA-256 in
-        /// version.json decides the bytes are the ones published, and this
-        /// decides who built them. Removing either of the other two because
-        /// this exists would be a straight loss.
+        /// This is one layer, not the only one. The sha256 a release names
+        /// decides the bytes are the ones published, the signed release record
+        /// decides somebody holding the signing right published them, and this
+        /// decides who built each program. Removing any of them because the
+        /// others exist would be a straight loss.
+        ///
+        /// The launcher's own self update (the download named by version.json's
+        /// launcherUrl, and the swap script in SelfSwap.cs that kept
+        /// Thornswood.exe.old) went with #4825: the launcher updates through
+        /// Velopack now, with every check in VeloUpdate.cs.
         /// </summary>
         public const string ExpectedSigner = "Gavin Knotts";
-
-        /// <summary>
-        /// Refuses a launcher that is not signed by us, and says which check it
-        /// failed, because "it would not update" with no reason is the report
-        /// nobody can act on.
-        ///
-        /// Until #912 this read the Subject of the embedded certificate and
-        /// nothing else, so a certificate anybody can make with this name on
-        /// it passed. Signature.Refusal now has Windows verify the signature
-        /// and its chain, then pins Microsoft's Artifact Signing root and
-        /// Thornswood's durable identity in the certificate, and only then
-        /// looks for ExpectedSigner in the Subject. Signature.cs says why each.
-        /// </summary>
-        static void CheckSigner(string path, Action<string> log)
-        {
-            if (String.IsNullOrEmpty(ExpectedSigner)) return;
-            string said;
-            string why = Signature.Refusal(path, ExpectedSigner, out said);
-            if (why.Length > 0)
-            {
-                throw new Exception(
-                    "The launcher that was downloaded " + why + " " +
-                    "Nothing has been replaced and the one you are running is untouched. " +
-                    "Tell Patrick before running anything.");
-            }
-            log(said);
-        }
-
-        /// <summary>Replaces the running exe and restarts, via a short detached script.</summary>
-        public static void SelfUpdate(Config cfg, VersionDoc v, Action<string> log)
-        {
-            SwapIn(FetchLauncher(cfg, v, log), log);
-        }
-
-        /// <summary>
-        /// The new launcher, downloaded and checked against its checksum, in
-        /// the temp folder; nothing is replaced yet. Apart from SwapIn so an
-        /// update can download while the game folder is prepared (#2210).
-        /// </summary>
-        public static string FetchLauncher(Config cfg, VersionDoc v, Action<string> log)
-        {
-            log("Downloading launcher " + v.launcherVersion + "...");
-            return Download(cfg, v.launcherUrl, v.launcherSha256, log);
-        }
-
-        /// <summary>
-        /// Puts the launcher FetchLauncher downloaded into place once this one
-        /// has gone, after the signer check, and deletes the download either
-        /// way.
-        /// </summary>
-        public static void SwapIn(string tmp, Action<string> log)
-        {
-            string exe = System.Reflection.Assembly.GetExecutingAssembly().Location;
-            string neu = exe + ".new";
-            // Before the copy, not after. Once a file is sitting at exe.new the
-            // swap script will pick it up on the next start whatever happens
-            // here, so a check that ran later would be checking a decision
-            // already made.
-            // The download is deleted whichever way this goes. A launcher the
-            // signer check refused used to stay in %TEMP%, one more copy on
-            // every check that offered it again.
-            try
-            {
-                CheckSigner(tmp, log);
-                File.Copy(tmp, neu, true);
-            }
-            finally
-            {
-                try { File.Delete(tmp); } catch (Exception ex) { Swallow.Note("Updater.SwapIn, delete", ex); }
-            }
-
-            int me = System.Diagnostics.Process.GetCurrentProcess().Id;
-            // Named for the launcher it waits on. The script stays up for a few
-            // minutes now, watching the new launcher start, and with one fixed
-            // name the dev build updating in that time would write over a
-            // script cmd is still reading.
-            string bat = Path.Combine(Path.GetTempPath(), "thornswood-update-" + me + ".cmd");
-
-            // Waits for this launcher to be gone, keeps it as Thornswood.exe.old,
-            // puts the new one in, and puts the old one back if the new one
-            // does not start. SelfSwap.cs has the script and the failures each
-            // line of it is there for.
-            File.WriteAllText(bat, SelfSwap.Script(exe, neu, me));
-
-            var psi = new System.Diagnostics.ProcessStartInfo(bat);
-            psi.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
-            psi.CreateNoWindow = true;
-            psi.UseShellExecute = true;
-            System.Diagnostics.Process.Start(psi);
-        }
     }
 }

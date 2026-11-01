@@ -63,6 +63,10 @@
     <PackageReference Include="Concentus" Version="2.2.2" />
     <PackageReference Include="SharpSRTP" Version="0.5.8" />
     <PackageReference Include="BouncyCastle.Cryptography" Version="2.7.0" />
+    <!-- Installs and updates the launcher, and carries the game files on the
+         same channel (#4825). The same version as the vpk that packs it in
+         .github/workflows/merge-release.yml (VPK_VERSION). -->
+    <PackageReference Include="Velopack" Version="1.2.161" />
   </ItemGroup>
 
   <!-- Every resource under the name the code asks for. -->
