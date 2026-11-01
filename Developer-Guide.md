@@ -284,6 +284,14 @@ git status
 
 `git status` should say you are on `main` and the working tree is clean. If the clone asks for a login and then fails, you are not a collaborator yet. Stop and say so in Discord.
 
+Then turn on the checks that run before every push:
+
+```powershell
+git config core.hooksPath .githooks
+```
+
+It prints nothing. From then on `git push` first checks that every script parses and that the writing rules hold in what you are pushing, in about twenty seconds (#5291). When one fails, the push stops and names the file and line; fix it, commit, and push again. A cloud session turns this on by itself.
+
 From here on, the commands assume PowerShell is inside your clone. If you used another folder, `cd` there first.
 
 #### Open the folder in Visual Studio Code
@@ -788,7 +796,7 @@ If the stop was a rebase rather than a merge, the last step is `git rebase --con
 
 #### Merge your own pull request
 
-Wait until the check named `Build check result` is green on the commit you are merging. It passes only when `Launcher builds` and the five `Gate harnesses (n of 5)` checks all passed (on a pull request their names end in ", what the change reaches" when they ran only that). Main also requires `Test tasks in the pull request`, which holds the test tasks in the body to the bot's rules; when it is red, fix the body, and the edit runs it again. Pending means it is still running. A red check means the branch is not ready. Fix it on the same branch and push again.
+Wait until the check named `Build check result` is green on the commit you are merging. It passes only when `Tree checks`, `Launcher builds` and every `Gate harnesses (n of N)` and `Gate harnesses on Linux (n of N)` check passed, or was skipped because the pick said the change gave it nothing to check (on a pull request the gate's names end in ", what the change reaches" when they ran only that). Main also requires `Test tasks in the pull request`, which holds the test tasks in the body to the bot's rules; when it is red, fix the body, and the edit runs it again. Pending means it is still running. A red check means the branch is not ready. Fix it on the same branch and push again.
 
 ```powershell
 gh pr merge --auto --squash
@@ -1586,32 +1594,45 @@ The short form of the rules. The same decisions, with the dates they were made, 
   and every push to main gets the same steps from
   `.github/workflows/build.yml`. build-pr.yml is generated from build.yml:
   change build.yml, then run `node scripts/dev/Build-PrWorkflow.js`
-  (`tests\test-1306-pr-workflow.js` fails while the two differ). It is one job
-  of named steps beside the gate's five shares, and it builds only; nothing is
-  published. It scans for
+  (`tests\test-1306-pr-workflow.js` fails while the two differ). It builds
+  only; nothing is published. The job "Tree checks", on GitHub's Linux
+  runner, scans for
   secrets, parses every PowerShell script and game script, checks the
   writing rules (see Words), the ownership page (`tests\test-ownership.js`,
   issue #752), the names that must stay out, that the engine is one commit and
-  the high-risk records, runs the voice service's health harness, checks our plugins are clean, the launcher
-  window and its UI thread, that the Python names only what exists (ruff,
-  issue #1343) and the count of silent catches, and builds the launcher with
-  MSBuild from its project files, held to its sources
-  (`tests\test-498-msbuild.ps1`, issue #498). Beside it, the job "gate" runs
+  the high-risk records, runs the voice service's health harness, checks our
+  plugins are clean, that the Python names only what exists (ruff, issue
+  #1343) and the count of silent catches (#5292). The job "Launcher builds",
+  on a Windows runner, checks the launcher window and its UI thread, builds
+  the launcher with MSBuild from its project files, held to its sources
+  (`tests\test-498-msbuild.ps1`, issue #498), and compares the writing check
+  under Windows PowerShell 5.1. A pull request that changes only files under
+  `docs`, `site` or `bot` skips it, because nothing it checks reads those
+  folders (`scripts\dev\Launcher-Reach.ps1`, #5292). Beside them, the job
+  "gate" runs
   the gate harnesses (every `tests\test-*.js` and `tests\test-*.ps1` that
   `tests\gate-excluded.txt` does not name, side by side through
-  `scripts\dev\Nightly-Harnesses.ps1`, issues #3009 and #3114) in five shares
-  on five hosted runners at once, `Gate harnesses (1 of 5)` to `(5 of 5)`,
-  so a pull request's checks take under ten minutes. First the job "Pick the
+  `scripts\dev\Nightly-Harnesses.ps1`, issues #3009 and #3114) in up to five
+  shares on hosted Windows runners at once, `Gate harnesses (1 of 5)` to
+  `(5 of 5)`, and the job "gate-linux" runs those that need nothing from
+  Windows in up to four shares on Linux, `Gate harnesses on Linux (1 of 4)`
+  and on (#5293), so a pull request's checks take under ten minutes. A
+  harness goes to Linux only when the nightly trace ran it on both, it passed
+  on both, and it skipped nothing on Linux that it ran on Windows; with no
+  such record for the map's commit, every harness runs on Windows. First the
+  job "Pick the
   gate harnesses" says what each share runs (#5183): on a pull request only
   the harnesses its change can reach, from the map main's nightly trace keeps
   (`.github\workflows\gate-map.yml`), and then the shares' names end in
   ", what the change reaches"; on main the whole gate. It splits them by the
   seconds each took when traced, so the shares end together, and its log
-  says why each one runs. Main runs the whole gate after a pull request that
+  says why each one runs. A change that reaches no harness on a platform
+  starts no runner there. Main runs the whole gate after a pull request that
   ran less.
-- The checks are **Launcher builds** and the five **Gate harnesses**, on
-  GitHub's hosted Windows runners, and on a pull request **Build check
-  result** passes only when all of them did (#3683).
+- The checks are **Tree checks**, **Launcher builds** and the shares of the
+  **Gate harnesses** on Windows and on Linux, and on a pull request **Build
+  check result** passes only when all of them did, or were skipped because
+  the pick said they had nothing to check (#3683, #5292, #5293).
   The repository is public since 30 Oct 2026, so hosted minutes are free, and
   nothing builds on the VPS any more: no fallback job and no `BUILD_RUNNER`
   switch (#4983). A push
@@ -1883,6 +1904,12 @@ A new server build, or a change to the live settings, from a machine with the fo
 ```
 
 The gamemode command, then the server command, is the live pair. `-GamemodeOnly` refuses, with nothing sent, when the live server runs another server build than the one your commit records; then the live pair is the way. What each one sends is in [What any developer may do](#what-any-developer-may-do). The full list, including the site, the bot, and voice, is [After a pull request is merged](#after-a-pull-request-is-merged).
+
+Once the box deploy agent looks after main (`Install-DeployAgent -Main`, docs/DEPLOY-AGENT.md "Main"), the gamemode and the server build reach the live server another way: the Release dev ran is promoted, and goes out when Patrick approves it on GitHub, which is his word for that exact build (#5181):
+
+```powershell
+gh workflow run promote-main.yml --ref main -f tag=build-<yyyyMMdd>.<run>
+```
 
 ### A hotfix
 

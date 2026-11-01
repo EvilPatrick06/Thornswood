@@ -151,9 +151,12 @@
 .PARAMETER StartLog
   A file to which a line of JSON is added as each harness starts (its name,
   its process id and when Windows says it started, in UTC) and as it ends
-  (its exit code, its seconds and whether it said SKIP or NOT RUN). A trace
-  of the gate (gate-map.yml through scripts\dev\Trace-Gate-Here.ps1, #3114) reads it to know which
-  process tree was which harness's.
+  (its exit code, its seconds, whether it said SKIP or NOT RUN, and since
+  #5293 each such line it said, once, and how many lines it began with PASS
+  or ok). A trace of the gate (gate-map.yml through
+  scripts\dev\Trace-Gate-Here.ps1, #3114) reads it to know which process tree
+  was which harness's; gate-map.yml compares a Windows run's lines with a
+  Linux run's to know which harnesses Linux runs as fully as Windows.
 
 .PARAMETER BusyFrom
   A file holding how busy the machine is, 0 to 100, read in place of its
@@ -457,8 +460,24 @@ function Finish-One($r, [bool]$timedOut) {
     Write-Host ("--- {0}  ({1}s{2})" -f $t.Name, $secs, $(if ($said.Count) { ', ' + ($said -join ', ') } else { '' }))
     $skipped = $false
     $printed = ''
-    foreach ($f in $r.Out, $r.Err) { if (Test-Path $f) { $txt = Get-Content -Raw $f; if ($txt) { Write-Host $txt.TrimEnd(); $printed += $txt.TrimEnd() + "`n"; if ($txt -match '(?m)^\s*(SKIP|NOT RUN)\b') { $skipped = $true } } } }
-    Write-StartLog ([ordered]@{ name = $t.Name; end = [DateTime]::UtcNow.ToString('o'); code = $code; secs = $secs; skipped = $skipped })
+    $skips = [System.Collections.Generic.List[string]]::new()
+    $passes = 0
+    foreach ($f in $r.Out, $r.Err) {
+        if (Test-Path $f) {
+            $txt = Get-Content -Raw $f
+            if ($txt) {
+                Write-Host $txt.TrimEnd()
+                $printed += $txt.TrimEnd() + "`n"
+                foreach ($m in [regex]::Matches($txt, '(?m)^\s*((?:SKIP|NOT RUN)\b[^\r\n]*)')) {
+                    $skipped = $true
+                    $line = $m.Groups[1].Value.Trim()
+                    if (-not $skips.Contains($line)) { $skips.Add($line) }
+                }
+                $passes += [regex]::Matches($txt, '(?m)^\s*(?:PASS|ok)\b').Count
+            }
+        }
+    }
+    Write-StartLog ([ordered]@{ name = $t.Name; end = [DateTime]::UtcNow.ToString('o'); code = $code; secs = $secs; skipped = $skipped; skips = @($skips); passes = $passes })
     $path = $t.File.FullName
     if ($timedOut) { Write-Host ("::error file={0}::harness timed out after {1}s and was killed" -f $path, $t.Clock) }
     elseif ($code -ne 0) { Write-Host ("::error file={0}::harness failed (exit {1})" -f $path, $code) }

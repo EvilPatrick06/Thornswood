@@ -142,10 +142,13 @@ param(
     [int]$Shard = 1,
     [int]$Of = 1,
     [int]$Pick = 0,
+    [int]$LinuxShares = 0,
     [int]$Throttle = 6,
     [int]$BudgetSeconds = 1800,
     [int]$AnswerSeconds = 60,
     [string]$StartLog = '',
+    [ValidateSet('Windows', 'Linux')]
+    [string]$Platform = 'Windows',
     [string]$Report = '',
     [string]$Summary = ''
 )
@@ -239,6 +242,17 @@ function Read-Map([string]$maps) {
             foreach ($h in $built.harnesses.PSObject.Properties) { if ($null -ne $h.Value.seconds) { $script:Seconds[$h.Name] = [double]$h.Value.seconds } }
         }
         Say ('The traced map: main ' + ([string]$m.commit).Substring(0, 8) + ', run ' + $m.key + ', read ' + $read + '.')
+        # Which harnesses Linux runs as fully as Windows (#5293): the same
+        # night's Linux run beside the trace, by Affected-Harnesses.js
+        # platforms. With none, every harness runs on Windows.
+        $pf = Join-Path $maps ([string]$m.key + '.platforms.json')
+        if (Test-Path -LiteralPath $pf) {
+            $plat = [IO.File]::ReadAllText($pf) | ConvertFrom-Json
+            if ([string]$plat.commit -eq [string]$m.commit) {
+                foreach ($h in $plat.harnesses.PSObject.Properties) { if ($h.Value.linux -eq $true) { $null = $script:OnLinux.Add($h.Name) } }
+                Say ('{0} of its harnesses run on Linux as fully as on Windows, so they run on Linux.' -f $script:OnLinux.Count)
+            } else { Say ('Its platforms file is of ' + [string]$plat.commit + ', not the map''s commit, so every harness runs on Windows.') }
+        } else { Say 'It says nothing of Linux (no platforms file), so every harness runs on Windows.' }
         return [pscustomobject]@{ Commit = [string]$m.commit; Traces = $traces; Tree = (Join-Path $maps ([string]$m.key + '.tree.gz')) }
     } catch {
         $script:MapWhy = 'the traced map could not be used (' + $_.Exception.Message + ')'
@@ -343,6 +357,7 @@ function Split-Shares([string[]]$list, [int]$count) {
 }
 
 $script:Seconds = @{}
+$script:OnLinux = [System.Collections.Generic.HashSet[string]]::new()
 $run = $gate
 $whole = $true
 $trace = $null
@@ -363,38 +378,72 @@ if ($Pick -gt 0) {
         $maps = Find-Map
         if ($maps) { $null = Read-Map $maps }
     }
-    $parts = Split-Shares $list $Pick
+    # WHERE EACH RUNS (#5293). A harness the map says Linux runs as fully as
+    # Windows goes to a Linux share, when there are any (-LinuxShares), and
+    # every other to a Windows share. A Linux runner starts sooner and costs
+    # nothing more on a public repository.
+    $toLinux = @()
+    if ($LinuxShares -gt 0) { $toLinux = @($list | Where-Object { $script:OnLinux.Contains($_) }) }
+    $toWindows = @($list | Where-Object { $toLinux -notcontains $_ })
+    # At most that many shares each, and no more than there are harnesses to
+    # run (#5292): a share with nothing in it still waited for a runner of its
+    # own, about a minute, to run nothing. A change that reaches none on a
+    # platform gets no share there, [] for its matrix, and build.yml skips
+    # that job.
+    function Split-For([string[]]$names, [int]$most, [string]$where) {
+        $n = [Math]::Min($most, $names.Count)
+        if ($n -eq 0) {
+            Say ('No gate harness of this change''s runs on ' + $where + ', so no ' + $where + ' runner is started for the gate.')
+            return [pscustomobject]@{ Of = 0; Parts = @() }
+        }
+        $parts = Split-Shares $names $n
+        if ($n -lt $most) { Say ('{0}: {1} share(s), not {2}: there are only {1} harness(es) to run there.' -f $where, $n, $most) }
+        for ($k = 0; $k -lt $n; $k++) {
+            $secs = $(if ($script:Seconds.Count) { (' about {0:N0} s' -f $script:Loads[$k]) } else { '' })
+            Say ('{0} share {1} of {2}: {3} harnesses{4}.' -f $where, ($k + 1), $n, $parts[$k].Count, $secs)
+        }
+        return [pscustomobject]@{ Of = $n; Parts = $parts }
+    }
     if ($script:Seconds.Count) { Say ('Split by the seconds each took when traced.') }
     else { Say ('Split by place in the list, with no seconds to split by: ' + $(if ($script:MapWhy) { $script:MapWhy } else { 'the map holds none' }) + '.') }
-    for ($k = 0; $k -lt $Pick; $k++) {
-        $secs = $(if ($script:Seconds.Count) { (' about {0:N0} s' -f $script:Loads[$k]) } else { '' })
-        Say ('Share {0} of {1}: {2} harnesses{3}.' -f ($k + 1), $Pick, $parts[$k].Count, $secs)
-    }
-    Say ('{0} of the gate''s {1} harnesses run, {2}.' -f $list.Count, $gate.Count, $(if ($whole) { 'the whole gate' } else { 'what this change can reach' }))
-    $plan = [ordered]@{ of = $Pick; whole = $whole; gate = $gate.Count; shares = $parts }
-    Set-StepOutput 'plan' ($plan | ConvertTo-Json -Compress -Depth 4)
-    Set-StepOutput 'shares' ('[' + ((1..$Pick) -join ',') + ']')
+    $w = Split-For $toWindows $Pick 'Windows'
+    $l = Split-For $toLinux $LinuxShares 'Linux'
+    Say ('{0} of the gate''s {1} harnesses run, {2}: {3} on Windows, {4} on Linux.' -f $list.Count, $gate.Count, $(if ($whole) { 'the whole gate' } else { 'what this change can reach' }), $toWindows.Count, $toLinux.Count)
+    $plan = [ordered]@{ of = $w.Of; whole = $whole; gate = $gate.Count; shares = $w.Parts; linux = [ordered]@{ of = $l.Of; shares = $l.Parts } }
+    Set-StepOutput 'plan' ($plan | ConvertTo-Json -Compress -Depth 5)
+    Set-StepOutput 'shares' $(if ($w.Of -eq 0) { '[]' } else { '[' + ((1..$w.Of) -join ',') + ']' })
+    Set-StepOutput 'linux_shares' $(if ($l.Of -eq 0) { '[]' } else { '[' + ((1..$l.Of) -join ',') + ']' })
     Set-StepOutput 'whole' $(if ($whole) { 'true' } else { 'false' })
     exit 0
 }
-if ($Of -gt 1) {
+if ($Of -gt 1 -or [string]$env:GATE_PLAN) {
     # A share. With the pick's plan in GATE_PLAN, its part of that; without
     # one, its part of the whole gate by place in the list. A share never
     # fetches a map or asks for a trace: a trace has to see every harness on
-    # one machine (gate-map.yml).
+    # one machine (gate-map.yml). Since #5292 the pick makes one share when
+    # the change reaches one harness, so a plan makes this a share whatever
+    # -Of says: share 1 of 1 runs the plan's one part, and never fetches a
+    # map for itself.
     $planText = [string]$env:GATE_PLAN
     if ($planText) {
         try { $plan = $planText | ConvertFrom-Json } catch { Write-Host ('::error::the pick''s plan does not read: ' + $_.Exception.Message); exit 1 }
-        if ([int]$plan.of -ne $Of) { Write-Host ('::error::the pick''s plan is for ' + $plan.of + ' shares, and this is a share of ' + $Of); exit 1 }
+        # This share's part: the plan's Windows shares, or with -Platform
+        # Linux its Linux ones (#5293). A plan with no Linux part has none.
+        $mine = $plan
+        if ($Platform -eq 'Linux') { $mine = $(if ($plan.PSObject.Properties['linux']) { $plan.linux } else { [pscustomobject]@{ of = 0; shares = @() } }) }
+        if ([int]$mine.of -ne $Of) { Write-Host ('::error::the pick''s plan is for ' + $mine.of + ' shares on ' + $Platform + ', and this is a share of ' + $Of); exit 1 }
         if ([int]$plan.gate -ne $gate.Count) { Write-Host ('::error::the pick''s plan was made from a gate of ' + $plan.gate + ' harnesses, and this checkout''s has ' + $gate.Count); exit 1 }
-        $all = @(foreach ($p in @($plan.shares)) { foreach ($n in @($p)) { [string]$n } })
+        $all = [System.Collections.Generic.List[string]]::new()
+        foreach ($p in @($plan.shares)) { foreach ($n in @($p)) { if ($null -ne $n) { $all.Add([string]$n) } } }
+        if ($plan.PSObject.Properties['linux']) { foreach ($p in @($plan.linux.shares)) { foreach ($n in @($p)) { if ($null -ne $n) { $all.Add([string]$n) } } } }
+        $all = @($all)
         $strange = @($all | Where-Object { $gate -notcontains $_ })
         if ($strange.Count) { Write-Host ('::error::the pick''s plan names what is not on this checkout''s gate: ' + ($strange -join ', ')); exit 1 }
         if (@($all | Sort-Object -Unique).Count -ne $all.Count) { Write-Host '::error::the pick''s plan puts a harness in two shares'; exit 1 }
         $whole = [bool]$plan.whole
         if ($whole -and $all.Count -ne $gate.Count) { Write-Host ('::error::the pick''s plan says whole and holds ' + $all.Count + ' of the gate''s ' + $gate.Count); exit 1 }
-        $run = @(foreach ($n in @(@($plan.shares)[$Shard - 1])) { if ($null -ne $n) { [string]$n } })
-        Say ('Share {0} of {1} of {2}: {3} of its {4} harnesses, as the job "Pick the gate harnesses" split them (its log says why each runs).' -f $Shard, $Of, $(if ($whole) { 'the whole gate' } else { 'what this change can reach' }), $run.Count, $all.Count)
+        $run = @(foreach ($n in @(@($mine.shares)[$Shard - 1])) { if ($null -ne $n) { [string]$n } })
+        Say ('{0}Share {1} of {2} of {3}: {4} of its {5} harnesses, as the job "Pick the gate harnesses" split them (its log says why each runs).' -f $(if ($Platform -eq 'Linux') { 'Linux ' } else { '' }), $Shard, $Of, $(if ($whole) { 'the whole gate' } else { 'what this change can reach' }), $run.Count, $all.Count)
     } else {
         $run = (Split-Shares $gate $Of)[$Shard - 1]
         Say ('Share {0} of {1} of the whole gate: {2} of its {3} harnesses.' -f $Shard, $Of, $run.Count, $gate.Count)

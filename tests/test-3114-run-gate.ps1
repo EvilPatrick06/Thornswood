@@ -40,7 +40,9 @@
        gate, split by the map's seconds, longest first to the least loaded
        share, or by place with no map; each share given the plan in
        GATE_PLAN runs its part, fetching nothing, and one given a plan it
-       cannot trust runs nothing and fails.
+       cannot trust runs nothing and fails. #5292: it makes no more shares
+       than there are harnesses to run, and none (shares=[]) for a change
+       that reaches none.
 
   Writes only its scratch folder, in the system's temp folder, and deletes it.
 #>
@@ -86,6 +88,8 @@ exit [int]$env:STUB_CODE
 param([string]$Fetch = '')
 [IO.File]::WriteAllText($env:STUB_TOKEN, [string]$env:GATE_MAP_TOKEN)
 if (-not $env:STUB_MAP) { Write-Host 'no map on GitHub, standing in'; exit 1 }
+# Whatever is there goes, as the real one does.
+if (Test-Path -LiteralPath $Fetch) { Remove-Item -LiteralPath $Fetch -Recurse -Force }
 $null = New-Item -ItemType Directory -Force -Path $Fetch
 Copy-Item -Path (Join-Path $env:STUB_MAP '*') -Destination $Fetch
 Write-Host 'the handed-on map, standing in'
@@ -280,6 +284,69 @@ exit 0
         if ($r.Asked) { $union += @($r.Asked.Only -split ' ') }
     }
     Yes 'the shares of the plan together run what it picked, each once' ((($union | Sort-Object) -join ' ') -eq 'test-a.js test-c.js')
+
+    # #5292: no more shares than harnesses to run, since an empty share still
+    # waited for a Windows runner of its own; and none at all for a change
+    # that reaches none, so build.yml skips the job "gate".
+    $r = Invoke-Gate 'pull_request' 'github-hosted' -extra @('-Pick', '5')
+    $p = $null; if ($r.Plan) { $p = $r.Plan | ConvertFrom-Json }
+    Yes ('two harnesses picked for five shares make two shares, and say so (' + $r.Plan + ')') ($r.Code -eq 0 -and $p -and [int]$p.of -eq 2 -and @($p.shares).Count -eq 2 -and $r.Outputs -match '(?m)^shares=\[1,2\]\s*$' -and $r.Text -match '2 share\(s\), not 5')
+    $r = Invoke-Gate 'pull_request' 'github-hosted' -extra @('-Shard', '1', '-Of', '1') -plan '{"of":1,"whole":false,"gate":3,"shares":[["test-a.js"]]}'
+    Yes ('share 1 of 1, given a plan, runs the plan''s one part and fetches no map (' + $(if ($r.Asked) { $r.Asked.Only } else { 'nothing' }) + ')') ($r.Code -eq 0 -and $r.Asked -and $r.Asked.Only -eq 'test-a.js' -and -not (Test-Path -LiteralPath $tokenFile) -and $r.Text -match 'Share 1 of 1 of what this change can reach')
+    $quiet = Join-Path $scratch 'quiet'
+    $null = New-Item -ItemType Directory -Path $quiet
+    $quietTraces = Join-Path $scratch 'quiet.traces.jsonl.gz'
+    [IO.File]::WriteAllBytes($quietTraces, (Gzip ((@(
+        '{"harness":"test-a.js","platform":"windows","listings":"enumerated","exit":0,"seconds":1,"skipped":false,"execs":["node.exe"],"paths":{"a.txt":"read"}}',
+        '{"harness":"test-b.js","platform":"windows","listings":"enumerated","exit":0,"seconds":1,"skipped":false,"execs":["node.exe"],"paths":{"b.txt":"read"}}',
+        '{"harness":"test-c.js","platform":"windows","listings":"enumerated","exit":0,"seconds":1,"skipped":false,"execs":["node.exe"],"paths":{"a.txt":"read"}}'
+    )) -join "`n")))
+    $null = & node (Join-Path $dev 'Affected-Harnesses.js') build $quietTraces (Join-Path $quiet ($key + '.map.json')) $base
+    Copy-Item -LiteralPath (Join-Path $handed ($key + '.tree.gz')), (Join-Path $handed 'latest.json') -Destination $quiet
+    $env:STUB_MAP = $quiet
+    $null = GitOk -C $sr reset -q --hard $base
+    Set-Content -LiteralPath (Join-Path $sr 'd.txt') -Value 'd, which no harness reads'
+    $null = GitOk -C $sr commit -q -am 'change d'
+    $r = Invoke-Gate 'pull_request' 'github-hosted' -extra @('-Pick', '5')
+    $p = $null; if ($r.Plan) { $p = $r.Plan | ConvertFrom-Json }
+    Yes ('a change no harness reads gets no share: shares=[] and a plan of none (' + $r.Plan + ')') ($r.Code -eq 0 -and $p -and [int]$p.of -eq 0 -and @($p.shares).Count -eq 0 -and $r.Outputs -match '(?m)^shares=\[\]\s*$' -and $r.Outputs -match '(?m)^whole=false\s*$')
+    Yes '  says no Windows runner is started for the gate, and runs nothing' (-not $r.Asked -and $r.Text -match 'No gate harness of this change''s runs on Windows')
+    $env:STUB_MAP = $handed
+
+    # #5293: a harness the map's platforms file says Linux runs as fully as
+    # Windows goes to a Linux share, when the pick is given Linux shares.
+    $plat = Join-Path $scratch 'plat'
+    $null = New-Item -ItemType Directory -Path $plat
+    Copy-Item -Path (Join-Path $handed '*') -Destination $plat
+    $pfile = Join-Path $plat ($key + '.platforms.json')
+    Set-Content -LiteralPath $pfile -Value ('{"format":1,"commit":"' + $base + '","harnesses":{"test-a.js":{"linux":true},"test-b.js":{"linux":true},"test-c.js":{"linux":false,"why":"did not pass on Linux (exit 1)"}}}')
+    $env:STUB_MAP = $plat
+    $null = GitOk -C $sr reset -q --hard $base
+    Set-Content -LiteralPath (Join-Path $sr 'a.txt') -Value 'a, changed'
+    $null = GitOk -C $sr commit -q -am 'change a'
+    $r = Invoke-Gate 'pull_request' 'github-hosted' -extra @('-Pick', '5', '-LinuxShares', '3')
+    $p = $null; if ($r.Plan) { $p = $r.Plan | ConvertFrom-Json }
+    Yes ('the pick sends what Linux runs fully to a Linux share, the rest to Windows (' + $r.Plan + ')') ($r.Code -eq 0 -and $p -and [int]$p.of -eq 1 -and (@(@($p.shares)[0]) -join ' ') -eq 'test-c.js' -and [int]$p.linux.of -eq 1 -and (@(@($p.linux.shares)[0]) -join ' ') -eq 'test-a.js')
+    Yes '  says so, and hands both matrices on' ($r.Outputs -match '(?m)^shares=\[1\]\s*$' -and $r.Outputs -match '(?m)^linux_shares=\[1\]\s*$' -and $r.Text -match '1 on Windows, 1 on Linux' -and $r.Text -match '2 of its harnesses run on Linux as fully as on Windows')
+    $lplan = $r.Plan
+    $r = Invoke-Gate 'pull_request' 'github-hosted' -extra @('-Shard', '1', '-Of', '1', '-Platform', 'Linux') -plan $lplan
+    Yes ('a Linux share runs the plan''s Linux part (' + $(if ($r.Asked) { $r.Asked.Only } else { 'nothing' }) + ')') ($r.Code -eq 0 -and $r.Asked -and $r.Asked.Only -eq 'test-a.js' -and $r.Text -match 'Linux Share 1 of 1')
+    $r = Invoke-Gate 'pull_request' 'github-hosted' -extra @('-Shard', '1', '-Of', '1') -plan $lplan
+    Yes ('  and the Windows share the rest (' + $(if ($r.Asked) { $r.Asked.Only } else { 'nothing' }) + ')') ($r.Code -eq 0 -and $r.Asked -and $r.Asked.Only -eq 'test-c.js')
+    $r = Invoke-Gate 'pull_request' 'github-hosted' -extra @('-Shard', '1', '-Of', '2', '-Platform', 'Linux') -plan $lplan
+    Yes '  a Linux share of a number the plan does not have runs nothing and fails' ($r.Code -eq 1 -and -not $r.Asked -and $r.Text -match 'is for 1 shares on Linux')
+    $r = Invoke-Gate 'pull_request' 'github-hosted' -extra @('-Pick', '5')
+    $p = $null; if ($r.Plan) { $p = $r.Plan | ConvertFrom-Json }
+    Yes '  with no Linux shares asked for, everything runs on Windows' ($p -and [int]$p.of -eq 2 -and [int]$p.linux.of -eq 0 -and $r.Outputs -match '(?m)^linux_shares=\[\]\s*$')
+    Set-Content -LiteralPath $pfile -Value ('{"format":1,"commit":"' + ('f' * 40) + '","harnesses":{"test-a.js":{"linux":true}}}')
+    $r = Invoke-Gate 'pull_request' 'github-hosted' -extra @('-Pick', '5', '-LinuxShares', '3')
+    $p = $null; if ($r.Plan) { $p = $r.Plan | ConvertFrom-Json }
+    Yes '  and a platforms file of another commit is not used, saying so' ($p -and [int]$p.linux.of -eq 0 -and [int]$p.of -eq 2 -and $r.Text -match 'not the map''s commit')
+    Remove-Item -LiteralPath $pfile
+    $r = Invoke-Gate 'pull_request' 'github-hosted' -extra @('-Pick', '5', '-LinuxShares', '3')
+    $p = $null; if ($r.Plan) { $p = $r.Plan | ConvertFrom-Json }
+    Yes '  nor is a map with none: every harness on Windows' ($p -and [int]$p.linux.of -eq 0 -and $r.Text -match 'no platforms file')
+    $env:STUB_MAP = $handed
 
     # A plan the share cannot trust stops it red, running nothing.
     $bad = @(
