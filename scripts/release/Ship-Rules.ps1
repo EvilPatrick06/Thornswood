@@ -31,7 +31,6 @@
                                    Vortex's records, window layouts, settings saved from a mod's menu, saves); never packed, recorded or on the site
       Get-ShipOwnGameCollection    the collection's files in a Game folder the launcher made; never shipped
       Test-ShipGenerated $rel      an animation or body file the launcher builds on each computer (#3715); never shipped, never removed
-      Get-ShipLooseArt $files      loose textures and meshes an installer carries that are not ours, by folder
       Test-ShipNotOurs $rel        another author's loose file (outside Data\Platform, not named ours); never packed, recorded or listed as removed
       Test-ShipOurs $rel           ours outside Data\Platform: the named files, the client runtime, required data, the menu, the BodySlide builds until #1259
       Test-ShipHeld $rel           a loose file that ships until the collection revision that carries its mod, or while the content plugin names it
@@ -1234,21 +1233,13 @@ function Get-ShipOwnGameCollection([string]$ProfileDir) {
     return ,$set
 }
 
-# LOOSE ART NOBODY HAS ACCOUNTED FOR, named so a build says what it carries.
-#
-# Measured from Profile\OwnGame\files.txt on 24 September: 563 files and 539
-# MB under Data\textures and Data\meshes, the menu backdrop not counted, that
-# Vortex never deployed, dropped into the Steam copy by hand. Lost Ark armour
-# ports, somebody's custom weapons, BodySlide output built for one person's
-# body, Nemesis output, and leftovers of mods no longer installed. The
-# installer leaves out what the collection provides and nothing else, so every
-# one of them went to everybody who installed, and nothing on screen said so.
-#
-# Since #1178 (29 September) Test-ShipNotOurs below keeps unaccounted-for files
-# out of packs, records and the installer, so this report should name nothing.
-# It stays as the alarm: a row here means a file reached what is about to ship
-# that the rule did not stop. The behavior files and bodies the launcher
-# builds on each computer never ship (#3715, Test-ShipGenerated).
+# THE MAIN MENU BACKDROP IS OURS. On 24 September Profile\OwnGame\files.txt
+# held 563 files and 539 MB under Data\textures and Data\meshes that Vortex
+# never deployed, and the old installer carried every one; Get-ShipLooseArt
+# named them a folder at a time for its build until it went (#4824). Since
+# #1178 Test-ShipNotOurs below keeps such files out of packs and records,
+# and the behavior files and bodies the launcher builds on each computer
+# never ship (#3715, Test-ShipGenerated).
 #
 # Ours is the main menu backdrop: the three files Go.ps1 writes from
 # game\menu ($menuPairs there; change the two together).
@@ -1257,31 +1248,6 @@ $ShipOwnArt = @(
     'Data\meshes\interface\logo\logo01ae.nif',
     'Data\textures\interface\objects\Mainmenuwallpaper.dds'
 )
-
-# $files is what is about to ship: anything with a Rel (the path under the game
-# folder) and a Len (its bytes). Returns one row per first folder under
-# Data\textures or Data\meshes, biggest first, as Folder, Files and Bytes.
-# Files straight under Data\textures or Data\meshes are a row of their own.
-function Get-ShipLooseArt($files) {
-    $rows = @{}
-    foreach ($f in @($files)) {
-        if ($null -eq $f) { continue }
-        $rel = [string]$f.Rel
-        if (Test-ShipOurs $rel) { continue }
-        $parts = $rel -split '\\'
-        if ($parts.Count -lt 3 -or $parts[0] -ne 'Data') { continue }
-        if ($parts[1] -ne 'textures' -and $parts[1] -ne 'meshes') { continue }
-        if ($parts.Count -eq 3) { $folder = $parts[0] + '\' + $parts[1] }
-        else { $folder = $parts[0] + '\' + $parts[1] + '\' + $parts[2] }
-        $key = $folder.ToLowerInvariant()
-        if (-not $rows.ContainsKey($key)) {
-            $rows[$key] = [pscustomobject]@{ Folder = $folder; Files = 0; Bytes = [long]0 }
-        }
-        $rows[$key].Files++
-        $rows[$key].Bytes += [long]$f.Len
-    }
-    return ,@($rows.Values | Sort-Object -Property @{ Expression = 'Bytes'; Descending = $true }, 'Folder')
-}
 
 # ---------------------------------------------------------------------------
 # OTHER PEOPLE'S LOOSE FILES NEVER SHIP. Issue #1178.
