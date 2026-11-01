@@ -192,9 +192,14 @@ Yes 'a Test task comes over as done-on-merge.yml reads it, ending at the rule' (
 # ---- 5. engine-pin.yml ----------------------------------------------------------
 $wf = [IO.File]::ReadAllText((Join-Path $root '.github/workflows/engine-pin.yml')).Replace("`r`n", "`n")
 $code = (@($wf -split "`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n")
-function Get-Job([string]$name) { return [regex]::Match($code, "(?ms)^  ${name}:\n.*?(?=^  \S|\z)").Value }
+# A job by name, read after "jobs:" alone: "push" is a trigger under "on:" too.
+$jobsText = $code.Substring([Math]::Max(0, $code.IndexOf("`njobs:")))
+function Get-Job([string]$name) { return [regex]::Match($jobsText, "(?ms)^  ${name}:\n.*?(?=^  \S|\z)").Value }
 $look = Get-Job 'look'; $make = Get-Job 'make'; $push = Get-Job 'push'
 Yes 'engine-pin.yml ticks on a schedule and runs by hand' ($code -match "(?m)^  schedule:\n    - cron: '[^']+'" -and $code -match '(?m)^  workflow_dispatch:')
+Yes '  a push to main that moves engine/skymp starts a look (plan part 8)' ($code -match '(?m)^  push:\n    branches: \[main\]\n    paths: \[engine/skymp\]$')
+$eng0 = [IO.File]::ReadAllText((Join-Path $root '.github/workflows/engine.yml')).Replace("`r`n", "`n")
+Yes '  engine.yml starts a look when a record run on main ends (plan part 8)' ($eng0 -match 'gh workflow run engine-pin\.yml --repo \$env:GITHUB_REPOSITORY --ref main')
 Yes '  one tick at a time, never cancelling the one before' ($code -match '(?m)^  group: engine-pin\n  cancel-in-progress: false')
 Yes '  the workflow''s own token reads only' ($code -match '(?m)^permissions:\n  contents: read\n(?!  )')
 Yes '  three jobs, look, make and push' ($look -and $make -and $push)

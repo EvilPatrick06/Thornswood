@@ -291,11 +291,11 @@ A change to the engine goes like this:
 2. The fork builds the merge itself: every push to `thornswood/engine-changes`
    builds the engine on GitHub's runner and keeps it as
    `thornswood-engine-<commit>` for 90 days. Wait for that build to be green.
-3. Nothing by hand from here (#5148): `.github\workflows\engine-pin.yml`
-   looks every ten minutes, starts `engine.yml` for the new head once the
-   fork's build is green, and when that has recorded it, moves the pin on
-   the rolling branch `engine-pin/next` and opens or updates its pull
-   request ("The pin moves by itself", below).
+3. Nothing by hand from here (#5148): `.github\workflows\engine-pin.yml` is
+   woken when the fork's build ends, starts `engine.yml` for the new head once
+   the fork's build is green, and when that has recorded it, moves the pin on
+   the rolling branch `engine-pin/next` and opens or updates its pull request
+   ("The pin moves by itself", below).
 4. The Desk merges that pull request under the merge rule, like any other.
    It carries the pin, the four records engine.yml handed back, the front
    built again at the commit (`records\front-build.json` and
@@ -362,7 +362,14 @@ and the commit typed into the notices went stale between pins. Now
 `.github\workflows\engine-pin.yml` does them, and its header says each
 choice:
 
-- Every ten minutes it asks GitHub what the pin needs
+- It asks GitHub what the pin needs when something changes: engine.yml's
+  wake job starts it when a record run on main ends, a push to main that
+  moves `engine/skymp` starts it, and the fork starts it when its push build
+  ends green (the fork's `thornswood-wake-pin.yml`, with the fork's one
+  secret, `THORNSWOOD_PIN_WAKE`: a fine-grained token scoped to this
+  repository that may start its workflows and nothing else). It also still
+  looks every ten minutes until the fork's wake has run for real. Each look
+  asks GitHub what the pin needs
   (`scripts\release\EnginePin.ps1`, `Get-EnginePinStep`): nothing, when main
   pins the fork's head or the fork is still building it; wait, when another
   open pull request moves `engine/skymp` (a pin made by hand goes first);
@@ -397,8 +404,8 @@ choice:
   over, so done-on-merge.yml moves the issue when the pin merges.
 
 From a fork merge to a pin pull request ready to merge: the fork's push build
-(20 to 45 minutes), a tick, the record (about 3), a tick, the pin (about 4)
-and the build check (about 5).
+(20 to 45 minutes), the record (about 3), the pin (about 4) and the build
+check (about 5), with no tick to wait for between them.
 
 ## The engine built in CI
 
