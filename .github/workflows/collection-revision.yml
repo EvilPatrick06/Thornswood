@@ -41,7 +41,14 @@ jobs:
     # Four reads and a few calls to GitHub. Past this it is stuck, not slow.
     timeout-minutes: 5
     steps:
+      # Every commit and tree, no old file contents: Nexus is asked with the
+      # launcher's number as Application-Version (Nexus.ps1), worked out from
+      # when its sources last changed (LauncherVersion.ps1, #5179), which a
+      # shallow checkout cannot say.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          filter: blob:none
       - name: Read the four revisions and keep the rebuild issue
         shell: pwsh
         env:

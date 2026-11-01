@@ -67,7 +67,7 @@ $guard = if ($ask -ge 0) { $src.Substring([Math]::Max(0, $ask - 400), 1400) } el
 Yes '  only on a main release' ($guard -match 'if \(-not \$Dev -and')
 Yes '  and stops it, not only a dry run' ($guard -match 'if \(\$DryRun\) \{ Say .+ \} else \{ Die \$why \}')
 Yes '  -ModsOnly still stops on a changed client record' ($guard -match "if \(\`$ModsOnly\) \{ \`$drift = @\(\`$drift \| Where-Object \{ \`$_ -eq 'records/client-build\.json' \}\) \}")
-Yes '  and the refusal says to move the version first' ($guard -match 'Bump-Version\.ps1')
+Yes '  and the refusal says the number is the launcher''s own time, so a drift means a rewritten history' ($guard -match 'LauncherVersion\.ps1' -and $guard -match 'history')
 Yes '  in the house words' ($guard -notmatch '(?i)player' -and $guard.IndexOf([char]0x2014) -lt 0)
 
 if (-not (Get-Command git -EA SilentlyContinue)) {
@@ -130,7 +130,7 @@ try {
     Yes 'a tag that is not here drifts nothing (the CI step stops that Ship)' (@(Get-LauncherDrift $work 'v9.9.9').Count -eq 0)
 
     G -C $work -c tag.gpgsign=false tag v1.1.102
-    Yes 'after Bump-Version and a new tag, nothing drifted' (@(Get-LauncherDrift $work 'v1.1.102').Count -eq 0)
+    Yes 'after a new tag at the newest change, nothing drifted' (@(Get-LauncherDrift $work 'v1.1.102').Count -eq 0)
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
