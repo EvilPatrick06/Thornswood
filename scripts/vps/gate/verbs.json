@@ -444,6 +444,19 @@
       "timeoutMinutes": 10,
       "fixed": ["-Yes"],
       "params": {}
+    },
+    "Install-Tunnel": {
+      "script": "scripts/deploy/Install-Tunnel.ps1",
+      "timeoutMinutes": 15,
+      "fixed": ["-NoPause"],
+      "params": {
+        "SealKey": "switch",
+        "Sealed": "^[A-Za-z0-9+/]{400,560}={0,2}$",
+        "Switch": "switch",
+        "Back": "switch",
+        "Status": "switch",
+        "Wait": "^[0-9]{1,3}$"
+      }
     }
   }
 }
