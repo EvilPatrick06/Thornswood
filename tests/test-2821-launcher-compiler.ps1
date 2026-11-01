@@ -140,7 +140,17 @@ try {
 }
 
 # ---- 3. Add-LauncherType itself ----------------------------------------------
+# A harness dot-sources the helper, so what the helper sets lands among the
+# harness's own variables: a loop variable in it once replaced test-963's
+# $root. Names a harness uses are set first, and must come through as they were.
+$root = 'harness root'; $p = 'harness p'; $v = 'harness v'; $rel = 'harness rel'; $name = 'harness name'; $value = 'harness value'
+$before = @(Get-Variable -Scope Script | ForEach-Object { $_.Name })
 . (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')
+$added = @(Get-Variable -Scope Script | ForEach-Object { $_.Name } | Where-Object { $before -notcontains $_ -and $_ -ne 'before' })
+Yes ('dot-sourcing the helper leaves the harness''s variables as they were') (
+    $root -eq 'harness root' -and $p -eq 'harness p' -and $v -eq 'harness v' -and $rel -eq 'harness rel' -and $name -eq 'harness name' -and $value -eq 'harness value')
+$stray = @($added | Where-Object { $_ -cnotmatch '^(Launcher|launcher)' -and $_ -ne 'OnWindows' })
+Yes ('and every name it adds starts with Launcher or launcher (' + (@($stray) -join ', ') + ')') ($stray.Count -eq 0)
 $said = ''
 if (-not (Test-Path -LiteralPath $LauncherDotnet)) {
     Yes ('the .NET SDK the build runs is on this machine (' + $LauncherDotnet + ')') $false
