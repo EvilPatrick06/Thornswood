@@ -209,7 +209,11 @@ a copy of dev that nobody plays on:
 The bot pass rides in the gamemode Release as a part of its own, `bot`
 (merge-release.yml, `New-SignedManifest.ps1 -BotFiles`), so the bot that
 checks a gamemode comes from the same commit and is signed with it. A change
-to the bot alone makes a Release too.
+to the bot alone makes a Release too. The agent puts that part into the
+copy's `bot` folder whole, every file the signed manifest lists, and needs
+only `Bot-Pass.js` among them, the file the task runs; a part without it
+fails the Deployment. So a file the bot comes to carry (its relay client and
+the voice service it joins, #5196) needs no change to the agent.
 
 Setting it up is part of `Install-DeployAgent`, once dev's engine has the
 bot client (`createBotClient`, skymp fork #137; the install checks and

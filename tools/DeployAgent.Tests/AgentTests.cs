@@ -1380,14 +1380,14 @@ public sealed class AgentTests : IDisposable
         ["Bot-Pass.js"] = B("// the pass"), ["bot.js"] = B("// the bot"), ["character.js"] = B("// the character"),
     };
 
-    static void BotRelease(FakeGitHub gh, string tag, string body, bool withBot = true, Dictionary<string, string>? tables = null)
+    static void BotRelease(FakeGitHub gh, string tag, string body, bool withBot = true, Dictionary<string, string>? tables = null, Dictionary<string, byte[]>? bot = null)
     {
         var parts = new Dictionary<string, Dictionary<string, byte[]>>
         {
             ["gamemode"] = new() { ["gamemode.js"] = B(body), ["thornswood-build.json"] = B("{\"commit\":\"new\"}") },
         };
         if (tables != null) parts["gamemode"][Tables.Zip] = TablesZip(tables);
-        if (withBot) parts["bot"] = BotPart;
+        if (withBot) parts["bot"] = bot ?? BotPart;
         gh.AddRelease(tag, ReleaseFiles(tag, Commit, "", parts));
     }
 
@@ -1546,6 +1546,42 @@ public sealed class AgentTests : IDisposable
         if (how == "face") Assert.Contains("FAIL  face", log);
     }
 
+    /// <summary>The bot part goes into the copy whole: a file the bot carries
+    /// beside the three it began with (its relay client and the voice service
+    /// it joins, #5196) needs no change here. Without Bot-Pass.js, the file
+    /// the task runs, there is no pass, and dev keeps what it runs.</summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task TheCopyTakesTheWholeBotPart(bool withPass)
+    {
+        string? botTree = null;
+        var (a, gh, s, bp) = MakeWithPass(bp =>
+        {
+            botTree = string.Join(",", Directory.GetFiles(bp.BotDir).Select(Path.GetFileName).Order(StringComparer.Ordinal));
+            return WriteResult(bp, true);
+        });
+        var part = new Dictionary<string, byte[]>(BotPart)
+        {
+            ["relay.js"] = B("// the relay client"), ["voice-server.js"] = B("// voice"), ["headlines.js"] = B("// headlines"),
+        };
+        if (!withPass) part.Remove(BotPass.Runs);
+        BotRelease(gh, "build-1", "// new gamemode\n", bot: part);
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        if (withPass)
+        {
+            HasStates(gh, s, id, "in_progress,success");
+            Assert.Equal("Bot-Pass.js,bot.js,character.js,headlines.js,relay.js,voice-server.js", botTree);
+            return;
+        }
+        var last = gh.Last(id)!;
+        Assert.Equal("failure", (string)last["state"]!);
+        Assert.Contains("the Release's bot part has no Bot-Pass.js", (string)last["description"]!);
+        Assert.Null(botTree);
+        Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
+    }
+
     [Fact]
     public async Task TheGateVerbDoesNotWaitOnABotPass()
     {
@@ -1604,19 +1640,19 @@ public sealed class AgentTests : IDisposable
             File.WriteAllBytes(files[n], b);
         }
         var said = new List<string>();
-        Assert.Equal("", bp.Prepare(files, said.Add));
+        Assert.Equal("", bp.Prepare(files, BotPart.Keys, said.Add));
         Assert.Contains(said, l => l.Contains("3 were new or changed on dev"));
         said.Clear();
-        Assert.Equal("", bp.Prepare(files, said.Add));
+        Assert.Equal("", bp.Prepare(files, BotPart.Keys, said.Add));
         Assert.Contains(said, l => l.Contains("0 were new or changed on dev"));
         File.WriteAllText(Path.Combine(s.Root, "data", "Thornswood.esp"), "plugin Thornswood.esp, changed");
         said.Clear();
-        Assert.Equal("", bp.Prepare(files, said.Add));
+        Assert.Equal("", bp.Prepare(files, BotPart.Keys, said.Add));
         Assert.Contains(said, l => l.Contains("1 were new or changed on dev"));
         Assert.Equal("plugin Thornswood.esp, changed", File.ReadAllText(Path.Combine(bp.PluginDir, "Thornswood.esp")));
         // A load order naming a file that is not there stops the copy.
         File.Delete(Path.Combine(s.Root, "data", "Skyrim.esm"));
-        Assert.Throws<InvalidDataException>(() => bp.Prepare(files, said.Add));
+        Assert.Throws<InvalidDataException>(() => bp.Prepare(files, BotPart.Keys, said.Add));
     }
 
     [Fact]
