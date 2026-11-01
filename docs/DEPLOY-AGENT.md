@@ -187,13 +187,14 @@ a copy of dev that nobody plays on:
    engine itself; it reads the result the task writes.
 4. Bot-Pass.js starts the copy, waits for it to say this gamemode loaded,
    and has a bot log in the way the game does as a profile nobody has. It
-   checks, a line each: **loads**, **login**, **new** (the race menu is
-   open and creation starts: the plain clothes arrive), **face** (only then
-   is a face sent, and the race menu closes; a face sent earlier is kept as
-   the starting face and closes nothing), **saved** (the world on disk
-   holds the character by name), **restart** (the copy is stopped and started again and loads
-   again) and **loads back** (a second bot logs in as the same profile and
-   gets the same character, where it was saved, with no race menu).
+   checks, a line each: **loads**, **login**, **new** (the character comes
+   with the race menu open and creation already open, at the face),
+   **face** (a face is sent and creation moves on to choosing a home),
+   **saved** (the world on disk holds the character by name), **restart**
+   (the copy is stopped and started again and loads again) and **loads
+   back** (a second bot logs in as the same profile and gets the same
+   character, where it was saved, with no race menu). A FAIL at new, face
+   or saved ends with what the gamemode's creation said about the bot.
 5. Every line goes in the Deployment's log. All PASS and the gamemode goes
    in as below. One FAIL, a pass that does not end within 30 minutes
    (`botPassSeconds`), or no result, and the Deployment says **failure**
