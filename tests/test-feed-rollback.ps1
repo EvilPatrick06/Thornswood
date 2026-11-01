@@ -62,7 +62,6 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $repo = Split-Path -Parent $Here
-$app = Join-Path $repo 'launcher\app'
 $rollback = Join-Path $repo 'scripts\release\Rollback-Feed.ps1'
 # Rollback-Feed runs in a pwsh of its own, as on the shipping machine.
 $shell = (Get-Process -Id $PID).Path
