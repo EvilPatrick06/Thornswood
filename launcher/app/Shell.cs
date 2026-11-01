@@ -28,11 +28,11 @@ namespace Thornswood
 {
     /// <summary>
     /// The launcher itself: Main, the window, every button, and the Play
-    /// sequence. There is no compiled window class. Run parses launcher\ui.xaml,
-    /// which Build-Launcher.ps1 embeds in the exe, into a live Window at run
-    /// time; Bind finds the named controls in it and Wire attaches every
-    /// handler. So this is one static class, not a Window subclass, split
-    /// across Shell.cs and every other file that declares partial class Shell.
+    /// sequence. The window is MainWindow.axaml, compiled with the launcher,
+    /// and holds no logic of its own: Run makes it, Bind takes the named
+    /// controls from its generated fields and Wire attaches every handler. So
+    /// this is one static class, not a Window subclass, split across Shell.cs
+    /// and every other file that declares partial class Shell.
     ///
     /// launcher\app\ARCHITECTURE.md walks through it: the startup order, what
     /// each of the other classes owns on disk, and every step between the
@@ -331,6 +331,25 @@ namespace Thornswood
             // is set up. The launcher runs its own message loop at the end of
             // Run, until its window closes.
             AppBuilder.Configure<App>().UsePlatformDetect().SetupWithoutStarting();
+
+            // The first start after Velopack's Setup.exe put the launcher down
+            // is the install (#4824): no folder recorded and none given, so the
+            // install window asks where and puts Thornswood there. Closed
+            // without installing, the launcher ends. Installed, it stays up
+            // until the launcher's own window is on screen (InstallWindow says
+            // why), and closing it then does not end anything. Somebody sent
+            // here by Windows Settings to uninstall is not asked to install.
+            string recorded = InstallPlace.Recorded();
+            InstallWindow installing = null;
+            if (root == null && recorded == null && !askedToUninstall)
+            {
+                installing = new InstallWindow();
+                installing.Show();
+                string installed = Pump(installing.Done);
+                if (installed == null) return;
+                root = installed;
+            }
+            else if (recorded != null) root = recorded;
 
             Paths.Init(root);
             // The log and the support zips are kept for LocalKeep.Days days on
@@ -682,6 +701,7 @@ namespace Thornswood
                 });
             }
             win.Show();
+            if (installing != null) installing.Close();
             Dispatcher.UIThread.MainLoop(closed.Token);
 
             StopFeedWatch(); Voice.Stop(); try { Presence.Stop(); } catch (Exception ex) { Swallow.Note("Shell.Run, dispose", ex); } try { Hold.Release(); } catch (Exception ex) { Swallow.Note("Shell.Run, dispose", ex); }
@@ -705,11 +725,6 @@ namespace Thornswood
             if (win != null) win.Close();
         }
 
-        /// <summary>
-        /// A control theme from the window's resources (MainWindow.axaml):
-        /// Ghost, Solid, Slab, Body, Small and the rest.
-        /// </summary>
-        static ControlTheme Look(string key) { return (ControlTheme)win.Resources[key]; }
 
         /// <summary>
         /// Centres the window on the primary monitor's work area. Centring on
@@ -1027,19 +1042,15 @@ namespace Thornswood
                     try
                     {
                         // TLS 1.2 and later are the default on .NET 10; #1360
-                        // had to add 1.2 by hand on the old framework.
+                        // had to add 1.2 by hand on the old framework. The
+                        // waits are WebClient's: 100 seconds for an answer.
                         using (var ask = new HttpRequestMessage(HttpMethod.Get, want))
                         {
                             ask.Headers.TryAddWithoutValidation("User-Agent", "ThornswoodLauncher/" + Updater.Version);
-                            using (HttpResponseMessage got = web.Send(ask))
+                            using (HttpResponseMessage got = Http.Send(ask, 100000))
                             {
                                 got.EnsureSuccessStatusCode();
-                                using (Stream body = got.Content.ReadAsStream())
-                                using (var copy = new MemoryStream())
-                                {
-                                    body.CopyTo(copy);
-                                    raw = copy.ToArray();
-                                }
+                                raw = Http.Body(got, Http.DefaultReadMs);
                             }
                         }
                     }
@@ -1071,13 +1082,6 @@ namespace Thornswood
         }
 
         static IBrush Res(string key) { return (IBrush)win.Resources[key]; }
-
-        /// <summary>
-        /// The requests this file makes itself: the Discord picture and the
-        /// voice check. One client for the life of the process, so a request
-        /// does not open connections of its own every time.
-        /// </summary>
-        static readonly HttpClient web = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
 
         static void Log(string m)
         {
@@ -1403,6 +1407,7 @@ namespace Thornswood
                         galleryTimer.Interval = TimeSpan.FromSeconds(7);
                         galleryTimer.Tick += delegate { ShowNextShot(); };
                         win.StateChanged += delegate { GalleryDecide(); };
+                        win.Opened += delegate { GalleryDecide(); };
                     }
                     ShowNextShot();
                     GalleryDecide();
@@ -1503,6 +1508,7 @@ namespace Thornswood
                             galleryTimer.Interval = TimeSpan.FromSeconds(7);
                             galleryTimer.Tick += delegate { ShowNextShot(); };
                             win.StateChanged += delegate { GalleryDecide(); };
+                            win.Opened += delegate { GalleryDecide(); };
                         }
                         if (galleryAt < 0) ShowNextShot();
                         GalleryDecide();
@@ -1592,7 +1598,7 @@ namespace Thornswood
             img.Stretch = Stretch.UniformToFill;
             img.HorizontalAlignment = HorizontalAlignment.Stretch;
             img.VerticalAlignment = VerticalAlignment.Stretch;
-            RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
+            RenderOptions.SetBitmapInterpolationMode(img, BitmapInterpolationMode.HighQuality);
             if (shot.Image != null) img.Source = shot.Image;
             frame.Child = img;
             stack.Children.Add(frame);
@@ -1673,7 +1679,7 @@ namespace Thornswood
 
             var img = new Image();
             img.Stretch = Stretch.UniformToFill;
-            RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
+            RenderOptions.SetBitmapInterpolationMode(img, BitmapInterpolationMode.HighQuality);
             if (item.Image != null) img.Source = item.Image;
             frame.Child = img;
             stack.Children.Add(frame);
@@ -1726,7 +1732,7 @@ namespace Thornswood
                     ToolTip.SetTip(small, "The " + width + " pixel copy");
                     var smallImg = new Image();
                     smallImg.Stretch = Stretch.UniformToFill;
-                    RenderOptions.SetBitmapScalingMode(smallImg, BitmapScalingMode.HighQuality);
+                    RenderOptions.SetBitmapInterpolationMode(smallImg, BitmapInterpolationMode.HighQuality);
                     small.Child = smallImg;
                     strip.Children.Add(small);
 
@@ -2181,7 +2187,7 @@ namespace Thornswood
         static void GalleryDecide()
         {
             if (galleryTimer == null || galleryShots == null) return;
-            bool seen = pages != null && pages[PagePlay] != null &&
+            bool seen = win.IsVisible && pages != null && pages[PagePlay] != null &&
                         pages[PagePlay].IsVisible &&
                         win.WindowState != WindowState.Minimized && !playing;
             if (seen) { if (!galleryTimer.IsEnabled) galleryTimer.Start(); }
@@ -2948,10 +2954,10 @@ namespace Thornswood
                 btnPlay.Content = checkFailed ? "NO ANSWER FROM THE UPDATE SOURCE"
                                 : updateAnswered ? "UPDATE FIRST" : "CHECKING...";
                 ToolTip.SetTip(btnPlay, checkFailed
-                    ? "The update source did not answer, so it is not known whether this build is current. Play stays shut until it answers); the check runs again every 30 seconds."
+                    ? "The update source did not answer, so it is not known whether this build is current. Play stays shut until it answers; the check runs again every 30 seconds."
                     : updateAnswered
                     ? "There is an update waiting. Install it and Play comes back."
-                    : "Checking for updates before letting anybody in. A moment.";
+                    : "Checking for updates before letting anybody in. A moment.");
             }
             // The feed holds Play (entry 262). Below the three above because
             // each of those is something to do or already under way, and the
@@ -2967,8 +2973,8 @@ namespace Thornswood
             {
                 btnPlay.Content = Downgrade.Busy ? "DOWNGRADING..." : "DOWNGRADE FIRST";
                 ToolTip.SetTip(btnPlay, ModsMissing()
-                    ? "This Skyrim is not build 1.6.1170. The card above puts it right); the mods come after that."
-                    : "This Skyrim is not build 1.6.1170. The card above puts it right.";
+                    ? "This Skyrim is not build 1.6.1170. The card above puts it right; the mods come after that."
+                    : "This Skyrim is not build 1.6.1170. The card above puts it right.");
             }
             // A shared Skyrim is not an install this supports, so the button
             // says the thing that fixes it rather than saying PLAY and then
@@ -3525,7 +3531,7 @@ namespace Thornswood
                 string hex = (box.Text == null ? "" : box.Text).Trim();
 
                 bool good = false;
-                try { ColorConverter.ConvertFromString(hex); good = true; }
+                try { Color.Parse(hex); good = true; }
                 catch (Exception ex) { Swallow.Note("ApplyCustomTheme, reading " + name, ex); }
                 if (!good)
                 {
@@ -4051,8 +4057,7 @@ namespace Thornswood
                 try
                 {
                     using (var ask = new HttpRequestMessage(HttpMethod.Get, where + "/health"))
-                    using (var wait = new CancellationTokenSource(TimeSpan.FromSeconds(4)))
-                    using (HttpResponseMessage resp = web.Send(ask, wait.Token))
+                    using (HttpResponseMessage resp = Http.Send(ask, 4000))
                         up = resp.StatusCode == HttpStatusCode.OK;
                 }
                 catch (Exception ex) { Swallow.Note("Shell.CheckVoice", ex); }
@@ -4142,8 +4147,8 @@ namespace Thornswood
                 // Exact chip width; cover the chip so open state is one left-aligned
                 // panel (Placement Bottom + VerticalOffset = -height), not a second card.
                 btnServerPick.UpdateLayout();
-                double w = btnServerPick.ActualWidth;
-                double h = btnServerPick.ActualHeight;
+                double w = btnServerPick.Bounds.Width;
+                double h = btnServerPick.Bounds.Height;
                 if (w < 1) w = btnServerPick.MinWidth > 0 ? btnServerPick.MinWidth : 210;
                 if (h < 1) h = 32;
                 if (serverPickPanel != null)
