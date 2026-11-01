@@ -360,6 +360,20 @@ public sealed class AgentTests : IDisposable
         return ms.ToArray();
     }
 
+    /// <summary>The Deployment's states, oldest first (or only its last one).
+    /// When they are not the ones wanted, the failure carries the last
+    /// description and the deploy log, so a run on the gate says why and not
+    /// only that (1 Nov: a failure on the Windows gate gave "Expected success,
+    /// Actual failure" and nothing more).</summary>
+    static void HasStates(FakeGitHub gh, FakeServer s, long id, string want, bool last = false)
+    {
+        var got = last ? (string)gh.Last(id)!["state"]! : string.Join(",", gh.States(id));
+        if (got == want) return;
+        var log = Path.Combine(s.Root, "data", $"deploy-{id}.log");
+        var said = (string?)gh.Last(id)?["description"] ?? "(no status)";
+        Assert.Fail($"Deployment {id}: expected {want}, got {got}: {said}\n" + (File.Exists(log) ? File.ReadAllText(log) : "(no deploy log)"));
+    }
+
     static void PutTables(FakeServer s, Dictionary<string, string> tables)
     {
         var d = Path.Combine(s.Root, Tables.Dir);
@@ -613,7 +627,7 @@ public sealed class AgentTests : IDisposable
         GamemodeRelease(gh, "build-1", "// new gamemode\n");
         var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
-        Assert.Equal("in_progress,success", string.Join(",", gh.States(id)));
+        HasStates(gh, s, id, "in_progress,success");
         Assert.Equal("// new gamemode\n", s.Read("gamemode.js"));
         Assert.Equal("{\"commit\":\"new\"}", s.Read("thornswood-build.json"));
         var rec = JsonSerializer.Deserialize<DeployRecord>(s.Read(Path.Combine("data", "thornswood-deploy.json")))!;
@@ -647,7 +661,7 @@ public sealed class AgentTests : IDisposable
         GamemodeRelease(gh, "build-1", Reading("tables gamemode"), new() { ["DATA.json"] = "{\n\"a\":2\n}\n", ["WELLS.json"] = "[]\n" });
         var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
-        Assert.Equal("in_progress,success", string.Join(",", gh.States(id)));
+        HasStates(gh, s, id, "in_progress,success");
         Assert.Equal("{\n\"a\":2\n}\n", s.Read(Path.Combine(Tables.Dir, "DATA.json")));
         var newTree = Tables.Tree(Path.Combine(s.Root, Tables.Dir));
         Assert.NotEqual(oldTree, newTree);
@@ -874,13 +888,13 @@ public sealed class AgentTests : IDisposable
     [Fact]
     public async Task ADeploymentCutShortIsMarkedError()
     {
-        var (a, gh, _, _, cfg) = Make();
+        var (a, gh, s, _, cfg) = Make();
         var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
         var state = Path.Combine(cfg.Home, "state", "working.json");
         Directory.CreateDirectory(Path.GetDirectoryName(state)!);
         File.WriteAllText(state, $"{{\"Deployment\":\"{id}\",\"Env\":\"dev\",\"Started\":\"then\"}}");
         await a.Start(default);
-        Assert.Equal("error", (string)gh.Last(id)!["state"]!);
+        HasStates(gh, s, id, "error", last: true);
         Assert.False(File.Exists(state));
     }
 
@@ -1177,7 +1191,7 @@ public sealed class AgentTests : IDisposable
         BotRelease(gh, "build-1", "// new gamemode\n");
         var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
-        Assert.Equal("in_progress,success", string.Join(",", gh.States(id)));
+        HasStates(gh, s, id, "in_progress,success");
         Assert.Equal("// new gamemode\n", s.Read("gamemode.js"));
         Assert.Contains("bot pass: 7 of 7 passed", s.Read(Path.Combine("data", $"deploy-{id}.log")));
 
@@ -1234,7 +1248,7 @@ public sealed class AgentTests : IDisposable
         }));
         var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-9\"}");
         await a.Pass("dev", default);
-        Assert.Equal("success", (string)gh.Last(id)!["state"]!);
+        HasStates(gh, s, id, "success", last: true);
         // The copy ran the build dev was about to get, with its own scripts
         // and none of dev's, and then dev got it.
         Assert.Equal("native " + ForkB, native);
@@ -1290,7 +1304,7 @@ public sealed class AgentTests : IDisposable
         GamemodeRelease(gh, "build-1", "// new gamemode\n");
         var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
-        Assert.Equal("success", (string)gh.Last(id)!["state"]!);
+        HasStates(gh, s, id, "success", last: true);
         Assert.Contains("no bot pass: it is not set up on this box yet", s.Read(Path.Combine("data", $"deploy-{id}.log")));
     }
 
@@ -1313,7 +1327,7 @@ public sealed class AgentTests : IDisposable
         BotRelease(gh, "build-1", Reading("new gamemode"), tables: inRelease ? new() { ["FOODS.json"] = "[\"new\"]", ["DATA.json"] = "{}" } : null);
         var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
-        Assert.Equal("success", (string)gh.Last(id)!["state"]!);
+        HasStates(gh, s, id, "success", last: true);
         Assert.NotNull(copied);
         Assert.Equal(inRelease ? "DATA.json={},FOODS.json=[\"new\"]" : "FOODS.json=[\"dev\"]",
             string.Join(",", copied!.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => kv.Key + "=" + kv.Value)));
