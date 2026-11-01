@@ -25,6 +25,11 @@ sealed class FakeGitHub : HttpMessageHandler
     public readonly List<string> Downloaded = new();
     /// <summary>Tags with no published Release.</summary>
     public readonly List<string> BareTags = new();
+    /// <summary>Workflow runs and their approvals (#5181), by run id.</summary>
+    public readonly Dictionary<long, JsonObject> Runs = new();
+    public readonly Dictionary<long, JsonArray> Approvals = new();
+    /// <summary>The answer to a run or approvals read, when not 200 (an App without Actions: read).</summary>
+    public HttpStatusCode? RunsAnswer { get; set; }
     public Func<HttpRequestMessage, HttpResponseMessage>? Other { get; set; }
 
     public void AddRelease(string tag, Dictionary<string, byte[]> files)
@@ -58,7 +63,9 @@ sealed class FakeGitHub : HttpMessageHandler
         }
     }
 
-    public long AddDeployment(string env, string sha, string payloadJson)
+    public long AddDeployment(string env, string sha, string payloadJson) => AddDeployment(env, sha, payloadJson, "github-actions[bot]");
+
+    public long AddDeployment(string env, string sha, string payloadJson, string creator)
     {
         lock (gate)
         {
@@ -66,7 +73,7 @@ sealed class FakeGitHub : HttpMessageHandler
             Deps.Insert(0, new JsonObject
             {
                 ["id"] = id, ["sha"] = sha, ["task"] = "deploy", ["environment"] = env,
-                ["payload"] = JsonNode.Parse(payloadJson), ["creator"] = new JsonObject { ["login"] = "github-actions[bot]" },
+                ["payload"] = JsonNode.Parse(payloadJson), ["creator"] = new JsonObject { ["login"] = creator },
             });
             return id;
         }
@@ -98,6 +105,16 @@ sealed class FakeGitHub : HttpMessageHandler
         var q = System.Web.HttpUtility.ParseQueryString(r.RequestUri.Query);
         lock (gate)
         {
+            const string ar = "/repos/O/R/actions/runs/";
+            if (r.Method == HttpMethod.Get && p.StartsWith(ar))
+            {
+                if (RunsAnswer is { } code) return Json(code, "{\"message\":\"Resource not accessible by integration\"}");
+                var rest = p[ar.Length..];
+                var approvals = rest.EndsWith("/approvals");
+                var rid = long.Parse(approvals ? rest[..^"/approvals".Length] : rest);
+                if (approvals) return Json(HttpStatusCode.OK, (Approvals.TryGetValue(rid, out var ap) ? ap : new JsonArray()).ToJsonString());
+                return Runs.TryGetValue(rid, out var run) ? Json(HttpStatusCode.OK, run.ToJsonString()) : Json(HttpStatusCode.NotFound, "{\"message\":\"Not Found\"}");
+            }
             const string dp = "/repos/O/R/deployments/";
             if (r.Method == HttpMethod.Get && p == "/repos/O/R/deployments")
             {
@@ -206,9 +223,8 @@ sealed class FakeServer : IDisposable
     public HttpResponseMessage Health(HttpRequestMessage r) =>
         new(Healthy && !(SickWhen?.Invoke() ?? false) ? HttpStatusCode.OK : HttpStatusCode.ServiceUnavailable) { Content = new StringContent("{}") };
 
-    /// <summary>What a load says in server.log, as the gamemode says it, of
-    /// the bytes it loaded.</summary>
-    string LoadLines(byte[] b)
+    /// <summary>What a load says in server.log, as the gamemode says it.</summary>
+    string LoadLines(string gm, byte[] b)
     {
         var dir = Path.Combine(Root, Tables.Dir);
         var reads = Encoding.UTF8.GetString(b).Contains(Tables.TreeSaid);
@@ -224,8 +240,7 @@ sealed class FakeServer : IDisposable
     async Task Engine()
     {
         var gm = Path.Combine(Root, "gamemode.js");
-        var lastWrite = File.GetLastWriteTimeUtc(gm);
-        var last = Thornswood.DeployAgent.Files.ReadShared(gm);
+        var (last, lastWrite) = ReadOnce(gm);
         while (!stop.IsCancellationRequested)
         {
             try { await Task.Delay(5, stop.Token); } catch (OperationCanceledException) { return; }
@@ -234,21 +249,31 @@ sealed class FakeServer : IDisposable
 
         void Look()
         {
-            // The write time first, then the bytes, as the engine's watcher
-            // stats the file and then loads it: a gamemode put in between is
-            // read as the one loaded. Read the other way round, the old bytes
-            // went with the new file's time and were loaded again, and the
-            // load said the new file's blob, so a gamemode that does not load
-            // read as loaded (Linux agent tests, #5325, 1 Nov).
-            if (!Running) { try { lastWrite = File.GetLastWriteTimeUtc(gm); last = Thornswood.DeployAgent.Files.ReadShared(gm); } catch (IOException) { } return; }
             byte[] b;
             DateTime w;
-            try { w = File.GetLastWriteTimeUtc(gm); b = Thornswood.DeployAgent.Files.ReadShared(gm); } catch (IOException) { return; }
+            try { (b, w) = ReadOnce(gm); } catch (IOException) { return; }
+            if (!Running) { last = b; lastWrite = w; return; }
             if (b.AsSpan().SequenceEqual(last) && w == lastWrite) return;
             last = b;
             lastWrite = w;
-            try { File.AppendAllText(Path.Combine(Root, "server.log"), LoadLines(b)); } catch (IOException) { }
+            try { File.AppendAllText(Path.Combine(Root, "server.log"), LoadLines(gm, b)); } catch (IOException) { }
         }
+    }
+
+    /// <summary>The bytes and the write time of one file, from one handle,
+    /// as the engine loads what it was told changed. Read by path one after
+    /// the other, a rename between the two paired the old bytes with the new
+    /// time, and the load lines named the blob of whatever was there when
+    /// they were written: a load of bytes nobody judged. With a pause put
+    /// between the two reads, 21 of 25 runs of the put-back test across
+    /// #5191 met that load before the real one (1 Nov).</summary>
+    static (byte[] bytes, DateTime written) ReadOnce(string path)
+    {
+        using var f = Thornswood.DeployAgent.Files.OpenShared(path);
+        var w = File.GetLastWriteTimeUtc(f.SafeFileHandle);
+        using var ms = new MemoryStream();
+        f.CopyTo(ms);
+        return (ms.ToArray(), w);
     }
 
     void Looked() { lock (looked) { looks++; Monitor.PulseAll(looked); } }
@@ -281,7 +306,7 @@ sealed class FakeServer : IDisposable
     {
         if (Read(Path.Combine("dist_back", "skymp5-server.js")).Contains("WONTSTART")) return;
         var gm = Path.Combine(Root, "gamemode.js");
-        File.AppendAllText(Path.Combine(Root, "server.log"), "server started\n" + LoadLines(File.ReadAllBytes(gm)));
+        File.AppendAllText(Path.Combine(Root, "server.log"), "server started\n" + LoadLines(gm, File.ReadAllBytes(gm)));
         Running = true;
     }
 
@@ -413,6 +438,130 @@ public sealed class AgentTests : IDisposable
         return (a, gh, s, server, cfg);
     }
 
+
+    /// <summary>An agent looking after main alone (#5181), on a stand-in live server.</summary>
+    (Agent agent, FakeGitHub gh, FakeServer srv, Config cfg) MakeMain(int port = 7777)
+    {
+        var gh = new FakeGitHub();
+        var s = new FakeServer(port);
+        owned.Add(s);
+        gh.Other = s.Health;
+        var http = new HttpClient(gh);
+        var home = Temp();
+        var env = Config.DefaultMain();
+        env.Root = s.Root;
+        env.Turn = Temp();
+        env.Store = Path.Combine(home, "store");
+        env.Health = "https://health.test/api/servers/thornswood/manifest.json";
+        env.LoadSeconds = 10;
+        env.TurnSeconds = 10;
+        env.Watch = Temp();
+        env.StartSeconds = 2;
+        var cfg = new Config { Repo = "O/R", Api = FakeGitHub.Api, Home = home, Environments = { ["main"] = env } };
+        var server = new Server(env, http) { Tick = TimeSpan.FromMilliseconds(5), Control = new FakeControl(s) };
+        var gh2 = new GitHub(FakeGitHub.Api, "O/R", new StaticToken("t"), http);
+        var a = new Agent(cfg, gh2, new FakeVerifier(), new() { ["main"] = server }, "1.0.0", "", l => { lock (said) said.Add(l); }) { Host = "box" };
+        return (a, gh, s, cfg);
+    }
+
+    /// <summary>What promote-main.yml leaves: a Release dev ran, the run that
+    /// Patrick approved, and the Deployment to Main it made.</summary>
+    static long Promoted(FakeGitHub gh, string tag, long run, string approval = "approved", bool devRan = true, string path = Agent.PromoteWorkflow, string creator = "github-actions[bot]")
+    {
+        var dev = gh.AddDeployment("Dev", Commit, $"{{\"release\":\"{tag}\"}}");
+        gh.StatusesById[dev] = new() { new JsonObject { ["state"] = devRan ? "success" : "failure", ["description"] = "x" } };
+        gh.Runs[run] = new JsonObject { ["id"] = run, ["path"] = path, ["head_branch"] = "main", ["event"] = "workflow_dispatch" };
+        gh.Approvals[run] = new JsonArray(new JsonObject
+        {
+            ["state"] = approval, ["user"] = new JsonObject { ["login"] = "EvilPatrick06" },
+            ["environments"] = new JsonArray(new JsonObject { ["name"] = "Main" }),
+        });
+        return gh.AddDeployment("Main", Commit, $"{{\"release\":\"{tag}\",\"run\":{run}}}", creator);
+    }
+
+    [Fact]
+    public async Task MainTakesAnApprovedPromotionOfAReleaseDevRan()
+    {
+        var (a, gh, s, _) = MakeMain();
+        GamemodeRelease(gh, "build-1", "// new gamemode\n");
+        var id = Promoted(gh, "build-1", 55);
+        await a.Pass("main", default);
+        Assert.Equal("in_progress,success", string.Join(",", gh.States(id)));
+        Assert.Equal("// new gamemode\n", s.Read("gamemode.js"));
+        Assert.Contains(said, l => l.Contains("approved by EvilPatrick06 in run 55"));
+    }
+
+    [Theory]
+    [InlineData("nobody", "nobody approved run 55")]
+    [InlineData("rejected", "EvilPatrick06 rejected run 55")]
+    [InlineData("devfailed", "dev has not run build-1")]
+    [InlineData("workflow", "not .github/workflows/promote-main.yml")]
+    [InlineData("creator", "made by someone")]
+    [InlineData("noread", "needs Actions: read")]
+    public async Task MainRefusesWhatIsNotAnApprovedPromotion(string how, string want)
+    {
+        var (a, gh, s, _) = MakeMain();
+        GamemodeRelease(gh, "build-1", "// new gamemode\n");
+        var id = Promoted(gh, "build-1", 55, approval: how == "rejected" ? "rejected" : "approved", devRan: how != "devfailed",
+            path: how == "workflow" ? ".github/workflows/merge-release.yml" : Agent.PromoteWorkflow, creator: how == "creator" ? "someone" : "github-actions[bot]");
+        if (how == "nobody") gh.Approvals[55] = new JsonArray();
+        if (how == "noread") gh.RunsAnswer = System.Net.HttpStatusCode.Forbidden;
+        await a.Pass("main", default);
+        var last = gh.Last(id)!;
+        Assert.Equal("failure", (string)last["state"]!);
+        Assert.Contains(want, (string)last["description"]!);
+        Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
+    }
+
+    [Fact]
+    public async Task OneApprovedRunMakesOneMainDeployment()
+    {
+        var (a, gh, s, _) = MakeMain();
+        GamemodeRelease(gh, "build-1", "// new gamemode\n");
+        Promoted(gh, "build-1", 55);
+        await a.Pass("main", default);
+        var again = gh.AddDeployment("Main", Commit, "{\"release\":\"build-1\",\"run\":55}");
+        await a.Pass("main", default);
+        Assert.Contains("already made a Main Deployment", (string)gh.Last(again)!["description"]!);
+    }
+
+    [Fact]
+    public async Task MainIsNeverPutInByATagAndOnlyOnTheLivePort()
+    {
+        var (a, gh, s, _) = MakeMain();
+        GamemodeRelease(gh, "build-1", "// new gamemode\n");
+        var outc = await a.DeployTag("main", "build-1", default);
+        Assert.Equal("failure", outc.State);
+        Assert.Contains("only a Deployment Patrick approved", outc.Summary);
+        var (b, gh2, s2, _) = MakeMain(port: 7787);
+        GamemodeRelease(gh2, "build-1", "// new gamemode\n");
+        var id = Promoted(gh2, "build-1", 56);
+        await b.Pass("main", default);
+        Assert.Contains("not 7777", (string)gh2.Last(id)!["description"]!);
+        Assert.Equal("// old gamemode\r\n", s2.Read("gamemode.js"));
+    }
+
+    [Fact]
+    public void MainsConfigCannotBeWrittenAway()
+    {
+        var p = Path.Combine(Temp(), "agent.json");
+        File.WriteAllText(p, "{\"repo\":\"O/R\",\"environments\":{\"dev\":{},\"main\":{\"approved\":false,\"logBase\":\"http://x:3000/\"}}}");
+        var m = Config.Load(p).Environments["main"];
+        Assert.Equal(("Main", @"C:\Thornswood-Server", 7777, true, 0), (m.GitHubEnvironment, m.Root, m.RequirePort, m.Approved, m.LivePort));
+        foreach (var bad in new[]
+        {
+            "{\"repo\":\"O/R\",\"environments\":{\"main\":{\"githubEnvironment\":\"Dev\"}}}",
+            "{\"repo\":\"O/R\",\"environments\":{\"main\":{\"requirePort\":0}}}",
+            "{\"repo\":\"O/R\",\"environments\":{\"main\":{\"livePort\":7777}}}",
+            "{\"repo\":\"O/R\",\"environments\":{\"main\":{\"botPassRoot\":\"C:\\\\p\"}}}",
+            "{\"repo\":\"O/R\",\"environments\":{\"dev\":{},\"main\":{\"root\":\"C:\\\\Thornswood-Server-Dev\"}}}",
+            "{\"repo\":\"O/R\",\"environments\":{\"bot\":{}}}",
+        })
+        {
+            File.WriteAllText(p, bad);
+            Assert.Throws<ConfigException>(() => Config.Load(p));
+        }
+    }
 
     // ---- a new server build (an engine pin) ---------------------------------
 
@@ -823,7 +972,7 @@ public sealed class AgentTests : IDisposable
         var tree = Tables.Tree(Path.Combine(s.Root, Tables.Dir));
         GamemodeRelease(gh, "build-22", Reading("new gamemode"), new() { ["DATA.json"] = "BROKEN\n" });
         var outc = await a.DeployTag("dev", "build-22", default);
-        Assert.True(outc.State == "failure", outc.State + ": " + outc.Summary);
+        Assert.True(outc.State == "failure", outc.State + ": " + outc.Summary + "\n" + string.Join("\n", said));
         Assert.Contains("previous gamemode is back", outc.Summary);
         Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
         Assert.Equal(tree, Tables.Tree(Path.Combine(s.Root, Tables.Dir)));
@@ -1200,7 +1349,6 @@ public sealed class AgentTests : IDisposable
         foreach (var bad in new[]
         {
             "{\"environments\":{\"dev\":{}}}",
-            "{\"repo\":\"O/R\",\"environments\":{\"main\":{}}}",
             "{\"repo\":\"O/R\",\"environments\":{\"dev\":{\"githubEnvironment\":\"\"}}}",
             "{\"repo\":\"O/R\",\"environments\":{\"dev\":{\"githubEnvironment\":\"Main\"}}}",
             "{\"repo\":\"O/R\",\"api\":\"http://example.com\"}",
