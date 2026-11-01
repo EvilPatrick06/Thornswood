@@ -17,7 +17,6 @@
 # minutes: on 21 Oct 2026 the gate's 495 harnesses took 23 minutes of a 26
 # minute build inside a 40 minute job, so they come on a few at a time.
 
-test-1050-news-file.ps1  not sorted yet, runs in the nightly (#2513)
 test-1252-leftover-settings.ps1  not sorted yet, runs in the nightly (#2513)
 test-1269-kept-character.js  not sorted yet, runs in the nightly (#2513)
 test-1377-season.js  not sorted yet, runs in the nightly (#2513)
@@ -274,7 +273,6 @@ test-secret-channel.ps1  not sorted yet, runs in the nightly (#2513)
 test-secrets-off-command-lines.ps1  not sorted yet, runs in the nightly (#2513)
 test-secrets-table.js  not sorted yet, runs in the nightly (#2513)
 test-select-focus.js  not sorted yet, runs in the nightly (#2513)
-test-self-update.ps1  not sorted yet, runs in the nightly (#2513)
 test-send-script.ps1  not sorted yet, runs in the nightly (#2513)
 test-server-build-record.ps1  not sorted yet, runs in the nightly (#2513)
 test-server-down.js  not sorted yet, runs in the nightly (#2513)

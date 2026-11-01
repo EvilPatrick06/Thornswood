@@ -2618,10 +2618,8 @@ function Show-Installer {
 # update that had never been published. That happened twice in one evening and
 # each time the only sign was one red line halfway up the output.
 #
-# The version was bumped into Updater.cs before the build, so put it back
-# rather than leaving a number nothing was ever published under. Otherwise the
-# next attempt climbs again and the gap between what this machine calls itself
-# and what the world has gets wider every time.
+# No source file holds the number (#4825), so nothing is put back here: the
+# next attempt works out the same number again.
 if ($published -ne 0 -and $published -ne 2) {
     Write-Host ''
     Say "The publisher stopped with exit code $published, so NOTHING was published." 'Red'

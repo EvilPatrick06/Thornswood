@@ -280,7 +280,7 @@ namespace Thornswood
         /// </summary>
         public static VersionDoc Check(Config cfg)
         {
-            // No ServicePointManager.SecurityProtocol line any more (#4825). On
+            // No line setting the security protocol any more (#4825). On
             // the .NET Framework it added TLS 1.2 to an old default (#1360). On
             // .NET 10 the default is whatever Windows allows, TLS 1.3 included,
             // and adding TLS 1.2 to that default would have turned it into TLS
@@ -348,7 +348,7 @@ namespace Thornswood
             return Tip(cfg, tip, tag, 60000);
         }
 
-        // THE WATCH'S OWN CONNECTION (#2440, WatchGroup until #4825). The .NET
+        // THE WATCH'S OWN CONNECTION (#2440, WatchGroup until #4823). The .NET
         // Framework let a program keep two connections to a host at a time,
         // and the watch, holding one all the time, left the Play page's
         // gallery, pictures, voice token and news to take turns on the other,

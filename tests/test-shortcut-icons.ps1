@@ -17,22 +17,24 @@
   the only forced redraw (#816) keyed on Thornswood.exe.old, which a rebuild or
   a Ship never leaves.
 
-  Part 1 compiles the real Icons.cs with the compiler the launcher is built
-  with (tests\Launcher-Csc.ps1) against stand-ins for Paths, Art and Swallow,
-  and drives its Due / Remember / IconFile through reflection in a scratch
-  folder. Ensure itself is never called: it walks the real Desktop and Start
-  menu and talks to Explorer.
+  Part 1 compiles the real Icons.cs with the .NET SDK the launcher builds
+  with (tests\Launcher-Csc.ps1, #4823) against stand-ins for Paths, Art and
+  Swallow, and drives its Due / Remember / IconFile through reflection in a
+  scratch folder, on any machine. Ensure itself is never called: it walks the
+  real Desktop and Start menu and talks to Explorer. ShortcutsTo and Drop make
+  real shortcuts through WScript.Shell, so they run on Windows only.
 
   Part 2 runs the real Install-Launcher.ps1 on a scratch root (which touches
   nothing outside its own folder, no Desktop, no Explorer) with an exe whose
   app.ico is not the repository's, and checks the icon file is named after the
-  exe's art.
+  exe's art. It runs Windows PowerShell and reads shortcuts, so it runs on
+  Windows only.
 #>
 [CmdletBinding()]
 param()
 
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the .NET SDK the launcher builds with (#498, #4823)
 . (Join-Path $PSScriptRoot 'Windows.ps1')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
@@ -54,9 +56,8 @@ function Hash8([byte[]]$b) {
     ([BitConverter]::ToString($sha.ComputeHash($b), 0, 4)).Replace('-', '').ToLower()
 }
 
-if (-not $OnWindows) { Write-Host 'SKIP  the launcher''s code, compiled and run: its compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has'; Done }
-Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
-if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
+Yes 'the .NET SDK the launcher builds with is on this machine' (Test-Path -LiteralPath $LauncherDotnet)
+if (-not (Test-Path -LiteralPath $LauncherDotnet)) { Done }
 
 $appIco = Join-Path $Repo 'launcher\app.ico'
 $devIco = Join-Path $Repo 'launcher\app-dev.ico'
@@ -74,21 +75,19 @@ using System;
 namespace Thornswood
 {
     public static class Paths { public static string Root, LauncherDir, ProfileDir; }
-    public static class Art { public static bool Dev; }
     public static class Swallow { public static void Note(string where, Exception ex) { } }
 }
 '@
-    $stubCs = Join-Path $work 'Stubs.cs'
-    Set-Content -LiteralPath $stubCs -Value $stub -Encoding ASCII
-    $dll = Join-Path $work 'IconsUnderTest.dll'
-    $out = & $LauncherCsc /nologo /target:library "/langversion:$LauncherLangVersion" "/out:$dll" "/resource:$appIco,app.ico" "/resource:$devIco,app-dev.ico" $iconsCs $stubCs 2>&1
-    Yes 'Icons.cs compiles with the launcher''s compiler' ($LASTEXITCODE -eq 0)
-    if ($LASTEXITCODE -ne 0) { $out | ForEach-Object { Write-Host "  $_" }; Done }
+    $asm = $null
+    # Built, then loaded: Add-LauncherType takes no resources, and Icons reads
+    # its art from its own assembly's. It uses no package, so nothing else loads.
+    try { $asm = [Reflection.Assembly]::LoadFrom((Build-LauncherCode -Source $stub -File $iconsCs, (Join-Path (Split-Path -Parent $iconsCs) 'InstallShortcut.cs') -Resource @{ 'app.ico' = $appIco; 'app-dev.ico' = $devIco })) }
+    catch { ($_.Exception.Message -split "`n") | Select-Object -First 20 | ForEach-Object { Write-Host "  $_" } }
+    Yes 'Icons.cs compiles with the .NET SDK the launcher builds with' ($null -ne $asm)
+    if (-not $asm) { Done }
 
-    $asm = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($dll))
     $icons = $asm.GetType('Thornswood.Icons')
     $paths = $asm.GetType('Thornswood.Paths')
-    $art = $asm.GetType('Thornswood.Art')
     $nps = [Reflection.BindingFlags]'NonPublic, Static'
     $due = $icons.GetMethod('Due', $nps)
     $remember = $icons.GetMethod('Remember', $nps)
@@ -131,8 +130,10 @@ namespace Thornswood
         Yes 'with the icon file gone, OutOfDate says so' (@($l | Where-Object { "$_" -like '*icon file*' }).Count -eq 1)
         Yes 'and writes nothing: the icon file is still gone, and no stamp or shortcut appeared' (((& $seen) -eq $before) -and -not (Test-Path -LiteralPath $iconNow))
         $r = IconNow
-        [string]$noExe = Join-Path $launcherDir 'Thornswood.exe'
-        $remember.Invoke($null, @($noExe, ([string]$r.Path + ',0'))) | Out-Null
+        # The launcher Icons itself names (Icons.Exe, the running process since
+        # #4823, so here this PowerShell): what OutOfDate compares the stamp with.
+        [string]$thisExe = $icons.GetProperty('Exe').GetValue($null)
+        $remember.Invoke($null, @($thisExe, ([string]$r.Path + ',0'))) | Out-Null
         $l = @($outOfDate.Invoke($null, @()))
         Yes ('with the icon written and the shortcuts redrawn for this launcher, nothing is out of date' + $(if ($l.Count) { ' (' + ($l -join '; ') + ')' } else { '' })) ($l.Count -eq 0)
         Remove-Item -LiteralPath (Join-Path $profileDir 'icons.stamp') -Force
@@ -173,18 +174,21 @@ namespace Thornswood
     New-Item -ItemType Directory -Force -Path (Join-Path $devRoot 'Launcher'), (Join-Path $devRoot 'Profile') | Out-Null
     $paths.GetField('LauncherDir').SetValue($null, (Join-Path $devRoot 'Launcher'))
     $paths.GetField('ProfileDir').SetValue($null, (Join-Path $devRoot 'Profile'))
-    $art.GetField('Dev').SetValue($null, $true)
+    $icons.GetField('Dev').SetValue($null, $true)
     $r = IconNow
     Yes "the dev build's IconFile is icon-$devHash.ico (app-dev.ico)" ($r.Path -and (Split-Path -Leaf $r.Path) -eq "icon-$devHash.ico")
     Yes 'the dev install does not read the main install''s stamp' ([bool]$due.Invoke($null, @($exe, $want, $false)))
-    $art.GetField('Dev').SetValue($null, $false)
+    $icons.GetField('Dev').SetValue($null, $false)
 
     # #3205: removal finds shortcuts by what they run, not by name. A pin left
     # behind under Thornswood.lnk made the next pin "Thornswood (2)".
     $to = $icons.GetMethod('ShortcutsTo', [Reflection.BindingFlags]'Public, Static')
     $drop = $icons.GetMethod('Drop', [Reflection.BindingFlags]'Public, Static')
     Yes 'Icons has ShortcutsTo and Drop (#3205)' ($to -and $drop)
-    if ($to -and $drop) {
+    if (-not $OnWindows) {
+        Write-Host 'SKIP  ShortcutsTo and Drop on real shortcuts: they are made through WScript.Shell, which only Windows has'
+    }
+    elseif ($to -and $drop) {
         $ws = New-Object -ComObject WScript.Shell
         function Link([string]$name, [string]$target) {
             $p = Join-Path $root $name
@@ -218,14 +222,20 @@ namespace Thornswood
     Yes 'ordinary starts never kill Explorer: taskkill is only in Repair' ($src.IndexOf('taskkill') -gt $src.IndexOf('public static string Repair()'))
 
     # ---- 2. Install-Launcher.ps1 names the file after the exe's art -------------
+    if (-not $OnWindows) {
+        Write-Host 'SKIP  2, Install-Launcher.ps1 on a scratch root: it runs in Windows PowerShell and the shortcut it makes is read through WScript.Shell, which only Windows has'
+        Done
+    }
     $stage = Join-Path $work 'stage'
     New-Item -ItemType Directory -Force -Path $stage | Out-Null
-    $prog = Join-Path $work 'Program.cs'
-    Set-Content -LiteralPath $prog -Value 'static class Program { static void Main() { } }' -Encoding ASCII
     # An exe whose app.ico is the dev art: what a CI-built exe with art other
-    # than the checkout's looks like to the install.
-    $out = & $LauncherCsc /nologo /target:winexe "/out:$(Join-Path $stage 'Thornswood.exe')" "/resource:$devIco,app.ico" $prog 2>&1
-    Yes 'a stand-in exe carrying other art compiles' ($LASTEXITCODE -eq 0)
+    # than the checkout's looks like to the install. Built with the .NET SDK
+    # (#4823), a managed program whose resource Install-Launcher reads.
+    $standIn = $null
+    try { $standIn = Build-LauncherCode -Exe -Source 'static class Program { static void Main() { } }' -Resource @{ 'app.ico' = $devIco } }
+    catch { ($_.Exception.Message -split "`n") | Select-Object -First 20 | ForEach-Object { Write-Host "  $_" } }
+    Yes 'a stand-in exe carrying other art compiles' ($null -ne $standIn)
+    if ($standIn) { Copy-Item -LiteralPath $standIn -Destination (Join-Path $stage 'Thornswood.exe') -Force }
     $sroot = Join-Path $work 'scratchroot'
     $ps = Get-WindowsPowerShell
     $inst = Join-Path $Repo 'scripts\release\Install-Launcher.ps1'

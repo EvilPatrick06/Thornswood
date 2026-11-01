@@ -1,6 +1,6 @@
 param([string]$Scratch)
 $ErrorActionPreference='Stop'
-. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the .NET SDK the launcher builds with (#498, #4823)
+. (Join-Path $PSScriptRoot 'Framework-Csc.ps1')  # C# 5 against the .NET Framework, through the .NET SDK the launcher builds with (#498, #4823)
 $repo=Split-Path -Parent $PSScriptRoot
 if(-not $Scratch){$Scratch=Join-Path ([IO.Path]::GetTempPath()) ('thornswood-vortex-state-'+[guid]::NewGuid().ToString('N'))}
 New-Item -ItemType Directory -Path $Scratch -Force | Out-Null
@@ -49,28 +49,9 @@ try {
     # Windows PowerShell is the .NET Framework compiler and stops at C# 5
     # (Developer-Guide.md, Settled design). The .NET SDK the launcher builds
     # with fetches the Framework's reference assemblies on any machine, so
-    # this runs everywhere (#4823).
-    $fx=Join-Path $Scratch 'framework'
-    New-Item -ItemType Directory -Path $fx -Force | Out-Null
-    $cs=[IO.Path]::Combine($repo,'launcher','app','VortexProfileState.cs')
-    $proj=@(
-        '<Project Sdk="Microsoft.NET.Sdk">',
-        '  <PropertyGroup>',
-        '    <TargetFramework>net48</TargetFramework>',
-        '    <LangVersion>5</LangVersion>',
-        '    <OutputType>Library</OutputType>',
-        '    <EnableDefaultItems>false</EnableDefaultItems>',
-        '  </PropertyGroup>',
-        '  <ItemGroup>',
-        ('    <Compile Include="'+[Security.SecurityElement]::Escape($cs)+'" />'),
-        '    <Reference Include="System.Xml" />',
-        '  </ItemGroup>',
-        '</Project>') -join "`n"
-    [IO.File]::WriteAllText((Join-Path $fx 'VortexProfileState.csproj'),$proj)
-    if(-not(Test-Path -LiteralPath $LauncherDotnet)){throw ('The .NET SDK the launcher builds with is not on this machine ('+$LauncherDotnet+')')}
-    $bin=Join-Path $fx 'bin'
-    $said=& $LauncherDotnet build (Join-Path $fx 'VortexProfileState.csproj') -nologo -v:q '-clp:NoSummary;ErrorsOnly' -o $bin 2>&1 | Out-String
-    if($LASTEXITCODE -or -not(Test-Path -LiteralPath (Join-Path $bin 'VortexProfileState.dll'))){Write-Host $said.Trim(); throw 'Framework compilation failed'}
+    # this runs everywhere (#4823). Build-FrameworkCode throws with what the
+    # compiler said when it refuses the file.
+    $null=Build-FrameworkCode -File ([IO.Path]::Combine($repo,'launcher','app','VortexProfileState.cs')) -Reference System.Xml
     Write-Host 'PASS framework compilation: VortexProfileState.cs at C# 5 against the .NET Framework'
     Write-Host ($count.ToString()+' profile cases and framework compilation passed')
 } finally {$env:APPDATA=$oldAppData}

@@ -252,9 +252,13 @@ function get(port, route) {
   yes('making the dev instance copies the voice program and no page from live',
       /robocopy \$liveVoice \$devVoice voice-server\.js/.test(dev) && !/Join-Path \$liveVoice 'public'/.test(dev));
 
+  // The list of what the build parses is in scripts\dev\Check-Parse.ps1
+  // since #5291, which build.yml and the pre-push hook both run.
   const build = read('.github/workflows/build.yml');
+  const parse = read('scripts/dev/Check-Parse.ps1');
   yes('the build parses the service and no file in voice\\public',
-      /Get-ChildItem -Path site\\server\.js, voice\\voice-server\.js -File/.test(build) && build.indexOf('voice\\public') < 0);
+      /Check-Parse\.ps1 -What Scripts/.test(build) && /\(Join-Path 'voice' 'voice-server\.js'\)/.test(parse) &&
+      build.indexOf('voice\\public') < 0 && !/public/.test(parse));
 
   const readers = tracked.filter((f) => /^(tests|voice)\/test-[^/]+\.(js|ps1)$/.test(f) && !/test-1822-/.test(f))
     .filter((f) => {

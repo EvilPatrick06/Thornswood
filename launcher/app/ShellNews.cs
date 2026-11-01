@@ -25,7 +25,7 @@ namespace Thornswood
         //
         // All four are only touched on the window's thread. newsHead is the
         // header line, so an answer can be put in without rebuilding the list
-        // under somebody who has a note's files open.
+        // under somebody reading it.
         static TextBlock newsHead;
         static string mainLive = "";
         static bool mainReading;
@@ -89,7 +89,9 @@ namespace Thornswood
             if (items.Length == 0)
             {
                 var empty = new TextBlock();
-                empty.Text = "Nothing posted yet. Anything Patrick writes to the update feed turns up here.";
+                empty.Text = cfg.IsDev
+                    ? "Nothing posted yet. The notes of each release turn up here once the dev server runs it."
+                    : "Nothing posted yet. The notes of each release turn up here once the live server runs it.";
                 empty.Foreground = Res("Faint"); empty.FontSize = 12.5;
                 empty.TextWrapping = TextWrapping.Wrap;
                 newsList.Children.Add(empty);
@@ -98,7 +100,7 @@ namespace Thornswood
 
             // What this build has that main does not.
             //
-            // The dev feed is main's whole history with the dev notes on top,
+            // The dev tab is main's whole history with the dev notes on top,
             // so the tab used to read as one long list with no seam in it. The
             // seam is the useful part: it is the difference between the build
             // in front of you and the build everybody plays, which is the list
@@ -168,8 +170,8 @@ namespace Thornswood
                         stamp.Children.Add(d);
                     }
 
-                    // Only a dev feed ever carries one of these, and inside a
-                    // dev feed only the notes main has not had yet.
+                    // Only a dev launcher ever has one of these, on the notes of
+                    // the Releases main's Deployment has not reached yet.
                     if (n.IsDev)
                     {
                         var ct = new TextBlock();
@@ -236,44 +238,6 @@ namespace Thornswood
                         box.Children.Add(row);
                     }
                     if (box.Children.Count > 0) sp.Children.Add(box);
-                }
-
-                if (n.files != null && n.files.Length > 0)
-                {
-                    var toggle = new Button();
-                    toggle.Theme = Look("Ghost");
-                    toggle.Content = "Show the " + n.files.Length + " file" + (n.files.Length == 1 ? "" : "s");
-                    toggle.HorizontalAlignment = HorizontalAlignment.Left;
-                    toggle.Margin = new Thickness(0, 12, 0, 0);
-
-                    var filesBox = new StackPanel();
-                    filesBox.IsVisible = false;
-                    filesBox.Margin = new Thickness(0, 10, 0, 0);
-                    for (int i = 0; i < n.files.Length; i++)
-                    {
-                        var ft = new TextBlock();
-                        ft.Text = n.files[i];
-                        ft.FontSize = 10.5;
-                        ft.FontFamily = new FontFamily("Cascadia Mono, Consolas");
-                        ft.Foreground = Res(n.files[i].StartsWith("- ") ? "Warn" : "Faint");
-                        ft.TextWrapping = TextWrapping.Wrap;
-                        ft.Margin = new Thickness(0, 0, 0, 2);
-                        filesBox.Children.Add(ft);
-                    }
-
-                    StackPanel captured = filesBox;
-                    Button capturedButton = toggle;
-                    string[] capturedFiles = n.files;
-                    toggle.Click += delegate
-                    {
-                        bool open = captured.IsVisible;
-                        captured.IsVisible = !open;
-                        capturedButton.Content = (open ? "Show the " : "Hide the ") + capturedFiles.Length
-                                               + " file" + (capturedFiles.Length == 1 ? "" : "s");
-                    };
-
-                    sp.Children.Add(toggle);
-                    sp.Children.Add(filesBox);
                 }
 
                 var b = new Border();

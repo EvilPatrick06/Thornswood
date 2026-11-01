@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Thornswood
 {
@@ -113,6 +115,18 @@ namespace Thornswood
                 settingsHeld = sha;
             }
             return raw;
+        }
+
+        /// <summary>The sha256 of b, in lower case hex.</summary>
+        static string ShaOf(byte[] b)
+        {
+            using (var h = SHA256.Create())
+            {
+                byte[] d = h.ComputeHash(b);
+                var sb = new StringBuilder();
+                foreach (byte x in d) sb.Append(x.ToString("x2"));
+                return sb.ToString();
+            }
         }
     }
 }

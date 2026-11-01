@@ -28,7 +28,8 @@ namespace Thornswood
 
         /// <summary>
         /// True in the dev build. Set by Shell as soon as the config is read,
-        /// before anything asks for the emblem or the shortcut icon.
+        /// before anything asks for the emblem. The shortcut icon reads
+        /// Icons.Dev, set beside it.
         /// </summary>
         public static bool Dev;
 

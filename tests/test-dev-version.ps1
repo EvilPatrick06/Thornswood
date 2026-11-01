@@ -108,8 +108,8 @@ function IsNewer([string]$remote, [string]$local) {
   pointed here at a folder of the harness's own so the machine's copy is
   never read.
 
-  $current is what the CHECKED OUT branch's Updater.cs says, which is the
-  value Ship reads before this block. An empty feed argument leaves that file
+  $current is main's number for the CHECKED OUT sources, which Ship works out
+  before this block (LauncherVersion.ps1; until #5179 a line in Updater.cs). An empty feed argument leaves that file
   out.
 #>
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('tsdevver-' + [Guid]::NewGuid().ToString('N'))
@@ -241,29 +241,19 @@ finally {
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-# ---- #2035: Updater.cs is written back with no byte order mark ------------
-# Ship writes Updater.cs for the bump, Unbump and the dev put-back. With
-# Set-Content -Encoding UTF8 that added a mark in Windows PowerShell 5.1 and
-# none in PowerShell 7, so a 5.1 Ship left the file changed in git by three
-# bytes. CI runs PowerShell 7, where Set-Content would pass a byte check, so
-# the script's own text is checked as well as the write.
-Yes 'Ship.ps1 never writes Updater.cs with Set-Content (#2035)' (-not ($src -match 'Set-Content\s+\$updaterCs'))
-$wm = [regex]::Match($src, '(?s)function Write-UpdaterCs\(\[string\]\$text\) \{.*?\r?\n\}')
-Yes 'Ship.ps1 has one writer for Updater.cs, Write-UpdaterCs' $wm.Success
-Yes 'and the bump, Unbump and the dev put-back all go through it' (([regex]::Matches($src, 'Write-UpdaterCs \$(src|back)')).Count -eq 3)
-if ($wm.Success) {
-    $bomTmp = Join-Path ([IO.Path]::GetTempPath()) ('tw-2035-' + [Guid]::NewGuid().ToString('N') + '.cs')
-    try {
-        $updaterCs = $bomTmp
-        . ([ScriptBlock]::Create($wm.Value))
-        $text = "using System;`r`n    public const string Version = `"1.2.0.1`";`r`n"
-        Write-UpdaterCs $text
-        $bytes = [IO.File]::ReadAllBytes($bomTmp)
-        Yes 'the file it writes starts with no byte order mark' (-not ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF))
-        Yes 'and holds exactly the text given, with no newline added' ([Text.Encoding]::UTF8.GetString($bytes) -ceq $text)
-    }
-    finally { Remove-Item -LiteralPath $bomTmp -Force -ErrorAction SilentlyContinue }
-}
+# ---- #4825: Ship writes no source file for the number ---------------------
+# Until #4825 Ship wrote the number into Updater.cs for the build and wrote
+# git's 0.0.0 back afterwards, through one writer with no byte order mark
+# (#2035), and a run that stopped between the two left the file changed. Now
+# the number goes to the build as -p:Version and the launcher reads it from
+# its own exe, so there is nothing to write and nothing to put back.
+Yes 'Ship.ps1 writes nothing into Updater.cs: no writer, no Set-Content or WriteAllText on it (#4825)' (
+    $src -notmatch 'function Write-UpdaterCs' -and $src -notmatch 'Set-Content\s+\$updaterCs' -and
+    $src -notmatch 'WriteAllText\(\s*\$updaterCs')
+Yes '  and hands the number it worked out to Build-Launcher.ps1 as -Version' ($src -match "Build-Launcher\.ps1'\) .*-Version \`$target")
+$updaterSrc = [IO.File]::ReadAllText((Join-Path $Here 'launcher\app\Updater.cs'))
+Yes '  which the launcher reads from its own exe, not from a line in Updater.cs' (
+    $updaterSrc.Contains('public static readonly string Version = BuiltVersion();') -and $updaterSrc -notmatch 'Version\s*=\s*"\d+\.\d+\.\d+')
 
 Write-Host ''
 Write-Host "$script:pass passed, $script:fail failed"

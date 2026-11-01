@@ -33,7 +33,7 @@
   GitHub token from the box admin App's key, which only SYSTEM,
   Administrators and the admin service can read (Install-AdminService.ps1,
   #4076). The token it asks for carries Deployments write and Contents read
-  on this repository and nothing else. Its folder takes nothing from C:\: SYSTEM
+  on this repository and nothing else, and Actions read once -Main is on. Its folder takes nothing from C:\: SYSTEM
   and Administrators only.
 
   WHEN IT ENDS. The service manager starts it again when it ends with an error
@@ -66,6 +66,14 @@
   Thornswood Dev Voice, Install-Voice.ps1), a Release's voice goes in with
   dev's Deployment, before the gamemode that pushes positions to it.
 
+  MAIN (#5181). -Main has agent.json name main too, so the agent applies the
+  Main environment's Deployments to the live server, each one only after
+  Patrick approved the promote-main.yml run that made it and only for a
+  Release dev ran (tools\DeployAgent\Agent.cs, NotApproved). Its token then
+  also asks Actions: read, to see who approved, which the box admin App
+  holds (Actions read and write since 30 Oct, #5006). -NoMain takes main
+  off again; with neither, what agent.json says is kept.
+
   WHAT IT CANNOT DO YET. Until the box admin App holds Deployments: Read and
   write (its permissions page, then Accept on its installation, an owner's
   step), the agent runs and every pass says GitHub gave it no token; -Status
@@ -97,6 +105,9 @@ param(
     # while it is there. Without this switch the install refuses on a stuck
     # service and changes nothing.
     [switch]$EndHung,
+    # Look after the live server as well (#5181): approved Main Deployments only.
+    [switch]$Main,
+    [switch]$NoMain,
     [switch]$NoPause
 )
 
@@ -113,6 +124,7 @@ if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
 
+if ($Main -and $NoMain) { Die '-Main and -NoMain each do one thing, so pass one of them. Nothing was sent.' }
 if ($Status -and $Remove) { Die '-Status and -Remove each do one thing, so pass one of them. Nothing was sent.' }
 if ($Tag -and $Tag -notmatch '^agent-v\d+\.\d+\.\d+$') { Die "-Tag $Tag is not agent-v<a.b.c>. Nothing was sent." }
 if ($Root -notmatch '^[A-Za-z]:\\[A-Za-z0-9._\\-]+$') { Die "-Root $Root is not a plain folder on the box. Nothing was sent." }
@@ -132,6 +144,8 @@ if ($Repo -notmatch '^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$') { Die "-Repo $Repo is not
 $publicName = Get-ThornswoodVpsAddress
 if ($publicName -notmatch '^[A-Za-z0-9.-]+$') { Die "vps.json's address ($publicName) is not a plain host name. Nothing was sent." }
 $logBase = 'http://' + $publicName + ':7788/'
+# The live server's resources port, for main's log links.
+$mainLogBase = 'http://' + $publicName + ':3000/'
 
 $target = "$VpsUser@$VpsHost"
 $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
@@ -283,6 +297,14 @@ if (-not `$cfg.environments) { `$cfg | Add-Member -NotePropertyName environments
 if (-not `$cfg.environments.dev) { `$cfg.environments | Add-Member -NotePropertyName dev -NotePropertyValue (New-Object PSObject) -Force }
 `$cfg.environments.dev | Add-Member -NotePropertyName logBase -NotePropertyValue '$logBase' -Force
 'agent.json names $Repo'
+# Main (#5181): only on -Main, taken off on -NoMain, otherwise kept.
+if ([bool]$([int][bool]$Main)) {
+  `$cfg.environments | Add-Member -NotePropertyName main -NotePropertyValue ([pscustomobject]@{ logBase = '$mainLogBase' }) -Force
+  'main: approved Main Deployments go on the live server'
+} elseif ([bool]$([int][bool]$NoMain)) {
+  `$cfg.environments.PSObject.Properties.Remove('main')
+  'main: off; the live server takes nothing from the agent'
+} elseif (`$cfg.environments.main) { 'main: kept, as agent.json said' }
 
 # The site and the Discord bot (#5190, #5187): the agent swaps in each
 # Deployment to Site and to Discord bot. Their logs go in the dev server's

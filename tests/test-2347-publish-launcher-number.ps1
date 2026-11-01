@@ -146,6 +146,10 @@ function Set-Prop($o, [string]$k, $v) { if ($o.PSObject.Properties[$k]) { $o.$k 
     Yes ('from the same sources it goes on with 1.2.3: ' + $r) ($r -eq '1.2.3')
     $r = RunExe @{ Version = '1.2.4'; Inputs = $D; Channel = 'main'; Feed = (Feed '1.2.3' $X $M) }
     Yes ('main moved to 1.2.4 goes on: ' + $r) ($r -eq '1.2.4')
+    # No source file holds the number since #4825, so the publisher has none
+    # of its own to fall back on: without the build's, it stops.
+    $r = RunExe @{ Version = ''; Inputs = $D; Channel = 'main'; Feed = (Feed '1.2.3' $X $M) }
+    Yes ('with no number given it stops rather than read one from a file: ' + $r) ($r -like 'STOP. No launcher number was given*')
     $r = RunExe @{ Version = '1.2.3'; Inputs = ''; Channel = 'main'; Feed = (Feed '1.2.3' $exeSha '') }
     Yes ('the very bytes the feed names go on: ' + $r) ($r -eq '1.2.3')
     $r = RunExe @{ Version = '1.2.3'; Inputs = $D; Channel = 'dev'; Feed = (Feed '1.2.3' $X $D) }

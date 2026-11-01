@@ -651,9 +651,11 @@ exit code $code"
     Yes 'B: Ship.ps1 has an Animation and body files step' ($at -gt 0)
     $buildAt = if ($at -gt 0) { $shipText.IndexOf('# ------------------------------------------------------------ node', $at) } else { -1 }
     $step = if ($at -gt 0 -and $buildAt -gt $at) { $shipText.Substring($at, $buildAt - $at) } else { '' }
-    Yes 'B: it runs Build-Generated.ps1 -DryRun on this install''s folder, and stops on both channels when that stops, putting the version back' (
+    # Nothing to put back first since #4825: the number goes into the build as
+    # -p:Version and no source file holds it (Unbump went).
+    Yes 'B: it runs Build-Generated.ps1 -DryRun on this install''s folder, and stops on both channels when that stops' (
         $step.Contains("& (Join-Path `$Here '..\mods\Build-Generated.ps1') -Root `$Root -DryRun -NoPause") -and
-        $step -match "if \(\`$genExit -ne 0\) \{\s*Unbump '[^']+'\s*Die " -and $step -notmatch '\$Dev')
+        $step -match "if \(\`$genExit -ne 0\) \{\s*Die " -and $step -notmatch '\$Dev')
     $buildCall = $shipText.IndexOf("'Build-Launcher.ps1') -Root")
     $installCall = $shipText.IndexOf("'Install-Launcher.ps1')")
     $publish = $shipText.IndexOf("Publish-Update.ps1", $at + 1)

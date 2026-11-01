@@ -253,6 +253,26 @@ try {
     Yes 'S8 a dropPatch on a file that does not move is refused' (@($cs2.Problems | Where-Object { $_ -match 'names dropPatch and its file does not move' }).Count -eq 1) (@($cs2.Problems) -join ' | ')
     $same = [pscustomobject]@{ mods = @($pubJson.mods | ForEach-Object { [pscustomobject]@{ modId = $_.source.modId; fileId = $_.source.fileId; name = $_.name; plugins = @() } }); plugins = @([pscustomobject]@{ name = 'B.esp'; after = @('A.esm') }, [pscustomobject]@{ name = 'C.esp'; after = @('B.esp') }) }
     Yes 'S9 a record that is the published revision asks for nothing' ((Get-CollectionChangeSet $same $pubJson).Empty)
+    # A FOMOD's answers (#5189): they go with a file the record adds, the
+    # record writes them on the mod's line, and a kept or moved file's are
+    # the published revision's.
+    $ch = '{"type":"fomod","options":[{"name":"Options","groups":[{"name":"Add-ons","choices":[{"name":"Dawnguard","idx":0}]}]}]}' | ConvertFrom-Json
+    $rec3 = [pscustomobject]@{ mods = @($rec.mods | ForEach-Object { if ($_.modId -eq 5) { [pscustomobject]@{ modId = 5; fileId = 50; name = 'five'; plugins = @('E.esp'); choices = $ch } } else { $_ } }); plugins = $rec.plugins }
+    $cs3 = Get-CollectionChangeSet $rec3 $pubJson
+    Yes 'S10 a new file''s choices go with it to -Add' ($cs3.Add[0].choices.options[0].groups[0].choices[0].name -eq 'Dawnguard' -and -not @($cs3.Problems).Count) (@($cs3.Problems) -join ' | ')
+    $rec4 = [pscustomobject]@{ mods = @($rec.mods | ForEach-Object { if ($_.modId -eq 1) { [pscustomobject]@{ modId = 1; fileId = 10; name = 'one'; plugins = @('A.esm'); choices = $ch } } elseif ($_.modId -eq 2) { [pscustomobject]@{ modId = 2; fileId = 21; name = 'two'; plugins = @('B.esp'); choices = $ch; dropPatch = @('B.esp') } } else { $_ } }); plugins = $rec.plugins }
+    $cs4 = Get-CollectionChangeSet $rec4 $pubJson
+    Yes 'S11 choices on a kept file that are not the published entry''s are refused' (@($cs4.Problems | Where-Object { $_ -match 'mod 1 file 10 gives choices that are not the published revision''s' }).Count -eq 1) (@($cs4.Problems) -join ' | ')
+    Yes 'S12 and so are choices on a file that moves' (@($cs4.Problems | Where-Object { $_ -match 'mod 2 moves to file 21 with choices' }).Count -eq 1) (@($cs4.Problems) -join ' | ')
+    $pubJson.mods[0] | Add-Member -NotePropertyName choices -NotePropertyValue $ch
+    $cs5 = Get-CollectionChangeSet ([pscustomobject]@{ mods = @($rec4.mods | Where-Object { $_.modId -ne 2 }); plugins = $rec.plugins }) $pubJson
+    Yes 'S13 a kept file''s choices that say the published ones again are fine' (-not @($cs5.Problems | Where-Object { $_ -match 'choices' }).Count) (@($cs5.Problems) -join ' | ')
+    $pubJson.mods[0].PSObject.Properties.Remove('choices')
+    $rr5 = [pscustomobject]@{ version = 1; issue = 5189; what = 'w'; collection = '7essxf'; game = 'skyrimspecialedition'; revision = 6; mods = @([pscustomobject]@{ modId = 5; fileId = 50; name = 'five'; plugins = @('E.esp'); choices = $ch }); plugins = @([pscustomobject]@{ name = 'E.esp'; master = $false; light = $false; masters = @(); after = @('Skyrim.esm') }); dropped = @() }
+    $t5 = ConvertTo-CollectionRecordText $rr5
+    Yes 'S14 the record writes a mod''s choices on its line, and they read back the same' ($t5 -match '"choices": \{ "type": "fomod", "options": \[\{ "name": "Options", "groups": \[\{ "name": "Add-ons", "choices": \[\{ "name": "Dawnguard", "idx": 0 \}\] \}\] \}\] \}' -and (ConvertTo-CollectionRecordText ($t5 | ConvertFrom-Json)) -ceq $t5 -and -not @(Get-CollectionRecordShapeProblems ($t5 | ConvertFrom-Json)).Count) (@(Get-CollectionRecordShapeProblems ($t5 | ConvertFrom-Json)) -join ' | ')
+    $bad = $t5.Replace('"idx": 0', '"idx": -1')
+    Yes 'S15 choices not shaped as Vortex writes them are refused' (@(Get-CollectionRecordShapeProblems ($bad | ConvertFrom-Json) | Where-Object { $_ -match 'mod 5 file 50: a choice in group "Add-ons"' }).Count -eq 1)
 
     # ---------------------------------------------------------------- L ----
     # A plugin file with a TES4 header: flags (0x1 master, 0x200 light) and a
