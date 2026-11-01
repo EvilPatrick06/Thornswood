@@ -745,9 +745,13 @@ jobs:
           # the check that read ui.xaml at run time (Check-Controls.ps1) went
           # with it. Until #4823 this step was tests\test-498-msbuild.ps1,
           # which held the MSBuild build of the .NET Framework launcher.
+          # -Version 0.0.0, the number a bare build carries: this job checks
+          # the tree alone (#3182, the note at the end), and the number a
+          # release takes comes from history (LauncherVersion.ps1), which the
+          # nightly's publish works out on a full checkout.
           $root = Join-Path $env:RUNNER_TEMP 'launcher'
           $out = Join-Path $root 'Launcher'
-          & .\scripts\release\Build-Launcher.ps1 -Root $root -OutDir $out -NoSign -NoPause
+          & .\scripts\release\Build-Launcher.ps1 -Root $root -OutDir $out -NoSign -NoPause -Version 0.0.0
           if ($LASTEXITCODE -ne 0) { Write-Host '::error file=scripts/release/Build-Launcher.ps1::the launcher did not publish, or its publish gave a trim or native code warning; the lines above say which'; exit 1 }
           # The programs it made, byte by byte, by the rules in
           # scripts\dev\Check-Secrets.ps1 (a key or address compiled in is in

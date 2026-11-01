@@ -149,21 +149,6 @@
   has no dev branch stops rather than make one: run -Channel dev once
   without -DryRun.
 
-  With -Package the installer is not rebuilt, because Package-Thornswood.ps1
-  puts what it builds on the site. The dry run says so and prints the
-  -NoPublish line that builds one and publishes nothing.
-
-.PARAMETER Package
-  Also rebuilds the two installer files for new people, after the release is
-  out, and puts them on the site. Twenty minutes or more. Not on a -DryRun,
-  and a dev release never touches the installer.
-
-  The installer carries the launcher the feed offers. A Ship that builds one
-  puts it in <Root>\Launcher first. One that keeps the feed's (nothing it is
-  built from changed, or -ModsOnly) downloads the feed's launcher, checks it
-  against the feed's sha256 and its signature, and puts it there, before
-  anything is published (issue #2661).
-
 .PARAMETER Root
   The Thornswood install whose launcher is built and whose files are
   published. Left out, it is the folder this machine builds the channel's
@@ -180,7 +165,7 @@
 
 .PARAMETER DistRoot
   Where releases are staged and zipped, passed straight through to
-  Publish-Update and Package-Thornswood so all three agree. Not under -Root:
+  Publish-Update so the two agree. Not under -Root:
   that is the folder people play from.
 
 .PARAMETER MoveServer
@@ -248,7 +233,7 @@
   launcher is built from changed, the new launcher is built and signed on
   GitHub from main's commit (#3312): release-tag.yml tags it and release.yml
   builds and signs it, on the box's runner 3 when GitHub has no minutes, so
-  the checkout must be exactly origin/main. Does not take -Package.
+  the checkout must be exactly origin/main.
 
 .EXAMPLE
   .\scripts\release\Ship.ps1 -Channel dev "The map marker points at the right door now"
@@ -271,16 +256,11 @@
   (LauncherVersion.ps1). Only when Patrick has said it goes live.
 
 .NOTES
-  The installer package is the one thing publishing does not touch, and that is
-  on purpose: it is a 21 GB copy and a 13 GB compress, twenty minutes or more,
-  for a release that is usually a handful of small files. Shipping does not wait
-  for that.
-
-  What it does instead is count. Someone installing from a stale package
-  downloads every update since, on first launch, before they can play, and that
-  goes wrong quietly, so every run says how many releases behind it is. Rebuild
-  it when the number gets big enough to annoy a new person, or when something
-  left the build that should not ship at all.
+  A Ship builds no installer (#4824, #4825). The download is Velopack's
+  Setup.exe, which every merge release carries as Thornswood-Setup.exe
+  (.github\workflows\merge-release.yml), and the install is the launcher's
+  own first start. Until then a main Ship took -Package to rebuild the old
+  installer and refused to go out past one that was behind.
 #>
 [CmdletBinding()]
 param(
@@ -289,11 +269,10 @@ param(
     [switch]$NoBump,
     [switch]$ModsOnly,
     [switch]$DryRun,
-    [switch]$Package,
     # Left out, Where.ps1 ShipRoot or ShipRootDev, asked below (#1692, #3031).
     [string]$Root
     # Where releases are staged and zipped, passed straight through to
-    # Publish-Update and Package-Thornswood so all three agree. Not under
+    # Publish-Update so the two agree. Not under
     # $Root: that is the folder people play from.
     ,[string]$DistRoot = (& (Join-Path $PSScriptRoot 'Where.ps1') Dist)
     ,[switch]$MoveServer
@@ -604,54 +583,6 @@ function Get-ReleaseLauncher([string]$repo, [string]$version, [string]$into) {
     return ''
 }
 
-# THE SETUP PROGRAM COMES FROM CI TOO, issue #932. Package-Thornswood.ps1
-# builds the installer around setup-stub.exe, which Build-Launcher.ps1
-# compiles. A main Ship takes the launcher CI built and never runs
-# Build-Launcher, so on 28 September Ship -Package on main stopped on
-# "setup-stub.exe is missing" after the release was already published, and
-# the stub in a shared clone's out\ is whatever the last local build left,
-# from whichever branch. release.yml builds the stub beside the launcher from
-# the same tagged commit and lists both in SHA256SUMS; this downloads it into
-# $into and checks it, the same way as the launcher. Returns '' when the
-# verified stub is in $into, or a sentence saying why not. A release drafted
-# before #932 has no stub: building that tag again attaches one.
-function Get-ReleaseStub([string]$repo, [string]$version, [string]$into) {
-    $tag = 'v' + $version
-    $again = ("Build the release for $tag again, which attaches the setup program beside the launcher, wait for the " +
-              """Build the release launcher"" run to finish, then run this same Ship again:`r`n" +
-              "    gh workflow run release.yml --repo $repo -f tag=$tag")
-    if (-not (Get-Command gh -EA SilentlyContinue)) {
-        return 'gh is not installed, so the setup program CI built cannot be downloaded. Install the GitHub CLI, gh auth login, then Ship again.'
-    }
-    New-Item -ItemType Directory -Force -Path $into | Out-Null
-    foreach ($n in 'setup-stub.exe', 'SHA256SUMS') {
-        $p = Join-Path $into $n
-        if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force }
-    }
-    $none = ("The release for $tag on $repo has no setup program (setup-stub.exe), so -Package would build an installer " +
-             "with nothing to run it. Nothing was published. " + $again)
-    $look = Save-ReleaseFiles $repo $tag @('setup-stub.exe', 'SHA256SUMS') $into
-    if ($look.LookWhy) {
-        return ("The setup program CI built for $tag could not be looked for: $($look.LookWhy). This is GitHub or gh, not the release; " +
-                "check gh auth status and run this same Ship again. Nothing was published.")
-    }
-    if ($look.None) { return $none }
-    if ($look.Why) { return ("The setup program CI built for $tag is on $repo, but $($look.Why). Run this same Ship again. Nothing was published.") }
-    $stub = Join-Path $into 'setup-stub.exe'
-    $sums = Join-Path $into 'SHA256SUMS'
-    $want = ''
-    foreach ($line in [IO.File]::ReadAllLines($sums)) {
-        $m = [regex]::Match($line, '(?i)^\s*([0-9a-f]{64})\s+\*?setup-stub\.exe\s*$')
-        if ($m.Success) { $want = $m.Groups[1].Value.ToLower(); break }
-    }
-    if (-not $want) { return ("SHA256SUMS from $tag has no line for setup-stub.exe, so the download cannot be verified. Nothing was published. " + $again) }
-    $got = (Get-FileHash -LiteralPath $stub -Algorithm SHA256).Hash.ToLower()
-    if ($got -ne $want) {
-        return ("The setup program downloaded for $tag does not match its SHA256SUMS (wanted $want, got $got). Do not ship it. Nothing was published.")
-    }
-    return ''
-}
-
 # THE TAG IS OLDER THAN THE LAUNCHER ON MAIN, issue #883. The exe CI built for
 # v<version> is the source at that tag, so a main Ship that has not moved the
 # version takes the exe of the last bump and quietly leaves out every launcher
@@ -928,16 +859,9 @@ function Test-KeepFeedLauncher($pub, [string]$inputs, [string]$current, [bool]$d
     if ([string]$mainPub.Version -ne [string]$pub.Version) { return $true }
     return ($mainPub.Inputs -and ([string]$mainPub.Inputs -eq [string]$pub.Inputs))
 }
-# THE FEED'S LAUNCHER, FOR THE INSTALLER, issue #2661. Package-Thornswood.ps1
-# packs <root>\Launcher\Thornswood.exe as it finds it. A Ship that builds a
-# launcher installs it there first; one that keeps the feed's
-# (Test-KeepFeedLauncher, or -ModsOnly) used to put nothing there, which held
-# only while main's root was Patrick's own install, whose launcher updated
-# itself to the feed's. Main's ship root local\release-main (#2448, #2603) is
-# never started, so it held no launcher, or whichever one a Ship last put
-# there, and -Package packed that or stopped at "MISSING the launcher" after
-# the release was out. So a main Ship with -Package that keeps the feed's
-# launcher puts that launcher there itself, before anything is published.
+# THE FEED'S LAUNCHER, issue #2661: a launcher a feed already offers, taken
+# from that feed and held to it, for a Ship that puts that launcher out again
+# rather than building one (main's own on dev, or the one dev tried, on main).
 #
 # Get-FeedLauncher downloads the launcher $pub names (Get-PublishedLauncher)
 # into $into\Thornswood.exe, checks it against the feed's launcherSha256 and
@@ -948,8 +872,8 @@ function Test-KeepFeedLauncher($pub, [string]$inputs, [string]$current, [bool]$d
 # feed off Windows holds the exe on the box (Get-SignedFileRefusal, #3312).
 function Get-FeedLauncher($pub, [string]$into, [string]$expectedSigner, [scriptblock]$check) {
     if ($null -eq $pub -or -not $pub.Url -or ([string]$pub.Sha) -notmatch '^[0-9a-fA-F]{64}$') {
-        return ("Main's feed names no whole launcher (a launcherUrl and a 64 digit launcherSha256), so there is no launcher " +
-                'it offers to put in the installer. Nothing was published.')
+        return ("The feed names no whole launcher (a launcherUrl and a 64 digit launcherSha256), so there is no launcher " +
+                'it offers to take. Nothing was published.')
     }
     if (-not $expectedSigner) {
         return 'ExpectedSigner is empty, so the launcher from the feed cannot be checked. Nothing was published.'
@@ -986,43 +910,6 @@ function Get-FeedLauncher($pub, [string]$into, [string]$expectedSigner, [scriptb
     return ''
 }
 
-# Puts the launcher main's feed offers into $root\Launcher: left alone when
-# the exe there already has the feed's sha256, else downloaded and checked
-# into $scratch (Get-FeedLauncher) and put in place by $installer
-# (Install-Launcher.ps1 -From), then read back. Returns Why ('' or the reason
-# to stop on) and Placed (whether it put one there).
-function Install-FeedLauncher($pub, [string]$root, [string]$scratch, [string]$expectedSigner, [string]$installer) {
-    $out = [pscustomobject]@{ Why = ''; Placed = $false }
-    if ($null -eq $pub -or -not $pub.Url -or ([string]$pub.Sha) -notmatch '^[0-9a-fA-F]{64}$') {
-        $out.Why = Get-FeedLauncher $pub $scratch $expectedSigner
-        return $out
-    }
-    $want = ([string]$pub.Sha).ToLowerInvariant()
-    $exe = Join-Path (Join-Path $root 'Launcher') 'Thornswood.exe'
-    if ((Test-Path -LiteralPath $exe -PathType Leaf) -and
-        (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant() -eq $want) {
-        return $out
-    }
-    $why = Get-FeedLauncher $pub $scratch $expectedSigner
-    if ($why) { $out.Why = $why; return $out }
-    $global:LASTEXITCODE = 0
-    & $installer -Root $root -From $scratch -NoPause | Out-Host
-    $rc = $LASTEXITCODE
-    if ($rc -ne 0) {
-        $out.Why = ("Putting the launcher main's feed offers into $(Split-Path -Parent $exe) stopped with exit code $rc. " +
-                    'Nothing was published. The errors are above.')
-        return $out
-    }
-    $now = ''
-    if (Test-Path -LiteralPath $exe -PathType Leaf) { $now = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant() }
-    if ($now -ne $want) {
-        $out.Why = ("The launcher main's feed offers is not in place in $(Split-Path -Parent $exe) after installing it " +
-                    "(wanted $want, found $(if ($now) { $now } else { 'no exe' })). Nothing was published.")
-        return $out
-    }
-    $out.Placed = $true
-    return $out
-}
 # ==== end thornswood release launcher ====
 
 # The dev number a Ship chose, checked before anything is built, signed or sent.
@@ -1062,13 +949,6 @@ function Assert-DevVersionSelection([string]$selected, [string]$current, [bool]$
 
 Set-StrictMode -Version Latest
 
-# Declared here because Set-StrictMode is on: reading a variable that was never
-# set is an error, and the whole point of this one is that it is usually never
-# set. Non-zero means the installer rebuild failed, and the Done section says
-# so again at the end.
-$script:InstallerFailed = 0
-# What the packager threw, when it threw rather than exiting (#2243).
-$script:InstallerWhy = ''
 # The sha256 of the launcher a release from the feed took from GitHub and
 # held to the launcher's own check (#3312), so the publish gate does not send
 # the same bytes to the box twice. Empty until then.
@@ -1091,7 +971,7 @@ function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; Wr
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $RepoDir = Split-Path -Parent (Split-Path -Parent $Here)
-# Launcher / setup-stub .pdb stay on this machine only (Ship-Rules, issue #462).
+# The launcher .pdb stays on this machine only (Ship-Rules, issue #462).
 . (Join-Path $Here 'Ship-Rules.ps1')
 # What a file of the repo ships as, and fingerprints as, from any machine (#2903).
 . (Join-Path $Here 'ShippedBytes.ps1')
@@ -1128,9 +1008,7 @@ if (-not $PSBoundParameters.ContainsKey('Root') -and -not $FromFeed) {
     catch { Die ($_.Exception.Message + ' Nothing was built.') }
 }
 # A Ship from the feed carries a new launcher since #3312, built and signed on
-# GitHub, so -RebuildLauncher and -Version mean what they mean anywhere else,
-# and its installer since #3412, built from the feed and signed on GitHub
-# (installer.yml, Publish-InstallerFromGitHub.ps1), so -Package does too.
+# GitHub, so -RebuildLauncher and -Version mean what they mean anywhere else.
 
 # ------------------------------------------------------------ dev channel
 # The dev build has its own feed and baseline on the VPS (feed-dev), and its
@@ -1507,7 +1385,7 @@ if (-not $Dev -and $FromFeed -and -not $ModsOnly -and $MainSourceAligned) {
 }
 
 # What the channel's feed offers as its launcher, read here when a Ship asks
-# whether to keep it, and again for the installer below when it keeps it (#2661).
+# whether to keep it (#2661).
 $pubLauncher = $null
 if (-not $ModsOnly -and -not $RebuildLauncher -and -not $Version) {
     $feedBranch = if ($Dev) { 'dev' } else { 'main' }
@@ -1778,28 +1656,6 @@ if (-not $Dev -and (Test-Path -LiteralPath (Join-Path $RepoDir '.git'))) {
 # nothing in this checkout. Until then Unbump wrote git's 0.0.0 back into
 # Updater.cs on every stop.
 
-# ------------------------------------------------------------ setup program
-# A main release with -Package builds the installer around the setup program
-# CI built for this tag (Get-ReleaseStub, issue #932), fetched here, before
-# anything is built or published, so a release with none stops now and not
-# after it is out. A dev Ship compiles its own with Build-Launcher below, and
-# Package-Thornswood finds it in out\ as before.
-$ciStub = ''
-if ($Package -and -not $Dev -and -not $DryRun) {
-    Head 'The setup program from CI'
-    $stubDir = & (Join-Path $Here 'Get-ScratchDir.ps1') ('Thornswood-setup-' + (Split-Path -Leaf $Root.TrimEnd('\')))
-    $why = Get-ReleaseStub (Get-SourceRepo $RepoDir) $target $stubDir
-    if ($why) {
-        Die $why
-    }
-    $ciStub = Join-Path $stubDir 'setup-stub.exe'
-    Say ("  verified against SHA256SUMS, {0:n0} KB" -f ((Get-Item -LiteralPath $ciStub).Length / 1KB)) 'Green'
-    # From the feed the installer is built on GitHub after the release, by
-    # installer.yml started on main (#3412; on main since 31 Oct, the header
-    # of installer.yml), which main always has.
-    if ($FromFeed) { Say '  the installer is built and signed on GitHub after the release (installer.yml on main)' 'Green' }
-}
-
 # ------------------------------------------------------------ animation and body files
 # The behavior files (Pandora) and the covered bodies (BodySlide) are built on
 # each computer by the launcher, before Play, from the collection installed
@@ -2008,13 +1864,8 @@ if (-not $ModsOnly) {
     }
     Say ("  in place, {0:n0} KB" -f ((Get-Item $exe).Length / 1KB)) 'Green'
     # Keep matching .pdb beside this release's version on the shipping machine.
-    # Packs, the installer and public release assets never carry them (#462).
+    # Packs and public release assets never carry them (#462).
     $kept = @(Save-ShipSymbols $buildOut $target)
-    $stubPdb = Join-Path (& (Join-Path $Here 'Where.ps1') Out) 'setup-stub.pdb'
-    if (Test-Path -LiteralPath $stubPdb) {
-        $extra = @(Save-ShipSymbols (Split-Path -Parent (Resolve-Path $stubPdb)) $target)
-        if ($extra.Count -gt 0) { $kept = $kept + $extra }
-    }
     if ($kept.Count -gt 0) {
         Say ("  symbols kept under {0} ({1} file(s))" -f (Get-ShipSymbolDir $target), $kept.Count) 'DarkGray'
     }
@@ -2022,35 +1873,6 @@ if (-not $ModsOnly) {
 
 
 # ------------------------------------------------------------ the feed's launcher
-# A main release with -Package that keeps the feed's launcher (above, or
-# -ModsOnly) packs the launcher the feed offers, issue #2661, so it puts that
-# one into <root>\Launcher here: downloaded from the feed, checked against its
-# launcherSha256 and its signature, put in place by Install-Launcher.ps1, and
-# left alone when the folder already holds it. Where the launcher a Ship
-# builds is installed, in its place (the two never both run): after the
-# animation and body files and node checks, so nothing is installed for a release that
-# stops there (#1692), and before anything is published, so a release with no
-# launcher to package stops now and not after it is out (Package-Thornswood
-# runs after, #2243). From the feed installer.yml takes that launcher off the
-# feed itself (#3412), so nothing is put anywhere here.
-if ($Package -and -not $Dev -and -not $DryRun -and $ModsOnly -and -not $FromFeed) {
-    Head 'The launcher the feed offers, for the installer'
-    if ($null -eq $pubLauncher) { $pubLauncher = Get-PublishedLauncher $ReleaseDir 'main' }
-    try {
-        $feedSigner = Get-ExpectedSignerFragment -RepoRoot $RepoDir
-    } catch {
-        Die ($_.Exception.Message + ' Nothing was published.')
-    }
-    $feedLauncherDir = & (Join-Path $Here 'Get-ScratchDir.ps1') ('Thornswood-feedlauncher-' + (Split-Path -Leaf $Root.TrimEnd('\')))
-    $fed = Install-FeedLauncher $pubLauncher $Root $feedLauncherDir $feedSigner (Join-Path $Here 'Install-Launcher.ps1')
-    if ($fed.Why) { Die $fed.Why }
-    if ($fed.Placed) {
-        Say ("  $($pubLauncher.Version) from main's feed, sha256 and signature checked, put in " + (Join-Path $Root 'Launcher')) 'Green'
-    } else {
-        Say ("  " + (Join-Path $Root 'Launcher') + " already holds the $($pubLauncher.Version) main's feed offers") 'Green'
-    }
-}
-
 # ------------------------------------------------------- the in game plugins
 # The plugins are source in this repo and files in the game folder, and Go.ps1
 # is the only thing that moves one to the other. Ship never did it, so a release
@@ -2284,108 +2106,6 @@ if ($FromFeed -and $revMoveFrom) {
     Say '  no game folder here, so SkyUI''s menus were not read' 'DarkGray'
 }
 
-# HOW FAR BEHIND the public installer is: the release the installer on the site
-# carries against the releases the main feed lists. Asked twice, and the two
-# answers differ on purpose. Before publishing, the gate just below reads it to
-# refuse a main release that would leave an already-behind installer further
-# behind. After publishing, the closing note reads it again, by which point
-# version.json carries this release (a dry run puts it back), so an installer
-# that was current now reads as one behind. Reading the site and the feed each
-# time keeps both answers true to what is published rather than to a value
-# cached before the publish.
-#
-# THE INSTALLER ON THE SITE, NOT A ZIP ON THIS DISK (#3043). This used to time
-# a Thornswood-Setup.zip in this machine's _dist against the release ids. With
-# no zip there, which Clean-Everything -Installers, a new shipping machine and
-# a Ship from another install root all lead to, it had nothing to count and the
-# gate let a main release through however far behind the published installer
-# was. Now Package-Thornswood names the release an installer is level with,
-# Publish-Installer writes that into the exe's entry in the site's files.json,
-# and this counts the feed's releases after it (Release-Name.ps1). Known is
-# false, with Why saying what was missing, when that cannot be read; the gate
-# refuses then, because an installer nobody can measure is not a current one.
-#
-# DistDir is only where this root's installer is built, one folder per install
-# root under -DistRoot, the same shape Publish-Update and Package-Thornswood
-# use; -Package builds into it.
-function Measure-Installer {
-    $distDir = Join-Path (Join-Path $DistRoot (Split-Path -Leaf $Root.TrimEnd('\'))) '_dist'
-    $o = [pscustomobject]@{ DistDir = $distDir; Known = $false; Why = ''; Release = ''; Behind = 0 }
-    $list = $null
-    try { $list = Read-SiteDownloads }
-    catch { $o.Why = "the site's list of downloads (files.json) did not read: $($_.Exception.Message)"; return $o }
-    $tip = $null
-    if ($null -ne $list -and $list.PSObject.Properties['Thornswood-Setup.exe']) { $tip = $list.'Thornswood-Setup.exe' }
-    if ($null -eq $tip) { $o.Why = 'the site lists no Thornswood-Setup.exe, so nobody new can install'; return $o }
-    if ($tip.PSObject.Properties['release'] -and $tip.release) { $o.Release = [string]$tip.release }
-    if (-not $o.Release) {
-        $o.Why = 'the site''s Thornswood-Setup.exe does not say which release it carries (it was published before Publish-Installer recorded that)'
-        return $o
-    }
-    $vf = Join-Path $MainReleaseDir 'version.json'
-    if (-not (Test-Path -LiteralPath $vf)) { $o.Why = "there is no main feed here ($vf) to count its releases from"; return $o }
-    try {
-        $doc = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $vf -Raw) $vf
-        $rl = Read-ReleaseListFile (Join-Path $MainReleaseDir 'releases.json')
-    } catch { $o.Why = "the main feed here did not read: $($_.Exception.Message)"; return $o }
-    $n = Get-ReleasesAfter $o.Release $doc $rl
-    if ($n -lt 0) { $o.Why = "the site's Thornswood-Setup.exe names '$($o.Release)', which is not a release id"; return $o }
-    $o.Behind = $n
-    $o.Known = $true
-    return $o
-}
-
-# ---------------------------------------------------- the installer gate
-# A MAIN RELEASE REFUSES TO GO OUT WHILE THE PUBLIC INSTALLER IS BEHIND, and
-# this is the whole of that rule. Every main Ship adds a release the installer
-# does not carry, so an already-stale installer only gets staler, and a new
-# person installing from it sits through the whole pile on first launch. The
-# closing note has counted this for a long time and warned; a warning on the one
-# screen nobody rereads let the installer drift release after release. It also
-# refuses when how far behind cannot be told (#3043): that is not the same as
-# current, and reading it as current is how a cleaned-away zip let releases out.
-#
-# BEFORE PUBLISH, on purpose. A refusal after the pack is on the feed would
-# leave a release out with #news, the site and the server never told, which is
-# the half-published state the -Package failure note further down calls worse
-# than an installer one release behind. Here nothing has shipped yet, so the
-# operator rebuilds and runs again with everything intact.
-#
-# -Package is the way through: it rebuilds the installer after this release, so
-# the two go out together, and a release that carries -Package is not refused
-# for behind because the rebuild is coming. A dev release never refuses: it does
-# not touch the installer, and its closing note still warns. A hotfix never
-# refuses either: it is the live build plus one urgent fix, and holding it for a
-# twenty-minute installer rebuild is the opposite of what a hotfix is for.
-# THE MAIN FEED AS THE STORE HOLDS IT NOW, read before the gate counts it
-# (#3961). Measure-Installer counts the releases after the installer's from
-# the main feed's working folder, and until 26 October nothing filled that
-# folder before the gate: Publish-Update receives the feed only later, inside
-# the publish. So the gate counted whatever copy the last main Ship left on
-# this machine, an old one on One, and none at all in a cloud container, where
-# the first main Ship from the feed stopped here at 8:08 PM.
-if (-not $Dev -and -not $hotfix -and -not $DryRun -and -not $Package) {
-    try { [void](Receive-FeedStore 'main' $MainReleaseDir) }
-    catch {
-        Die ('Could not receive the main feed from the VPS, so how far behind the installer is cannot be counted and nothing was published: ' + $_.Exception.Message)
-    }
-}
-if (-not $Dev -and -not $hotfix -and -not $DryRun -and -not $Package) {
-    $ins = Measure-Installer
-    $rebuild = ('Rebuild it as part of this release by adding -Package, or run .\scripts\release\Package-Thornswood.ps1 -OneFile ' +
-                'first, which publishes it, then Ship.')
-    if (-not $ins.Known) {
-        Die ("How far behind the installer on the site is cannot be told: $($ins.Why). A main release does not go out " +
-             "past an installer nobody can measure. $rebuild")
-    }
-    if ($ins.Behind -gt 0) {
-        Die (("The installer on the site (Thornswood-Setup.exe) carries release {0} and is {1} release{2} behind, and a main release would leave it further behind. " -f `
-                 $ins.Release, $ins.Behind, $(if ($ins.Behind -eq 1) { '' } else { 's' })) +
-             "Anyone installing from it would sit through all of those on first launch. $rebuild")
-    }
-}
-
-
 # ------------------------------------------------------------ publish sign gate
 # Site and feed only. Local Build-Launcher may print "not signing" and leave an
 # unsigned exe on disk; that must not reach Releases or the host feed.
@@ -2577,41 +2297,6 @@ if (-not $DryRun -and $published -eq 0) {
     }
 }
 
-<#
-  How far behind the installer is now, worked out before anything can exit.
-
-  This used to sit below the early return further down, so the one run that
-  most needed it never printed: ship something, get told nothing changed,
-  leave, and the package quietly stays another release behind. A count that
-  only appears on the runs where it is least urgent is not a warning.
-
-  Measure-Installer is the same reading the gate above the publish took, run
-  again because version.json has moved: by now it carries this release (a dry
-  run put it back), so an installer that was current reads as one behind,
-  which is what the closing note says.
-#>
-$ins = Measure-Installer
-$DistDir = $ins.DistDir
-
-function Show-Installer {
-    Head 'The installer'
-    if (-not $ins.Known) {
-        Say "  how far behind the installer on the site is could not be told: $($ins.Why)" 'Yellow'
-        Say '  The next main release refuses until it can be. Rebuilding the installer puts that right.' 'Yellow'
-        Say '  .\scripts\release\Package-Thornswood.ps1 -OneFile   builds and publishes it, twenty minutes or so' 'Yellow'
-        return
-    }
-    if ($ins.Behind -le 0) {
-        Say "  the installer on the site is current, release $($ins.Release)" 'Green'
-        return
-    }
-    Say ("  the installer on the site carries release {0} and is {1} release{2} behind." -f `
-         $ins.Release, $ins.Behind, $(if ($ins.Behind -eq 1) { '' } else { 's' })) 'Yellow'
-    Say '  Anyone installing from it sits through all of those on first launch.' 'Yellow'
-    Say '  Nobody who already has the game is affected.' 'DarkGray'
-    Say '  .\scripts\release\Package-Thornswood.ps1 -OneFile   to rebuild it, twenty minutes or so' 'Yellow'
-}
-
 # Anything other than 0 or 2 means the publisher stopped on an error. It used
 # to carry on regardless: the site was told, the Discord was posted to, and the
 # server counted everybody down and put them back to the launcher to collect an
@@ -2639,7 +2324,6 @@ if ($published -ne 0 -and $published -ne 2) {
 # still brings the dev feed's DEV marks up to date with main (Dev-News.ps1);
 # it says how that went in $global:ThornswoodDevMarks, read back here.
 if ($published -eq 2) {
-    Show-Installer
     Head 'Done'
     Say 'Nothing was released. The build already matches the last release.' 'Yellow'
     Say ('  No news entry was added, ' + $(if ($Dev) { 'the dev updates channel' } else { '#news' }) +
@@ -2661,113 +2345,6 @@ if ($published -eq 2) {
     Write-Host ''
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
     exit 0
-}
-
-# ------------------------------------------------------------ the installer
-if ($Dev) {
-    Head 'The installer'
-    Say '  dev release, the installer is not touched' 'DarkGray'
-}
-elseif ($Package -and $DryRun) {
-    # A DRY RUN DOES NOT REBUILD THE INSTALLER. Package-Thornswood.ps1 puts
-    # what it builds on the site, through Publish-Installer.ps1 over ssh, unless
-    # it is given -NoPublish, and this called it without. So -DryRun -Package
-    # put a new installer in front of every new person, which is the opposite
-    # of a dry run. Found on 24 September by the script index run (entry 260).
-    #
-    # Skipped rather than built with -NoPublish. That build is twenty minutes
-    # and leaves an installer in the staging folder that the site does not
-    # have. The gate reads the installer on the site since #3043, so that one
-    # could no longer pass for current, but a dry run still leaves nothing
-    # behind that a real run would not; see the Publishing section.
-    Show-Installer
-    Say '  dry run, so not rebuilt: Package-Thornswood.ps1 puts what it builds on the site' 'Yellow'
-    Say ('  .\scripts\release\Package-Thornswood.ps1 -OneFile -NoPublish -OutDir "' + $DistDir + '"   builds it and publishes nothing') 'DarkGray'
-}
-elseif ($Package -and $FromFeed) {
-    # FROM THE FEED, ON GITHUB (#3412). installer.yml builds it from what the
-    # release just published recorded and signs it, a second runner checks it,
-    # and Publish-InstallerFromGitHub.ps1 takes it off the launcher's draft and
-    # publishes it. Not stopping the release when it fails, for the reason the
-    # One path below gives.
-    Head 'Rebuilding the installer on GitHub'
-    $pubArgs = @{ OutDir = $DistDir }
-    if ($AllowStaleCheckout) { $pubArgs['AllowStaleCheckout'] = $true }
-    try { & (Join-Path $Here 'Publish-InstallerFromGitHub.ps1') @pubArgs }
-    catch {
-        $script:InstallerWhy = [string]$_.Exception.Message
-        $script:InstallerFailed = 1
-        Say "  THE INSTALLER DID NOT BUILD. $($script:InstallerWhy)" 'Red'
-        Say '  The release itself is already published and is fine. What is not' 'Red'
-        Say '  rebuilt is Thornswood-Setup.exe, so anybody installing from scratch' 'Red'
-        Say '  sits through this release on first launch.' 'Red'
-        Say '  .\scripts\release\Publish-InstallerFromGitHub.ps1   to put that right' 'Yellow'
-    }
-}
-elseif ($Package) {
-    Head 'Rebuilding the installer'
-    # THE ONE FILE SHAPE, issue #1213: the payload attached to
-    # Thornswood-Setup.exe, which is what the site has carried since the
-    # payload came under a gigabyte (Package-Thornswood.ps1 -OneFile says why).
-    # Without it Package-Thornswood builds the two file shape, a small exe that
-    # downloads Thornswood-Setup.zip, and a main Ship would put that on the
-    # site under the same name. Which shape the site carries is Patrick's, asked
-    # on #1213; this keeps the one it has.
-    $pkgArgs = @{ Root = $Root; OutDir = $DistDir; NoPause = $true; OneFile = $true }
-    if ($ciStub) { $pkgArgs['Stub'] = $ciStub }
-    # Ship's -AllowStaleCheckout goes on to the packager (#2436), the same as
-    # to Publish-Update (#2235), or the packager refuses what Ship let past.
-    if ($AllowStaleCheckout) { $pkgArgs['AllowStaleCheckout'] = $true }
-    # A THROW IS A FAILED BUILD TOO (#2243). On 11 October a stale generated
-    # files check inside the packager threw, and
-    # the throw went straight out of Ship: the remirror, the dev feed's marks,
-    # the news, the Discord post, the restart and the tag never ran, after the
-    # pack was already on the feed. Caught here and given the same treatment
-    # as a non-zero exit below, so the rest of the release still runs.
-    # LASTEXITCODE is cleared first so an earlier native command's code is not
-    # read as the packager's.
-    $global:LASTEXITCODE = 0
-    $pkgThrew = $null
-    try { & (Join-Path $Here 'Package-Thornswood.ps1') @pkgArgs }
-    catch { $pkgThrew = $_ }
-    if ($pkgThrew) {
-        $script:InstallerWhy = [string]$pkgThrew.Exception.Message
-        if ($LASTEXITCODE -eq 0) { $global:LASTEXITCODE = 1 }
-    }
-
-    # AND READ WHETHER IT WORKED, which is the same fault as the build step
-    # above and entry 118 on the list: Ship called a script and never looked at
-    # what it said. With -Package the installer is what a new person downloads,
-    # so a packager that stopped halfway left the release saying it had been
-    # rebuilt when it had not.
-    #
-    # IT DOES NOT STOP THE RELEASE, and that is deliberate rather than a
-    # half fix. This step runs long after 'Publishing': the pack is already on
-    # the feed by the time it starts. Dying here would leave a release that is
-    # out with the site never told, the Discord never posted to and the server
-    # never asked to restart, which is worse than an installer one release
-    # behind. So it says exactly what happened, in red, with the command to put
-    # it right. That the installer is rebuilt after the release goes out is its
-    # own question and it is on the list.
-    #
-    # Package-Thornswood.ps1 ends with an explicit exit 0 for this, because a
-    # script that runs off the end hands back whatever its last native command
-    # left behind and it runs 7z and winget.
-    if ($LASTEXITCODE -ne 0) {
-        $script:InstallerFailed = $LASTEXITCODE
-        if ($script:InstallerWhy) {
-            Say "  THE INSTALLER DID NOT BUILD. Package-Thornswood.ps1 stopped: $($script:InstallerWhy)" 'Red'
-        } else {
-            Say "  THE INSTALLER DID NOT BUILD. Package-Thornswood.ps1 exited with $LASTEXITCODE." 'Red'
-        }
-        Say '  The release itself is already published and is fine. What is not' 'Red'
-        Say '  rebuilt is Thornswood-Setup.exe, so anybody installing from scratch' 'Red'
-        Say '  sits through this release on first launch.' 'Red'
-        Say '  .\scripts\release\Package-Thornswood.ps1 -OneFile   to put that right' 'Yellow'
-    }
-}
-else {
-    Show-Installer
 }
 
 # ------------------------------------------------------- after the tip is out
@@ -2805,9 +2382,8 @@ else {
 
   WHAT A FAILURE DOES. The tip is already on the feed by the time this runs, so
   none of it can unpublish anything, and dying here would leave a release out
-  with #news, the site and the server never told, which the installer note
-  further up calls the worse half state. So it reports what happened, the release
-  is announced either way, and the Done section names what did not complete with
+  with #news, the site and the server never told, the worst half state there
+  is. So it reports what happened, the release is announced either way, and the Done section names what did not complete with
   the line that puts it right. Ship still exits 0: the website lane's rule is
   that a refused remirror is a line and not a failed release, and a release that
   is on the feed, in #news and on the server is out.
@@ -3029,13 +2605,6 @@ if (-not $DryRun -and $Dev -and $global:ThornswoodPublishedRelease) {
 Head 'Done'
 # Repeated here on purpose. A red line in the middle of a release log is a line
 # nobody reads: the last screen is the one that gets looked at.
-if ($script:InstallerFailed) {
-    Say ("The installer did NOT rebuild (exit $script:InstallerFailed). The release went out " +
-         'without it.') 'Red'
-    if ($script:InstallerWhy) { Say ("  It stopped with: " + $script:InstallerWhy) 'Red' }
-    Say $(if ($FromFeed) { '  .\scripts\release\Publish-InstallerFromGitHub.ps1' } else { '  .\scripts\release\Package-Thornswood.ps1 -OneFile' }) 'Yellow'
-    Write-Host ''
-}
 # The release is out either way, and the people who would have read the post
 # do not know it. Said here because this is the screen that gets looked at.
 if ($global:ThornswoodDiscordResult -eq 'failed') {
@@ -3046,7 +2615,7 @@ if ($global:ThornswoodDiscordResult -eq 'failed') {
          '   posts it on its own') 'Yellow'
     Write-Host ''
 }
-# Said again here for the same reason as the installer and the Discord above:
+# Said again here for the same reason as the Discord above:
 # the last screen is the one that gets looked at, and one red line in the middle
 # of a release log is a line nobody reads.
 if ($script:PostShipFailed.Count) {
