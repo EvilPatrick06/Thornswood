@@ -209,7 +209,7 @@ const OFFER = { t: 'sdp', from: 2, sdp: { type: 'offer', sdp: 'v=0' } };
     fs.readdirSync(dir, { withFileTypes: true }).forEach(function (d) {
       const full = path.join(dir, d.name);
       if (d.isDirectory()) { sources(full, out); }
-      else if (/\.(cs|ps1|xaml)$/i.test(d.name)) { out.push(full); }
+      else if (/\.(cs|ps1|xaml|axaml)$/i.test(d.name)) { out.push(full); }
     });
     return out;
   }
@@ -221,10 +221,12 @@ const OFFER = { t: 'sdp', from: 2, sdp: { type: 'offer', sdp: 'v=0' } };
   yes('nothing in the launcher or installer writes a firewall rule or asks for administrator' +
       (asks.length ? ' (' + asks.map(function (f) { return path.relative(root, f); }).join(', ') + ')' : ''),
       asks.length === 0);
-  const words = fs.readFileSync(path.join(root, 'launcher', 'ui.xaml'), 'utf8') +
-                fs.readFileSync(path.join(root, 'installer', 'setup', 'Bootstrap.cs'), 'utf8');
-  yes('Settings and the installer no longer say Windows asks for administrator',
-      !/asks for administrator/i.test(words));
+  // The launcher's window is Avalonia markup since #4823 (MainWindow.axaml),
+  // and the installer is whatever C# and PowerShell it is made of now.
+  const shown = files.filter(function (f) { return /\.axaml$/i.test(f) || f.indexOf(path.join(root, 'installer') + path.sep) === 0; });
+  const words = shown.map(function (f) { return fs.readFileSync(f, 'utf8'); }).join('\n');
+  yes('Settings and the installer no longer say Windows asks for administrator (' + shown.length + ' files read)',
+      shown.some(function (f) { return /MainWindow\.axaml$/.test(f); }) && !/asks for administrator/i.test(words));
 }
 
 console.log('');
