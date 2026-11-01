@@ -67,6 +67,12 @@ try {
             $reads++
             $ok = $l -match '/logs" @flags\b' -or $l -match '/logs" \(Get-GhLogFlags'
             Yes ("2. {0}:{1} passes what gh needs told" -f $rel, ($i + 1)) $ok
+            # A lone string splatted into a native command goes letter by
+            # letter (engine-pin.yml run 41267774073: "accepts 1 arg(s),
+            # received 25"), so @flags is always an array.
+            if ($l -match '/logs" @flags\b') {
+                Yes ("2.   and {0} takes the answer as an array, so @flags is one argument, not one a letter" -f $rel) ($text -match '\$flags = @\(Get-GhLogFlags\b' -and $text -notmatch '\$flags = Get-GhLogFlags\b')
+            }
             if ($l -match 'Get-GhLogFlags' -or $text -match '\$flags = (@\()?Get-GhLogFlags') {
                 $loads = $text -match "LogHandBack\.ps1" -or $rel -eq 'scripts/release/LogHandBack.ps1'
                 if ($rel -eq 'scripts/release/Get-EngineRecords.ps1') { $loads = (Read 'scripts/release/EngineRecords.ps1') -match "\. \(Join-Path \`$PSScriptRoot 'LogHandBack\.ps1'\)" }

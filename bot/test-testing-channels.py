@@ -649,9 +649,15 @@ EMPTY_LISTS = set()
 DELETED = set()
 
 
+# What the stand-in GitHub calls the repository now (#5184).
+REPO_NOW = ['EvilPatrick06/Thornswood']
+
+
 def gh(url):
     ASKED.append(url)
     path = url.split('?')[0]
+    if path.endswith('/repos/' + bot.KNOWN_REPO):
+        return {'full_name': REPO_NOW[0]}
     if path.endswith('/comments'):
         return COMMENTS.get(int(path.split('/')[-2]), [])
     if path.endswith('/timeline'):
@@ -1693,6 +1699,55 @@ try:
     yes('  and so does one moved to another repository',
         removed == [2215] and any('took #2215 down: it moved to evilpatrick06/skymp'
                                   in x for x in said))
+    # The repository itself moved to another owner (#5184): GitHub answers
+    # its issues under the new name, and they are still the bot's.
+    EMPTY_LISTS.discard('Dev Findings')
+    issue(2216, 'Still here', ['Dev Findings'])
+    posted = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))[0]
+    yes('  (a finding in the repository is posted)', 2216 in posted)
+    EMPTY_LISTS.update(['Dev Findings'])
+    REPO_NOW[0] = 'ThornswoodRP/Thornswood'
+    ISSUES[2216]['repository_url'] = 'https://api.github.com/repos/ThornswoodRP/Thornswood'
+    del said[:]
+    removed = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))[2]
+    yes('  but one whose repository moved to another owner stays up (#5184)',
+        2216 not in removed and not any('took #2216 down' in x for x in said))
+    # and its writes go to the new name, since GitHub answers a POST to the
+    # old one with a 307 that urllib does not follow (#5184).
+    wrote = []
+
+    class _Answer:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return b'{"number": 7}'
+
+    real_open = bot.urllib.request.urlopen
+    bot.urllib.request.urlopen = lambda req, timeout=None: (wrote.append(req.full_url), _Answer())[1]
+    token = os.environ.get('GITHUB_TOKEN')
+    os.environ['GITHUB_TOKEN'] = 'stand-in'
+    try:
+        bot.github_say(2216, 'x')
+        bot.github_file('t', 'b', [])
+    finally:
+        bot.urllib.request.urlopen = real_open
+        if token is None:
+            os.environ.pop('GITHUB_TOKEN', None)
+        else:
+            os.environ['GITHUB_TOKEN'] = token
+    yes('  and its comments and new issues go to the name it has now',
+        wrote == [bot.GITHUB_API + '/repos/ThornswoodRP/Thornswood/issues/2216/comments',
+                  bot.GITHUB_API + '/repos/ThornswoodRP/Thornswood/issues'])
+    yes('  and the bot can say which kind of token it has, never the token',
+        [bot.github_token_kind(t) for t in
+         ('github_pat_x', 'ghp_x', 'ghs_x', 'gho_x', '', 'zzz')] ==
+        ['fine-grained', 'classic', 'app installation', 'oauth', 'no', 'unknown'])
+    REPO_NOW[0] = 'EvilPatrick06/Thornswood'
+    bot._KNOWN_REPO_NOW['name'] = ''
 
     def broken_issue(url):
         if '/issues/2299' in url.split('?')[0]:

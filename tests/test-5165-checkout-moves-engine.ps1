@@ -46,7 +46,6 @@ $Exempt = [ordered]@{
     'scripts/oneoff/Reset-History.ps1'  = 'only tells people what to run after the history rewrite, which keeps every pin as it was'
     'scripts/release/Ship-OnBox.ps1'    = 'puts the gate''s checkout on the branch main at the commit GateBroker.ps1 has just moved it to, submodules and all'
     'scripts/release/Publish-InstallerOnBox.ps1' = 'puts the gate''s checkout on the branch main at the commit GateBroker.ps1 has just moved it to, submodules and all'
-    'scripts/release/Bump-Version.ps1'  = 'only prints the lines that move the commit it just made onto a branch, which changes no pin'
     'scripts/release/Update-EnginePin.ps1' = 'names git switch only in its example, and then moves engine\skymp to the new pin itself'
 }
 

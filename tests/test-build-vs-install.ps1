@@ -169,7 +169,7 @@ try {
     Copy-Item -LiteralPath (Join-Path $realRepo 'scripts\release\Build-Launcher.ps1') -Destination (Join-Path $fakeRepo 'scripts\release')
     # Build-Launcher holds the embedded records to RecordShape.ps1 (#2180), and
     # asks Where.ps1 which folders are the installs (#3031).
-    foreach ($n in 'RecordShape.ps1', 'Read-JsonFile.ps1', 'Where.ps1') { Copy-Item -LiteralPath (Join-Path $realRepo ('scripts\release\' + $n)) -Destination (Join-Path $fakeRepo 'scripts\release') -Force }
+    foreach ($n in 'RecordShape.ps1', 'Read-JsonFile.ps1', 'Where.ps1', 'LauncherVersion.ps1') { Copy-Item -LiteralPath (Join-Path $realRepo ('scripts\release\' + $n)) -Destination (Join-Path $fakeRepo 'scripts\release') -Force }
     # The build is MSBuild and the two project files since #498's switch:
     # Find-MSBuild.ps1 finds MSBuild, and the projects say what goes in.
     Copy-Item -LiteralPath (Join-Path $realRepo 'scripts\release\Find-MSBuild.ps1') -Destination (Join-Path $fakeRepo 'scripts\release') -Force

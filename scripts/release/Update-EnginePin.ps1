@@ -106,14 +106,14 @@ if ($LASTEXITCODE -ne 0) { Stop-Here 'git add failed' }
 
 try { $notes = Get-EnginePinNotes $old $Commit $get } catch { Stop-Here ("the fork pull requests could not be read: " + $_.Exception.Message) }
 $facts = Get-EnginePinFacts $repo
-$title = "The engine pin moves to the fork's head $($facts.Short)"
+$title = "The engine pin moves to fork commit $($facts.Short)"
 if ($notes.Issues.Count) {
     $named = @($notes.Issues | Select-Object -First 8 | ForEach-Object { "#$_" }) -join ', '
     $title += " (Refs $named$(if ($notes.Issues.Count -gt 8) { ', and more' }))"
 }
 $body = New-Object System.Collections.Generic.List[string]
 $body.Add('## What changed'); $body.Add('')
-$body.Add(("The engine pin moves from ``{0}`` to the fork's head ``{1}`` (in full ``{2}``)." -f $old.Substring(0, 8), $facts.Short, $Commit))
+$body.Add(("The engine pin moves from ``{0}`` to fork commit ``{1}`` (in full ``{2}``)." -f $old.Substring(0, 8), $facts.Short, $Commit))
 $body.Add(("Cause: the fork's {0} had {1} merged pull request(s) that main did not pin, so no release carried them." -f $ForkEngineBranch, $notes.Count))
 $body.Add('')
 $body.Add('Fork pull requests it brings in:')
@@ -123,6 +123,22 @@ $body.Add(("Every change: {0}/compare/{1}...{2}" -f $facts.Fork, $old.Substring(
 $body.Add('')
 $body.Add('## How you checked it'); $body.Add('')
 $body.Add(("Made by scripts/release/Update-EnginePin.ps1 (#5148) from engine.yml run {0} ({1}), which recorded the fork's push build of this commit. The four records came from its log, the front was built again with Build-Front.ps1 -Record, and the pin blocks of THIRD-PARTY.md and credits.md were written from the records. Check-Records.ps1, tests/test-one-engine.js, tests/test-third-party.js and Write-EnginePinText.ps1 -Check passed before it was pushed. The server module's SHA256 is ``{2}``." -f $Run, $r.html_url, $facts.ServerSha256))
+$body.Add('')
+# The release note (plan part 8): the fork pull requests' own lines joined,
+# none when each says none. With a fork pull request that has no line, none
+# is written here: the line is left for a person, and the Release note check
+# stays red until it is there.
+$body.Add('## Release note'); $body.Add('')
+if ($notes.NoNote.Count) {
+    $body.Add(('Fork pull request(s) {0} carry no "Release note:" line. Write the line for them here, the way Developer-Guide.md says.' -f ((@($notes.NoNote | ForEach-Object { 'fork #' + $_ })) -join ', ')))
+    if ($notes.ReleaseNote) { $body.Add(''); $body.Add('The others say:'); foreach ($l in @($notes.ReleaseNote -split "`n")) { $body.Add('    ' + $l) } }
+} elseif ($notes.ReleaseNote) {
+    $nl = @($notes.ReleaseNote -split "`n")
+    $body.Add('Release note: ' + $nl[0])
+    foreach ($l in @($nl | Select-Object -Skip 1)) { $body.Add($l) }
+} else {
+    $body.Add('Release note: none')
+}
 $body.Add('')
 $body.Add('Whose work: mine')
 $body.Add('')

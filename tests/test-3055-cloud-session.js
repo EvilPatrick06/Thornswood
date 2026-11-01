@@ -15,6 +15,10 @@
      does nothing at all: no output, and no Python asked.
   C  in a cloud session it runs that one pip line, says one line when it
      worked, and when pip fails it says so with pip's own words and exit 1.
+     #5231: it also writes the session's git identity, EvilPatrick06 by his
+     noreply address, into the CLAUDE_ENV_FILE Claude Code gives the hook,
+     and says so in one line; with no CLAUDE_ENV_FILE it says the identity
+     was not set and goes on. --register writes no identity.
   D  --register adds the hook once to the settings it is pointed at and keeps
      every other key; off Linux it refuses and writes nothing.
   E  scripts/dev/cloud-environment-setup.sh, the text of the environment's
@@ -117,15 +121,38 @@ else {
     yes('B3 and no Python was asked either time', called() === '');
 
     // C
-    r = run([], { CLAUDE_CODE_REMOTE: 'true' });
+    const envFile = path.join(tmp, 'session.env');
+    r = run([], { CLAUDE_CODE_REMOTE: 'true', CLAUDE_ENV_FILE: envFile });
     const line = called().trim();
-    yes('C1 in a cloud session it exits 0 (' + r.status + ') with one line', r.status === 0 && r.stdout.trim().split('\n').length === 1);
+    yes('C1 in a cloud session it exits 0 (' + r.status + ') with one line for the identity and one for the libraries',
+      r.status === 0 && r.stdout.trim().split('\n').length === 2 && r.stderr === '');
+    const envText = fs.existsSync(envFile) ? fs.readFileSync(envFile, 'utf8') : '';
+    const envLines = envText.trim().split('\n');
+    const NOREPLY = '187923600+EvilPatrick06@users.noreply.github.com';
+    yes('C4 #5231: the session\'s environment file makes its commits EvilPatrick06\'s, author and committer (' + envLines.length + ' lines)',
+      envLines.length === 4 &&
+      envLines.indexOf("export GIT_AUTHOR_NAME='EvilPatrick06'") >= 0 &&
+      envLines.indexOf("export GIT_AUTHOR_EMAIL='" + NOREPLY + "'") >= 0 &&
+      envLines.indexOf("export GIT_COMMITTER_NAME='EvilPatrick06'") >= 0 &&
+      envLines.indexOf("export GIT_COMMITTER_EMAIL='" + NOREPLY + "'") >= 0);
+    let who = '';
+    try {
+      who = cp.execFileSync('bash', ['-c', '. "$1"; git var GIT_AUTHOR_IDENT; git var GIT_COMMITTER_IDENT', 'x', envFile],
+        { encoding: 'utf8' });
+    }
+    catch (e) { who = 'git var failed: ' + e.message; }
+    yes('C5 and git, with that file read, names EvilPatrick06 as author and committer',
+      who.split('\n').filter(function (l) { return l.indexOf('EvilPatrick06 <' + NOREPLY + '>') === 0; }).length === 2);
+    fs.unlinkSync(calls);
+    r = run([], { CLAUDE_CODE_REMOTE: 'true', CLAUDE_ENV_FILE: null });
+    yes('C6 with no CLAUDE_ENV_FILE it says the identity was not set, and still installs and exits 0',
+      r.status === 0 && r.stderr.indexOf('no CLAUDE_ENV_FILE') >= 0 && /--require-hashes/.test(called()));
     yes('C2 having asked python3.12 for exactly bot/requirements.txt, by hash, wheels only (' + line + ')',
       line.indexOf('-m pip install --user --break-system-packages --require-hashes --only-binary :all:') === 0 &&
       line.indexOf('-r ' + path.join(ROOT, 'bot', 'requirements.txt')) >= 0);
     fs.unlinkSync(calls);
     stand(1);
-    r = run([], { CLAUDE_CODE_REMOTE: 'true' });
+    r = run([], { CLAUDE_CODE_REMOTE: 'true', CLAUDE_ENV_FILE: envFile });
     yes('C3 when pip fails it exits 1 and passes on pip\'s words',
       r.status === 1 && r.stderr.indexOf('stand-in pip said no') >= 0 && r.stderr.indexOf('bot/requirements.txt') >= 0);
     stand(0);
@@ -136,9 +163,11 @@ else {
     const settings = path.join(cfg, 'settings.json');
     fs.writeFileSync(settings, JSON.stringify({ model: 'kept', hooks: { Stop: [{ hooks: [{ type: 'command', command: 'true' }] }] } }));
     const uname = cp.spawnSync('uname', ['-s'], { encoding: 'utf8' }).stdout.trim();
-    r = run(['--register'], { CLAUDE_CONFIG_DIR: cfg, CLAUDE_CODE_REMOTE: null });
+    const regEnv = path.join(tmp, 'register.env');
+    r = run(['--register'], { CLAUDE_CONFIG_DIR: cfg, CLAUDE_CODE_REMOTE: null, CLAUDE_ENV_FILE: regEnv });
     if (uname === 'Linux') {
-      r = run(['--register'], { CLAUDE_CONFIG_DIR: cfg, CLAUDE_CODE_REMOTE: null });
+      r = run(['--register'], { CLAUDE_CONFIG_DIR: cfg, CLAUDE_CODE_REMOTE: null, CLAUDE_ENV_FILE: regEnv });
+      yes('D6 #5231: --register, at image build, writes no git identity', !fs.existsSync(regEnv));
       const s = JSON.parse(fs.readFileSync(settings, 'utf8'));
       const start = ((s.hooks || {}).SessionStart || []);
       const cmds = [].concat.apply([], start.map(function (g) { return (g.hooks || []).map(function (h) { return h.command; }); }));

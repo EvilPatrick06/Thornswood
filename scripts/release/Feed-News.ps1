@@ -38,9 +38,11 @@
 
   $FeedNewsFileLauncher is the first launcher number with FeedNews.cs: 1.2.4,
   the number after 1.2.3, which went out on both channels on 11 Oct without
-  it. That holds as long as FeedNews.cs is on main before Bump-Version.ps1
-  moves main to 1.2.4, which it was (#1050). Every dev number climbs from
-  main's, so dev's first such launcher is 1.2.4 or a 1.2.4.N.
+  it. That held because FeedNews.cs was on main before Bump-Version.ps1
+  moved main to 1.2.4 (#1050). Every dev number climbs from main's, so dev's
+  first such launcher was 1.2.4 or a 1.2.4.N. Since 1 Nov 2026 the number is
+  worked out from git (LauncherVersion.ps1, #5179), 2026.1101.1745 and the
+  like, which is above every 1.2 number, so the comparison still holds.
 #>
 
 . (Join-Path $PSScriptRoot 'Release-Baseline.ps1')   # Compare-FeedVersion, Get-FeedAssetFile, Get-BaselineFileSha
