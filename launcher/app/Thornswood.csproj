@@ -29,7 +29,9 @@
     <LangVersion>latest</LangVersion>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <ApplicationIcon>..\app.ico</ApplicationIcon>
-    <ApplicationManifest>Thornswood.manifest</ApplicationManifest>
+    <!-- Thornswood.manifest with this build's version, written by
+         ThornswoodManifest below (#463). -->
+    <ApplicationManifest>$(BaseIntermediateOutputPath)Thornswood.stamped.manifest</ApplicationManifest>
     <Product>Thornswood</Product>
     <Company>Thornswood</Company>
     <Copyright>Thornswood</Copyright>
@@ -83,4 +85,21 @@
     <EmbeddedResource Include="..\..\records\ui-gone.json"><LogicalName>ui-gone.json</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\..\records\generated.json"><LogicalName>generated.json</LogicalName></EmbeddedResource>
   </ItemGroup>
+
+  <!-- The application manifest (#463) with this build's version, four parts,
+       in assemblyIdentity, stamped on every build, so the identity Windows
+       reads is the number the launcher reports and can never sit at the
+       placeholder. The native publish carries the assembly's manifest into
+       the exe. tests\test-app-manifest.ps1 reads it back. -->
+  <Target Name="ThornswoodManifest" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ThornswoodVersionFour>$(Version)</ThornswoodVersionFour>
+      <ThornswoodVersionFour Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(ThornswoodVersionFour)', '^[0-9]+\.[0-9]+\.[0-9]+$'))">$(ThornswoodVersionFour).0</ThornswoodVersionFour>
+    </PropertyGroup>
+    <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(ThornswoodVersionFour)', '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'))"
+           Text="The launcher's version is '$(Version)', which is not three or four numbers, so the application manifest cannot carry it (#463)." />
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)Thornswood.manifest" DestinationFiles="$(ApplicationManifest)" />
+    <XmlPoke XmlInputPath="$(ApplicationManifest)" Query="/asm:assembly/asm:assemblyIdentity/@version" Value="$(ThornswoodVersionFour)"
+             Namespaces="&lt;Namespace Prefix='asm' Uri='urn:schemas-microsoft-com:asm.v1' /&gt;" />
+  </Target>
 </Project>
