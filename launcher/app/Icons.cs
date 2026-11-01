@@ -98,6 +98,14 @@ namespace Thornswood
         static bool iconWritten;
 
         /// <summary>
+        /// True in the dev build. Set by the shell from the config, as
+        /// BuildName is, so the shortcuts' icon is chosen here and not by the
+        /// window's art (Art.cs, which is Avalonia's). The ship root tool
+        /// builds this file without the window (#4823).
+        /// </summary>
+        public static bool Dev;
+
+        /// <summary>
         /// The artwork this build's shortcuts show, out of the exe, or null
         /// when it carries none. The dev build's shortcuts get the dev icon,
         /// app-dev.ico; the main build keeps app.ico. A dev build without it
@@ -107,7 +115,7 @@ namespace Thornswood
         {
             pick = null;
             Assembly asm = typeof(Icons).Assembly;
-            if (Art.Dev)
+            if (Dev)
                 foreach (string n in asm.GetManifestResourceNames())
                     if (n.EndsWith("app-dev.ico", StringComparison.OrdinalIgnoreCase)) { pick = n; break; }
             if (pick == null)

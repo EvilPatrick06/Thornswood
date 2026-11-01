@@ -45,6 +45,12 @@
           -SkyrimFrom on a made root is said and not used. A file of the
           source that changes after it was checked stops Make (the stamp
           check, called as Make calls it).
+       f. The tool's own project, ShipRoot.csproj (#4823): it names only
+          launcher files that exist and none that uses Avalonia, at the
+          launcher's framework, C# version and package versions; it builds
+          with the .NET SDK on every machine, and the program it builds
+          refuses a channel that is not main or dev. Update-ShipRoot.ps1
+          builds it with dotnet build, not MSBuild.
     2. Where.ps1 and where.js: with no record ClientDist and ServerDist are
        under the checkout's engine\skymp; with Setup-ShipMachine's record they
        are under the recorded fork's build, for every clone; a record naming
@@ -462,10 +468,56 @@ if (Test-Path -LiteralPath $LauncherDotnet) {
     }
 }
 
+# ------------------------------------------- 1f. the tool's own project ----
+# What Update-ShipRoot.ps1 builds at the start of every Ship: OwnGame's
+# closure, no window (#4823).
+$projPath = Join-Path $Tool 'ShipRoot.csproj'
+$projText = [IO.File]::ReadAllText($projPath)
+$appDir = $App.TrimEnd('\', '/')
+$named = @([regex]::Matches($projText, '<Compile Include="\$\(ThornswoodApp\)([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
+$toolOwn = @([regex]::Matches($projText, '<Compile Include="\$\(MSBuildThisFileDirectory\)([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
+Yes ('1f. ShipRoot.csproj names its own two files and launcher files (' + $named.Count + ')') (
+    $named.Count -gt 0 -and (@($toolOwn | Sort-Object) -join ',') -eq 'OwnGameShipRoot.cs,ShipRoot.cs' -and
+    $projText -match '<EnableDefaultItems>false</EnableDefaultItems>' -and $projText -notmatch '<Compile Include="[^"]*\*')
+$gone = @($named | Where-Object { -not (Test-Path -LiteralPath (Join-Path $appDir $_)) })
+Yes ('1f.   every one of them is in launcher\app' + $(if ($gone.Count) { ', not ' + ($gone -join ', ') } else { '' })) ($gone.Count -eq 0)
+$ui = @($named | Where-Object { (Test-Path -LiteralPath (Join-Path $appDir $_)) -and ([IO.File]::ReadAllText((Join-Path $appDir $_)) -match '(?m)^\s*using Avalonia') })
+Yes ('1f.   and none of them is the window''s (no using Avalonia)' + $(if ($ui.Count) { ', not ' + ($ui -join ', ') } else { '' })) ($ui.Count -eq 0)
+$parts = @(Get-ChildItem -LiteralPath $appDir -Filter '*.cs' -File | Where-Object { [IO.File]::ReadAllText($_.FullName) -match 'static partial class OwnGame\b' } | ForEach-Object { $_.Name })
+Yes ('1f.   every part of OwnGame is in it (' + ($parts -join ', ') + ')') ($parts.Count -gt 0 -and @($parts | Where-Object { $named -notcontains $_ }).Count -eq 0)
+$launcherProj = [IO.File]::ReadAllText((Join-Path $appDir 'Thornswood.csproj'))
+function ProjValue([string]$text, [string]$name) { $m = [regex]::Match($text, '<' + $name + '>([^<]+)</' + $name + '>'); if ($m.Success) { $m.Groups[1].Value } else { '' } }
+Yes '1f.   at the launcher''s framework and C# version' (
+    (ProjValue $projText 'TargetFramework') -eq (ProjValue $launcherProj 'TargetFramework') -and (ProjValue $projText 'TargetFramework') -ne '' -and
+    (ProjValue $projText 'LangVersion') -eq (ProjValue $launcherProj 'LangVersion'))
+$pkgs = @([regex]::Matches($projText, '<PackageReference Include="([^"]+)" Version="([^"]+)"') | ForEach-Object { [pscustomobject]@{ Name = $_.Groups[1].Value; Version = $_.Groups[2].Value } })
+$offPkg = @($pkgs | Where-Object { $launcherProj -notmatch ('<PackageReference Include="' + [regex]::Escape($_.Name) + '" Version="' + [regex]::Escape($_.Version) + '"') } | ForEach-Object { $_.Name + ' ' + $_.Version })
+Yes ('1f.   with only the launcher''s packages, at its versions' + $(if ($offPkg.Count) { ', not ' + ($offPkg -join ', ') } else { '' })) ($offPkg.Count -eq 0 -and @($pkgs | Where-Object { $_.Name -like 'Avalonia*' }).Count -eq 0)
+if (Test-Path -LiteralPath $LauncherDotnet) {
+    $toolOut = Join-Path $work 'shiproot-tool'
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    $built = & $LauncherDotnet build $projPath -c Release -o $toolOut --nologo -v quiet --disable-build-servers 2>&1 | Out-String
+    $rc = $LASTEXITCODE
+    $ErrorActionPreference = $old
+    $toolDll = Join-Path $toolOut 'Thornswood-ShipRoot.dll'
+    Yes '1f. ShipRoot.csproj builds with the .NET SDK the launcher builds with' ($rc -eq 0 -and (Test-Path -LiteralPath $toolDll))
+    if ($rc -ne 0) { ($built -split "`n") | Where-Object { $_ -match 'error' } | Select-Object -First 20 | ForEach-Object { Write-Host "      $_" } }
+    else {
+        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        $said = @(& $LauncherDotnet $toolDll -Root (Join-Path $work 'no-root') -Channel nightly 2>&1 | ForEach-Object { "$_" })
+        $rc = $LASTEXITCODE
+        $ErrorActionPreference = $old
+        Yes '1f.   and the program it builds refuses a channel that is not main or dev, with a sentence' ($rc -eq 1 -and ($said -join ' ') -match 'STOP\. -Channel is main or dev, and it was nightly\.')
+    }
+}
+$upd = [IO.File]::ReadAllText((Join-Path $Release 'Update-ShipRoot.ps1'))
+Yes '1f. Update-ShipRoot.ps1 builds it with dotnet build, not MSBuild' (
+    $upd -match "\`$dotnet\.Source build \(Resolve-Path -LiteralPath \`$proj\)\.Path -c Release -o \`$out" -and $upd -notmatch 'Find-MSBuild|Find-ThornswoodMSBuild')
+
 # ============================================== 2. Where.ps1 and where.js ====
 $repo = Join-Path $work 'repo'
 New-Item -ItemType Directory -Force -Path (Join-Path $repo 'scripts\release'), (Join-Path $repo 'records') | Out-Null
-foreach ($n in 'Where.ps1', 'where.js', 'Update-ShipRoot.ps1', 'Sync-Client.ps1', 'RecordShape.ps1', 'Read-JsonFile.ps1', 'Get-ScratchDir.ps1', 'Find-MSBuild.ps1') {
+foreach ($n in 'Where.ps1', 'where.js', 'Update-ShipRoot.ps1', 'Sync-Client.ps1', 'RecordShape.ps1', 'Read-JsonFile.ps1', 'Get-ScratchDir.ps1') {
     Copy-Item -LiteralPath (Join-Path $Release $n) -Destination (Join-Path $repo 'scripts\release')
 }
 Copy-Item -LiteralPath (Join-Path $Here 'layout.json') -Destination $repo
