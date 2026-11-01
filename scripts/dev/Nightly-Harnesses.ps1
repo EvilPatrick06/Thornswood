@@ -112,6 +112,15 @@
   at once took 157 s under node --test and 156 s here, so the runner stays
   and only the results gained a structure.
 
+  With -Summary (build.yml's gate, nightly.yml and harnesses.yml pass
+  GITHUB_STEP_SUMMARY) it also hands its report to
+  Merge-HarnessReports.ps1, which writes how many checks ran and every
+  failing one, by harness, on the run's page: one section a share, all on
+  the one page. Asked for by name, never read from the environment, since
+  harnesses that run this against stand-ins run inside a real run, and
+  their stand-in results must not reach its page. No artifact is kept: the
+  builds keep none (#3399), and the page is where a reader looks.
+
   tests\test-nightly-harnesses.ps1 runs this against stand-in harnesses.
 
 .PARAMETER Shard
@@ -161,7 +170,16 @@
 
 .PARAMETER Report
   A JUnit file to write when the run ends: a test case for each check every
-  harness printed, as above. None unless asked.
+  harness printed, as above. None unless asked, or report.xml in -OutDir
+  with -Summary.
+
+.PARAMETER Summary
+  A Markdown file to add the run's checks to, as above: GITHUB_STEP_SUMMARY
+  on a runner. None unless asked.
+
+.PARAMETER Title
+  The heading of that section. "Harnesses, share n of m", or "Harnesses"
+  with -Only, unless asked.
 #>
 [CmdletBinding()]
 param(
@@ -175,7 +193,9 @@ param(
     [int]$Share = 0,
     [string]$BusyFrom = '',
     [string]$StartLog = '',
-    [string]$Report = ''
+    [string]$Report = '',
+    [string]$Summary = '',
+    [string]$Title = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -184,13 +204,16 @@ if ($Throttle -lt 1 -or $Throttle -gt 16) { Write-Host "::error::-Throttle $Thro
 if ($Share -eq 0) { $Share = $Throttle }
 if ($Share -lt 1 -or $Share -gt $Throttle) { Write-Host "::error::-Share $Share is not 1 to -Throttle ($Throttle)"; exit 2 }
 if ($StartLog) { $StartLog = [IO.Path]::GetFullPath($StartLog) }
-if ($Report) { $Report = [IO.Path]::GetFullPath($Report) }
 if (-not $Root) { $Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 $Root = [IO.Path]::GetFullPath($Root)
 if (-not $OutDir) {
     $base = $(if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [IO.Path]::GetTempPath() })
     $OutDir = Join-Path $base ('harness-out-' + $Shard)
 }
+if ($Summary -and -not $Report) { $Report = Join-Path $OutDir 'report.xml' }
+if ($Report) { $Report = [IO.Path]::GetFullPath($Report) }
+if ($Summary) { $Summary = [IO.Path]::GetFullPath($Summary) }
+if (-not $Title) { $Title = $(if ($Only.Trim()) { 'Harnesses' } else { 'Harnesses, share {0} of {1}' -f $Shard, $Of }) }
 
 $PER_HARNESS = 300
 $MAX_CLOCK = 600
@@ -635,7 +658,12 @@ if ($failed.Count) {
     Write-Host ''
     Write-Host ("{0} harness(es) failed: {1}" -f $failed.Count, ($failed -join ', '))
 }
+$reportBad = $false
 if ($Report) { Write-Report $results $notRun }
-if ($failed.Count -or $notRun.Count) { exit 1 }
+if ($Summary) {
+    & (Join-Path $PSScriptRoot 'Merge-HarnessReports.ps1') -Path $Report -Expect 1 -Summary $Summary -Title $Title
+    if ($LASTEXITCODE -ne 0) { $reportBad = $true; Write-Host '::error::the report could not be written to the run''s summary' }
+}
+if ($failed.Count -or $notRun.Count -or $reportBad) { exit 1 }
 Write-Host 'every harness passed'
 exit 0

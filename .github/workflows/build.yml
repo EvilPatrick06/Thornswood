@@ -283,12 +283,18 @@ jobs:
 
       - name: Keep this share's report for the gate report
         if: ${{ !cancelled() }}
+        # The share's verdict is its harnesses'. When this upload fails, the
+        # report job names this share as having left no report and is red,
+        # so the failure is said where the report is read.
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: gate-report-${{ matrix.shard }}
           path: ${{ runner.temp }}/gate-report/share.xml
           if-no-files-found: ignore
-          retention-days: 7
+          # Read by the report job of this run, minutes later, and by
+          # nothing after it.
+          retention-days: 1
 
   # The gate's checks in one report (#5295). Each share above keeps a JUnit
   # file with a test case for every PASS, FAIL and SKIP line its harnesses
@@ -330,7 +336,7 @@ jobs:
           name: gate-report
           path: ${{ runner.temp }}/gate-report.xml
           if-no-files-found: ignore
-          retention-days: 30
+          retention-days: 14
 
   # The launcher build and every check, on GitHub's hosted windows-latest
   # (#1306; the only runner since #4983).
@@ -762,3 +768,9 @@ jobs:
       # of Actions storage, which Patrick's billing page read at 1.8 GB. The
       # pdb was never kept either (#1356 / #462): it carries absolute
       # build-machine source paths.
+      # The gate's reports are the only artifacts of a build (#5295): each
+      # share's, kept a day for the job "Gate report" of the same run, and
+      # the merged one, kept 14 days. #3399's failures were a private
+      # repository's storage allowance; since 30 Oct 2026 this repository is
+      # public, where GitHub bills no Actions storage, and gate-map.yml has
+      # kept its map as an artifact here since.

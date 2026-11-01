@@ -29,7 +29,17 @@
     5. it says so and exits 1 when fewer reports came than -Expect, or one
        is not a harness report, so a share that died early is not hidden
        behind a short report;
-    6. with no -Report the runner writes no report and prints what it did.
+    6. with no -Report the runner writes no report and prints what it did;
+    7. with -Summary it writes its section of the run's page itself, under
+       the title given, failing checks by name, with no -Report needed, and
+       Run-Gate.ps1 -Summary titles a share of the gate by its number;
+    8. build.yml's gate shares and nightly.yml's write a report each and
+       keep it for the run, and a job of each merges them, expecting one a
+       share, onto the run's page and keeps the merged one; harnesses.yml,
+       one job, hands GITHUB_STEP_SUMMARY to -Summary by name. No runner
+       script reads the page from the environment by itself, since harnesses
+       that run these against stand-ins run inside a real run, and their
+       stand-in checks must stay off its page.
 
   Writes only into a scratch folder under TEMP, which it removes.
 #>
@@ -166,6 +176,38 @@ try {
     # ---- 6. no -Report ----------------------------------------------------------
     $r = Run $b @()
     Yes "6. with no -Report there is no report line, and the run is as before (exit $($r.Code))" ($r.Code -eq 0 -and $r.Said -notmatch '(?m)^report: ' -and $r.Said -match 'every harness passed')
+
+    # ---- 7. -Summary ------------------------------------------------------------
+    $page = Join-Path $work 'page.md'
+    $r = Run $a @('-Summary', $page, '-Title', 'Gate harnesses, share 2 of 5', '-BudgetSeconds', '400')
+    $md = $(if (Test-Path -LiteralPath $page) { [IO.File]::ReadAllText($page) } else { '' })
+    Yes "7. -Summary writes the run's section, under the title given (exit $($r.Code))" ($r.Code -eq 1 -and $md -match '(?m)^## Gate harnesses, share 2 of 5\s*$' -and $md -match '(?m)^\d+ checks in 5 harnesses: 5 failed, 2 skipped\.\s*$')
+    Yes '   naming each failing check by harness' ($md -match '(?m)^\| test-3-throws\.js \| the harness ended with exit 1 and no FAIL line \|\s*$')
+    $r = Run $b @('-Summary', $page)
+    $md = [IO.File]::ReadAllText($page)
+    Yes "   a second run adds its own section after the first, a share's own title by default (exit $($r.Code))" ($r.Code -eq 0 -and $md -match '(?m)^## Harnesses, share 1 of 1\s*$' -and $md.IndexOf('## Gate harnesses, share 2 of 5') -lt $md.IndexOf('## Harnesses, share 1 of 1'))
+    $rg = [IO.File]::ReadAllText((Join-Path $repo 'scripts\dev\Run-Gate.ps1'))
+    Yes '7. Run-Gate.ps1 hands -Summary on, titled "Gate harnesses, share n of m"' ($rg -match "\`$with\.Summary = \`$Summary" -and $rg -match [regex]::Escape("'Gate harnesses, share {0} of {1}' -f `$Shard, `$Of"))
+
+    # ---- 8. the workflows -------------------------------------------------------
+    $wf = Join-Path $repo '.github\workflows'
+    foreach ($pair in @(@('build.yml', 'Run-Gate', 'gate-report', 'report', 'Gate report', 'needs.pick.outputs.shares'), @('build-pr.yml', 'Run-Gate', 'gate-report', 'report', 'Gate report', 'needs.pick.outputs.shares'), @('nightly.yml', 'Nightly-Harnesses', 'harness-report', 'harness-report', 'Harness report', '-Expect 2'))) {
+        $k, $runs, $art, $job, $name, $expect = $pair
+        $y = [IO.File]::ReadAllText((Join-Path $wf $k))
+        Yes "8. $k's shares each write a report" ($y -match ('(?m)^\s+\.\\scripts\\dev\\' + $runs + '\.ps1 -Shard .* -Report \(Join-Path \$env:RUNNER_TEMP ''' + $art + '\\share\.xml''\)\s*$'))
+        Yes "   and keep it for the run as $art-<share>, a day" ($y -match ('(?s)uses: actions/upload-artifact@[0-9a-f]{40} # v\d+\s+with:\s+name: ' + $art + '-\$\{\{ matrix\.shard \}\}\s+path: \$\{\{ runner\.temp \}\}/' + $art + '/share\.xml.*?retention-days: 1\b'))
+        $jb = [regex]::Match($y, '(?s)(?m)^  ' + [regex]::Escape($job) + ':\s*$(.*?)(?=^  [A-Za-z0-9_-]+:\s*$|\z)').Groups[1].Value
+        Yes "   the job ""$name"" downloads them all and merges them onto the run's page" ($jb -match ('name: ' + [regex]::Escape($name)) -and $jb -match ('pattern: ' + [regex]::Escape($art) + '-\*') -and $jb -match 'Merge-HarnessReports\.ps1 -Path \$in -Expect ' -and $jb -match [regex]::Escape($expect))
+        Yes '   running whenever the shares ran, red or green, never with always()' ($jb -match "if: \`$\{\{ !cancelled\(\) && needs\.[a-z]+\.result != 'skipped' \}\}" -and $jb -notmatch 'always\(\)')
+    }
+    $y = [IO.File]::ReadAllText((Join-Path $wf 'harnesses.yml'))
+    Yes "8. harnesses.yml, one job, hands the run's page to -Summary" ($y -match '(?m)^\s+\.\\scripts\\dev\\Nightly-Harnesses\.ps1 -Only .* -Summary \$env:GITHUB_STEP_SUMMARY\s*$')
+    $reads = @(foreach ($f in 'Nightly-Harnesses.ps1', 'Run-Gate.ps1', 'Merge-HarnessReports.ps1') {
+        $text = [IO.File]::ReadAllText((Join-Path $repo ('scripts\dev\' + $f)))
+        $code = (($text -split "`n") | Where-Object { $_ -notmatch '^\s*#' }) -join "`n"
+        if ($f -ne 'Merge-HarnessReports.ps1' -and $code -match 'env:GITHUB_STEP_SUMMARY') { $f }
+    })
+    Yes ('8. the runners read the page from no environment by themselves (' + ($reads -join ', ') + ')') (-not $reads.Count)
 }
 finally {
     if (Test-Path -LiteralPath $work) { Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue }

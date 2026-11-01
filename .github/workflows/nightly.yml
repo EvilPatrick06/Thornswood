@@ -372,12 +372,18 @@ jobs:
 
       - name: Keep this share's report for the harness report
         if: ${{ !cancelled() }}
+        # The share's verdict is its harnesses'. When this upload fails, the
+        # report job names this share as having left no report and is red,
+        # so the failure is said where the report is read.
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: harness-report-${{ matrix.shard }}
           path: ${{ runner.temp }}/harness-report/share.xml
           if-no-files-found: ignore
-          retention-days: 7
+          # Read by the report job of this run, minutes later, and by
+          # nothing after it.
+          retention-days: 1
 
   harness-report:
     # The night's checks in one report (#5295): both shares' merged, kept
@@ -411,7 +417,7 @@ jobs:
           name: harness-report
           path: ${{ runner.temp }}/harness-report.xml
           if-no-files-found: ignore
-          retention-days: 30
+          retention-days: 14
 
   bot:
     # The bot harnesses install discord.py from pypi. While the repository

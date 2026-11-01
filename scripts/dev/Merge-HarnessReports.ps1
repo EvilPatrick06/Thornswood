@@ -4,11 +4,12 @@
   writes the failing checks, by name, to the run's summary (#5295).
 
 .DESCRIPTION
-  scripts\dev\Nightly-Harnesses.ps1 -Report writes one JUnit file a share:
+  scripts\dev\Nightly-Harnesses.ps1 -Report writes one JUnit file a run:
   a test suite for each harness and a test case for each PASS, FAIL, SKIP
-  or NOT RUN line it printed. A gate or a nightly is several shares on
-  runners of their own, so its checks are in several files. This reads
-  them all and writes:
+  or NOT RUN line it printed. Nightly-Harnesses.ps1 -Summary hands its own
+  to this, so each share of the gate and the nightly writes its section of
+  the run's page. Given several, from shares run by hand, it reads them
+  all as one. It writes:
 
     -Out      one JUnit file with every share's suites, in the order given;
     -Summary  Markdown for the run's summary page: how many checks ran, how
