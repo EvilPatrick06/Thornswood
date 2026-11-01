@@ -77,6 +77,14 @@ param(
     [switch]$Remove,
     # Leave the bot pass off (#5196): no task, and agent.json names no folder.
     [switch]$NoBotPass,
+    # Ends the service's process when the service is stuck stopping
+    # (StopPending), and only then, before the new agent goes in. Agents
+    # up to 1.0.21 called Stop() from inside their own work at a self-update
+    # and waited on themselves for good (1 Nov, #5180); such a process
+    # never ends by itself, and the service manager will not start it again
+    # while it is there. Without this switch the install refuses on a stuck
+    # service and changes nothing.
+    [switch]$EndHung,
     [switch]$NoPause
 )
 
@@ -178,11 +186,16 @@ $out = @(Remote @"
 `$exe = '$exe'
 `$agentSvc = '$agentSvc'
 `$want = '$Tag'
+`$endHung = '$(if ($EndHung) { '1' } else { '' })'
 `$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 `$stage = Join-Path `$root ('.stage-' + `$stamp)
 `$h = @{ 'User-Agent' = 'thornswood-install-deploy-agent'; Accept = 'application/vnd.github+json' }
 
 function Refuse([string]`$why) { 'REFUSED: ' + `$why + '. Nothing was stopped or changed.'; if (Test-Path -LiteralPath `$stage) { Remove-Item -LiteralPath `$stage -Recurse -Force }; exit 1 }
+
+# A service stuck stopping is said before anything changes (see -EndHung).
+`$was = Get-Service -Name `$agentSvc -ErrorAction SilentlyContinue
+if (`$was -and `$was.Status -eq 'StopPending' -and -not `$endHung) { Refuse ('the service ' + `$agentSvc + ' is stuck stopping (StopPending) and will not end by itself; run this with -EndHung to end its process and put the new agent in') }
 
 # The folder: nothing from C:\, SYSTEM and Administrators only.
 if (-not (Test-Path -LiteralPath `$root)) { New-Item -ItemType Directory -Path `$root | Out-Null }
@@ -318,7 +331,11 @@ $(Get-ThornswoodServiceAccountScript)
 
 # In place, with the one it replaces kept beside it until the new one runs.
 `$svc = Get-Service -Name `$agentSvc -ErrorAction SilentlyContinue
-if (`$svc -and `$svc.Status -ne 'Stopped') {
+if (`$svc -and `$svc.Status -eq 'StopPending' -and `$endHung) {
+  `$hung = [int](Get-CimInstance -ClassName Win32_Service -Filter "Name='`$agentSvc'").ProcessId
+  if (`$hung -gt 0) { Stop-Process -Id `$hung -Force; 'ENDED the stuck process ' + `$hung + ' of ' + `$agentSvc + ' (-EndHung)' }
+  `$svc.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(60))
+} elseif (`$svc -and `$svc.Status -ne 'Stopped') {
   Stop-Service -Name `$agentSvc -Force
   `$svc.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(120))
 }

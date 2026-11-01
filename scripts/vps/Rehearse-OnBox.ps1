@@ -73,7 +73,10 @@ $Repo = Split-Path -Parent (Split-Path -Parent $Here)
 $Mark = '.thornswood-rehearsal'
 $ServerRoots = @{ live = 'C:\Thornswood-Server'; dev = 'C:\Thornswood-Server-Dev' }
 $Source = $ServerRoots[$Which]
-$script:Node = $null
+# The rehearsal server's process. Not $script:Node: PowerShell names are not
+# case sensitive, so that was the same variable as the $node path below, and
+# step 8 called WaitForExit on a string (1 Nov 2026).
+$script:Server = $null
 $script:Failed = ''
 $started = Get-Date
 
@@ -140,10 +143,10 @@ function Get-InboundAllow {
 
 # node and every child it started, then the folder's own node processes.
 function Stop-Rehearsal {
-  if ($script:Node -and -not $script:Node.HasExited) {
-    & "$env:SystemRoot\System32\taskkill.exe" /T /F /PID ([string]$script:Node.Id) 2>&1 | Out-Null
-    $script:Node.WaitForExit(30000) | Out-Null
-    Say ('  node ' + $script:Node.Id + ' stopped')
+  if ($script:Server -is [Diagnostics.Process] -and -not $script:Server.HasExited) {
+    & "$env:SystemRoot\System32\taskkill.exe" /T /F /PID ([string]$script:Server.Id) 2>&1 | Out-Null
+    $script:Server.WaitForExit(30000) | Out-Null
+    Say ('  node ' + $script:Server.Id + ' stopped')
   }
   $esc = [regex]::Escape($Root)
   foreach ($p in @(Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -match $esc })) {
@@ -155,8 +158,8 @@ function Stop-Rehearsal {
 $result = 1
 try {
   if ($ServerRoots.Values -contains $Root.TrimEnd('\') -or $ServerRoots.Values -contains $Work.TrimEnd('\')) { Fail ('-Root and -Work are never a server folder.') }
-  $node = (Get-Command node -ErrorAction SilentlyContinue).Source
-  if (-not $node) { Fail 'node is not on PATH here.' }
+  $nodeExe = (Get-Command node -ErrorAction SilentlyContinue).Source
+  if (-not $nodeExe) { Fail 'node is not on PATH here.' }
   $check = Join-Path $Repo 'scripts\bot\Check-Character.js'
   if (-not (Test-Path -LiteralPath $check)) { Fail ('main has no scripts\bot\Check-Character.js (Thornswood #5213), so nothing can load the character.') }
 
@@ -220,26 +223,26 @@ try {
   $mem = [math]::Round((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1KB)
   Say ('  ' + $mem + ' MB of memory free before it starts')
   $so = Join-Path $Work 'node.out.txt'; $se = Join-Path $Work 'node.err.txt'
-  $script:Node = Start-Process -FilePath $node -ArgumentList 'dist_back/skymp5-server.js' -WorkingDirectory $Root -RedirectStandardOutput $so -RedirectStandardError $se -WindowStyle Hidden -PassThru
-  Say ('  node ' + $script:Node.Id + ' started in ' + $Root)
+  $script:Server = Start-Process -FilePath $nodeExe -ArgumentList 'dist_back/skymp5-server.js' -WorkingDirectory $Root -RedirectStandardOutput $so -RedirectStandardError $se -WindowStyle Hidden -PassThru
+  Say ('  node ' + $script:Server.Id + ' started in ' + $Root)
   $until = (Get-Date).AddMinutes($ListenMinutes)
   $up = $false
   while ((Get-Date) -lt $until) {
     Start-Sleep -Seconds 2
-    if ($script:Node.HasExited) { break }
+    if ($script:Server.HasExited) { break }
     $udp = @(Get-NetUDPEndpoint -LocalPort ([int]$rh.port) -ErrorAction SilentlyContinue)
     if ($udp.Count) { $up = $true; break }
   }
   if (-not $up) {
     Get-Content -LiteralPath $so, $se -Tail 20 -ErrorAction SilentlyContinue | ForEach-Object { Say ('  | ' + $_) }
-    if ($script:Node.HasExited) { Fail ('node ended with ' + $script:Node.ExitCode + ' before it listened on ' + $rh.port + '.') }
+    if ($script:Server.HasExited) { Fail ('node ended with ' + $script:Server.ExitCode + ' before it listened on ' + $rh.port + '.') }
     Fail ('node did not listen on UDP ' + $rh.port + ' within ' + $ListenMinutes + ' minutes.')
   }
-  Say ('  listening on UDP ' + $rh.port + ' after ' + [int]((Get-Date) - $script:Node.StartTime).TotalSeconds + ' s')
+  Say ('  listening on UDP ' + $rh.port + ' after ' + [int]((Get-Date) - $script:Server.StartTime).TotalSeconds + ' s')
 
   Step '7. the bot loads the character'
   $json = Join-Path $Work 'character-check.json'
-  $out7 = & $node $check --root $Root --profile $ProfileId --host 127.0.0.1 --port ([string]$rh.port) --out $json 2>&1
+  $out7 = & $nodeExe $check --root $Root --profile $ProfileId --host 127.0.0.1 --port ([string]$rh.port) --out $json 2>&1
   $rc = $LASTEXITCODE
   $out7 | ForEach-Object { Say ('  ' + $_) }
   if ($Out) {
@@ -256,9 +259,13 @@ catch {
 }
 finally {
   Step '8. stop and clean up'
-  Stop-Rehearsal
-  $log = Join-Path $Root 'thornswood.log'
-  if (Test-Path -LiteralPath $log) { Say '  the end of its thornswood.log:'; Get-Content -LiteralPath $log -Tail 15 -ErrorAction SilentlyContinue | ForEach-Object { Say ('  | ' + $_) } }
+  # Each part on its own, so one that throws never keeps the folders, which
+  # hold the unpacked world, from being deleted.
+  try { Stop-Rehearsal } catch { $result = 1; Say ('  node could not be stopped: ' + $_.Exception.Message) }
+  try {
+    $log = Join-Path $Root 'thornswood.log'
+    if (Test-Path -LiteralPath $log) { Say '  the end of its thornswood.log:'; Get-Content -LiteralPath $log -Tail 15 -ErrorAction SilentlyContinue | ForEach-Object { Say ('  | ' + $_) } }
+  } catch { Say ('  its log could not be read: ' + $_.Exception.Message) }
   foreach ($d in $Root, $Work) {
     try { if (Test-Path -LiteralPath $d) { Remove-Item -LiteralPath $d -Recurse -Force }; Say ('  ' + $d + ' deleted') }
     catch { $result = 1; Say ('  ' + $d + ' could not be deleted: ' + $_.Exception.Message + ' It holds the unpacked world; delete it.') }

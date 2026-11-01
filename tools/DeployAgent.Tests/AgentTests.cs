@@ -181,6 +181,8 @@ sealed class FakeServer : IDisposable
     public volatile bool Running = true;
     readonly CancellationTokenSource stop = new();
     readonly Task engine;
+    readonly object looked = new();
+    long looks;
 
     public FakeServer(int port)
     {
@@ -195,7 +197,14 @@ sealed class FakeServer : IDisposable
         engine = Task.Run(Engine);
     }
 
-    public HttpResponseMessage Health(HttpRequestMessage r) => new(Healthy ? HttpStatusCode.OK : HttpStatusCode.ServiceUnavailable) { Content = new StringContent("{}") };
+    /// <summary>Asked at each health request: true answers 503. A test that
+    /// needs a server sick only after a load says so here, from what is on
+    /// disk, rather than flipping Healthy from a task of its own, which a
+    /// 15.6 ms timer tick on Windows let the agent's health check overtake.</summary>
+    public Func<bool>? SickWhen { get; set; }
+
+    public HttpResponseMessage Health(HttpRequestMessage r) =>
+        new(Healthy && !(SickWhen?.Invoke() ?? false) ? HttpStatusCode.OK : HttpStatusCode.ServiceUnavailable) { Content = new StringContent("{}") };
 
     /// <summary>What a load says in server.log, as the gamemode says it.</summary>
     string LoadLines(string gm, byte[] b)
@@ -219,14 +228,41 @@ sealed class FakeServer : IDisposable
         while (!stop.IsCancellationRequested)
         {
             try { await Task.Delay(5, stop.Token); } catch (OperationCanceledException) { return; }
-            if (!Running) { try { last = Thornswood.DeployAgent.Files.ReadShared(gm); lastWrite = File.GetLastWriteTimeUtc(gm); } catch (IOException) { } continue; }
+            try { Look(); } finally { Looked(); }
+        }
+
+        void Look()
+        {
+            if (!Running) { try { last = Thornswood.DeployAgent.Files.ReadShared(gm); lastWrite = File.GetLastWriteTimeUtc(gm); } catch (IOException) { } return; }
             byte[] b;
             DateTime w;
-            try { b = Thornswood.DeployAgent.Files.ReadShared(gm); w = File.GetLastWriteTimeUtc(gm); } catch (IOException) { continue; }
-            if (b.AsSpan().SequenceEqual(last) && w == lastWrite) continue;
+            try { b = Thornswood.DeployAgent.Files.ReadShared(gm); w = File.GetLastWriteTimeUtc(gm); } catch (IOException) { return; }
+            if (b.AsSpan().SequenceEqual(last) && w == lastWrite) return;
             last = b;
             lastWrite = w;
             try { File.AppendAllText(Path.Combine(Root, "server.log"), LoadLines(gm, b)); } catch (IOException) { }
+        }
+    }
+
+    void Looked() { lock (looked) { looks++; Monitor.PulseAll(looked); } }
+
+    /// <summary>Puts a gamemode.js in place the way a test sets the scene, and
+    /// returns once the engine has loaded it, so its load lines are written
+    /// before the agent marks server.log. Without this the engine (a 5 ms
+    /// poll, a 15.6 ms timer tick on Windows) could notice the scene's
+    /// gamemode after the agent's mark, and its lines were read as the
+    /// deploy's load: same blob, old tables (the gate failures of 1 Nov).</summary>
+    public void WriteGamemode(string text)
+    {
+        long from;
+        lock (looked) from = looks;
+        File.WriteAllText(Path.Combine(Root, "gamemode.js"), text);
+        // The look in hand may have read the file before the write; the one
+        // after it began after the write, so two looks on is past it.
+        lock (looked)
+        {
+            while (looks < from + 2)
+                if (!Monitor.Wait(looked, TimeSpan.FromSeconds(30))) throw new TimeoutException("the stand-in engine stopped looking");
         }
     }
 
@@ -322,6 +358,20 @@ public sealed class AgentTests : IDisposable
             foreach (var (n, t) in tables)
                 using (var e = za.CreateEntry(n).Open()) e.Write(B(t));
         return ms.ToArray();
+    }
+
+    /// <summary>The Deployment's states, oldest first (or only its last one).
+    /// When they are not the ones wanted, the failure carries the last
+    /// description and the deploy log, so a run on the gate says why and not
+    /// only that (1 Nov: a failure on the Windows gate gave "Expected success,
+    /// Actual failure" and nothing more).</summary>
+    static void HasStates(FakeGitHub gh, FakeServer s, long id, string want, bool last = false)
+    {
+        var got = last ? (string)gh.Last(id)!["state"]! : string.Join(",", gh.States(id));
+        if (got == want) return;
+        var log = Path.Combine(s.Root, "data", $"deploy-{id}.log");
+        var said = (string?)gh.Last(id)?["description"] ?? "(no status)";
+        Assert.Fail($"Deployment {id}: expected {want}, got {got}: {said}\n" + (File.Exists(log) ? File.ReadAllText(log) : "(no deploy log)"));
     }
 
     static void PutTables(FakeServer s, Dictionary<string, string> tables)
@@ -577,7 +627,7 @@ public sealed class AgentTests : IDisposable
         GamemodeRelease(gh, "build-1", "// new gamemode\n");
         var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
-        Assert.Equal("in_progress,success", string.Join(",", gh.States(id)));
+        HasStates(gh, s, id, "in_progress,success");
         Assert.Equal("// new gamemode\n", s.Read("gamemode.js"));
         Assert.Equal("{\"commit\":\"new\"}", s.Read("thornswood-build.json"));
         var rec = JsonSerializer.Deserialize<DeployRecord>(s.Read(Path.Combine("data", "thornswood-deploy.json")))!;
@@ -605,13 +655,13 @@ public sealed class AgentTests : IDisposable
     {
         var (a, gh, s, _, _) = Make();
         PutTables(s, OldTables);
-        File.WriteAllText(Path.Combine(s.Root, "gamemode.js"), Reading("tables gamemode"));
+        s.WriteGamemode(Reading("tables gamemode"));
         var oldTree = Tables.Tree(Path.Combine(s.Root, Tables.Dir));
         // The same gamemode.js the server runs: only a table changed.
         GamemodeRelease(gh, "build-1", Reading("tables gamemode"), new() { ["DATA.json"] = "{\n\"a\":2\n}\n", ["WELLS.json"] = "[]\n" });
         var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
-        Assert.Equal("in_progress,success", string.Join(",", gh.States(id)));
+        HasStates(gh, s, id, "in_progress,success");
         Assert.Equal("{\n\"a\":2\n}\n", s.Read(Path.Combine(Tables.Dir, "DATA.json")));
         var newTree = Tables.Tree(Path.Combine(s.Root, Tables.Dir));
         Assert.NotEqual(oldTree, newTree);
@@ -632,7 +682,7 @@ public sealed class AgentTests : IDisposable
         PutTables(s, OldTables);
         // The old gamemode reads tables too, so its load after the put-back
         // reads the folder, which has to be the old one by then.
-        File.WriteAllText(Path.Combine(s.Root, "gamemode.js"), Reading("old tables gamemode"));
+        s.WriteGamemode(Reading("old tables gamemode"));
         var oldTree = Tables.Tree(Path.Combine(s.Root, Tables.Dir));
         GamemodeRelease(gh, "build-2", Reading("new gamemode"), new() { ["DATA.json"] = "BROKEN\n", ["WELLS.json"] = "[]\n" });
         var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-2\"}");
@@ -782,20 +832,10 @@ public sealed class AgentTests : IDisposable
         var (a, gh, s, server, _) = Make();
         GamemodeRelease(gh, "build-3", "// new but sick\n");
         var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-3\"}");
-        // Healthy for the check before, sick after the load.
-        using var stop = new CancellationTokenSource();
-        var watch = Task.Run(async () =>
-        {
-            while (!stop.IsCancellationRequested)
-            {
-                try { if (s.Read("gamemode.js").Contains("sick")) { s.Healthy = false; return; } } catch (IOException) { }
-                await Task.Delay(1);
-            }
-        });
+        // Healthy for the check before, sick while the new gamemode is in.
+        s.SickWhen = () => Encoding.UTF8.GetString(Thornswood.DeployAgent.Files.ReadShared(Path.Combine(s.Root, "gamemode.js"))).Contains("sick");
         server.Tick = TimeSpan.FromMilliseconds(20);
         await a.Pass("dev", default);
-        stop.Cancel();
-        await watch;
         var last = gh.Last(id)!;
         Assert.Equal("failure", (string)last["state"]!);
         Assert.Contains("health check failed", (string)last["description"]!);
@@ -848,13 +888,13 @@ public sealed class AgentTests : IDisposable
     [Fact]
     public async Task ADeploymentCutShortIsMarkedError()
     {
-        var (a, gh, _, _, cfg) = Make();
+        var (a, gh, s, _, cfg) = Make();
         var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
         var state = Path.Combine(cfg.Home, "state", "working.json");
         Directory.CreateDirectory(Path.GetDirectoryName(state)!);
         File.WriteAllText(state, $"{{\"Deployment\":\"{id}\",\"Env\":\"dev\",\"Started\":\"then\"}}");
         await a.Start(default);
-        Assert.Equal("error", (string)gh.Last(id)!["state"]!);
+        HasStates(gh, s, id, "error", last: true);
         Assert.False(File.Exists(state));
     }
 
@@ -897,6 +937,42 @@ public sealed class AgentTests : IDisposable
         await a.SelfUpdate(default);
         Assert.Equal("old program", File.ReadAllText(exe));
         Assert.Contains(lines, l => l.Contains("agent-v1.0.2 has no published Release"));
+    }
+
+    // ---- the service's end ---------------------------------------------------
+
+    [Theory]
+    [InlineData("update", 3)]
+    [InlineData("failure", 1)]
+    [InlineData("loop ended", 1)]
+    public async Task WorkThatEndsByItselfStopsTheServiceWithoutWaitingOnItself(string how, int code)
+    {
+        Func<CancellationToken, Task> run = how switch
+        {
+            "update" => _ => throw new RestartException(),
+            "failure" => _ => throw new InvalidOperationException("broken"),
+            _ => _ => Task.CompletedTask,
+        };
+        var life = new Lifetime(run, _ => { });
+        var stopped = new TaskCompletionSource<(int, int)>(TaskCreationOptions.RunContinuationsAsynchronously);
+        // What AgentService does: the end calls ServiceBase.Stop(), which runs
+        // OnStop on the same thread, and OnStop waits for the work.
+        var ended = life.Start(c => stopped.SetResult((c, life.StopAndWait(() => { }))));
+        var first = await Task.WhenAny(stopped.Task, Task.Delay(TimeSpan.FromSeconds(30)));
+        Assert.True(first == stopped.Task, "the stop waited on the work that asked for it");
+        Assert.Equal((code, code), await stopped.Task);
+        await ended;
+    }
+
+    [Fact]
+    public async Task AStopThatWasAskedForEndsWithZeroAndIsNotReportedAsAnEnd()
+    {
+        var life = new Lifetime(ct => Task.Delay(Timeout.Infinite, ct), _ => { });
+        var called = false;
+        var ended = life.Start(_ => called = true);
+        Assert.Equal(0, life.StopAndWait(() => { }));
+        await ended;
+        Assert.False(called);
     }
 
     [Fact]
@@ -1115,7 +1191,7 @@ public sealed class AgentTests : IDisposable
         BotRelease(gh, "build-1", "// new gamemode\n");
         var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
-        Assert.Equal("in_progress,success", string.Join(",", gh.States(id)));
+        HasStates(gh, s, id, "in_progress,success");
         Assert.Equal("// new gamemode\n", s.Read("gamemode.js"));
         Assert.Contains("bot pass: 7 of 7 passed", s.Read(Path.Combine("data", $"deploy-{id}.log")));
 
@@ -1172,7 +1248,7 @@ public sealed class AgentTests : IDisposable
         }));
         var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-9\"}");
         await a.Pass("dev", default);
-        Assert.Equal("success", (string)gh.Last(id)!["state"]!);
+        HasStates(gh, s, id, "success", last: true);
         // The copy ran the build dev was about to get, with its own scripts
         // and none of dev's, and then dev got it.
         Assert.Equal("native " + ForkB, native);
@@ -1228,7 +1304,7 @@ public sealed class AgentTests : IDisposable
         GamemodeRelease(gh, "build-1", "// new gamemode\n");
         var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
-        Assert.Equal("success", (string)gh.Last(id)!["state"]!);
+        HasStates(gh, s, id, "success", last: true);
         Assert.Contains("no bot pass: it is not set up on this box yet", s.Read(Path.Combine("data", $"deploy-{id}.log")));
     }
 
@@ -1251,7 +1327,7 @@ public sealed class AgentTests : IDisposable
         BotRelease(gh, "build-1", Reading("new gamemode"), tables: inRelease ? new() { ["FOODS.json"] = "[\"new\"]", ["DATA.json"] = "{}" } : null);
         var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
-        Assert.Equal("success", (string)gh.Last(id)!["state"]!);
+        HasStates(gh, s, id, "success", last: true);
         Assert.NotNull(copied);
         Assert.Equal(inRelease ? "DATA.json={},FOODS.json=[\"new\"]" : "FOODS.json=[\"dev\"]",
             string.Join(",", copied!.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => kv.Key + "=" + kv.Value)));

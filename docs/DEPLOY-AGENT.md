@@ -284,6 +284,17 @@ most), starts it, and prints the agent's own check. To see it afterwards:
 pwsh scripts/vps/Box-Run.ps1 -Line 'Install-DeployAgent -Status'
 ```
 
+A service stuck stopping (`StopPending`) makes the install refuse and change
+nothing. Agents up to 1.0.21 got there at their first self-update: the work
+called `Stop()` from inside itself, and the stop waited for that same work,
+so it never ended (1 Nov). The agent now ends its work first and stops from
+outside it. A process stuck that way can only be ended, which this does
+once, before the new agent goes in:
+
+```
+pwsh scripts/vps/Box-Run.ps1 -Line 'Install-DeployAgent -EndHung'
+```
+
 On the box itself, `thornswood-agent.exe check` says whether the App gives a
 token, what the newest Deployment says, and whether the dev server answers.
 

@@ -301,9 +301,11 @@ function Mend($from, $to) {
   if ($bad) { Note ("  TORN      {0}: {1} file(s) would not parse after three copies" -f $to, $bad) }
 }
 
-# How many people a world folder holds: the change forms named with a bare
-# number are character slots (scripts\ops\Reset-Character.ps1 reads them the
-# same way), everything else in there describes the world. A deleted
+# How many people a world folder holds: the runtime change forms, named with
+# their form id in lowercase hex and no plugin (the engine's
+# FormDesc::ToString, %x, so a.json and 1f.json as well as 3.json), are
+# character slots when their profileId is above 0; everything else in there
+# describes the world. Digits alone missed every id with a letter (#5168). A deleted
 # character keeps its slot with profileId -1 and isDeleted true, so only a
 # slot with a profile id that is not deleted is a person (#401: the first
 # rehearsal found 18 slots on live and 11 people).
@@ -312,7 +314,7 @@ function People($to) {
   if (-not (Test-Path -LiteralPath $forms)) { return 0 }
   $n = 0
   foreach ($f in @(Get-ChildItem -LiteralPath $forms -File -Filter *.json -EA SilentlyContinue |
-                   Where-Object { $_.BaseName -match '^[0-9]+$' })) {
+                   Where-Object { $_.BaseName -cmatch '^[0-9a-f]{1,16}$' })) {
     try { $o = [IO.File]::ReadAllText($f.FullName) -replace '^\uFEFF', '' | ConvertFrom-Json } catch { continue }
     if ($null -ne $o.profileId -and [long]$o.profileId -gt 0 -and $o.isDeleted -ne $true) { $n++ }
   }
