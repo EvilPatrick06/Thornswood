@@ -33,8 +33,8 @@
     .NET Framework 4.8.1, so the C# features that need a newer runtime do
     not work here even though they compile: default interface methods,
     static abstract interface members, Index and Range (^1, a..b), and init
-    or required members without their attribute types.
-    docs/guide/settled-design.md lists them.
+    or required members without their attribute types. Developer-Guide.md
+    "Settled design, not up for a quiet rewrite" lists them.
 
   Nothing goes beside the exe. The update system publishes one file, so the
   WebView2 DLLs and NLayer (the menu theme's decoder) are referenced with

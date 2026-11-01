@@ -6,7 +6,7 @@
   It runs MSBuild on the two project files, launcher\app\Thornswood.csproj and
   installer\setup\Setup.csproj, with the MSBuild of Visual Studio 2022 or its
   free Build Tools (Find-MSBuild.ps1 says whether this machine has it;
-  docs/guide/set-up-a-machine.md "Setting up a machine" has the one install line). Your
+  Developer-Guide.md "Setting up a machine" has the one install line). Your
   friends never compile anything - they get the finished exe in the bundle.
 
   THE SWITCH (#498, Patrick's option C, 11 Oct; done 15 Oct). Until then this
@@ -90,8 +90,8 @@ if ($Root.TrimEnd('\\') -ieq [string](& (Join-Path $Here 'Where.ps1') Install)) 
 # ------------------------------------------------------------ MSBuild
 . (Join-Path $Here 'Find-MSBuild.ps1') -Load
 $found = Find-ThornswoodMSBuild
-if (-not $found.MSBuild) { Die 'MSBuild was not found on this machine. The launcher builds with Visual Studio 2022 or its Build Tools with the MSBuild component; docs/guide/set-up-a-machine.md "Setting up a machine" has the install line. On a VPS runner: .\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments ''-IncludeBuildTools -SkipFirewall''.' }
-if (-not $found.RefAssemblies) { Die 'The .NET Framework 4.8.1 reference assemblies are not on this machine. They are the Build Tools component Microsoft.Net.Component.4.8.1.TargetingPack; docs/guide/set-up-a-machine.md "Setting up a machine" has the install line.' }
+if (-not $found.MSBuild) { Die 'MSBuild was not found on this machine. The launcher builds with Visual Studio 2022 or its Build Tools with the MSBuild component; Developer-Guide.md "Setting up a machine" has the install line. On a VPS runner: .\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments ''-IncludeBuildTools -SkipFirewall''.' }
+if (-not $found.RefAssemblies) { Die 'The .NET Framework 4.8.1 reference assemblies are not on this machine. They are the Build Tools component Microsoft.Net.Component.4.8.1.TargetingPack; Developer-Guide.md "Setting up a machine" has the install line.' }
 Say "  $($found.MSBuild)" 'DarkGray'
 $proj = Join-Path $Src 'Thornswood.csproj'
 $stubProj = Join-Path $Here '..\..\installer\setup\Setup.csproj'

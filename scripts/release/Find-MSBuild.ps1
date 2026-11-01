@@ -9,7 +9,7 @@
     .\scripts\release\Find-MSBuild.ps1           prints the MSBuild.exe path, or exits 1 saying what is missing
     .\scripts\release\Find-MSBuild.ps1 -Report   one line for each thing it looked at, exit 0 or 1 the same way
 
-  What it needs, and how a machine gets it, is docs/guide/set-up-a-machine.md "Setting up a
+  What it needs, and how a machine gets it, is Developer-Guide.md "Setting up a
   machine": Visual Studio 2022 (any edition, or the free Build Tools) with the
   MSBuild component and the .NET Framework 4.8.1 targeting pack. The in-box
   MSBuild under Windows\Microsoft.NET is not it: that one drives the in-box
@@ -70,7 +70,7 @@ if (-not $f.MSBuild -or -not $f.Csc -or -not $f.RefAssemblies) {
     if (-not $f.MSBuild) { $what += 'MSBuild from Visual Studio 2022 or its Build Tools' }
     elseif (-not $f.Csc) { $what += 'the Roslyn csc beside MSBuild (repair the Build Tools install)' }
     if (-not $f.RefAssemblies) { $what += 'the .NET Framework 4.8.1 targeting pack' }
-    Write-Host ("This machine cannot build Thornswood.csproj. Missing: " + ($what -join '; ') + '. docs/guide/set-up-a-machine.md "Setting up a machine" has the one install line.') -ForegroundColor Yellow
+    Write-Host ("This machine cannot build Thornswood.csproj. Missing: " + ($what -join '; ') + '. Developer-Guide.md "Setting up a machine" has the one install line.') -ForegroundColor Yellow
     exit 1
 }
 if (-not $Report) { $f.MSBuild }
