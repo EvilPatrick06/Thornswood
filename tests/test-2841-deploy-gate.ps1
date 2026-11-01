@@ -144,6 +144,8 @@ Yes 'Delete-Person takes a Discord id in digits, -Delete with a name for the rec
 foreach ($check in 'Check-Roster', 'Check-Load', 'Check-ServerPriority', 'Chargen-Log') {
     Yes "$check takes no host, user or folder of the caller's" ((Words "$check -Vps x") -eq 'REFUSED' -and (Words "$check -User x") -eq 'REFUSED' -and (Words "$check -Root x") -eq 'REFUSED' -and (Words $check) -ne 'REFUSED')
 }
+Yes 'Rotate-ServerPassword makes the site''s new password on the box after a ban, never one the caller types or names' ((Words 'Rotate-ServerPassword') -eq '-Yes' -and
+    (Words 'Rotate-ServerPassword -Password') -eq 'REFUSED' -and (Words 'Rotate-ServerPassword -DocsRoot C:/x') -eq 'REFUSED' -and (Words 'Rotate-ServerPassword -Vps x') -eq 'REFUSED')
 Yes '  Check-Load never waits for Enter or watches, and Chargen-Log takes a line count only' ((Words 'Check-Load') -eq '-NoPause' -and (Words 'Check-Load -Watch 10') -eq 'REFUSED' -and
     (Words 'Chargen-Log -Lines 200') -eq '-Lines|200' -and (Words 'Chargen-Log -Lines all') -eq 'REFUSED')
 # What has a server's folder open, read on the box (#5211): live or dev, and

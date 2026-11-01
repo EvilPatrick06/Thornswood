@@ -436,6 +436,12 @@
       "timeoutMinutes": 5,
       "fixed": [],
       "params": {}
+    },
+    "Rotate-ServerPassword": {
+      "script": "scripts/deploy/Rotate-ServerPassword.ps1",
+      "timeoutMinutes": 10,
+      "fixed": ["-Yes"],
+      "params": {}
     }
   }
 }
