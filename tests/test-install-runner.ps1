@@ -51,9 +51,12 @@ Yes 'Install-Runner.ps1 parses' (-not $e -or $e.Count -eq 0)
 $label = [regex]::Match($text, "\[string\]\`$Label\s*=\s*'([^']+)'").Groups[1].Value
 Yes "Install-Runner gives the runner a label ($label)" ($label.Length -gt 0)
 # The box's runners serve Thornswood-Ops alone since the flip (#4013), so
-# no workflow here asks for one (#4983).
+# no workflow here asks for one (#4983). A runner is asked for by runs-on,
+# on its line or as an item of the list under it; self-hosted anywhere else
+# is not an ask (engine.yml's gh attestation verify --deny-self-hosted-runners
+# refuses a build made on one, #5201). The box's label is never written here.
 $wfDir = Join-Path $Repo '.github\workflows'
-$asks = @(Get-ChildItem -LiteralPath $wfDir -Filter '*.yml' | Where-Object { [IO.File]::ReadAllText($_.FullName) -match '(?m)^[^#\n]*(self-hosted|' + [regex]::Escape($label) + ')' } | ForEach-Object { $_.Name })
+$asks = @(Get-ChildItem -LiteralPath $wfDir -Filter '*.yml' | Where-Object { [IO.File]::ReadAllText($_.FullName) -match ('(?m)^[^#\n]*runs-on:[^#\n]*self-hosted|^\s*-\s*self-hosted\b|^[^#\n]*' + [regex]::Escape($label)) } | ForEach-Object { $_.Name })
 Yes ("no workflow here asks for a runner of the box or its label (" + ($asks -join ', ') + ")") ([bool]$label -and $asks.Count -eq 0)
 Yes '  build.yml and nightly.yml run on GitHub''s hosted runner (#1306, #4983)' ($yml -match '(?m)^\s+runs-on: windows-latest\s*$' -and $night -match '(?m)^\s+runs-on: windows-latest\s*$')
 Yes '  while a pull request builds on GitHub''s hosted runner in build-pr.yml, never the VPS (#1306)' ([IO.File]::ReadAllText((Join-Path (Split-Path $PSScriptRoot) '.github\workflows\build-pr.yml')) -match '(?m)^\s+runs-on: windows-latest\s*$')

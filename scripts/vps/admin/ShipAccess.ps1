@@ -15,10 +15,20 @@
 
   It returns the token, or throws with what ship-access.js said; nothing of
   the App's key is ever in what it returns or throws.
+
+  Get-ThornswoodOpsAccess: the same App's token for one change to the ops
+  repository, from scripts\vps\admin\ops-access.js (#2862): -For runners
+  (Administration write, for Install-Runner.ps1 -FromGate) or -For keys
+  (Environments write, for Renew-BoxKey.ps1). Taken and handed over the same
+  way.
+
+      $token = Get-ThornswoodOpsAccess -Repo $repo -For keys
 #>
-function Get-ThornswoodShipAccess {
+function Invoke-ThornswoodAppMinter {
     param(
         [Parameter(Mandatory = $true)][string]$Repo,
+        [Parameter(Mandatory = $true)][string]$Script,
+        [string[]]$Arguments = @(),
         [string]$AdminState = 'C:\Thornswood-Admin\state'
     )
     $node = Get-Command node -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -28,19 +38,36 @@ function Get-ThornswoodShipAccess {
     $was = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     try {
         $global:LASTEXITCODE = 0
-        $minted = @(& $node.Source ([IO.Path]::Combine($Repo, 'scripts', 'vps', 'admin', 'ship-access.js')) 2>&1)
+        $minted = @(& $node.Source ([IO.Path]::Combine($Repo, 'scripts', 'vps', 'admin', $Script)) @Arguments 2>&1)
         $code = $LASTEXITCODE
     }
     finally {
         $ErrorActionPreference = $was
         if ($null -eq $had) { Remove-Item -LiteralPath Env:\THORNSWOOD_ADMIN_STATE -ErrorAction SilentlyContinue } else { $env:THORNSWOOD_ADMIN_STATE = $had }
     }
-    # ship-access.js prints the token alone on its standard output and
+    # The minter prints the token alone on its standard output and
     # everything else on its standard error, so the two are told apart by the
     # stream, never by the token's shape, which is GitHub's to change.
     $said = @($minted | Where-Object { $_ -is [Management.Automation.ErrorRecord] } | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
     $out = @($minted | Where-Object { $_ -isnot [Management.Automation.ErrorRecord] } | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
-    if ($code -ne 0) { throw ('ship-access.js ended ' + $code + $(if ($said.Count) { ': ' + ($said -join ' ') } else { ' and said nothing' })) }
-    if ($out.Count -ne 1 -or $out[0] -match '\s') { throw ('ship-access.js ended 0 but printed ' + $out.Count + ' line(s) where one token belongs' + $(if ($said.Count) { '; it said: ' + ($said -join ' ') } else { '' })) }
+    if ($code -ne 0) { throw ($Script + ' ended ' + $code + $(if ($said.Count) { ': ' + ($said -join ' ') } else { ' and said nothing' })) }
+    if ($out.Count -ne 1 -or $out[0] -match '\s') { throw ($Script + ' ended 0 but printed ' + $out.Count + ' line(s) where one token belongs' + $(if ($said.Count) { '; it said: ' + ($said -join ' ') } else { '' })) }
     return $out[0]
+}
+
+function Get-ThornswoodShipAccess {
+    param(
+        [Parameter(Mandatory = $true)][string]$Repo,
+        [string]$AdminState = 'C:\Thornswood-Admin\state'
+    )
+    return (Invoke-ThornswoodAppMinter -Repo $Repo -Script 'ship-access.js' -AdminState $AdminState)
+}
+
+function Get-ThornswoodOpsAccess {
+    param(
+        [Parameter(Mandatory = $true)][string]$Repo,
+        [Parameter(Mandatory = $true)][ValidateSet('runners', 'keys')][string]$For,
+        [string]$AdminState = 'C:\Thornswood-Admin\state'
+    )
+    return (Invoke-ThornswoodAppMinter -Repo $Repo -Script 'ops-access.js' -Arguments @($For) -AdminState $AdminState)
 }
