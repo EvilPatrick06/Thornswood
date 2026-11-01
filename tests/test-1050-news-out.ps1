@@ -69,9 +69,14 @@ try {
     # The number holds only while every launcher from it on reads the file: a
     # launcher source at or past it without FeedNews.cs would let in a launcher
     # that shows no news once the publisher empties "news".
-    $ver = [regex]::Match([IO.File]::ReadAllText((Join-Path $Repo 'launcher\app\Updater.cs')), 'Version\s*=\s*"([^"]+)"').Groups[1].Value
+    # The number is the build's, worked out from git since #4825
+    # (LauncherVersion.ps1); no source file holds it.
+    . (Join-Path $Repo 'scripts\release\LauncherVersion.ps1')
+    $ver = ''
+    try { $ver = Get-LauncherVersion -RepoDir $Repo }
+    catch { Yes ("the launcher's number for this checkout is known: " + $_.Exception.Message) $false }
     $reader = Test-Path -LiteralPath (Join-Path $Repo 'launcher\app\FeedNews.cs')
-    Yes ("this launcher source ({0}) is below {1}, or it reads the news file" -f $ver, $FeedNewsFileLauncher) ((-not (Test-FeedNewsOut $ver)) -or $reader)
+    Yes ("this launcher source ({0}) is below {1}, or it reads the news file" -f $ver, $FeedNewsFileLauncher) ($ver -and ((-not (Test-FeedNewsOut $ver)) -or $reader))
 
     $three = @((Note '10-12-2026 1:00 AM' 'Third' 'dev'), (Note '10-11-2026 5:51 PM' 'Second'), (Note '10-10-2026 9:00 AM' 'First'))
 

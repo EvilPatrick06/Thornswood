@@ -101,7 +101,7 @@ Yes 'and never the number Vortex has, nor keeps the last feed''s quietly' (-not 
 Write-Host ''; Write-Host 'Ship.ps1'
 $ship = [IO.File]::ReadAllText((Join-Path (Join-Path (Join-Path $Repo 'scripts') 'release') 'Ship.ps1')).Replace("`r`n", "`n")
 $sAsks = [regex]::Matches($ship, 'Get-ShipCollectionRevisionProblem -RepoDir \$RepoDir -Built \$revBuilt')
-$bump = $ship.IndexOf("`$updaterCs = Join-Path `$Here '..\..\launcher\app\Updater.cs'")
+$bump = $ship.IndexOf('try { $current = Get-LauncherVersion -RepoDir $RepoDir }')
 $root = $ship.IndexOf("Head 'The ship root'")
 Yes 'it asks on both paths' ($sAsks.Count -eq 2)
 Yes '  after the ship root is staged and before the version moves' ($root -gt 0 -and $bump -gt 0 -and $sAsks.Count -eq 2 -and $sAsks[0].Index -gt $root -and $sAsks[1].Index -lt $bump)
