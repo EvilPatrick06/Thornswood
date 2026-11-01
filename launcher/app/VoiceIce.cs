@@ -71,8 +71,11 @@ namespace Thornswood
     /// launcher and one other, through whatever routers lie between, and
     /// keeping it open. What RTCPeerConnection did inside the voice page.
     ///
-    /// One UDP socket per connection. Its candidates are this machine's own
-    /// addresses on that socket's port (host), the address a STUN server sees
+    /// One UDP socket per connection, bound to the address this machine
+    /// reaches the internet from, never to every address: a socket on every
+    /// address is a listener on every network, which Windows Firewall asks
+    /// about (#911). Its candidates are that address on the socket's port
+    /// (host), the address a STUN server sees
     /// it from (server reflexive), and, when the service hands out a relay,
     /// an address on the relay (TURN, RFC 8656) that forwards to this socket.
     /// Each side sends the other its candidates through the voice service
@@ -99,6 +102,7 @@ namespace Thornswood
         readonly ulong tiebreaker;
         readonly Socket sock;
         readonly int port;
+        readonly IPAddress bound;
         readonly object gate = new object();
         /* Held around every send and around closing, so the socket is never
            disposed while a send is on it: Dispose sets closed under it, and
@@ -185,7 +189,8 @@ namespace Thornswood
                 try { sock.IOControl(unchecked((int)0x9800000C), new byte[] { 0, 0, 0, 0 }, null); }
                 catch (Exception ex) { Swallow.Note("VoiceIce, SIO_UDP_CONNRESET", ex); }
             }
-            sock.Bind(new IPEndPoint(IPAddress.Any, 0));
+            bound = DefaultLocal();
+            sock.Bind(new IPEndPoint(bound, 0));
             port = ((IPEndPoint)sock.LocalEndPoint).Port;
 
             direct = new Local { Type = "host", Priority = Prio(126, 65535) };
@@ -219,12 +224,10 @@ namespace Thornswood
             var lines = new List<string>();
             lock (gate)
             {
-                int pref = 65535;
-                foreach (IPAddress ip in HostAddresses())
+                if (!IPAddress.IsLoopback(bound))
                 {
-                    hostIps.Add(ip.ToString());
-                    lines.Add(Line("1", Prio(126, pref), ip.ToString(), port, "host", null, 0));
-                    pref -= 256;
+                    hostIps.Add(bound.ToString());
+                    lines.Add(Line("1", Prio(126, 65535), bound.ToString(), port, "host", null, 0));
                 }
                 bool relayTried = false;
                 foreach (IceServer s in servers)
@@ -237,6 +240,41 @@ namespace Thornswood
             foreach (string l in lines) OnCandidate(l);
         }
 
+        /// <summary>
+        /// The address this machine sends to the internet from, the way
+        /// Chromium's WebRTC finds its default local address
+        /// (BasicNetworkManager::QueryDefaultLocalAddress): a UDP socket
+        /// connected to a public address, which sends nothing, and the
+        /// address the system chose for it. With no route out, the first
+        /// address of an interface that is up; with none, loopback, where
+        /// nobody else can reach and nothing listens on a network.
+        /// </summary>
+        static IPAddress DefaultLocal()
+        {
+            using (var probe = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
+            {
+                try
+                {
+                    probe.Connect(new IPEndPoint(IPAddress.Parse("8.8.8.8"), 53));
+                    IPAddress a = ((IPEndPoint)probe.LocalEndPoint).Address;
+                    if (Usable(a)) return a;
+                }
+                // No route out (no network, or none with a gateway): the
+                // interfaces below say what there is.
+                catch (SocketException ex) { Swallow.Note("VoiceIce.DefaultLocal, no route out", ex); }
+            }
+            List<IPAddress> all = HostAddresses();
+            return all.Count > 0 ? all[0] : IPAddress.Loopback;
+        }
+
+        static bool Usable(IPAddress a)
+        {
+            if (a.AddressFamily != AddressFamily.InterNetwork || IPAddress.IsLoopback(a)) return false;
+            byte[] b = a.GetAddressBytes();
+            // 0.0.0.0 is no address, and 169.254 is one nobody else can reach.
+            return !(b[0] == 0 || (b[0] == 169 && b[1] == 254));
+        }
+
         static List<IPAddress> HostAddresses()
         {
             var outp = new List<IPAddress>();
@@ -245,14 +283,7 @@ namespace Thornswood
                 if (ni.OperationalStatus != OperationalStatus.Up) continue;
                 if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
                 foreach (UnicastIPAddressInformation a in ni.GetIPProperties().UnicastAddresses)
-                {
-                    if (a.Address.AddressFamily != AddressFamily.InterNetwork) continue;
-                    if (IPAddress.IsLoopback(a.Address)) continue;
-                    // 169.254 is an address nobody else can reach.
-                    byte[] b = a.Address.GetAddressBytes();
-                    if (b[0] == 169 && b[1] == 254) continue;
-                    outp.Add(a.Address);
-                }
+                    if (Usable(a.Address)) outp.Add(a.Address);
             }
             return outp;
         }
@@ -704,7 +735,8 @@ namespace Thornswood
         void Read()
         {
             byte[] buf = new byte[2048];
-            EndPoint from = new IPEndPoint(IPAddress.Any, 0);
+            // Overwritten by each ReceiveFrom; it only has to be IPv4.
+            EndPoint from = new IPEndPoint(bound, 0);
             while (!closed)
             {
                 int n;
