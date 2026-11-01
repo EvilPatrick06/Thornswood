@@ -121,6 +121,35 @@ Yes 'Set-InboundRules takes -Check and -Own, never another box, user, record or 
     (Words 'Set-InboundRules -Vps x') -eq 'REFUSED' -and (Words 'Set-InboundRules -Record x') -eq 'REFUSED' -and (Words 'Set-InboundRules -KnownHosts x') -eq 'REFUSED')
 Yes 'Setup-Discord runs on the box and only audits or checks: -Prune, -Posts, -Give and another guild wait for Patrick' ((Words 'Setup-Discord -Audit') -eq '-OnBox|-Audit' -and
     (Words 'Setup-Discord -Prune') -eq 'REFUSED' -and (Words 'Setup-Discord -Posts') -eq 'REFUSED' -and (Words 'Setup-Discord -Give x') -eq 'REFUSED' -and (Words 'Setup-Discord -Guild 1') -eq 'REFUSED')
+# The last box scripts a person ran from One with its ssh key (#2862, 1 Nov):
+# the nightly backup's install (#5168 waited on it), a deletion request, and
+# four reads. None takes a host, user, folder, task or passphrase file.
+Yes 'Install-Backup installs, runs or reads through the gate, never -Remove, -AsSystem, a folder, a task or a passphrase file' ((Words 'Install-Backup') -eq '-FromGate|-NoPause' -and
+    (Words 'Install-Backup -RunNow') -eq '-FromGate|-NoPause|-RunNow' -and (Words 'Install-Backup -Status') -eq '-FromGate|-NoPause|-Status' -and
+    (Words 'Install-Backup -Remove') -eq 'REFUSED' -and (Words 'Install-Backup -AsSystem') -eq 'REFUSED' -and (Words 'Install-Backup -Root x') -eq 'REFUSED' -and
+    (Words 'Install-Backup -KeyOut x') -eq 'REFUSED' -and (Words 'Install-Backup -TaskName x') -eq 'REFUSED' -and (Words 'Install-Backup -At 01:00Z') -eq 'REFUSED')
+$ib = Text 'scripts\deploy\Install-Backup.ps1'
+# A Windows checkout may hold it CRLF (core.autocrlf), and the checks below read line breaks.
+$ib = $ib.Replace("`r`n", "`n")
+Yes '  -FromGate runs only under the gate, refuses what the verb leaves out, and never copies, sends or makes the passphrase' (
+    $ib.Contains("if (`$env:THORNSWOOD_GATE -ne '1') { Die '-FromGate is for the deploy gate") -and
+    $ib.Contains("if (`$Remove -or `$AsSystem -or @(`$handPicked).Count) { Die 'through the gate") -and
+    $ib.Contains("if (`$FromGate) {`n  # Neither copied down nor sent up") -and $ib.Contains("if (`"`$there`" -notmatch 'KEY THERE') { Die") -and
+    $ib.IndexOf('if (-not $FromGate) {' + "`n" + '$made = Remote') -gt 0 -and $ib.IndexOf("Copying it down") -gt $ib.IndexOf('if (-not $FromGate) {' + "`n" + '$made = Remote'))
+Yes '  and its last words send nobody to Fetch-Backups on One' (-not $ib.Contains('Fetch-Backups.ps1 -Schedule'))
+Yes 'Delete-Person takes a Discord id in digits, -Delete with a name for the record, or -Reapply; never a folder, a merge list or -AllowGamingPc' (
+    (Words 'Delete-Person -DiscordId 123456789012345678') -eq '-DiscordId|123456789012345678' -and
+    (Words 'Delete-Person -DiscordId 123456789012345678 -Delete -By Patrick') -eq '-DiscordId|123456789012345678|-Delete|-By|Patrick' -and
+    (Words 'Delete-Person -Reapply') -eq '-Reapply' -and (Words 'Delete-Person -DiscordId 12345') -eq 'REFUSED' -and (Words 'Delete-Person -DiscordId abc') -eq 'REFUSED' -and
+    (Words 'Delete-Person -Reapply -Merge x') -eq 'REFUSED' -and (Words 'Delete-Person -DiscordId 123456789012345678 -SiteRoot C:/x') -eq 'REFUSED' -and
+    (Words 'Delete-Person -DiscordId 123456789012345678 -AllowGamingPc') -eq 'REFUSED' -and (Words 'Delete-Person -DiscordId 123456789012345678 -RecordRoot x') -eq 'REFUSED')
+foreach ($check in 'Check-Roster', 'Check-Load', 'Check-ServerPriority', 'Chargen-Log') {
+    Yes "$check takes no host, user or folder of the caller's" ((Words "$check -Vps x") -eq 'REFUSED' -and (Words "$check -User x") -eq 'REFUSED' -and (Words "$check -Root x") -eq 'REFUSED' -and (Words $check) -ne 'REFUSED')
+}
+Yes 'Rotate-ServerPassword makes the site''s new password on the box after a ban, never one the caller types or names' ((Words 'Rotate-ServerPassword') -eq '-Yes' -and
+    (Words 'Rotate-ServerPassword -Password') -eq 'REFUSED' -and (Words 'Rotate-ServerPassword -DocsRoot C:/x') -eq 'REFUSED' -and (Words 'Rotate-ServerPassword -Vps x') -eq 'REFUSED')
+Yes '  Check-Load never waits for Enter or watches, and Chargen-Log takes a line count only' ((Words 'Check-Load') -eq '-NoPause' -and (Words 'Check-Load -Watch 10') -eq 'REFUSED' -and
+    (Words 'Chargen-Log -Lines 200') -eq '-Lines|200' -and (Words 'Chargen-Log -Lines all') -eq 'REFUSED')
 # What has a server's folder open, read on the box (#5211): live or dev, and
 # a minute of Defender's log, never a folder, a file or a process of the caller's.
 Yes 'Read-ServerHolders takes live or dev and a UTC minute of Defender''s log, never a folder, file or task' ((Words 'Read-ServerHolders') -eq '' -and

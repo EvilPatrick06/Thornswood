@@ -228,7 +228,7 @@ try {
     # ---- 8. the start log (-StartLog, #3114) --------------------------------
     $s = Join-Path $work 'startlog'
     Put (Join-Path $s 'tests\test-1-ok.js') "console.log('PASS  fine');`nprocess.exit(0);`n"
-    Put (Join-Path $s 'tests\test-2-skip.js') "console.log('SKIP  not here');`nprocess.exit(0);`n"
+    Put (Join-Path $s 'tests\test-2-skip.js') "console.log('  ok   one');`nconsole.log('SKIP  not here');`nconsole.log('SKIP  not here');`nconsole.log('  NOT RUN  that either');`nprocess.exit(0);`n"
     Put (Join-Path $s 'tests\test-3-red.ps1') "Write-Host 'FAIL  no'`nexit 3`n"
     $log = Join-Path $work 'starts.jsonl'
     $t0 = [DateTime]::UtcNow.AddSeconds(-1)
@@ -244,6 +244,10 @@ try {
     $byName = @{}; foreach ($e in $ends) { $byName[$e.name] = $e }
     Yes '  and an end line for each, with its exit code and whether it said SKIP' ($ends.Count -eq 3 -and $byName['test-1-ok.js'].code -eq 0 -and -not $byName['test-1-ok.js'].skipped -and
         $byName['test-2-skip.js'].code -eq 0 -and $byName['test-2-skip.js'].skipped -and $byName['test-3-red.ps1'].code -eq 3 -and -not $byName['test-3-red.ps1'].skipped)
+    # #5293: gate-map.yml compares the lines of a Windows run and a Linux run.
+    Yes '  each end line holds the SKIP and NOT RUN lines it said, once each, trimmed (#5293)' ($ends.Count -eq 3 -and
+        (@($byName['test-2-skip.js'].skips) -join '|') -eq 'SKIP  not here|NOT RUN  that either' -and @($byName['test-1-ok.js'].skips).Count -eq 0)
+    Yes '  and how many lines it began with PASS or ok' ($ends.Count -eq 3 -and $byName['test-1-ok.js'].passes -eq 1 -and $byName['test-2-skip.js'].passes -eq 1 -and $byName['test-3-red.ps1'].passes -eq 0)
 
     # ---- 9. a longer clock for heavy harnesses off the box (#4981) ----------
     # The budget proves the clock: with 400 s, a 600 s clock does not fit

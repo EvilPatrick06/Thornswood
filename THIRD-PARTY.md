@@ -190,10 +190,10 @@ file carries outside code and the file does not carry that project's notice.
 <!-- engine-pin:fork -->
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/ThornswoodRP/skymp, branch `thornswood/engine-changes`,
-commit `6ebd3487` (in full, `6ebd3487d478bbe73f3d32a2956c55fe404b555b`). That
+commit `25859378` (in full, `258593783db454d10cab6d79091c226946847118`). That
 is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
 top, and every one of those changes is in
-https://github.com/ThornswoodRP/skymp/compare/2849e676...6ebd3487.
+https://github.com/ThornswoodRP/skymp/compare/2849e676...25859378.
 <!-- /engine-pin:fork -->
 Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
@@ -462,7 +462,7 @@ at the engine pin, with webpack, and holds what it built to
 `records\front-build.json`:
 <!-- engine-pin:front -->
 67 files, 8,676,260 bytes, from commit
-`6ebd3487`, the commit the client record names.
+`25859378`, the commit the client record names.
 <!-- /engine-pin:front -->
 Its build.js is 2,444,820
 bytes, sha256
@@ -1218,6 +1218,14 @@ reserves every right it does not grant; it grants no right to copy the game's
 own files from anywhere but the person's own copy. Whether the fork's build
 keeps downloading them is Patrick's decision on #3728.
 
+The load test (`.github/workflows/load-test.yml` in this repository, #4623)
+downloads the same five files from the same address on GitHub's runner,
+through `scripts\bot\New-LoadServer.js`, which holds each to the sha256 above
+and stops when one differs, for the server the bots log in to. The same rules
+hold there: they stay on the runner for the run and go with it, they are not
+cached, and the artifact the run keeps holds only the result, the server's log
+and its samples. The same decision on #3728 covers it.
+
 ## Kept in the repository, not shipped
 
 These files sit in the repository for its tests and are never handed to
@@ -1239,15 +1247,15 @@ rewrite takes it out (#3684).
 <!-- engine-pin:servers -->
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `6ebd3487d478bbe73f3d32a2956c55fe404b555b` on the public fork. The
+  name `258593783db454d10cab6d79091c226946847118` on the public fork. The
   server module and the six client files were built from that commit, which
   is upstream at `2849e676` with every change in
-  https://github.com/ThornswoodRP/skymp/compare/2849e676...6ebd3487. Each change
+  https://github.com/ThornswoodRP/skymp/compare/2849e676...25859378. Each change
   is a merged pull request of the fork, and the pull request here that moved
   the pin lists the ones it brought in.
   The server module's SHA256
-  is `6afb88ab2a8b02764a750df68edd6a3eb928002cbf03ba55d023d2ba4e6b102a`, built
-  2026-11-01T03:26:30Z. This is the recorded next release, not a deployment
+  is `4919f496d18f8e3767c6c84472d2aa6be665743eb9d974f220349330be5defc7`, built
+  2026-11-01T21:13:12Z. This is the recorded next release, not a deployment
   claim. Main remains on `0714e444047a994b1013dfe4cac187aef29ad65a` until this goes
   out.
   <!-- /engine-pin:servers -->
@@ -1284,7 +1292,7 @@ Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
 <!-- engine-pin:source -->
-https://github.com/ThornswoodRP/skymp/tree/6ebd3487d478bbe73f3d32a2956c55fe404b555b
+https://github.com/ThornswoodRP/skymp/tree/258593783db454d10cab6d79091c226946847118
 
 For the engine Main runs until then:
 
