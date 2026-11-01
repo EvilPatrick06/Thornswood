@@ -34,6 +34,7 @@
 */
 const fs = require('fs');
 const path = require('path');
+const siteFiles = require('./site-files');
 
 const ROOT = path.join(__dirname, '..');
 const APP = path.join(ROOT, 'launcher', 'app');
@@ -41,7 +42,7 @@ const GALLERY = fs.readFileSync(path.join(APP, 'Gallery.cs'), 'utf8');
 const DISCORD = fs.readFileSync(path.join(APP, 'Discord.cs'), 'utf8');
 const SHELL = fs.readFileSync(path.join(APP, 'Shell.cs'), 'utf8');
 const XAML = fs.readFileSync(path.join(ROOT, 'launcher', 'ui.xaml'), 'utf8');
-const SERVER = fs.readFileSync(path.join(ROOT, 'site', 'server.js'), 'utf8');
+const SERVER = siteFiles.source();
 
 let pass = 0, fail = 0;
 const yes = (w, c) => {

@@ -34,11 +34,12 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const siteFiles = require('./site-files');
 const CR = String.fromCharCode(13);
 const ROOT = path.join(__dirname, '..');
 function read(p) { return fs.readFileSync(path.join(ROOT, p), 'utf8').split(CR).join(''); }
 const src = read('game/gamemode.js');
-const site = read('site/server.js');
+const site = siteFiles.source();
 // The home page's script, out of home.html since #1479.
 const home = read('site/public/home.js');
 const chatJs = read('game/ui/thornswood-chat.js');

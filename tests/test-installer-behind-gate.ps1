@@ -47,6 +47,8 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
+# The site is server.js over its modules in site\lib since #5357.
+. (Join-Path $PSScriptRoot 'SiteFiles.ps1')
 if (-not $ShipPath) { $ShipPath = Join-Path $Repo 'scripts\release\Ship.ps1' }
 $Rel = Join-Path $Repo 'scripts\release'
 
@@ -273,7 +275,7 @@ try {
     # The site serves files.json at /file/files.json like any other download,
     # which is where Read-SiteDownloads reads it. Read off the route in
     # site\server.js, so a change that stops serving it is caught here.
-    $server = [IO.File]::ReadAllText((Join-Path $Repo 'site\server.js'))
+    $server = Get-SiteSource (Join-Path $Repo 'site')
     $route = [regex]::Match($server, 'p\.match\(/(\^\\/file\\/[^\r\n]*?\$)/\)')
     Yes 'M10 the site has its /file/ download route' ($route.Success)
     if ($route.Success) {

@@ -16,9 +16,10 @@ const REPO_DIR = require('path').join(__dirname, '..', '..'); // this harness is
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const siteFiles = require('../../tests/site-files');
 
 const CR = String.fromCharCode(13);
-const server = fs.readFileSync(path.join(REPO_DIR, 'site', 'server.js'), 'utf8').split(CR).join('');
+const server = siteFiles.source().split(CR).join('');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {

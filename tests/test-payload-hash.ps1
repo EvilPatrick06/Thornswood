@@ -42,6 +42,8 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, the repository is one folder up.
 $Here = Split-Path -Parent $Here
+# The site is server.js over its modules in site\lib since #5357.
+. (Join-Path $PSScriptRoot 'SiteFiles.ps1')
 if (-not $InstallerPath) { $InstallerPath = Join-Path $Here 'scripts\release\Publish-Installer.ps1' }
 if (-not $ServerPath)    { $ServerPath    = Join-Path $Here 'site\server.js' }
 if (-not $BootstrapPath) { $BootstrapPath = Join-Path $Here 'installer\setup\Bootstrap.cs' }
@@ -263,12 +265,15 @@ eval(text.slice(j0, j1) + '\n' + fn('function payloadZip(') + '\n' + fn('functio
 process.stdout.write(sent === null ? 'NOTHING SENT' : sent);
 '@
     [IO.File]::WriteAllText($driver, $js, $noBom)
+    # The site named, as one text (#5357): server.js over its modules in lib.
+    $siteText = Join-Path $work 'site-source.js'
+    [IO.File]::WriteAllText($siteText, (Get-SiteSource (Split-Path -Parent $ServerPath)), $noBom)
 
     function Reply([string]$dir) {
         if (-not $node) { return '' }
         # stdout only. A lift that throws prints its stack to stderr, the
         # reply comes back empty, and the checks below say FAIL.
-        $out = & $node.Source $driver $ServerPath $dir
+        $out = & $node.Source $driver $siteText $dir
         return (($out | ForEach-Object { [string]$_ }) -join '')
     }
     function Parse([string]$text) {

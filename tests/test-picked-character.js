@@ -43,11 +43,12 @@ const os = require('os');
 const path = require('path');
 const vm = require('vm');
 const cp = require('child_process');
+const siteFiles = require('./site-files');
 const CR = String.fromCharCode(13);
 const ROOT = path.join(__dirname, '..');
 function read(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8').split(CR).join(''); }
 const src = process.env.GM ? fs.readFileSync(process.env.GM, 'utf8').split(CR).join('') : read('game/gamemode.js');
-const site = read('site/server.js');
+const site = siteFiles.source();
 const rosterCs = read('launcher/app/Roster.cs');
 const charsCs = read('launcher/app/Chars.cs');
 const page = read('game/ui/thornswood-select.js');
