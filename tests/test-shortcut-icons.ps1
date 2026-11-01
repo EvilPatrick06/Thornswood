@@ -25,10 +25,16 @@
   real shortcuts through WScript.Shell, so they run on Windows only.
 
   Part 2 runs the real Install-Launcher.ps1 on a scratch root (which touches
-  nothing outside its own folder, no Desktop, no Explorer) with an exe whose
-  app.ico is not the repository's, and checks the icon file is named after the
-  exe's art. It runs Windows PowerShell and reads shortcuts, so it runs on
-  Windows only.
+  nothing outside its own folder, no Desktop, no Explorer) with a build whose
+  art is not the repository's, and checks the icon file is named after the
+  build's art. Since #4823 the exe is native code, whose resources cannot be
+  read back out of it, so Build-Launcher.ps1 writes the two icons the exe
+  embeds beside it and Install-Launcher reads those: the stand-in build is a
+  folder, an exe, a native library and the two icons. It also checks the
+  whole folder goes in, that a dev root takes app-dev.ico, and that a build
+  with no icon stops before anything is installed rather than falling back
+  to the repository's art. It runs Windows PowerShell and reads shortcuts, so
+  it runs on Windows only.
 #>
 [CmdletBinding()]
 param()
@@ -228,14 +234,14 @@ namespace Thornswood
     }
     $stage = Join-Path $work 'stage'
     New-Item -ItemType Directory -Force -Path $stage | Out-Null
-    # An exe whose app.ico is the dev art: what a CI-built exe with art other
-    # than the checkout's looks like to the install. Built with the .NET SDK
-    # (#4823), a managed program whose resource Install-Launcher reads.
-    $standIn = $null
-    try { $standIn = Build-LauncherCode -Exe -Source 'static class Program { static void Main() { } }' -Resource @{ 'app.ico' = $devIco } }
-    catch { ($_.Exception.Message -split "`n") | Select-Object -First 20 | ForEach-Object { Write-Host "  $_" } }
-    Yes 'a stand-in exe carrying other art compiles' ($null -ne $standIn)
-    if ($standIn) { Copy-Item -LiteralPath $standIn -Destination (Join-Path $stage 'Thornswood.exe') -Force }
+    # A build whose app.ico is the dev art: what a CI-built launcher with art
+    # other than the checkout's looks like to the install. app-dev.ico is the
+    # main art, so a dev root taking the other file shows. The exe and the
+    # library are stand-in bytes: Install-Launcher reads neither (#4823).
+    [IO.File]::WriteAllBytes((Join-Path $stage 'Thornswood.exe'), [byte[]](@(0x4D, 0x5A) + [byte[]](1..200)))
+    [IO.File]::WriteAllBytes((Join-Path $stage 'libSkiaSharp.dll'), [byte[]](@(0x4D, 0x5A) + [byte[]](201..250)))
+    Copy-Item -LiteralPath $devIco -Destination (Join-Path $stage 'app.ico')
+    Copy-Item -LiteralPath $appIco -Destination (Join-Path $stage 'app-dev.ico')
     $sroot = Join-Path $work 'scratchroot'
     $ps = Get-WindowsPowerShell
     $inst = Join-Path $Repo 'scripts\release\Install-Launcher.ps1'
@@ -258,6 +264,33 @@ namespace Thornswood
     if (Test-Path -LiteralPath $lnk) { $loc = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk).IconLocation }
     Yes 'the scratch shortcut names that same file' ($loc -like "*\icon-$devHash.ico,0")
     Yes 'a scratch install asks nothing of Explorer' ($iout -notmatch 'Explorer told to redraw' -and $iout -notmatch 'Explorer restarted')
+    $sameBytes = { param($a, $b) (Test-Path -LiteralPath $a) -and (Get-FileHash -LiteralPath $a).Hash -eq (Get-FileHash -LiteralPath $b).Hash }
+    Yes 'the whole build went in: the exe and the native library beside it, byte for byte (#4823)' (
+        (& $sameBytes (Join-Path $sLauncher 'Thornswood.exe') (Join-Path $stage 'Thornswood.exe')) -and
+        (& $sameBytes (Join-Path $sLauncher 'libSkiaSharp.dll') (Join-Path $stage 'libSkiaSharp.dll')))
+
+    # A dev root's shortcuts get app-dev.ico, as the dev launcher picks it.
+    $droot = Join-Path $work 'scratch-DevBuild'
+    $ErrorActionPreference = 'Continue'
+    $dout = & $ps -NoProfile -ExecutionPolicy Bypass -File $inst -Root $droot -From $stage -NoClose -NoPause 2>&1 | Out-String
+    $dcode = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    Yes "a dev root installs (exit $dcode)" ($dcode -eq 0)
+    if ($dcode -ne 0) { Write-Host $dout }
+    Yes "  and names its icon file after the build's app-dev.ico (icon-$mainHash.ico here)" (Test-Path -LiteralPath (Join-Path $droot "Launcher\icon-$mainHash.ico"))
+
+    # A build with no icon beside its exe stops, before it closes or copies
+    # anything, rather than taking the repository's art (#887).
+    $bare = Join-Path $work 'bare'
+    New-Item -ItemType Directory -Force -Path $bare | Out-Null
+    [IO.File]::WriteAllBytes((Join-Path $bare 'Thornswood.exe'), [byte[]](@(0x4D, 0x5A) + [byte[]](9..99)))
+    $exeBefore = (Get-FileHash -LiteralPath (Join-Path $sLauncher 'Thornswood.exe')).Hash
+    $ErrorActionPreference = 'Continue'
+    $bout = & $ps -NoProfile -ExecutionPolicy Bypass -File $inst -Root $sroot -From $bare -NoClose -NoPause 2>&1 | Out-String
+    $bcode = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    Yes "a build with no app.ico beside its exe stops (exit $bcode)" ($bcode -eq 1 -and $bout -match 'There is no app\.ico beside Thornswood\.exe')
+    Yes '  and installs nothing: the exe in place is the one before' ((Get-FileHash -LiteralPath (Join-Path $sLauncher 'Thornswood.exe')).Hash -eq $exeBefore)
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
