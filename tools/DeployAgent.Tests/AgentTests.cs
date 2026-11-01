@@ -489,7 +489,7 @@ public sealed class AgentTests : IDisposable
         var (newFiles, newRec) = Build(ForkB);
         PinRelease(gh, "build-7", "// gamemode for B\n", newFiles, newRec);
         File.WriteAllText(Path.Combine(s.Root, "data", "restart.json"), "{}");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-7\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-7\"}");
         await a.Pass("dev", default);
         var last = gh.Last(id)!;
         Assert.Equal("success", (string)last["state"]!);
@@ -625,7 +625,7 @@ public sealed class AgentTests : IDisposable
     {
         var (a, gh, s, _, _) = Make();
         GamemodeRelease(gh, "build-1", "// new gamemode\n");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
         HasStates(gh, s, id, "in_progress,success");
         Assert.Equal("// new gamemode\n", s.Read("gamemode.js"));
@@ -659,7 +659,7 @@ public sealed class AgentTests : IDisposable
         var oldTree = Tables.Tree(Path.Combine(s.Root, Tables.Dir));
         // The same gamemode.js the server runs: only a table changed.
         GamemodeRelease(gh, "build-1", Reading("tables gamemode"), new() { ["DATA.json"] = "{\n\"a\":2\n}\n", ["WELLS.json"] = "[]\n" });
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
         HasStates(gh, s, id, "in_progress,success");
         Assert.Equal("{\n\"a\":2\n}\n", s.Read(Path.Combine(Tables.Dir, "DATA.json")));
@@ -685,7 +685,7 @@ public sealed class AgentTests : IDisposable
         s.WriteGamemode(Reading("old tables gamemode"));
         var oldTree = Tables.Tree(Path.Combine(s.Root, Tables.Dir));
         GamemodeRelease(gh, "build-2", Reading("new gamemode"), new() { ["DATA.json"] = "BROKEN\n", ["WELLS.json"] = "[]\n" });
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-2\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-2\"}");
         await a.Pass("dev", default);
         var last = gh.Last(id)!;
         Assert.Equal("failure", (string)last["state"]!);
@@ -814,7 +814,7 @@ public sealed class AgentTests : IDisposable
     {
         var (a, gh, s, _, _) = Make();
         GamemodeRelease(gh, "build-2", "BROKEN gamemode\n");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-2\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-2\"}");
         await a.Pass("dev", default);
         var last = gh.Last(id)!;
         Assert.Equal("failure", (string)last["state"]!);
@@ -831,7 +831,7 @@ public sealed class AgentTests : IDisposable
     {
         var (a, gh, s, server, _) = Make();
         GamemodeRelease(gh, "build-3", "// new but sick\n");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-3\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-3\"}");
         // Healthy for the check before, sick while the new gamemode is in.
         s.SickWhen = () => Encoding.UTF8.GetString(Thornswood.DeployAgent.Files.ReadShared(Path.Combine(s.Root, "gamemode.js"))).Contains("sick");
         server.Tick = TimeSpan.FromMilliseconds(20);
@@ -863,7 +863,7 @@ public sealed class AgentTests : IDisposable
             gh.Replace("build-1", "manifest.json", B(text.Replace("\"schema\":1", "\"schema\":1 ")));
         }
         if (sick) s.Healthy = false;
-        var id = gh.AddDeployment("Dev server", sha, payload);
+        var id = gh.AddDeployment("Dev", sha, payload);
         await a.Pass("dev", default);
         var last = gh.Last(id)!;
         Assert.Equal("failure", (string)last["state"]!);
@@ -872,24 +872,41 @@ public sealed class AgentTests : IDisposable
     }
 
     [Fact]
-    public async Task OnlyTheNewestIsAppliedAndRecordsAreLeftAlone()
+    public async Task OnlyTheNewestIsAppliedAndOtherEnvironmentsAreLeftAlone()
     {
         var (a, gh, _, _, _) = Make();
         GamemodeRelease(gh, "build-1", "// new gamemode\n");
-        var record = gh.AddDeployment("Dev", Commit, "{}");
-        var older = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
-        var newest = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var record = gh.AddDeployment("Dev server", Commit, "{}");
+        var older = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        var newest = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
         Assert.Equal("inactive", string.Join(",", gh.States(older)));
         Assert.Equal("in_progress,success", string.Join(",", gh.States(newest)));
         Assert.Empty(gh.States(record));
     }
 
+    // Record-Deployment.ps1 wrote Deployments to Dev with a success straight
+    // away (#5179 retired it). The newest of them is not applied again, and
+    // the unapplied older ones under it are left as they are.
+    [Fact]
+    public async Task AnOldRecordWithASuccessIsNotAppliedAgain()
+    {
+        var (a, gh, s, _, _) = Make();
+        GamemodeRelease(gh, "build-1", "// new gamemode\n");
+        var before = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        var record = gh.AddDeployment("Dev", Commit, "{}");
+        lock (gh.StatusesById) gh.StatusesById[record] = new() { new JsonObject { ["state"] = "success", ["description"] = "Live on the dev feed" } };
+        await a.Pass("dev", default);
+        Assert.Equal("success", string.Join(",", gh.States(record)));
+        Assert.Empty(gh.States(before));
+        Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
+    }
+
     [Fact]
     public async Task ADeploymentCutShortIsMarkedError()
     {
         var (a, gh, s, _, cfg) = Make();
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         var state = Path.Combine(cfg.Home, "state", "working.json");
         Directory.CreateDirectory(Path.GetDirectoryName(state)!);
         File.WriteAllText(state, $"{{\"Deployment\":\"{id}\",\"Env\":\"dev\",\"Started\":\"then\"}}");
@@ -1085,12 +1102,12 @@ public sealed class AgentTests : IDisposable
         var p = Path.Combine(Temp(), "agent.json");
         File.WriteAllText(p, "{\"repo\":\"O/R\",\"environments\":{\"dev\":{\"loadSeconds\":60}}}");
         var e = Config.Load(p).Environments["dev"];
-        Assert.Equal((60, @"C:\Thornswood-Server-Dev", "Dev server"), (e.LoadSeconds, e.Root, e.GitHubEnvironment));
+        Assert.Equal((60, @"C:\Thornswood-Server-Dev", "Dev"), (e.LoadSeconds, e.Root, e.GitHubEnvironment));
         foreach (var bad in new[]
         {
             "{\"environments\":{\"dev\":{}}}",
             "{\"repo\":\"O/R\",\"environments\":{\"main\":{}}}",
-            "{\"repo\":\"O/R\",\"environments\":{\"dev\":{\"githubEnvironment\":\"Dev\"}}}",
+            "{\"repo\":\"O/R\",\"environments\":{\"dev\":{\"githubEnvironment\":\"\"}}}",
             "{\"repo\":\"O/R\",\"environments\":{\"dev\":{\"githubEnvironment\":\"Main\"}}}",
             "{\"repo\":\"O/R\",\"api\":\"http://example.com\"}",
             "{\"repo\":\"O/R\",\"pollSeconds\":1}",
@@ -1189,7 +1206,7 @@ public sealed class AgentTests : IDisposable
             return WriteResult(bp, true);
         });
         BotRelease(gh, "build-1", "// new gamemode\n");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
         HasStates(gh, s, id, "in_progress,success");
         Assert.Equal("// new gamemode\n", s.Read("gamemode.js"));
@@ -1246,7 +1263,7 @@ public sealed class AgentTests : IDisposable
             ["bot"] = BotPart,
             ["server"] = new() { ["server-build.json"] = newRec, [zipName] = zip },
         }));
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-9\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-9\"}");
         await a.Pass("dev", default);
         HasStates(gh, s, id, "success", last: true);
         // The copy ran the build dev was about to get, with its own scripts
@@ -1274,7 +1291,7 @@ public sealed class AgentTests : IDisposable
             _ => WriteResult(bp, false, how),
         });
         BotRelease(gh, "build-1", "// new gamemode\n", withBot: how != "nobot");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
         var last = gh.Last(id)!;
         Assert.Equal("failure", (string)last["state"]!);
@@ -1302,7 +1319,7 @@ public sealed class AgentTests : IDisposable
     {
         var (a, gh, s, _, _) = Make();
         GamemodeRelease(gh, "build-1", "// new gamemode\n");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
         HasStates(gh, s, id, "success", last: true);
         Assert.Contains("no bot pass: it is not set up on this box yet", s.Read(Path.Combine("data", $"deploy-{id}.log")));
@@ -1325,7 +1342,7 @@ public sealed class AgentTests : IDisposable
         });
         PutTables(s, new() { ["FOODS.json"] = "[\"dev\"]" });
         BotRelease(gh, "build-1", Reading("new gamemode"), tables: inRelease ? new() { ["FOODS.json"] = "[\"new\"]", ["DATA.json"] = "{}" } : null);
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
         HasStates(gh, s, id, "success", last: true);
         Assert.NotNull(copied);

@@ -344,7 +344,9 @@ if ($Pick -gt 0) {
         $picked = Select-Affected
         if ($null -ne $picked) { $list = $picked; $whole = $false }
     } else {
-        # Main and a run by hand run the whole gate; the map only times it.
+        # Main, the merge queue's run and a run by hand run the whole gate;
+        # the map only times it. The queue's commit is the one that lands on
+        # main (#5296), so its run is main's build, early.
         $maps = Find-Map
         if ($maps) { $null = Read-Map $maps }
     }

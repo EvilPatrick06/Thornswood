@@ -29,8 +29,8 @@
   served on its resources port; the last line here names its address.
 
   WHAT IT NEEDS. The agent, installed by Install-DeployAgent (a gate verb).
-  The Release is published by .github\workflows\gamemode-release.yml when a
-  gamemode change reaches main. Reading a Release needs no token beyond the
+  The Release is published by .github\workflows\merge-release.yml when a
+  change to one of its parts reaches main. Reading a Release needs no token beyond the
   one the agent mints from the box admin App.
 
   Keep it ASCII: Windows PowerShell 5.1 at the far end reads what is sent as

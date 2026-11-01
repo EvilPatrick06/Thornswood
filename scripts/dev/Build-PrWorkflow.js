@@ -44,7 +44,16 @@ function build(src) {
     branch after each push, and its checks land on the pull request's head.
     A manual run needs write access, which a push already needs.
   */
-  body = body.replace(on[0], '\non:\n  pull_request:\n  workflow_dispatch:\n');
+  /*
+    THE MERGE QUEUE'S RUN (#5182, the redesign's part 5). Main's ruleset puts
+    a pull request in GitHub's merge queue, and the queue lands it only once
+    every check the ruleset requires has passed on the queue's own merge of
+    it onto the newest main, a merge_group event. Without this trigger
+    "Build check result" is never reported there and nothing merges. The
+    pick runs the whole gate on it (it narrows only a pull_request run), and
+    build.yml's tested job finds this run when that merge lands on main.
+  */
+  body = body.replace(on[0], '\non:\n  pull_request:\n  merge_group:\n    types: [checks_requested]\n  workflow_dispatch:\n');
   body = swap(body, 'group: build-${{ github.ref }}', 'group: build-pr-${{ github.ref }}', 'its concurrency group');
   /*
     A PULL REQUEST'S NEWER PUSH CANCELS ITS OLDER RUN (#3874). Main's builds
@@ -120,7 +129,8 @@ function build(src) {
     '# change build.yml and run  node scripts/dev/Build-PrWorkflow.js\n' +
     '#\n' +
     '# Every pull request runs the same checks as build.yml, on GitHub\'s hosted\n' +
-    '# windows-latest runner (#1306, #4983). No secrets, no live folders: every\n' +
+    '# windows-latest runner (#1306, #4983), and again on the merge queue\'s\n' +
+    '# merge of it onto the newest main (#5182). No secrets, no live folders: every\n' +
     '# scratch path is under RUNNER_TEMP. The job keeps the name "Launcher builds",\n' +
     '# and the gate runs beside it in shares, "Gate harnesses (n of 5)", after\n' +
     '# the job "Pick the gate harnesses" says what each runs.\n';

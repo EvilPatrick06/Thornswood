@@ -45,6 +45,17 @@
 // pull request merged as this commit. Anything less, or any answer from
 // GitHub this cannot read, is "not tested", and main builds.
 //
+// THE MERGE QUEUE (#5182). Once main's ruleset puts pull requests in
+// GitHub's merge queue, build-pr.yml runs again on the queue's merge of each
+// one onto the newest main (a merge_group event, on a gh-readonly-queue/
+// branch), and the pick runs the whole gate there. That merge is what lands
+// on main, so before anything else this reads the newest passed merge_group
+// runs of build-pr.yml and takes one whose commit is HEAD or whose commit's
+// tree is HEAD's tree, under the same rules as below: Launcher builds through
+// its last step, every share of the whole gate passed, and the tree in its
+// log. A pull request's own run is still read after it, for a merge made
+// before the queue.
+//
 // WHY THE TREE IS ENOUGH. actions/checkout fetches one commit, so a check
 // sees the same files and no history on both builds; what differs is the
 // commit's own id, message and date, the branch name and the event, and no
@@ -109,11 +120,27 @@ async function find(o) {
   if (!SHA.test(String(o.tree || ''))) { return { run: '', why: 'no tree was given' }; }
   if (!SHA.test(String(o.commit || ''))) { return { run: '', why: 'no commit was given' }; }
   if (!/^[\w.-]+\/[\w.-]+$/.test(String(o.repo || ''))) { return { run: '', why: 'no repository was given' }; }
+  const whys = [];
+  // A run of the merge queue (#5182) on this very commit, or on this tree.
+  const queued = await o.get('repos/' + o.repo + '/actions/workflows/' + WORKFLOW.split('/').pop() + '/runs?event=merge_group&status=success&per_page=50');
+  const groups = (queued && Array.isArray(queued.workflow_runs) ? queued.workflow_runs : []).filter(r => r &&
+    (r.head_sha === o.commit || (r.head_commit && r.head_commit.tree_id === o.tree))).sort((a, b) => b.id - a.id);
+  for (const r of groups) {
+    const id = r.id;
+    if (r.path !== WORKFLOW) { whys.push('run ' + id + ': not ' + WORKFLOW); continue; }
+    if (r.event !== 'merge_group' || !/^gh-readonly-queue\//.test(String(r.head_branch || ''))) { whys.push('run ' + id + ': not a run of the merge queue'); continue; }
+    if (!r.repository || r.repository.full_name !== o.repo || !r.head_repository || r.head_repository.full_name !== o.repo) {
+      whys.push('run ' + id + ': its head is not this repository'); continue;
+    }
+    const got = await passedOn(o, r);
+    if (got.tree) { return { run: String(r.html_url || ''), why: 'the merge queue\'s run ' + id + ' passed every check on this tree' }; }
+    whys.push('run ' + id + ': ' + got.why);
+  }
+  if (groups.length === 0) { whys.push('no passed merge queue run of this commit or tree'); }
   const prs = await o.get('repos/' + o.repo + '/commits/' + o.commit + '/pulls?per_page=100');
   const merged = (Array.isArray(prs) ? prs : []).filter(p => p && p.merged_at && p.head && SHA.test(String(p.head.sha || '')) &&
     p.head.repo && p.head.repo.full_name === o.repo);
-  if (merged.length === 0) { return { run: '', why: 'no pull request of this repository was merged as ' + o.commit.slice(0, 12) }; }
-  const whys = [];
+  if (merged.length === 0) { whys.push('no pull request of this repository was merged as ' + o.commit.slice(0, 12)); return { run: '', why: whys.join('; ') }; }
   for (const p of merged) {
     const list = await o.get('repos/' + o.repo + '/actions/workflows/' + WORKFLOW.split('/').pop() + '/runs?event=pull_request&head_sha=' + p.head.sha + '&per_page=100');
     const runs = (list && Array.isArray(list.workflow_runs) ? list.workflow_runs : []).filter(r => r && r.head_sha === p.head.sha).sort((a, b) => b.id - a.id);
@@ -125,22 +152,31 @@ async function find(o) {
       if (!r.repository || r.repository.full_name !== o.repo || !r.head_repository || r.head_repository.full_name !== o.repo) {
         whys.push('run ' + id + ': its head is not this repository'); continue;
       }
-      const j = await o.get('repos/' + o.repo + '/actions/runs/' + id + '/jobs?per_page=100');
-      const all = j && Array.isArray(j.jobs) ? j.jobs : [];
-      const job = all.find(x =>
-        JOBS.indexOf(x.name) >= 0 && x.conclusion === 'success' &&
-        (Array.isArray(x.steps) ? x.steps : []).some(s => s.name === STEP && s.conclusion === 'success'));
-      if (!job) { whys.push('run ' + id + ': no Launcher builds job passed through to its last step'); continue; }
-      const gate = gateShares(all);
-      if (gate) { whys.push('run ' + id + ': ' + gate); continue; }
-      const trees = treesInLog(await o.getText('repos/' + o.repo + '/actions/jobs/' + job.id + '/logs'));
-      if (trees.indexOf(o.tree) >= 0) {
+      const got = await passedOn(o, r);
+      if (got.tree) {
         return { run: String(r.html_url || ''), why: 'pull request #' + p.number + ' passed every check on this tree' };
       }
-      whys.push('run ' + id + ': ' + (trees.length ? 'it passed on ' + trees.map(t => t.slice(0, 12)).join(', ') + ', another tree (main moved under it)' : 'its log has no ' + MARK + ' line'));
+      whys.push('run ' + id + ': ' + got.why);
     }
   }
   return { run: '', why: whys.join('; ') };
+}
+
+// { tree: true } when run r's Launcher builds job got through its last step,
+// every share of the whole gate beside it passed, and its log names o.tree;
+// otherwise { why }.
+async function passedOn(o, r) {
+  const j = await o.get('repos/' + o.repo + '/actions/runs/' + r.id + '/jobs?per_page=100');
+  const all = j && Array.isArray(j.jobs) ? j.jobs : [];
+  const job = all.find(x =>
+    JOBS.indexOf(x.name) >= 0 && x.conclusion === 'success' &&
+    (Array.isArray(x.steps) ? x.steps : []).some(s => s.name === STEP && s.conclusion === 'success'));
+  if (!job) { return { why: 'no Launcher builds job passed through to its last step' }; }
+  const gate = gateShares(all);
+  if (gate) { return { why: gate }; }
+  const trees = treesInLog(await o.getText('repos/' + o.repo + '/actions/jobs/' + job.id + '/logs'));
+  if (trees.indexOf(o.tree) >= 0) { return { tree: true }; }
+  return { why: trees.length ? 'it passed on ' + trees.map(t => t.slice(0, 12)).join(', ') + ', another tree (main moved under it)' : 'its log has no ' + MARK + ' line' };
 }
 
 // GET https://api.github.com/<path>, as text. A job's log answers with a

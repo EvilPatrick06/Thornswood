@@ -301,7 +301,7 @@ Yes '  the hand-back mark is put together, never written whole' ((@($wf -split "
 $eng = [IO.File]::ReadAllText((Join-Path $root '.github/workflows/engine.yml')).Replace("`r`n", "`n")
 Yes 'engine.yml''s runs carry the commit in their title, which Get-EnginePinStep finds them by' ($eng -match "(?m)^run-name: Engine build of \$\{\{ inputs\.commit \|\| 'the pin' \}\}$")
 $bp = [IO.File]::ReadAllText((Join-Path $root '.github/workflows/build-pr.yml')).Replace("`r`n", "`n")
-Yes 'build-pr.yml can be started by hand on the pin branch' ($bp -match '(?m)^on:\n  pull_request:\n  workflow_dispatch:\n')
+Yes 'build-pr.yml can be started by hand on the pin branch' ($bp -match '(?m)^on:\n  pull_request:\n(  merge_group:\n    types: \[checks_requested\]\n)?  workflow_dispatch:\n')
 $tt = [IO.File]::ReadAllText((Join-Path $root '.github/workflows/test-tasks.yml')).Replace("`r`n", "`n")
 Yes 'test-tasks.yml can be started by hand on the pin branch' ($tt -match '(?m)^  workflow_dispatch:\s*$')
 $gs = [IO.File]::ReadAllText((Join-Path $root 'records/github-settings.json')) | ConvertFrom-Json

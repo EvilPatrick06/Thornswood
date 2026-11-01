@@ -26,7 +26,10 @@ yes('  and no runner to pick on a manual run', !/\n    inputs:\n/.test(build) &&
 yes('build-pr.yml exists', !!pr);
 // #5148: and a manual run, which engine-pin.yml starts on the pin branch it
 // pushes, since a push with the run's own token starts no pull_request run.
-yes('build-pr.yml runs on a pull request and a manual run, nothing else', JSON.stringify(triggers(pr)) === '["pull_request","workflow_dispatch"]');
+// #5182: and in the merge queue, which lands a pull request only once the
+// checks main's ruleset requires passed on the queue's merge of it.
+yes('build-pr.yml runs on a pull request, in the merge queue and on a manual run, nothing else', JSON.stringify(triggers(pr)) === '["pull_request","merge_group","workflow_dispatch"]' &&
+    /\n  merge_group:\n    types: \[checks_requested\]\n/.test(pr));
 yes('on GitHub\'s hosted windows-latest', /\n    runs-on: windows-latest\n/.test(pr));
 yes('no pull request job is on a self-hosted runner (#4983)', !!pr && code(pr).indexOf('self-hosted') < 0 && !/\n  launcher-vps:\n/.test(pr));
 yes('it takes no secrets', !!pr && !/\$\{\{\s*secrets\./.test(pr));

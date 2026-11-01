@@ -90,7 +90,7 @@ try {
     # pull request build has no VPS fallback, and anything anyone can start
     # on a public repository (#3685), opening or closing their own issue, is
     # on GitHub's runner.
-    T ($x.Out -notmatch 'RISK  workflow build-pr\.yml runs on' -and $x.Report -match '\| workflow \| build-pr\.yml runs on \|[^\n]*triggers pull_request,workflow_dispatch \|' -and $x.Report -notmatch '\| workflow \| build-pr\.yml runs on \|[^\n]*; on thornswood') 'the real build-pr.yml is not on the production label at all, and the check says ok (#4983)'
+    T ($x.Out -notmatch 'RISK  workflow build-pr\.yml runs on' -and $x.Report -match '\| workflow \| build-pr\.yml runs on \|[^\n]*triggers pull_request,merge_group,workflow_dispatch \|' -and $x.Report -notmatch '\| workflow \| build-pr\.yml runs on \|[^\n]*; on thornswood') 'the real build-pr.yml is not on the production label at all, and the check says ok (#4983)'
     foreach ($n in 'area-label.yml', 'drop-claims.yml') {
         T ($x.Out -notmatch ('RISK  workflow ' + [regex]::Escape($n) + ' started by anyone') -and $x.Report -match ('\| workflow \| ' + [regex]::Escape($n) + ' started by anyone \|[^\n]*; not on thornswood-vps[^\n]*\| ok \|')) "the real $n is not on the production label, and the check says ok"
     }
@@ -140,6 +140,10 @@ try {
     Set-Content (Join-Path $wfPr 'build-pr.yml') "on:`n  pull_request_target:`npermissions:`n  contents: read`njobs:`n  a:`n    if: `${{ github.event.pull_request.head.repo.full_name == github.repository }}`n    runs-on: [self-hosted, Windows, thornswood-vps]`n"
     $x = Run (Facts) $wfPr
     T ($x.Out -match 'RISK  workflow build-pr\.yml runs on') 'pull_request_target on the production label stays a risk, condition or not'
+    # #5296: the merge queue runs a queued pull request's code, a fork's too.
+    Set-Content (Join-Path $wfPr 'build-pr.yml') "on:`n  merge_group:`npermissions:`n  contents: read`njobs:`n  a:`n    if: `${{ github.event.pull_request.head.repo.full_name == github.repository }}`n    runs-on: [self-hosted, Windows, thornswood-vps]`n"
+    $x = Run (Facts) $wfPr
+    T ($x.Out -match 'RISK  workflow build-pr\.yml runs on') 'merge_group on the production label is a risk too, condition or not (#5296)'
     # Two pull request jobs on the production label, one limited to this
     # repository: the other is still a risk (#3550, the condition used to be
     # matched against the whole file).
