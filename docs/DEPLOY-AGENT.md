@@ -55,7 +55,7 @@ That is the gate verb for
 `thornswood-agent.exe deploy --environment dev --tag <tag>` on the box, which
 does steps 3 to 7 below with no Deployment to report on, and prints the
 address of the log. The tags are on the
-repository's Releases page as `build-<date>.<run>`. To roll dev back, deploy the tag before the one that
+repository's Releases page as `build-<date>.<n>`. To roll dev back, deploy the tag before the one that
 is on it now; the box's deploy record says which one that is
 (`http://play.thornswood.net:7788/thornswood-deploy.json`).
 
@@ -77,7 +77,7 @@ the App holds Deployments.
    ([New-SignedManifest.ps1](../scripts/release/New-SignedManifest.ps1)),
    makes a catalog over the manifest and signs it with ThornswoodRelease
    ([Sign-OnRunner.ps1](../scripts/release/Sign-OnRunner.ps1)), then
-   publishes the Release `build-<date>.<run>` from a draft (Releases here
+   publishes the Release `build-<date>.<n>` from a draft (Releases here
    are immutable once published) and makes a Deployment to the environment
    **Dev** naming it. A merge that changed none of the parts publishes
    nothing; the workflow's header says how a change is told.
