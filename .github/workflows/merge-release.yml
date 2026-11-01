@@ -81,6 +81,9 @@ on:
     paths:
       - 'game/**'
       - 'launcher/**'
+      # Not its harnesses (plan line 42): a change to a check is no new
+      # launcher, as LauncherVersion.ps1 says.
+      - '!launcher/tests/**'
       - 'records/**'
       - 'scripts/bot/Bot-Pass.js'
       - 'scripts/bot/bot.js'
