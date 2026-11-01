@@ -9,9 +9,8 @@
       .\scripts\dev\Nightly-Harnesses.ps1 -Shard 2 -Of 2
 
   The harnesses are every test-*.js and test-*.ps1 in tests\ and in each
-  product's own tests folder (launcher\tests\), as
-  scripts\dev\Harness-Files.ps1 lists and names them, then every
-  voice\test-*.js, in name order. Harness number n (from 0) belongs to share
+  product's own tests folder (launcher\tests\, voice\tests\), as
+  scripts\dev\Harness-Files.ps1 lists and names them, in name order. Harness number n (from 0) belongs to share
   (n mod Of) + 1, so every harness is in exactly one share and the slow ones
   spread out by name.
 
@@ -94,7 +93,7 @@
   way, so a harness that needs Windows PowerShell is run from a cloud
   session by dispatching that workflow, with no login on the box:
 
-      .\scripts\dev\Nightly-Harnesses.ps1 -Only 'test-deploy-swaps.ps1 voice/test-most.js'
+      .\scripts\dev\Nightly-Harnesses.ps1 -Only 'test-deploy-swaps.ps1 voice/tests/test-most.js'
 
   -Only takes the names as the nightly prints them, split by spaces or
   commas, and runs those in place of a share. A name that is no harness here
@@ -549,15 +548,11 @@ function Write-Report($results, $notRun) {
 }
 
 # Every harness, in one order every share agrees on: those in tests\ and in
-# each product's tests folder, as scripts\dev\Harness-Files.ps1 lists and
-# names them for the gate too, then voice's, which sit beside its service.
+# each product's tests folder (voice's among them since they moved from beside
+# voice-server.js into voice\tests\), as scripts\dev\Harness-Files.ps1 lists
+# and names them for the gate too.
 . (Join-Path $PSScriptRoot 'Harness-Files.ps1')
 $every = @(Get-Harnesses $Root)
-$voice = Join-Path $Root 'voice'
-if (Test-Path -LiteralPath $voice) {
-    $every += @(Get-ChildItem -LiteralPath $voice -Filter 'test-*.js' -File | Sort-Object Name |
-                ForEach-Object { [pscustomobject]@{ Name = 'voice/' + $_.Name; File = $_ } })
-}
 if ($Only.Trim()) {
     $asked = @($Only -split '[\s,]+' | Where-Object { $_ } | Select-Object -Unique)
     $known = @{}; foreach ($t in $every) { $known[$t.Name] = $true }

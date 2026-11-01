@@ -18,7 +18,8 @@
                         launcher\tests\, site\tests\. Named by its path from
                         the repository with forward slashes,
                         launcher/tests/test-498-msbuild.ps1, the way the
-                        nightly has named voice's (voice/test-turn-key.js).
+                        nightly named voice's when they sat beside its
+                        service (voice/test-turn-key.js, now in voice\tests\).
 
   Get-HarnessFile turns a name back into its file, either kind. A name with a
   slash in it is a path from the repository; one without is in tests\.

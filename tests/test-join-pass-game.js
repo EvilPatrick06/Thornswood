@@ -328,7 +328,7 @@ door(null);
 // Since #1131 what a command writes to the chat log is commandLogText's word,
 // run here: the pass masked, whatever the case of the command. The front
 // plugin's own pass, sent with press, is not written at all since #2723
-// (tests\test-2723-plugin-reports.js); this is the typed one.
+// (voice\tests\test-2723-plugin-reports.js); this is the typed one.
 {
   const at = voice.indexOf('function commandLogText(');
   let body = '';

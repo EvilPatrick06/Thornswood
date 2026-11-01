@@ -28,8 +28,8 @@ has a line there too, "own step in build.yml", so the gate does not run it
 twice. The "not sorted yet" lines are minutes together, which is why they
 come onto the gate a few at a time.
 
-The voice service's own harnesses stay beside it in `voice\`, and the bot's in
-`bot\`, because they are run from there.
+The voice service's own harnesses are beside it in `voice\tests\`, and the
+bot's Python ones in `bot\`, because they are run from there.
 
 ## Beside their product
 
@@ -40,8 +40,9 @@ top: `launcher\tests\`, `site\tests\`. This folder keeps the checks that are
 about the whole repository (the gate, the words, the secrets, the scripts'
 paths), the shared helpers (`Windows.ps1`, `Launcher-Csc.ps1`,
 `launcher-csc.js`, `fork-git.js` and the rest) and `fixtures\`, and every
-harness whose product has not moved yet. The launcher's moved on 1 Nov 2026:
-`launcher\tests\`. Its harnesses are no part of the launcher:
+harness whose product has not moved yet. Moved on 1 Nov 2026: the launcher's
+(`launcher\tests\`), voice's (`voice\tests\`) and the setup program's
+(`installer\tests\`). Its harnesses are no part of the launcher:
 `LauncherVersion.ps1` and Ship's launcher fingerprint leave that folder out,
 so a change to one gives no launcher a new number.
 
@@ -212,5 +213,5 @@ child's output up to that line, and so does any stand-in it starts on a port
 it let go (the GitHub stand-in in `test-site-assets.ps1`, the game server in
 `test-record-sync.ps1`); before #1755 five of them drained the output unread
 and polled the port. `test-1703-test-ports.js` fails on any `.js` harness here
-or in `voice\` that names a fixed port, or on any `.js` or `.ps1` harness that
+or in a product's tests folder that names a fixed port, or on any `.js` or `.ps1` harness that
 starts the site without waiting for that line.

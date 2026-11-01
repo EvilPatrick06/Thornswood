@@ -14,7 +14,7 @@
         for a session staff marked kept stays.
     G2  the voice service's chat prune ran every six hours, hourly only while
         a day was overdue; the page says the check is hourly. It now runs
-        every hour (held by tests\test-chat-log.js, which lifts chatPrune).
+        every hour (held by voice\tests\test-chat-log.js, which lifts chatPrune).
     G4  a Discord sign-in set the member cookie tw for a year, which the page
         describes as the fallback for a site with no Discord. It is now
         cleared there instead (tests\test-site-oauth-gaps.js checks the

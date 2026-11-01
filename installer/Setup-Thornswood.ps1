@@ -157,7 +157,7 @@ if (-not (Test-Path $Payload)) { Die "The 'payload' folder is missing. If you ex
 #     or nothing is installed: a setup program that did not ask is an old one;
 #   - by hand, the same four questions are asked here, all four must be yes,
 #     and the same Profile\accepted.json is written.
-# Before anything is written anywhere else. tests\test-setup-by-hand-agreements.ps1
+# Before anything is written anywhere else. installer\tests\test-setup-by-hand-agreements.ps1
 # holds it; the wording is the window's (installer\setup\Bootstrap.cs).
 $AcceptedFile = Join-Path $ProfileDir 'accepted.json'
 $AgreePages = [ordered]@{

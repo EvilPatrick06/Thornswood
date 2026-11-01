@@ -81,7 +81,7 @@ const files = [];
 const beside = fs.readdirSync(REPO_DIR, { withFileTypes: true })
   .filter(d => d.isDirectory() && d.name !== 'tests' && d.name !== 'node_modules' && fs.existsSync(path.join(REPO_DIR, d.name, 'tests')))
   .map(d => d.name + '/tests').sort();
-for (const dir of ['tests', 'voice'].concat(beside)) {
+for (const dir of ['tests'].concat(beside)) {
   for (const n of fs.readdirSync(path.join(REPO_DIR, dir)).sort()) {
     if (/^test-.*\.js$/.test(n)) { files.push(dir + '/' + n); }
   }
@@ -135,10 +135,10 @@ const SELF = 'tests/' + path.basename(__filename);
 const starters = files.filter((f) => f !== SELF && /spawn\(/.test(text[f]) && /'voice-server\.js'/.test(text[f]));
 console.log('\nthe harnesses that start the voice service (' + starters.length + '):');
 yes('there are the twelve this issue found, and test-local-chat.js',
-    ['tests/test-command-ack.js', 'tests/test-deploy-records.js', 'tests/test-staff-commands.js',
-     'voice/test-auth.js', 'voice/test-backpressure.js', 'voice/test-chat-limit.js', 'voice/test-cull.js',
-     'voice/test-ice.js', 'voice/test-keepalive.js', 'voice/test-line-close.js', 'voice/test-local-chat.js',
-     'voice/test-moved.js', 'voice/test-turn-key.js'].every((f) => starters.indexOf(f) >= 0));
+    ['voice/tests/test-command-ack.js', 'tests/test-deploy-records.js', 'tests/test-staff-commands.js',
+     'voice/tests/test-auth.js', 'voice/tests/test-backpressure.js', 'voice/tests/test-chat-limit.js', 'voice/tests/test-cull.js',
+     'voice/tests/test-ice.js', 'voice/tests/test-keepalive.js', 'voice/tests/test-line-close.js', 'voice/tests/test-local-chat.js',
+     'voice/tests/test-moved.js', 'voice/tests/test-turn-key.js'].every((f) => starters.indexOf(f) >= 0));
 function lift(src) {
   const a = src.indexOf('function listening(srv, port) {');
   if (a < 0) { return null; }
