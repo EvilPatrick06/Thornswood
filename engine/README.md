@@ -419,7 +419,12 @@ run and every file, puts it in the fork's build folder, and makes the records
 from it with `-BuiltBy` naming the fork's run: `New-ServerBuildRecord.ps1`,
 `New-ClientBuildRecord.ps1` and `New-ClientLicenceRecord.ps1`, as for any
 build. A fork build still running, or one that ended red, or none at all,
-stops the run with its link.
+stops the run with its link. Before it records anything it also holds the
+fork's `fork-build.json` to the fork's signed attestation of it (#5153,
+since fork #136): `gh attestation verify` with the fork's
+`thornswood-pr-windows.yml` as the signer, the commit as the source, its
+branch as the ref and no self-hosted runner, so a pin is proven to be the
+fork's own build of that commit.
 
 Nothing is compiled in CI. The VPS cannot (#3014, Patrick's A on 22
 October): its runner accounts reach GitHub's addresses and nothing else

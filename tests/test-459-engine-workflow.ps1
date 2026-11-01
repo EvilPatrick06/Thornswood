@@ -81,7 +81,7 @@ Yes 'a build is never cancelled by another run for the same commit' ($head -matc
 
 # ---- 2. where: GitHub's runner alone (#4983) -----------------------------------
 Yes 'the job is GitHub''s windows-2022, the image with the generator the fork demands' ($job -match '(?m)^    runs-on: windows-2022$')
-Yes '  the only job: no VPS fallback, no runner of the box, no BUILD_RUNNER switch' (@([regex]::Matches(($code.Substring($code.IndexOf("`njobs:"))), '(?m)^  \S')).Count -eq 1 -and $code -notmatch 'self-hosted|thornswood-vps|BUILD_RUNNER')
+Yes '  the only job: no VPS fallback, no runner of the box, no BUILD_RUNNER switch' (@([regex]::Matches(($code.Substring($code.IndexOf("`njobs:"))), '(?m)^  \S')).Count -eq 1 -and $code -notmatch '(?<!deny-)self-hosted|thornswood-vps|BUILD_RUNNER')
 $tj = [regex]::Match($job, 'timeout-minutes: (\d+)')
 Yes 'it has 30 minutes: it only takes the fork''s build (#3014, #3399)' ($tj.Success -and [int]$tj.Groups[1].Value -eq 30)
 
@@ -131,6 +131,8 @@ Yes 'the fork''s build is looked for before anything is compiled, with ForkEngin
 Yes '  read with this run''s own token, handed through env; no secret anywhere in the file' ($look -match 'GH_TOKEN: \$\{\{ github\.token \}\}' -and $code -notmatch 'secrets\.')
 Yes '  with none, one still running or one red, the run stops with its Why; nothing builds it in its place' ($look -match "if \(\`$f\.State -ne 'found'\) \{ Write-Host ""::error::\`$\(\`$f\.Why\)""; exit 1 \}" -and $look -notmatch 'found=false')
 Yes '  the build is held to the commit, the run and GitHub''s digest before it goes in the fork''s build folder' ($look -match 'Expand-ForkEngineBuild -Zip \$zip -Commit \$env:COMMIT -RunId \$f\.Run\.id -Digest \(\[string\]\$f\.Artifact\.digest\) -Fork engine\\skymp')
+# #5153: the fork's signed attestation of its fork-build.json, before anything is recorded.
+Yes '  its fork-build.json is held to the fork''s attestation of it: that workflow, that commit, that branch, GitHub''s runner (#5153)' ($look -match 'gh attestation verify \$kept --repo \$env:FORK_REPO --signer-workflow "\$env:FORK_REPO/\.github/workflows/thornswood-pr-windows\.yml" --source-ref refs/heads/thornswood/engine-changes --source-digest \$env:COMMIT --deny-self-hosted-runners' -and $look -match 'FORK_REPO: EvilPatrick06/skymp' -and $look.IndexOf('gh attestation verify') -gt $look.IndexOf('Expand-ForkEngineBuild'))
 Yes '  and says which run built it to the steps after' ($look -match "\('run=' \+ \`$f\.Run\.html_url\)" -and $look -match "\('manifest=' \+ \`$kept\)")
 $rf = Get-Step $job 'Record the fork''s server build'
 Yes 'the fork''s server build is recorded after the server''s packages from its yarn.lock' ($rf -notmatch '(?m)^        if:' -and $rf -match 'yarn install --frozen-lockfile --non-interactive' -and
