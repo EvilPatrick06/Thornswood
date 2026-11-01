@@ -150,7 +150,7 @@ this repository's Releases. The addresses a launcher asks do not move.
 - **What it never does.** It never changes a published Release: one that
   lacks a file stops the run. It publishes a Release only after GitHub's own
   digest of every file is right. It runs on GitHub's hosted runner, never on
-  the box. `tests\test-3686-release-files.ps1` and `tests\test-release-copies.js`
+  the box. `tests\test-3686-release-files.ps1` and `site\tests\test-release-copies.js`
   hold both halves.
 
 ### The feed store on the VPS (#907)

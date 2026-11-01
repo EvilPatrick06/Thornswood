@@ -28,7 +28,7 @@
     7. kept until looked at (#2319, Patrick, 12 Oct): each snapshot is
        remembered against the session it crashed in, the check in asks the
        site which of those staff marked looked at, and Tidy deletes those,
-       keeping the rest up to two. tests\test-2319-crash-looked-at.js runs
+       keeping the rest up to two. site\tests\test-2319-crash-looked-at.js runs
        the site's half.
 
   HOW. Compiles the shipped CrashDump.cs and Enforce.cs with the build's own

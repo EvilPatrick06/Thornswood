@@ -12,7 +12,7 @@
 // front plugin's sender is lifted out of thornswood-front.js and run the same
 // way. The dispatcher hook and the voice chat log are read.
 //
-// THE SHARED PASS. VECTOR_PASS below is the one tests\test-join-pass-site.js
+// THE SHARED PASS. VECTOR_PASS below is the one site\tests\test-join-pass-site.js
 // checks makePass in site\server.js writes exactly, so the site and the game
 // server cannot drift apart on the format.
 //
@@ -418,7 +418,7 @@ door(null);
   const r = rig({ thornswoodServer: 'dev', thornswoodRequirePass: true });
   const hook = r.box.mp.onThornswoodLogin;
   yes('the block sets mp.onThornswoodLogin for the fork\'s login', typeof hook === 'function');
-  // The shared pass's own key, the value tests\test-join-pass-site.js checks
+  // The shared pass's own key, the value site\tests\test-join-pass-site.js checks
   // passLoginKey in site\server.js derives.
   const VECTOR_LOGIN_KEY = 'Wh9OwaY7Rg7e4duCPpNl3c_DZb9RfUB0FUT9Pphs9L4';
   const ownKey = function (p) { return b64u(crypto.createHmac('sha256', KEY).update('jpk1.' + p.split('.')[2]).digest()); };

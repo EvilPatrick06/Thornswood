@@ -41,8 +41,8 @@ about the whole repository (the gate, the words, the secrets, the scripts'
 paths), the shared helpers (`Windows.ps1`, `Launcher-Csc.ps1`,
 `launcher-csc.js`, `fork-git.js` and the rest) and `fixtures\`, and every
 harness whose product has not moved yet. Moved on 1 Nov 2026: the launcher's
-(`launcher\tests\`), voice's (`voice\tests\`) and the setup program's
-(`installer\tests\`). Its harnesses are no part of the launcher:
+(`launcher\tests\`), voice's (`voice\tests\`), the setup program's
+(`installer\tests\`) and the site's (`site\tests\`). Its harnesses are no part of the launcher:
 `LauncherVersion.ps1` and Ship's launcher fingerprint leave that folder out,
 so a change to one gives no launcher a new number.
 

@@ -130,7 +130,7 @@ $r = Invoke-Lister $Repo
 foreach ($l in @($r.Out | Where-Object { $_ -notmatch '^test-' })) { Write-Host "        $l" }
 Yes 'this repository''s gate list has no fault' ($r.Code -eq 0)
 Yes ('and has harnesses in it ({0})' -f $r.Out.Count) ($r.Out.Count -gt 10)
-Yes 'test-page-changed.js is on the gate (#1589)' ($r.Out -contains 'test-page-changed.js')
+Yes 'site/tests/test-page-changed.js is on the gate (#1589)' ($r.Out -contains 'site/tests/test-page-changed.js')
 Yes 'and so is this harness' ($r.Out -contains 'test-gate-list.ps1')
 
 # --- 3. build.yml's gate step, and scripts\dev\Run-Gate.ps1, which it runs
