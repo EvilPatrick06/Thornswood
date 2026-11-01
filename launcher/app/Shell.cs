@@ -7,15 +7,19 @@ using System.Net.NetworkInformation;
 using System.Reflection;
 using System.Text;
 using System.Threading;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
-using System.Windows.Input;
-using System.Windows.Markup;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using Ellipse = System.Windows.Shapes.Ellipse;   // not the namespace: System.Windows.Shapes.Path would collide with System.IO.Path
-using System.Windows.Threading;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Controls.Primitives;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform.Storage;
+using Avalonia.Styling;
+using Avalonia.Threading;
+using Ellipse = Avalonia.Controls.Shapes.Ellipse;   // not the namespace: Avalonia.Controls.Shapes.Path would collide with System.IO.Path
 
 namespace Thornswood
 {
@@ -36,7 +40,10 @@ namespace Thornswood
     /// </summary>
     static partial class Shell
     {
-        static Window win;
+        // The compiled window (MainWindow.axaml). Its named controls are
+        // generated fields, so win.BtnPlay and the rest are checked when the
+        // launcher is built.
+        static MainWindow win;
         static Config cfg;
         static VersionDoc pendingDoc;
         static bool playing;
@@ -111,8 +118,8 @@ namespace Thornswood
                           firstRunCard, quickKeysCard, quickKeys;
         // Play hero stats strip: three equal columns (Played / Sessions / Last played).
         static UniformGrid statRow;
-        // GalleryCard is a Grid that fills the Play centre; only Visibility is touched.
-        static FrameworkElement galleryCard;
+        // GalleryCard is a Grid that fills the Play centre; only IsVisible is touched.
+        static Control galleryCard;
         static Image galleryImage; static TextBlock galleryBy;
         // The pictures /api/public is showing and where the card is in turning
         // through them. Null until the feed has answered with at least one.
@@ -131,7 +138,7 @@ namespace Thornswood
         static TextBox boxGalleryBy, boxGalleryNote, boxGalleryWhy;
         static TextBlock txtGalleryChosen, txtGalleryPageSaid, txtGalleryDropLead,
                          txtGalleryApprovedEmpty;
-        static FrameworkElement galleryPageReportRow;
+        static Control galleryPageReportRow;
         static Border galleryDrop;
         static StackPanel galleryChosenList;
         static WrapPanel galleryApprovedList;
@@ -179,7 +186,7 @@ namespace Thornswood
                       btnIcons, btnScan, btnFix, btnInstallNow, btnSaveDisplay,
                       btnQuitGame;
         static Button[] navButtons;
-        static UIElement[] pages;
+        static Control[] pages;
 
         [STAThread]
         static void Main(string[] args)
