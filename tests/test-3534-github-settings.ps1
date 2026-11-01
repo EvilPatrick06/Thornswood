@@ -111,7 +111,7 @@ Yes 'a repository secret the record does not name: one line' ($d.Count -eq 1 -an
 $r = Matching
 $r.environments['board'].secrets = @()
 $d = @(Compare-GitHubSettings $record $r)
-Yes 'an environment secret the record names and GitHub lacks: one line' ($d.Count -eq 1 -and $d[0] -eq 'environment board secrets: BOARD_TOKEN is in the record and not on GitHub')
+Yes 'an environment secret the record names and GitHub lacks: one line' ($d.Count -eq 1 -and $d[0] -eq 'environment board secrets: BOARD_APP_KEY is in the record and not on GitHub')
 $r = Matching
 $r.environments['board'].deploy_from = @('any')
 $d = @(Compare-GitHubSettings $record $r)
@@ -164,7 +164,7 @@ $svcAll = ConvertTo-Json -Compress -Depth 8 @{ ok = $true; unread = @(); lines =
         actions = $record.actions; workflow_token = $record.workflow_token; sharing = $record.sharing; fork_pull_requests = $record.fork_pull_requests
         retention = @{ days = 90 }; runners = @(@{ name = 'thornswood-vps'; status = 'online'; labels = @('self-hosted', 'thornswood-vps') })
         secrets = @($record.secrets); variables = @($record.variables)
-        environments = @{ board = @{ secrets = @('BOARD_TOKEN'); variables = @() }; desk = @{ secrets = @('NEXUS_API_KEY'); variables = @() }; 'engine-pin' = @{ secrets = @('PIN_APP_KEY'); variables = @('PIN_APP_CLIENT_ID') }; release = @{ secrets = @(); variables = @() }; watch = @{ secrets = @('RUNNER_TOKEN', 'STAFF_WEBHOOK'); variables = @() } } } }
+        environments = @{ board = @{ secrets = @('BOARD_APP_KEY'); variables = @('BOARD_APP_CLIENT_ID', 'BOARD_NUMBER') }; desk = @{ secrets = @('NEXUS_API_KEY'); variables = @() }; 'engine-pin' = @{ secrets = @('PIN_APP_KEY'); variables = @('PIN_APP_CLIENT_ID') }; release = @{ secrets = @(); variables = @() }; watch = @{ secrets = @('RUNNER_TOKEN', 'STAFF_WEBHOOK'); variables = @() } } } }
 function OnGitHub([hashtable]$envs, [hashtable]$state) {
     $base = @{ tokenCode = 200; code = 200; content = $svcAll; envCode = 200; envs = $envList; policies = $policies }
     foreach ($k in $state.Keys) { $base[$k] = $state[$k] }
