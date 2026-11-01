@@ -577,9 +577,6 @@ namespace Thornswood
             win.ContentRendered += delegate
             {
                 try { LogStartTime(); } catch (Exception ex) { Swallow.Note("Shell.Run, saying how long the start took", ex); }
-                // Message boxes belong to the window from here on, so they
-                // stay in front of it and keep it from being used meanwhile.
-                try { Ask.Owner = win.TryGetPlatformHandle().Handle; } catch (Exception ex) { Swallow.Note("Shell.Run, giving message boxes the window", ex); }
                 string self = Environment.ProcessPath;
                 ThreadPool.QueueUserWorkItem(delegate
                 {
@@ -608,6 +605,9 @@ namespace Thornswood
                     if (string.IsNullOrEmpty(said)) return;
                     try { Dispatcher.UIThread.Post((Action)delegate { Log(said); }); } catch (Exception ex) { Swallow.Note("Shell.Run, saying what the self update left", ex); }
                 });
+                // Message boxes belong to the window from here on, so they
+                // stay in front of it and keep it from being used meanwhile.
+                try { Ask.Owner = win.TryGetPlatformHandle().Handle; } catch (Exception ex) { Swallow.Note("Shell.Run, giving message boxes the window", ex); }
             };
 
             // Inside the screen at any display scale, before it is centred (#463).
