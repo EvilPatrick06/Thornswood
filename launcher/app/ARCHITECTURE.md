@@ -787,7 +787,9 @@ farewell names any it could not.
 
 **DevBuild** (DevBuild.cs). The second launcher in `<Root>-DevBuild`, made
 from the main one's files with the channel set to dev and the dev ports (game
-7787, voice 7789). It is installed and opened from the Server card on the main
+7787, voice 7789). Its program is copied from the folder the running exe is
+in (Velopack's `current\`), the `.exe` and `.dll` files only, into
+`<Root>-DevBuild\Launcher`. It is installed and opened from the Server card on the main
 build's Play page (`Shell.cs DrawServerPick()`, `SwitchToDev()`), which checks
 the person's Discord roles before it offers the install (#605); `MainRoot` and
 `MainExe` are the way back the dev build's own Server card opens the main
