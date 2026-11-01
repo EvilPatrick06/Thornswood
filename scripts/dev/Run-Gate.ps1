@@ -125,6 +125,17 @@
   harness's, for the ops repository's trace-gate.yml (#4013), the trace taken by hand
   (scripts\dev\Trace-Gate.ps1). A main build the trace task traces writes
   its own in <runner>\trace.
+
+.PARAMETER Report
+  A JUnit file for this share, as Nightly-Harnesses.ps1 -Report writes it:
+  a test case for each check (#5295). build.yml's job "Gate report" merges
+  every share's into one. A share with nothing to run writes one with no
+  harnesses in it, so the merge still counts every share.
+
+.PARAMETER Summary
+  Where this run's checks go for a run's page, as Nightly-Harnesses.ps1
+  -Summary writes them (#5295). The gate's shares leave that to the job
+  "Gate report"; this is for a run of its own.
 #>
 [CmdletBinding()]
 param(
@@ -134,7 +145,9 @@ param(
     [int]$Throttle = 6,
     [int]$BudgetSeconds = 1800,
     [int]$AnswerSeconds = 60,
-    [string]$StartLog = ''
+    [string]$StartLog = '',
+    [string]$Report = '',
+    [string]$Summary = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -394,13 +407,22 @@ if ($Of -gt 1) {
 }
 
 $code = 0
+$title = $(if ($Of -gt 1) { 'Gate harnesses, share {0} of {1}' -f $Shard, $Of } else { 'Gate harnesses' })
 if ($run.Count) {
     $with = @{ Only = ($run -join ' '); Throttle = $Throttle; Share = $share; BudgetSeconds = $BudgetSeconds }
     if ($trace) { $with.StartLog = $trace.Starts } elseif ($StartLog) { $with.StartLog = $StartLog }
+    if ($Report) { $with.Report = $Report }
+    if ($Summary) { $with.Summary = $Summary; $with.Title = $title }
     & (Join-Path $Here 'Nightly-Harnesses.ps1') @with
     $code = $LASTEXITCODE
 } else {
     Say 'No gate harness can be affected by this change, so none runs.'
+    if ($Report) {
+        $full = [IO.Path]::GetFullPath($Report)
+        New-Item -ItemType Directory -Path (Split-Path -Parent $full) -Force | Out-Null
+        [IO.File]::WriteAllText($full, '<?xml version="1.0" encoding="utf-8"?>' + "`n" + '<testsuites name="harnesses" tests="0" failures="0" skipped="0" time="0"></testsuites>' + "`n")
+    }
+    if ($Summary) { [IO.File]::AppendAllText([IO.Path]::GetFullPath($Summary), "## $title`n`nNo gate harness can be affected by this change, so none ran.`n") }
 }
 if ($trace) {
     Write-Whole (Join-Path $trace.Dir 'done.json') (([ordered]@{ key = $trace.Key; code = $code }) | ConvertTo-Json -Compress)

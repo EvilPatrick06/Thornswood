@@ -382,7 +382,58 @@ jobs:
           # 2400 of the job's 45 minutes: a harness starts only when its
           # whole clock still fits, so the list of what failed is printed
           # before the job could be cancelled.
-          .\scripts\dev\Nightly-Harnesses.ps1 -Shard ${{ matrix.shard }} -Of 2 -BudgetSeconds 2400
+          # One report (#5295): each share keeps a test case for every check,
+          # and the job "Harness report" merges both shares' into one.
+          .\scripts\dev\Nightly-Harnesses.ps1 -Shard ${{ matrix.shard }} -Of 2 -BudgetSeconds 2400 -Report (Join-Path $env:RUNNER_TEMP 'harness-report\share.xml')
+
+      - name: Keep this share's report for the harness report
+        if: ${{ !cancelled() }}
+        # The share's verdict is its harnesses'. When this upload fails, the
+        # report job names this share as having left no report and is red,
+        # so the failure is said where the report is read.
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: harness-report-${{ matrix.shard }}
+          path: ${{ runner.temp }}/harness-report/share.xml
+          if-no-files-found: ignore
+          # Read by the report job of this run, minutes later, and by
+          # nothing after it.
+          retention-days: 1
+
+  harness-report:
+    # The night's checks in one report (#5295): both shares' merged, kept
+    # with the run, and every failing check named by harness on the run's
+    # page. A share that left no report is named and turns this red.
+    name: Harness report
+    needs: harnesses
+    if: ${{ !cancelled() && needs.harnesses.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          sparse-checkout: scripts/dev/Merge-HarnessReports.ps1
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: harness-report-*
+          path: ${{ runner.temp }}/harness-reports
+      - name: Merge the shares' reports into one
+        shell: pwsh
+        run: |
+          $in = Join-Path $env:RUNNER_TEMP 'harness-reports'
+          New-Item -ItemType Directory -Path $in -Force | Out-Null
+          .\scripts\dev\Merge-HarnessReports.ps1 -Path $in -Expect 2 -Out (Join-Path $env:RUNNER_TEMP 'harness-report.xml') -Title 'Nightly harnesses'
+          exit $LASTEXITCODE
+      - name: Keep the merged report with the run
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: harness-report
+          path: ${{ runner.temp }}/harness-report.xml
+          if-no-files-found: ignore
+          retention-days: 14
 
   bot:
     # The bot harnesses install discord.py from pypi. While the repository
