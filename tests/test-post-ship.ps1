@@ -196,7 +196,10 @@ $marksCall = @($allCalls | Where-Object { $_.Extent.Text -match "'Refresh-DevNew
 # Since 22 Oct a third, on main only, closes the Done issues the release
 # carries, after the tag, with the commit the release record names
 # (Close-ShippedIssues.ps1, tests\test-3279-close-shipped.ps1, #3279).
-$closeCall = @($allCalls | Where-Object { $_.Extent.Text -match "'Close-ShippedIssues\.ps1'" })
+$closeCall = @($allCalls | Where-Object { $_.Extent.Text -match "'Close-ShippedIssues\.ps1'" -and $_.Extent.Text -notmatch 'Dev = \$true' })
+# Since 1 Nov a fourth, on dev only, writes the Dev test tasks the dev
+# release carries, with the same script and -Dev (#5199).
+$devTaskCall = @($allCalls | Where-Object { $_.Extent.Text -match "'Close-ShippedIssues\.ps1'" -and $_.Extent.Text -match 'Dev = \$true' })
 $calls = @($allCalls | Where-Object { $_.Extent.Text -notmatch "'(Refresh-DevNews|Close-ShippedIssues)\.ps1'" })
 Yes ("  Ship has one Invoke-PostShip call for the remirror ({0})" -f $calls.Count) ($calls.Count -eq 1)
 Yes ("  and one for the dev feed's DEV marks, main only, never on a dry run ({0})" -f $marksCall.Count) (
@@ -207,6 +210,10 @@ Yes ("  and one closing the Done issues it carries, main only, never on a dry ru
     @(Conditions $closeCall[0] | Where-Object { $_ -match '-not \$DryRun\b' }).Count -gt 0 -and
     $closeCall[0].Extent.Text -match 'Commit = \$tagged\.Commit' -and
     $closeCall[0].Extent.StartOffset -gt $shipSrc.IndexOf('$tagged = Add-ReleaseTag'))
+Yes ("  and one writing the Dev test tasks it carries, dev only, never on a dry run, after the tag, with the release's name ({0})" -f $devTaskCall.Count) (
+    $devTaskCall.Count -eq 1 -and @(Conditions $devTaskCall[0] | Where-Object { $_ -match '-not \$DryRun\b' -and $_ -match '-and \$Dev\b' }).Count -gt 0 -and
+    $devTaskCall[0].Extent.Text -match 'Commit = \$tagged\.Commit' -and $devTaskCall[0].Extent.Text -match 'Build = \$devName' -and
+    $devTaskCall[0].Extent.StartOffset -gt $shipSrc.IndexOf('$tagged = Add-ReleaseTag'))
 $atPublish = $shipSrc.IndexOf("& (Join-Path `$Here 'Publish-Update.ps1') @pubArgs")
 $atNews = $shipSrc.IndexOf("'..\ops\Publish-News.ps1'")
 $atAnnounce = $shipSrc.IndexOf("'..\vps\Request-Restart.ps1'")

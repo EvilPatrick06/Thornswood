@@ -3092,6 +3092,27 @@ if (-not $DryRun -and -not $Dev -and $global:ThornswoodPublishedRelease) {
     }
 }
 
+# A DEV RELEASE WRITES THE DEV TEST TASKS IT CARRIES (#5199). A Dev test task
+# is for developers and goes up as soon as a dev release carries the fix
+# (Patrick, 22 Oct), which was a hand step with no owner. The same script,
+# with -Dev and this release's name: each issue in Done whose Dev block this
+# release carries gets that block with its Build: line naming this release,
+# and the bot posts it in #dev-test-tasks. Nothing is closed.
+if (-not $DryRun -and $Dev -and $global:ThornswoodPublishedRelease) {
+    Head 'The Dev test tasks it carries'
+    $devName = [string]$global:ThornswoodPublishedRelease
+    if ($tagged.Commit) {
+        Invoke-PostShip 'writing the Dev test tasks it carries' 'Close-ShippedIssues.ps1' @{ Commit = $tagged.Commit; RepoDir = $RepoDir; NoPause = $true; Dev = $true; Build = $devName } `
+            ".\scripts\release\Close-ShippedIssues.ps1 -Commit $($tagged.Commit) -Dev -Build $devName"
+    } else {
+        Say '  not written: the release record names no commit, so what this release carries is not known' 'Red'
+        $script:PostShipFailed += [pscustomobject]@{
+            What     = 'the Dev test tasks it carries were not written'
+            PutRight = ".\scripts\release\Close-ShippedIssues.ps1 -Commit (git rev-parse HEAD) -Dev -Build $devName"
+        }
+    }
+}
+
 Head 'Done'
 # Repeated here on purpose. A red line in the middle of a release log is a line
 # nobody reads: the last screen is the one that gets looked at.
