@@ -337,8 +337,8 @@ namespace Thornswood
         /// profile id, so two people on two different machines both connected
         /// as profile 2 and both loaded the same character:
         ///
-        ///     Connecting a user 1 with ip 216.82.9.54   -> 1 logged as 2
-        ///     Connecting a user 2 with ip 24.168.10.118 -> 2 logged as 2
+        ///     Connecting a user 1 with ip 203.0.113.10  -> 1 logged as 2
+        ///     Connecting a user 2 with ip 203.0.113.20  -> 2 logged as 2
         ///     Loading character ff000000                (the same one, twice)
         ///
         /// Which also meant creation never ran for either of them: the server
