@@ -267,6 +267,14 @@ $(Get-ThornswoodServiceAccountScript)
   `$node = Get-Command node -ErrorAction SilentlyContinue
   `$nodeExe = if (`$node) { `$node.Source } elseif (Test-Path -LiteralPath 'C:\Program Files\nodejs\node.exe') { 'C:\Program Files\nodejs\node.exe' } else { '' }
   if (-not `$passWhy -and -not `$nodeExe) { `$passWhy = 'node is not installed on this machine' }
+  # The bot connects through dev's own engine (createBotClient, skymp fork
+  # #137). With an engine older than that every pass would fail, so the pass
+  # waits for a dev release that carries it, and this says so.
+  `$devEngine = 'C:\Thornswood-Server-Dev\scam_native.node'
+  if (-not `$passWhy) {
+    try { `$hasBot = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes(`$devEngine)).Contains('createBotClient') } catch { `$hasBot = `$false; `$passWhy = 'dev''s engine could not be read: ' + `$_.Exception.Message }
+    if (-not `$passWhy -and -not `$hasBot) { `$passWhy = 'dev''s engine has no createBotClient (skymp fork #137); run this again once a dev release carries it' }
+  }
   if (-not `$passWhy) {
     try {
       foreach (`$d in `$passRoot, (Join-Path `$passRoot 'run'), (Join-Path `$passRoot 'plugins')) { if (-not (Test-Path -LiteralPath `$d)) { New-Item -ItemType Directory -Path `$d | Out-Null } }

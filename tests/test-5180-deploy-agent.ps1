@@ -126,6 +126,7 @@ try {
             Yes '  at below normal priority, on demand, with a time limit' ($t.Contains('-Priority 7') -and $t.Contains('-ExecutionTimeLimit (New-TimeSpan -Minutes 40)') -and -not ($t -match 'TaskName \$passTask[^\r\n]*-Trigger'))
             $safe = $t.IndexOf('Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach -Own $passRoot')
             Yes '  and the fail-safe on what no service may read comes first' ($safe -gt 0 -and $safe -lt $t.IndexOf('Register-ScheduledTask -TaskName $passTask'))
+            Yes '  and only once dev''s engine has the bot client (skymp #137)' ($t.Contains("Contains('createBotClient')") -and $t.IndexOf("Contains('createBotClient')") -lt $t.IndexOf('Register-ScheduledTask -TaskName $passTask'))
             Yes '  and names the folder in agent.json only once the task is set up' ($t.Contains('-NotePropertyName botPassRoot') -and $t.Contains('$noPass = [bool]0'))
             $off = Probe 'Install-DeployAgent.ps1' 'INSTALLED: probe' @('-Repo', 'O/R', '-NoBotPass')
             Yes '  -NoBotPass sends a script that parses and leaves the bot pass off' ($null -ne $off -and $off.Parses -and $off.Text.Contains('$noPass = [bool]1'))

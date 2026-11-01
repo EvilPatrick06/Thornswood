@@ -150,8 +150,9 @@ The bot pass rides in the gamemode Release as a part of its own, `bot`
 checks a gamemode comes from the same commit and is signed with it. A change
 to the bot alone makes a Release too.
 
-Setting it up is part of `Install-DeployAgent`: the fail-safe on what no
-service may read comes first, the task is registered on LOCAL SERVICE and
+Setting it up is part of `Install-DeployAgent`, once dev's engine has the
+bot client (`createBotClient`, skymp fork #137; the install checks and
+says so). The fail-safe on what no service may read comes first, the task is registered on LOCAL SERVICE and
 given its folder, and only then does `agent.json` name the folder
 (`botPassRoot`). It is never put on SYSTEM: when any of that cannot be
 done, the install says `BOT PASS NOT SET UP` and why, and Deployments go in
