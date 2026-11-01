@@ -547,7 +547,7 @@ if (Has 'gh') {
   $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
   & gh auth status *> $null; $ghOk = ($LASTEXITCODE -eq 0)
   $ErrorActionPreference = $old
-  Row 'gh, signed in to GitHub' $ghOk '' 'gh auth login   (an account that is a collaborator on EvilPatrick06/Thornswood)'
+  Row 'gh, signed in to GitHub' $ghOk '' 'gh auth login   (an account that is a collaborator on ThornswoodRP/Thornswood)'
 } else { Row 'gh, signed in to GitHub' $false 'gh is not installed' 'winget install --id GitHub.cli -e, then gh auth login' }
 Row 'PowerShell 7' (Has 'pwsh') '' 'winget install --id Microsoft.PowerShell -e'
 Row 'node' (Has 'node') '' 'winget install --id OpenJS.NodeJS.LTS -e'

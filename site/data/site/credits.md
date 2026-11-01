@@ -44,17 +44,17 @@ connect to runs on SkyMP as well. Six of those files, and the server's engine,
 are built from Thornswood's public copy of SkyMP, with Thornswood's changes on
 top:
 
-**[github.com/EvilPatrick06/skymp](https://github.com/EvilPatrick06/skymp)**, on
+**[github.com/ThornswoodRP/skymp](https://github.com/ThornswoodRP/skymp)**, on
 the branch `thornswood/engine-changes`. Anybody can read it or download it,
 with no account.
 
 <!-- engine-pin:credits -->
 The server's engine recorded for the next release, `scam_native.node`, is
 built from one commit,
-[`ce9f925a`](https://github.com/EvilPatrick06/skymp/tree/ce9f925a14d194f56671ed6241562e358ac9ac9e).
+[`ce9f925a`](https://github.com/ThornswoodRP/skymp/tree/ce9f925a14d194f56671ed6241562e358ac9ac9e).
 That commit starts from
 [SkyMP](https://github.com/skyrim-multiplayer/skymp) at `2849e676`, and
-[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...ce9f925a)
+[every change Thornswood made](https://github.com/ThornswoodRP/skymp/compare/2849e676...ce9f925a)
 is the difference between the two.
 <!-- /engine-pin:credits -->
 
@@ -93,7 +93,7 @@ which library is in which file. The installer puts that folder in your
 Thornswood folder. Frida is Frida's own build, with other libraries inside
 it, and the note names where their source is: one archive of each, at the
 commit Frida built it from, on
-**[Thornswood's release of Frida's sources](https://github.com/EvilPatrick06/Thornswood/releases/tag/frida-sources-16.0.19)**.
+**[Thornswood's release of Frida's sources](https://github.com/ThornswoodRP/Thornswood/releases/tag/frida-sources-16.0.19)**.
 Until that repository is public, the same commits are in Thornswood's
 copies of Frida's repositories, which the note names too.
 

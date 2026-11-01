@@ -216,7 +216,7 @@ try {
     $stubBytes = [byte[]](0x4D, 0x5A, 1, 2, 3, 4)
     $stubSha = -join ([Security.Cryptography.SHA256]::Create().ComputeHash($stubBytes) | ForEach-Object { $_.ToString('x2') })
     $sumsOk = [Text.Encoding]::ASCII.GetBytes("aaaa$('0' * 60)  Thornswood.exe`n$stubSha  setup-stub.exe`n")
-    $repoName = 'EvilPatrick06/Thornswood'
+    $repoName = 'ThornswoodRP/Thornswood'
 
     $gh.Releases = @((New-Rel 7 'v1.2.8' $true @{ 'setup-stub.exe' = $stubBytes; 'SHA256SUMS' = $sumsOk }), (New-Rel 6 'v1.2.7' $false @{}))
     $into = Join-Path $Scratch 'stub'

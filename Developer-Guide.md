@@ -4,7 +4,7 @@ This is the one guide for working on Thornswood. A first day starts at section 1
 
 The outline nests, and the table of contents follows it. A part is a numbered section. A group inside it is a subsection. A step inside that is a sub-subsection.
 
-- Repository: https://github.com/EvilPatrick06/Thornswood
+- Repository: https://github.com/ThornswoodRP/Thornswood
 - Board: https://github.com/users/EvilPatrick06/projects/1
 - Site: https://thornswood.net
 - Staff pages: https://thornswood.net/hub
@@ -277,7 +277,7 @@ Choose GitHub.com, then HTTPS, then login with a browser, as the GitHub user tha
 ```powershell
 New-Item -ItemType Directory -Force -Path C:\Dev | Out-Null
 cd C:\Dev
-git clone https://github.com/EvilPatrick06/Thornswood.git
+git clone https://github.com/ThornswoodRP/Thornswood.git
 cd C:\Dev\Thornswood
 git status
 ```
@@ -320,7 +320,7 @@ baseline are on the VPS (#907).
 
 ```
 cd C:\Users\<you>\Downloads
-git clone https://github.com/EvilPatrick06/Thornswood.git Thornswood-Repo
+git clone https://github.com/ThornswoodRP/Thornswood.git Thornswood-Repo
 gh auth login
 gh auth status
 ```
@@ -448,14 +448,14 @@ by hand, and no secret is written into the repository.
 
 | What a Ship needs | On One | A second machine |
 | --- | --- | --- |
-| The source | the shared clone | `git clone https://github.com/EvilPatrick06/Thornswood.git` and `gh auth login` as a collaborator |
+| The source | the shared clone | `git clone https://github.com/ThornswoodRP/Thornswood.git` and `gh auth login` as a collaborator |
 | The feed, its baseline, the launcher list and history | the VPS store, with a working copy in `%LOCALAPPDATA%\Thornswood\feed\<channel>` | Nothing to copy: every Ship receives them from the VPS first (`scripts\release\Feed-Store.ps1`, #907). The working copy is made on the first Ship |
 | The release webhooks, dev and #news | the VPS, `C:\Thornswood-Bot\webhooks`; One has no local copy | Nothing to copy: Ship reads them over ssh (`scripts\ops\Discord-Hook.ps1`) |
 | VPS access | One's own key, `.ssh\thornswood_ed25519`, and its own bridge token, `.ssh\thornswood-box-token` | Its own key and token: `.\scripts\vps\Setup-SshKey.ps1`, and somebody the VPS already knows runs `.\scripts\vps\Grant-BoxAccess.ps1 -Name <machine> -FromClipboard` with the line it prints (`docs\BOX-ACCESS.md` in the private ops repo). With no such machine left, the BisectHosting panel is the way in (`docs\IT-IS-DOWN.md` in the private ops repo) |
 | Signing: `records\signing\signing.json` | written from the template like any other machine's since 5 Oct, when `C:\tools` (an older copy of `metadata.json`) was removed. Never copy one machine's to another | `.\scripts\release\Setup-ShipMachine.ps1` writes one from `records\signing\signing.template.json` (paths and "enabled": true, no key or password) |
 | Signing: Microsoft's signing client | `records\signing\client`, ignored by git | The same script fetches `Microsoft.ArtifactSigning.Client` 1.0.128 from nuget.org and refuses it unless its sha256 is the pinned one, which is the package One has |
 | Signing: the Azure sign in | `az login` on One, as Patrick | `az login` on the new machine, as the person who ships from it, with an account of their own in the signing tenant that holds the Certificate Profile Signer role on the ThornswoodSigning account's profile ThornswoodRelease (Patrick, 4 Oct; #1740). Patrick makes the account and gives the role once: [Your own signing sign in](#your-own-signing-sign-in). The script asks the signing service with that sign in and checks the profile answers with the identity the launcher pins |
-| The client runtime `records\client-build.json` names | only in the dev game folder, `C:\Thornswood-DevBuild\Game`. The build copies in `Downloads\Thornswood-ClientBuild-<commit>` are older builds, and the shared clone's `engine\skymp\build` does not match the record | Setup-ShipMachine records CI's build of the pin as the machine's engine build (`-EngineBuild ci`, which it does by itself on a machine with no engine build), and `Get-EngineArtifact.ps1` fetches the public fork's build of the pin, `thornswood-engine-<fork commit>` from EvilPatrick06/skymp (#3540), and holds every file to both records. A build made on the machine is not the recorded bytes (engine\README.md, "A Ship machine takes CI's build") |
+| The client runtime `records\client-build.json` names | only in the dev game folder, `C:\Thornswood-DevBuild\Game`. The build copies in `Downloads\Thornswood-ClientBuild-<commit>` are older builds, and the shared clone's `engine\skymp\build` does not match the record | Setup-ShipMachine records CI's build of the pin as the machine's engine build (`-EngineBuild ci`, which it does by itself on a machine with no engine build), and `Get-EngineArtifact.ps1` fetches the public fork's build of the pin, `thornswood-engine-<fork commit>` from ThornswoodRP/skymp (#3540), and holds every file to both records. A build made on the machine is not the recorded bytes (engine\README.md, "A Ship machine takes CI's build") |
 | The game folder the Ship packs, `<root>-DevBuild\Game` | built by the dev launcher from what Vortex deployed | Skyrim Special Edition on Steam, Vortex with a profile named Thornswood and the Thornswood collection installed and deployed, the launcher from thornswood.net, then the dev build and its own game folder (Setting up a machine, above). A person does this; it needs a Nexus account, not Patrick's |
 | The collection itself | Nexus collection `7essxf`, curated from Patrick's Nexus account in his Vortex | Any machine installs it. Only publishing a new revision needs his account (`docs\OWNERSHIP.md` in the private ops repo) |
 | Backups | the originals on the VPS, `C:\Thornswood-Backup`, and copies fetched to `local\backups` in One's repository folder (`.\scripts\release\Where.ps1 Backups`); the passphrase on the VPS and in One's Documents | Not needed to Ship. `.\scripts\vps\Fetch-Backups.ps1` brings them down to any machine the VPS knows |
@@ -1038,7 +1038,7 @@ How to use it:
   the card's Order the same way, and the label is deleted afterwards. A cloud
   Claude thread is refused GraphQL, which the board needs, so these labels
   are how it moves a card:
-  `gh api -X POST repos/EvilPatrick06/Thornswood/issues/<N>/labels -f "labels[]=board: In Progress"`.
+  `gh api -X POST repos/ThornswoodRP/Thornswood/issues/<N>/labels -f "labels[]=board: In Progress"`.
   To see the cards, `pwsh scripts/ops/Read-Board.ps1` starts
   `.github\workflows\board-read.yml`, which reads every card's Status and
   Order on a VPS runner and changes nothing, and writes them to board.json
@@ -1435,7 +1435,7 @@ The short form of the rules. The same decisions, with the dates they were made, 
   off today, which is why the admin account is not held to main's rules.
   Check which it is rather than assuming, because this paragraph was wrong
   for a day before anybody looked:
-  `gh api repos/EvilPatrick06/Thornswood/branches/main/protection`
+  `gh api repos/ThornswoodRP/Thornswood/branches/main/protection`
 ##### Branch names
 
 - Everybody's work goes on a branch named for whoever did it:
@@ -1547,7 +1547,7 @@ The short form of the rules. The same decisions, with the dates they were made, 
   - Before a session ends, the same look in both repositories, locally
     too: `git worktree list`, `git branch`, `gh pr list` and
     `git ls-remote --heads origin`, here and in `engine\skymp` (and
-    `gh pr list -R EvilPatrick06/skymp`). Each of yours still there is open
+    `gh pr list -R ThornswoodRP/skymp`). Each of yours still there is open
     work with the reason it is open written on its issue, or it goes.
 ##### Signing, the build check, and the six shared files
 
@@ -1643,7 +1643,7 @@ this is the long form.
   a pull request touches one of the shared files, and blocks nothing while
   the code owner review is off. The settings change without a commit, so
   read them rather than this paragraph:
-  `gh api repos/EvilPatrick06/Thornswood/branches/main/protection`
+  `gh api repos/ThornswoodRP/Thornswood/branches/main/protection`
 - **One fix per pull request.** A branch that changes eight things is eight
   reviews at once; split it.
 - **`git pull` before anything.** A conflicting pull is resolved on your
@@ -2029,7 +2029,7 @@ release, launcher, game files and server together, are in How work moves.
 
 | Piece | Where | What it is |
 | --- | --- | --- |
-| Source repo | github.com/EvilPatrick06/Thornswood (private), clone at `C:\Users\<you>\Downloads\Thornswood-Repo` | Launcher source, plugins, site, bot, every script |
+| Source repo | github.com/ThornswoodRP/Thornswood (private), clone at `C:\Users\<you>\Downloads\Thornswood-Repo` | Launcher source, plugins, site, bot, every script |
 | Feed store | On the VPS beside the feed the site serves: `C:\Thornswood-Docs\feed\{version.json, published.json, launchers.txt, history\}` and the same under `feed-dev`. Each machine's working copy is `%LOCALAPPDATA%\Thornswood\feed\main` and `\dev` | `version.json` (the feed, served at `/feed[-dev]/version.json`), `published.json` (the pack baseline), every launcher version the channel published, and each replaced file, none of those three served. Ship receives and sends them through `scripts\release\Feed-Store.ps1` (#907). Until then they were the `Thornswood-Releases` GitHub repository and its two clones |
 | Downloads | On the VPS, `C:\Thornswood-Docs\feed\assets` and `feed-dev\assets`, served at `https://thornswood.net/feed[-dev]/assets/<sha256>` | Every pack, launcher exe and client runtime a feed names, one file per sha256, one folder per channel (`docs\FEED.md` "Downloads come from the site") |
 | Launcher | `launcher\app\*.cs` + `launcher\ui.xaml`, built by `scripts\release\Build-Launcher.ps1` with MSBuild from `launcher\app\Thornswood.csproj`, C# 13 (#498) | WPF app at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on most machines); profile, config and packs under that folder. The scripts find the install on whichever fixed drive holds it; `-Root` overrides |
@@ -2043,7 +2043,7 @@ release, launcher, game files and server together, are in How work moves.
 | Bot | `bot`, on the VPS at `C:\Thornswood-Bot`, the Windows service `ThornswoodBot` under its own account, `NT SERVICE\ThornswoodBot` | discord.py: tickets, join cards, staff tools |
 | Watchdog | `C:\Thornswood-Watch\watch.ps1`, every five minutes | Restarts any service that stops answering, three tries an hour, and tells #staff-updates (the id in `bot\staff-channel.txt`) once when anything dies and once when it is back: the servers, voice, the site, the bot, the nightly backup, the build runner and the disk. Through the bot, or its own webhook when the bot is down. A server stopped on purpose is held (`C:\Thornswood-Watch\holds`, #5155): left alone until its hold runs out, 30 minutes unless the stop says, 2 hours at most, then told once and started. Every script that stops a server writes and removes its own hold; a stop by hand in a run note is held with `.\scripts\vps\Hold-Server.ps1 -Service <name> -Why "<why>"` first and `-Clear` after, or from a cloud thread `pwsh scripts/vps/Box-Run.ps1 -Line 'Hold-Server -Service <name> -Why "<why>"'`. Its install is the gate verb `Watch-Services -Install` |
 
-The server's SkyMP fork is on GitHub (github.com/EvilPatrick06/skymp, branch
+The server's SkyMP fork is on GitHub (github.com/ThornswoodRP/skymp, branch
 `thornswood/engine-changes`), so its source survives any one machine, and since
 25 September it is the `engine\skymp` submodule of this repository, pinned to
 the commit the build records name: `git submodule update --init engine/skymp`
@@ -2329,7 +2329,7 @@ Each letter stands on its own: what the thing is, then the commands. The numbere
 
 ### A. GitHub
 
-GitHub is the website copy of the repository, at https://github.com/EvilPatrick06/Thornswood. Your PC and GitHub each hold the history. `origin` is the name Git uses for the GitHub copy.
+GitHub is the website copy of the repository, at https://github.com/ThornswoodRP/Thornswood. Your PC and GitHub each hold the history. `origin` is the name Git uses for the GitHub copy.
 
 #### Sign in and look
 
@@ -2352,7 +2352,7 @@ The Pull requests tab lists open pull requests. `gh pr create` adds yours. The s
 - [Hello World on GitHub](https://docs.github.com/en/get-started/quickstart/hello-world), the first-time walkthrough
 - [About pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests)
 - [GitHub flow](https://docs.github.com/en/get-started/using-github/github-flow), the short version of branch, pull request, merge
-- This repository: https://github.com/EvilPatrick06/Thornswood
+- This repository: https://github.com/ThornswoodRP/Thornswood
 - The board: https://github.com/users/EvilPatrick06/projects/1
 
 ### B. Git
@@ -2812,10 +2812,10 @@ An edit to one of them that blocks others' work gets a line in #dev-coordination
 
 #### Learn more about the repository
 
-- The repository on GitHub: https://github.com/EvilPatrick06/Thornswood
-- The launcher folder: https://github.com/EvilPatrick06/Thornswood/tree/main/launcher
-- The game folder: https://github.com/EvilPatrick06/Thornswood/tree/main/game
-- The scripts folder: https://github.com/EvilPatrick06/Thornswood/tree/main/scripts
+- The repository on GitHub: https://github.com/ThornswoodRP/Thornswood
+- The launcher folder: https://github.com/ThornswoodRP/Thornswood/tree/main/launcher
+- The game folder: https://github.com/ThornswoodRP/Thornswood/tree/main/game
+- The scripts folder: https://github.com/ThornswoodRP/Thornswood/tree/main/scripts
 - How the launcher is built: [launcher/app/ARCHITECTURE.md](launcher/app/ARCHITECTURE.md)
 
 ### O. Others
@@ -2832,7 +2832,7 @@ Launcher code is C# 13, built with MSBuild from `launcher\app\Thornswood.csproj`
 
 #### SkyMP
 
-The game server is SkyMP. The fork's source is on GitHub at github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`, and it is the `engine\skymp` submodule of this repository. `git submodule update --init engine/skymp` fetches it. It is large. A machine that only copies server binaries can leave it unfetched. Building it needs Visual Studio, and [Setting up a machine](#setting-up-a-machine) gives that command.
+The game server is SkyMP. The fork's source is on GitHub at github.com/ThornswoodRP/skymp, branch `thornswood/engine-changes`, and it is the `engine\skymp` submodule of this repository. `git submodule update --init engine/skymp` fetches it. It is large. A machine that only copies server binaries can leave it unfetched. Building it needs Visual Studio, and [Setting up a machine](#setting-up-a-machine) gives that command.
 
 #### HTML
 
@@ -2905,13 +2905,13 @@ An overlay change uses the same `Go.ps1 -SkipServer` as the HTML section, with t
 - CSS, the web.dev course: https://web.dev/learn/css
 - JavaScript, the web.dev course: https://web.dev/learn/javascript
 - JavaScript, the long written guide: https://javascript.info/
-- The public pages in this repository: https://github.com/EvilPatrick06/Thornswood/tree/main/site/public
-- The in-game page in this repository: https://github.com/EvilPatrick06/Thornswood/tree/main/game/ui
+- The public pages in this repository: https://github.com/ThornswoodRP/Thornswood/tree/main/site/public
+- The in-game page in this repository: https://github.com/ThornswoodRP/Thornswood/tree/main/game/ui
 - Python's tutorial: https://docs.python.org/3/tutorial/
 - Python downloads: https://www.python.org/downloads/
 - C# on Microsoft Learn: https://learn.microsoft.com/en-us/dotnet/csharp/
 - The .NET Framework: https://learn.microsoft.com/en-us/dotnet/framework/
-- The SkyMP fork this server builds from: https://github.com/EvilPatrick06/skymp
+- The SkyMP fork this server builds from: https://github.com/ThornswoodRP/skymp
 
 ### P. Secrets, by name and place, never by value
 

@@ -113,14 +113,14 @@ function New-World { return @{ head = $H; prs = @(); files = @{}; branchPin = $n
 function Get-Answer($w) {
     return {
         param([string]$path)
-        if ($path -like 'repos/EvilPatrick06/skymp/branches/*') { return [pscustomobject]@{ commit = [pscustomobject]@{ sha = $w.head } } }
-        if ($path -like 'repos/EvilPatrick06/Thornswood/pulls?state=open*') { return , @($w.prs) }
-        if ($path -match '^repos/EvilPatrick06/Thornswood/pulls/(\d+)/files') { return , @($w.files[[int]$Matches[1]]) }
-        if ($path -like 'repos/EvilPatrick06/Thornswood/contents/engine/skymp*') { if ($w.branchPin) { return [pscustomobject]@{ sha = $w.branchPin } } ; throw 'Not Found (HTTP 404)' }
-        if ($path -like 'repos/EvilPatrick06/skymp/actions/workflows/*') { return [pscustomobject]@{ workflow_runs = @($w.forkRuns) } }
-        if ($path -match '^repos/EvilPatrick06/skymp/actions/runs/(\d+)/artifacts') { return [pscustomobject]@{ artifacts = @($w.arts[[long]$Matches[1]]) } }
-        if ($path -like 'repos/EvilPatrick06/Thornswood/actions/workflows/engine.yml/runs*') { return [pscustomobject]@{ workflow_runs = @($w.engineRuns) } }
-        if ($path -match '^repos/EvilPatrick06/skymp/compare/([0-9a-f]{40})\.\.\.([0-9a-f]{40})$') {
+        if ($path -like 'repos/ThornswoodRP/skymp/branches/*') { return [pscustomobject]@{ commit = [pscustomobject]@{ sha = $w.head } } }
+        if ($path -like 'repos/ThornswoodRP/Thornswood/pulls?state=open*') { return , @($w.prs) }
+        if ($path -match '^repos/ThornswoodRP/Thornswood/pulls/(\d+)/files') { return , @($w.files[[int]$Matches[1]]) }
+        if ($path -like 'repos/ThornswoodRP/Thornswood/contents/engine/skymp*') { if ($w.branchPin) { return [pscustomobject]@{ sha = $w.branchPin } } ; throw 'Not Found (HTTP 404)' }
+        if ($path -like 'repos/ThornswoodRP/skymp/actions/workflows/*') { return [pscustomobject]@{ workflow_runs = @($w.forkRuns) } }
+        if ($path -match '^repos/ThornswoodRP/skymp/actions/runs/(\d+)/artifacts') { return [pscustomobject]@{ artifacts = @($w.arts[[long]$Matches[1]]) } }
+        if ($path -like 'repos/ThornswoodRP/Thornswood/actions/workflows/engine.yml/runs*') { return [pscustomobject]@{ workflow_runs = @($w.engineRuns) } }
+        if ($path -match '^repos/ThornswoodRP/skymp/compare/([0-9a-f]{40})\.\.\.([0-9a-f]{40})$') {
             $k = $Matches[1] + '...' + $Matches[2]
             if ($w.compare.ContainsKey($k)) { return [pscustomobject]@{ status = $w.compare[$k] } }
         }
@@ -128,7 +128,7 @@ function Get-Answer($w) {
     }.GetNewClosure()
 }
 function Step($w, [string]$pin = $P) { return (Get-EnginePinStep $pin (Get-Answer $w)) }
-$green = [pscustomobject]@{ id = 7; status = 'completed'; conclusion = 'success'; head_sha = $H; head_branch = 'thornswood/engine-changes'; event = 'push'; html_url = 'https://example/7'; repository = [pscustomobject]@{ id = 1375283516; full_name = 'EvilPatrick06/skymp' }; head_repository = [pscustomobject]@{ id = 1375283516; full_name = 'EvilPatrick06/skymp' } }
+$green = [pscustomobject]@{ id = 7; status = 'completed'; conclusion = 'success'; head_sha = $H; head_branch = 'thornswood/engine-changes'; event = 'push'; html_url = 'https://example/7'; repository = [pscustomobject]@{ id = 1375283516; full_name = 'ThornswoodRP/skymp' }; head_repository = [pscustomobject]@{ id = 1375283516; full_name = 'ThornswoodRP/skymp' } }
 $art = [pscustomobject]@{ name = "thornswood-engine-$H"; expired = $false }
 
 $w = New-World
@@ -151,7 +151,7 @@ $s = Step $w
 Yes '  and with its pull request open, which is not a reason to stand aside' ($s.Step -eq 'ready' -and $s.Pr -eq 42)
 
 $w = New-World
-$w.forkRuns = @([pscustomobject]@{ id = 8; status = 'in_progress'; conclusion = $null; head_sha = $H; head_branch = 'thornswood/engine-changes'; event = 'push'; html_url = 'https://example/8'; repository = [pscustomobject]@{ id = 1375283516; full_name = 'EvilPatrick06/skymp' }; head_repository = [pscustomobject]@{ id = 1375283516; full_name = 'EvilPatrick06/skymp' } })
+$w.forkRuns = @([pscustomobject]@{ id = 8; status = 'in_progress'; conclusion = $null; head_sha = $H; head_branch = 'thornswood/engine-changes'; event = 'push'; html_url = 'https://example/8'; repository = [pscustomobject]@{ id = 1375283516; full_name = 'ThornswoodRP/skymp' }; head_repository = [pscustomobject]@{ id = 1375283516; full_name = 'ThornswoodRP/skymp' } })
 Yes 'building: the fork is still building the head' ((Step $w).Step -eq 'building')
 
 $w = New-World
@@ -163,7 +163,7 @@ Yes 'no-build: the fork has no build of the head' ((Step $w).Step -eq 'no-build'
 $E = '4444444444444444444444444444444444444444'
 $O = '5555555555555555555555555555555555555555'
 function Fork-Run([long]$id, [string]$sha, [string]$status, $conclusion) {
-    return [pscustomobject]@{ id = $id; status = $status; conclusion = $conclusion; head_sha = $sha; head_branch = 'thornswood/engine-changes'; event = 'push'; html_url = "https://example/$id"; repository = [pscustomobject]@{ id = 1375283516; full_name = 'EvilPatrick06/skymp' }; head_repository = [pscustomobject]@{ id = 1375283516; full_name = 'EvilPatrick06/skymp' } }
+    return [pscustomobject]@{ id = $id; status = $status; conclusion = $conclusion; head_sha = $sha; head_branch = 'thornswood/engine-changes'; event = 'push'; html_url = "https://example/$id"; repository = [pscustomobject]@{ id = 1375283516; full_name = 'ThornswoodRP/skymp' }; head_repository = [pscustomobject]@{ id = 1375283516; full_name = 'ThornswoodRP/skymp' } }
 }
 function New-Building {
     $w = New-World
@@ -216,17 +216,17 @@ Yes 'red: the newest record of the head ended red, which is said and never start
 # ---- 4. the notes -------------------------------------------------------------
 $fake = {
     param([string]$path)
-    if ($path -like 'repos/EvilPatrick06/skymp/compare/*') {
+    if ($path -like 'repos/ThornswoodRP/skymp/compare/*') {
         return [pscustomobject]@{ commits = @(
             [pscustomobject]@{ commit = [pscustomobject]@{ message = "Merge pull request #133 from EvilPatrick06/claude/x`n`nLoading" } },
             [pscustomobject]@{ commit = [pscustomobject]@{ message = 'A commit of its own' } },
             [pscustomobject]@{ commit = [pscustomobject]@{ message = 'Merge pull request #81 from EvilPatrick06/herald/y' } }) }
     }
-    if ($path -eq 'repos/EvilPatrick06/skymp/pulls/133') {
+    if ($path -eq 'repos/ThornswoodRP/skymp/pulls/133') {
         return [pscustomobject]@{ number = 133; title = 'The loading screen is cleared (Thornswood #3130)'
             body = "Fixes the flash.`r`n`r`nRelease note: The loading screen shows no flash`r`n- The screen stays dark until the picture is up.`r`n`r`nTest task for Thornswood #3130: No flash before the loading screen`r`nServer: Main`r`n`r`n1. Load in.`r`nWhat should happen: no flash.`r`n`r`n---`r`nfooter" }
     }
-    if ($path -eq 'repos/EvilPatrick06/skymp/pulls/81') { return [pscustomobject]@{ number = 81; title = 'An equipped form is not drunk'; body = $script:body81 } }
+    if ($path -eq 'repos/ThornswoodRP/skymp/pulls/81') { return [pscustomobject]@{ number = 81; title = 'An equipped form is not drunk'; body = $script:body81 } }
     throw "no answer for $path"
 }
 $script:body81 = 'Refs Thornswood #1649 and thornswood #1383.'

@@ -18,7 +18,7 @@
                     runners }: the runners it lists (thornswood-vps is 1,
                     thornswood-vps-<n> is n) carry the label and no other
                     runner does. The runners are registered to the private
-                    ops repository, EvilPatrick06/Thornswood-Ops, since
+                    ops repository, ThornswoodRP/Thornswood-Ops, since
                     this one went public (#4013, Patrick's A on #3685).
                     records/build-runners.json is the build cap
                     (#2994). A record may also list off-box runners by
@@ -63,7 +63,7 @@
                     secret_scanning, secret_scanning_push_protection,
                     allow_auto_merge, collaborators: [login] }] },
                     for Thornswood and
-                    the engine fork, EvilPatrick06/skymp, and no other
+                    the engine fork, ThornswoodRP/skymp, and no other
                     repository: each ruleset an entry names is on GitHub
                     with exactly its target, enforcement, conditions, rules
                     and bypass list, made or put back by name, and private
@@ -180,11 +180,16 @@ const PLAIN = 'box admin: not here';
 
 // Where the records are, and where the runners and the workflow that asks
 // are (#4013).
-const REPO = 'EvilPatrick06/Thornswood';
-const RUNNERS_REPO = 'EvilPatrick06/Thornswood-Ops';
-const OWNER = 'EvilPatrick06';
+const REPO = 'ThornswoodRP/Thornswood';
+const RUNNERS_REPO = 'ThornswoodRP/Thornswood-Ops';
+// The owner of the repositories (#5184).
+const OWNER = 'ThornswoodRP';
+// Patrick's own login, which owns the App and holds the organization. He is
+// never a collaborator a record lists and never one this takes off: after
+// the move into the organization GitHub may list him beside the others.
+const HOLDER = 'EvilPatrick06';
 // A run is known by its repository's id, which GitHub never changes, not by
-// its owner/name, which a move into the Thornswood organization changes
+// its owner/name, which a move into the ThornswoodRP organization changes
 // (#5184): matched by name, the box refused every admin run the moment the
 // ops repository moved, until this file was changed and the service put back
 // by hand. The workflow must be that same repository's own github-admin.yml
@@ -192,7 +197,7 @@ const OWNER = 'EvilPatrick06';
 const RULES = {
   iss: 'https://token.actions.githubusercontent.com',
   aud: 'thornswood-admin',
-  repositoryId: '1435123931', // EvilPatrick06/Thornswood-Ops (repos API, 1 Nov 2026)
+  repositoryId: '1435123931', // ThornswoodRP/Thornswood-Ops (repos API, 1 Nov 2026)
   ref: 'refs/heads/main',
   workflow: '/.github/workflows/github-admin.yml@refs/heads/main',
   events: ['workflow_dispatch'],
@@ -428,7 +433,7 @@ function checkCollaborators(repo, list) {
   for (const x of list) {
     if (typeof x !== 'string' || !LOGIN.test(x)) throw new Error(at + ': ' + JSON.stringify(x) + ' is not a GitHub login');
     const k = x.toLowerCase();
-    if (k === OWNER.toLowerCase()) throw new Error(at + ': the owner, ' + OWNER + ', is not a collaborator and is never listed');
+    if (k === OWNER.toLowerCase() || k === HOLDER.toLowerCase()) throw new Error(at + ': ' + x + ' owns these repositories, is not a collaborator and is never listed');
     if (seen[k]) throw new Error(at + ' names the collaborator ' + x + ' twice');
     seen[k] = true;
   }
@@ -444,7 +449,7 @@ function checkCollaborators(repo, list) {
 // GitHub's do. The owner is never dropped.
 function planCollaborators(list, have, invites) {
   const named = k => list.some(x => x.toLowerCase() === k.toLowerCase());
-  const logins = have.map(c => String(c.login)).filter(l => l.toLowerCase() !== OWNER.toLowerCase());
+  const logins = have.map(c => String(c.login)).filter(l => l.toLowerCase() !== OWNER.toLowerCase() && l.toLowerCase() !== HOLDER.toLowerCase());
   const asked = invites.map(i => ({ id: i.id, login: String((i.invitee && i.invitee.login) || '') }));
   const right = list.filter(x => logins.some(l => l.toLowerCase() === x.toLowerCase()));
   const missing = list.filter(x => !right.includes(x) && !asked.some(i => i.login.toLowerCase() === x.toLowerCase()));
@@ -1187,9 +1192,9 @@ async function setupDone(res, q, now) {
     return;
   }
   const owner = a.body.owner && a.body.owner.login;
-  if (owner !== OWNER) {
+  if (owner !== HOLDER) {
     log('setup: refused an App made by ' + owner);
-    page(res, 403, 'Not this App', '<p>That App belongs to ' + esc(owner) + ', not ' + OWNER + ', so nothing was kept.</p>');
+    page(res, 403, 'Not this App', '<p>That App belongs to ' + esc(owner) + ', not ' + HOLDER + ', so nothing was kept.</p>');
     return;
   }
   fs.writeFileSync(path.join(STATE, 'key.pem'), a.body.pem, { mode: 0o600 });

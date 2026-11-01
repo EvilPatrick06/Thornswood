@@ -16,7 +16,7 @@
 
   REPOSITORY SETTINGS (#3683, Patrick's answers of 26 Oct 2026). With
   -RepoSettings it asks for records\github-repo-settings.json instead, which
-  names Thornswood and the engine fork, EvilPatrick06/skymp, and for each its
+  names Thornswood and the engine fork, ThornswoodRP/skymp, and for each its
   rulesets and, where it says, private vulnerability reporting, immutable
   releases, secret scanning and push protection: each ruleset is made on
   GitHub, or put back, with exactly its target, enforcement, conditions,
@@ -53,7 +53,7 @@
   only by somebody who administers the repository, and a cloud thread's proxy
   refuses every actions/runners path, so this no longer calls GitHub's
   runner API itself. It starts github-admin.yml on the main of
-  EvilPatrick06/Thornswood-Ops, which checks out this repository's main
+  ThornswoodRP/Thornswood-Ops, which checks out this repository's main
   (#4013), waits, and prints
   the runner's answer, the way Set-Ref.ps1 does. That run hands GitHub's OIDC
   token for it to the box's admin service (scripts\vps\admin\admin.js,
@@ -111,7 +111,7 @@ param(
     [switch]$RepoSettings,
     [int]$WaitMinutes = 15,
     # Where github-admin.yml and the VPS runners are (#4013).
-    [string]$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'
+    [string]$GitHubRepo = 'ThornswoodRP/Thornswood-Ops'
 )
 
 Set-StrictMode -Version Latest

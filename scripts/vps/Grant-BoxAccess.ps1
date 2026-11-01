@@ -69,7 +69,7 @@
 
   -ToEnvironment <name> (with -MakeKey -NoticesOnly; #3045) puts the key
   instead into the secret NOTICE_KEY_B64 of that environment on GitHub, on
-  -GitHubRepo, the private ops repository EvilPatrick06/Thornswood-Ops where
+  -GitHubRepo, the private ops repository ThornswoodRP/Thornswood-Ops where
   the VPS runners are registered (#4013), whose staff-notice.yml reads it:
   the way a cloud thread posts. Before anything on the box changes, it makes the environment usable
   by main alone (a branch policy for main and nothing else), and stops,
@@ -129,7 +129,7 @@ param(
     # With -MakeKey -NoticesOnly or -MakeKey -Deploy: the GitHub environment the key goes into.
     [string]$ToEnvironment = '',
     # Where staff-notice.yml and the VPS runners are (#4013).
-    [string]$GitHubRepo = 'EvilPatrick06/Thornswood-Ops',
+    [string]$GitHubRepo = 'ThornswoodRP/Thornswood-Ops',
     [switch]$Remove,
     [switch]$List,
     # -ThisMachine: this machine's key, the one Setup-SshKey.ps1 makes.

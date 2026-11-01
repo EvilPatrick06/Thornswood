@@ -162,7 +162,7 @@ function Run-Flow($f, [hashtable]$table, [hashtable]$envs) {
     $runner = Join-Path $work 'flow.ps1'
     [IO.File]::WriteAllText($runner, $standIn + $f.Script)
     $keep = @{}
-    $all = @{ GITHUB_REPOSITORY = 'EvilPatrick06/Thornswood'; GH_TOKEN = 'run-token'; TS_CALLS = $calls; TS_ROUTES = $routes } + $envs
+    $all = @{ GITHUB_REPOSITORY = 'ThornswoodRP/Thornswood'; GH_TOKEN = 'run-token'; TS_CALLS = $calls; TS_ROUTES = $routes } + $envs
     foreach ($k in $all.Keys) { $keep[$k] = [Environment]::GetEnvironmentVariable($k); [Environment]::SetEnvironmentVariable($k, [string]$all[$k]) }
     try {
         $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'

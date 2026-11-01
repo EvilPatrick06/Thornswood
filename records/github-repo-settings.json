@@ -1,8 +1,8 @@
 {
-  "about": "The rulesets, private vulnerability reporting, immutable releases and secret scanning of Thornswood and of the engine fork, EvilPatrick06/skymp (#3683, #3691). A change is a pull request to this file; once it merges, the Desk runs pwsh scripts/deploy/Set-BuildRunners.ps1 -RepoSettings (-Check first), which starts github-admin.yml in the private ops repository, and the box's admin service (scripts/vps/admin/admin.js, repo-settings) makes GitHub match it: each ruleset named here is made or put back by name, one GitHub has that this does not name stops the run and is never deleted, reporting, immutable releases, secret scanning and push protection are switched as each entry says, and where an entry lists collaborators, one GitHub has that the list does not name is taken off and an invitation to one is withdrawn; this only ever takes people off, and one it names who is not there is reported for Patrick to invite by hand. A why is this file's own note and is never sent to GitHub.",
+  "about": "The rulesets, private vulnerability reporting, immutable releases and secret scanning of Thornswood and of the engine fork, ThornswoodRP/skymp (#3683, #3691). A change is a pull request to this file; once it merges, the Desk runs pwsh scripts/deploy/Set-BuildRunners.ps1 -RepoSettings (-Check first), which starts github-admin.yml in the private ops repository, and the box's admin service (scripts/vps/admin/admin.js, repo-settings) makes GitHub match it: each ruleset named here is made or put back by name, one GitHub has that this does not name stops the run and is never deleted, reporting, immutable releases, secret scanning and push protection are switched as each entry says, and where an entry lists collaborators, one GitHub has that the list does not name is taken off and an invitation to one is withdrawn; this only ever takes people off, and one it names who is not there is reported for Patrick to invite by hand. A why is this file's own note and is never sent to GitHub.",
   "repositories": [
     {
-      "repository": "EvilPatrick06/Thornswood",
+      "repository": "ThornswoodRP/Thornswood",
       "why": "Switched on at the flip (#3721, public since 30 Oct 2026, 6:23 PM): GitHub offers private vulnerability reporting, the route SECURITY.md names, only on a public repository, and secret scanning with push protection costs a public repository nothing (#3683). Immutable releases: Patrick on the report page, 26 Oct 2026, 11:46 PM MT (#3287): a published Release's files and tag never change after it is published, and every release step here only fills a draft.",
       "private_vulnerability_reporting": true,
       "immutable_releases": true,
@@ -41,7 +41,7 @@
       ]
     },
     {
-      "repository": "EvilPatrick06/skymp",
+      "repository": "ThornswoodRP/skymp",
       "private_vulnerability_reporting": true,
       "secret_scanning": true,
       "secret_scanning_push_protection": true,

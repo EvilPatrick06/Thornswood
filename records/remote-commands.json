@@ -1000,7 +1000,7 @@
                       "script":  "scripts/deploy/Install-Runner.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "Remote ($watcherLib + @\"",
+                      "anchor":  "Remote ($lockLib + $watcherLib + @\"",
                       "does":  "install-time or outside-the-gate work",
                       "class":  "admin",
                       "reason":  "sends register-ScheduledTask"

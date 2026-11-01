@@ -10,8 +10,8 @@
 # measured 19 Oct), but it can add a label to an issue over REST. So a label
 # is the instruction and this workflow carries it out:
 #
-#     gh api -X POST repos/EvilPatrick06/Thornswood/issues/<N>/labels -f "labels[]=board: In Progress"
-#     gh api -X POST repos/EvilPatrick06/Thornswood/issues/<N>/labels -f "labels[]=order: 52.5"
+#     gh api -X POST repos/ThornswoodRP/Thornswood/issues/<N>/labels -f "labels[]=board: In Progress"
+#     gh api -X POST repos/ThornswoodRP/Thornswood/issues/<N>/labels -f "labels[]=order: 52.5"
 #
 # "board: <Status>" names a Status option. Case, spaces and hyphens do not
 # matter ("in-progress" is In Progress). A name the board does not have turns

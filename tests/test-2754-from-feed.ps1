@@ -274,7 +274,7 @@ try {
             if (-not $script:runState.Seen) { return '[]' }
             $req = ''
             foreach ($c in $script:calls) { $i = [array]::IndexOf($c, 'request=' + $script:want); if ($i -ge 0) { $req = $script:want } }
-            return ('[{"databaseId":42,"displayTitle":"sign ' + $req + '","status":"' + $script:runState.Status + '","conclusion":"' + $script:runState.Conclusion + '","url":"https://github.com/EvilPatrick06/skymp/actions/runs/42"},' +
+            return ('[{"databaseId":42,"displayTitle":"sign ' + $req + '","status":"' + $script:runState.Status + '","conclusion":"' + $script:runState.Conclusion + '","url":"https://github.com/ThornswoodRP/skymp/actions/runs/42"},' +
                     '{"databaseId":41,"displayTitle":"sign somebody-else","status":"completed","conclusion":"success","url":"x"}]')
         }
         if ($args[0] -eq 'run' -and $args[1] -eq 'download') {
@@ -300,7 +300,7 @@ try {
     $sent = if ($d.Count) { @($d[0]) } else { @() }
     $pin = Get-SignOnGitHubClientPin $repo
     $meta = [IO.File]::ReadAllText((Join-Path $repo 'records\signing\metadata.json')) | ConvertFrom-Json
-    Yes 'it asks the fork''s workflow on main' ($sent -contains 'thornswood-sign-manifest.yml' -and $sent -contains 'EvilPatrick06/skymp' -and $sent -contains 'main')
+    Yes 'it asks the fork''s workflow on main' ($sent -contains 'thornswood-sign-manifest.yml' -and $sent -contains 'ThornswoodRP/skymp' -and $sent -contains 'main')
     Yes '  with release.json and its sha256' ($sent -contains ('manifest=' + [Convert]::ToBase64String([IO.File]::ReadAllBytes($sign))) -and $sent -contains ('manifest_sha256=' + (ShaFile $sign)))
     Yes '  with the pin Setup-ShipMachine.ps1 holds' ($sent -contains ('client_version=' + $pin.Version) -and $sent -contains ('client_sha256=' + $pin.Sha256))
     Yes '  with the account and profile metadata.json names' ($sent -contains ('endpoint=' + $meta.Endpoint) -and $sent -contains ('account=' + $meta.CodeSigningAccountName) -and $sent -contains ('certificate_profile=' + $meta.CertificateProfileName))
@@ -399,7 +399,7 @@ try {
         throw "gh was asked something unexpected: $($args -join ' ')"
     }
     $sha40 = 'c' * 40
-    function AskNow { $script:lcalls.Clear(); return (Invoke-ReleaseLauncherOnGitHub -Repo 'EvilPatrick06/Thornswood' -Tag 'v1.2.6.7' -Commit $sha40 -Gh $lgh -WaitSeconds 1 -Poll 0) }
+    function AskNow { $script:lcalls.Clear(); return (Invoke-ReleaseLauncherOnGitHub -Repo 'ThornswoodRP/Thornswood' -Tag 'v1.2.6.7' -Commit $sha40 -Gh $lgh -WaitSeconds 1 -Poll 0) }
     $why = AskNow
     Yes ("a green release.yml run on the tag: '' ('{0}')" -f $why) ($why -eq '')
     $d = @($script:lcalls | Where-Object { $_[0] -eq 'workflow' })

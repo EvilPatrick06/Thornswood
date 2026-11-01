@@ -112,14 +112,14 @@ try {
     $good = @"
 | Channel | Feed | The six client files are built from |
 |---|---|---|
-| Public | ``feed/version.json`` | [``aaaaaaa1``](https://github.com/EvilPatrick06/skymp/tree/aaaaaaa1) |
-| Dev | ``feed-dev/version.json`` | [``bbbbbbb2``](https://github.com/EvilPatrick06/skymp/tree/bbbbbbb2) |
+| Public | ``feed/version.json`` | [``aaaaaaa1``](https://github.com/ThornswoodRP/skymp/tree/aaaaaaa1) |
+| Dev | ``feed-dev/version.json`` | [``bbbbbbb2``](https://github.com/ThornswoodRP/skymp/tree/bbbbbbb2) |
 "@
     $swapped = @"
 | Channel | Feed | The six client files are built from |
 |---|---|---|
-| Public | ``feed/version.json`` | [``bbbbbbb2``](https://github.com/EvilPatrick06/skymp/tree/bbbbbbb2) |
-| Dev | ``feed-dev/version.json`` | [``aaaaaaa1``](https://github.com/EvilPatrick06/skymp/tree/aaaaaaa1) |
+| Public | ``feed/version.json`` | [``bbbbbbb2``](https://github.com/ThornswoodRP/skymp/tree/bbbbbbb2) |
+| Dev | ``feed-dev/version.json`` | [``aaaaaaa1``](https://github.com/ThornswoodRP/skymp/tree/aaaaaaa1) |
 "@
     Test-Holds $good $pubPath $devPath 'fixture'
     $shownSwapPublic = Get-ShownCommit $swapped 'Public' 'feed/version.json'

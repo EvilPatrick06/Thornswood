@@ -497,10 +497,10 @@ no('gh: Not Found (HTTP 404)');
     $g = ThroughGitHub @('-From', 'claude', '-Text', $text) $done @((Note 'failure' '' 'Process completed with exit code 1.'), (Note 'notice' 'Say-Staff' $queued))
     Yes 'no ssh: it starts staff-notice.yml on main, with the text, and asks for the run' (
         $g.Body -and $g.Body.ref -eq 'main' -and $g.Body.inputs.text -eq $text -and -not $g.Body.inputs.PSObject.Properties['check'] -and $g.Body.return_run_details -eq $true -and
-        @($g.Calls | Where-Object { $_ -match '^api -X POST repos/EvilPatrick06/Thornswood-Ops/actions/workflows/staff-notice\.yml/dispatches --input -$' }).Count -eq 1)
+        @($g.Calls | Where-Object { $_ -match '^api -X POST repos/ThornswoodRP/Thornswood-Ops/actions/workflows/staff-notice\.yml/dispatches --input -$' }).Count -eq 1)
     Yes '  the text went on gh''s standard input and is on no command line' (-not (($g.Calls -join ' ').Contains('scan button')))
     Yes '  it reads the runner''s Say-Staff annotation off the run''s job and says queued, exit 0' (
-        $g.Code -eq 0 -and $g.Out -match 'queued agent-claude-20261021130000-0a1b2c' -and @($g.Calls | Where-Object { $_ -like 'api repos/EvilPatrick06/Thornswood-Ops/check-runs/555/annotations*' }).Count -eq 1)
+        $g.Code -eq 0 -and $g.Out -match 'queued agent-claude-20261021130000-0a1b2c' -and @($g.Calls | Where-Object { $_ -like 'api repos/ThornswoodRP/Thornswood-Ops/check-runs/555/annotations*' }).Count -eq 1)
     $g = ThroughGitHub @('-Text', $text) $done @((Note 'notice' 'Say-Staff' $queued))
     Yes '  -From is not needed there' ($g.Code -eq 0 -and $g.Out -match 'queued agent-claude-')
     $g = ThroughGitHub @('-From', 'codex', '-Text', $text) $done @()
@@ -522,7 +522,7 @@ no('gh: Not Found (HTTP 404)');
     Yes '  and refuses a run of another workflow' ($g.Code -eq 1 -and $g.Out -match 'not a staff-notice run')
 
     # #3081: the dispatch names the run before every read of GitHub serves it.
-    $runReads = { param($calls) @($calls | Where-Object { $_ -eq 'api repos/EvilPatrick06/Thornswood-Ops/actions/runs/77' }).Count }
+    $runReads = { param($calls) @($calls | Where-Object { $_ -eq 'api repos/ThornswoodRP/Thornswood-Ops/actions/runs/77' }).Count }
     $g = ThroughGitHub @('-Text', $text) $done @((Note 'notice' 'Say-Staff' $queued)) 1
     Yes 'a started run GitHub does not serve yet is waited for, then read: queued, exit 0, no stop' (
         $g.Code -eq 0 -and $g.Out -match 'queued agent-claude-' -and $g.Out -match 'does not serve the new run yet' -and $g.Out -notmatch 'STOP' -and (& $runReads $g.Calls) -eq 2)
@@ -598,7 +598,7 @@ function icacls { }
         Yes ("Grant-BoxAccess.ps1 has one $n") ($fn.Count -eq 1)
         Invoke-Expression $fn[0].Extent.Text
     }
-    $GitHubRepo = 'EvilPatrick06/Thornswood'
+    $GitHubRepo = 'ThornswoodRP/Thornswood'
     function Say { }
     function Die([string]$m) { throw "DIE $m" }
     $script:ghAnswers = @{}
@@ -621,7 +621,7 @@ function icacls { }
         try { Set-MainOnlyEnvironment 'notices' } catch { $err = $_.Exception.Message }
         return [pscustomobject]@{ Err = $err; Calls = $script:ghCalls; Changes = @($script:ghCalls | Where-Object { $_ -notmatch '^api -X GET ' }) }
     }
-    $envPath = 'repos/EvilPatrick06/Thornswood/environments/notices'
+    $envPath = 'repos/ThornswoodRP/Thornswood/environments/notices'
     $c = EnvCase @{ ("GET " + $envPath) = @(1, 'gh: Not Found (HTTP 404)') }
     Yes '-ToEnvironment: no environment yet, so it is made for chosen branches and main is the one let in' (
         -not $c.Err -and $c.Changes.Count -eq 2 -and
@@ -649,8 +649,8 @@ function icacls { }
     Yes 'staff-notice.yml is not in this repository, which has no VPS runner once public' (-not (Test-Path -LiteralPath (P '.github', 'workflows', 'staff-notice.yml')))
     $sayText = [IO.File]::ReadAllText($say)
     Yes '  Say-Staff.ps1 starts it in the private ops repository by its file name, and says notices through it are from claude' (
-        $sayText.Contains("[string]`$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'") -and $sayText.Contains("`$workflow = 'staff-notice.yml'") -and $sayText.Contains("`$workflowSender = 'claude'"))
-    Yes '  and Grant-BoxAccess.ps1 -ToEnvironment puts the key in that repository''s environment' ($grantText.Contains("[string]`$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'"))
+        $sayText.Contains("[string]`$GitHubRepo = 'ThornswoodRP/Thornswood-Ops'") -and $sayText.Contains("`$workflow = 'staff-notice.yml'") -and $sayText.Contains("`$workflowSender = 'claude'"))
+    Yes '  and Grant-BoxAccess.ps1 -ToEnvironment puts the key in that repository''s environment' ($grantText.Contains("[string]`$GitHubRepo = 'ThornswoodRP/Thornswood-Ops'"))
 }
 finally {
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
