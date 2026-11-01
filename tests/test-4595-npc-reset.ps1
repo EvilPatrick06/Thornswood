@@ -34,9 +34,9 @@
     G  the gate: Reset-Npcs-Dev and Reset-Npcs-Main run this script held to
        their server with -Yes and -NoPause and take only -Survey; main is a
        live verb
-    B  the box step checks the server's own settings name it, stops it the
-       way Reset-Character does, and fails rather than start it when
-       something else started it during the move (#5155)
+    B  the box step checks the server's own settings name it, holds it
+       from before its stop until it answers again (#5155), leaves alone a
+       server somebody else holds, and stops it the way Reset-Character does
 
   Read only, apart from its scratch folder.
 #>
@@ -242,11 +242,15 @@ Yes 'G no verb runs it for any other server or lets the caller add a word' (
 $rn = [IO.File]::ReadAllText((P 'scripts/ops/Reset-Npcs.ps1'))
 Yes 'B the box step stops unless the folder''s own settings name the server' ($rn.Contains('[string]$cfg.thornswoodServer -ne $Want'))
 Yes 'B it opens and waits for the server on its own port, as Reset-Character does' ($rn.Contains('Get-ThornswoodProcessHeld $pids') -and $rn.Contains('Stop-ThornswoodProcessHeld $held') -and $rn.Contains("'..\deploy\StopAndMove.ps1'"))
-Yes 'B it fails, and does not start the server, when something else started it during the move' ($rn.IndexOf('Something started the server') -gt 0 -and $rn.IndexOf('Something started the server') -lt $rn.IndexOf('Start-ScheduledTask -TaskName $Task -EA Stop'))
-Yes 'B a server that was not running is left stopped' ($rn.Contains('if (-not $wasRunning) { if ($bad)'))
-Yes 'B a survey sends no stop' ($rn.Contains("`$(if (`$Survey) { '' } else { `$stopAndMove"))
+$set = $rn.IndexOf("Set-ThornswoodHold -Target `$Task -Why 'resetting the NPCs'")
+Yes 'B it holds the server before it stops it, so the watchdog leaves it alone while the files move (#5155)' ($set -gt 0 -and $set -lt $rn.IndexOf('Stop-ScheduledTask -TaskName $Task'))
+Yes 'B and takes the hold away on every way out after it' (@([regex]::Matches($rn, 'Clear-ThornswoodHold -Target \$Task')).Count -eq 3 -and
+    $rn.LastIndexOf('Clear-ThornswoodHold -Target $Task') -lt $rn.IndexOf("if (`$up) { 'ANSWERED|'"))
+Yes 'B a server somebody else holds is left as it is, with nothing moved' ($rn.IndexOf('is held by another stop on purpose') -gt 0 -and $rn.IndexOf('is held by another stop on purpose') -lt $set)
+Yes 'B a survey sends no stop and no hold' ($rn.Contains("`$(if (`$Survey) { '' } else { (Get-ThornswoodHoldScript -Script 'Reset-Npcs.ps1') + `$stopAndMove"))
 Yes 'B a reset asks for RESET unless -Yes' ($rn.Contains("`$typed -cne 'RESET'"))
 # The box step as the script builds it, for a survey and for a reset.
+. (P 'scripts/vps/ServerHold.ps1')
 $from = $rn.IndexOf('$stopAndMove = ')
 $to = $rn.IndexOf("Write-Host ''", $from)
 Yes 'B the box step is built in the script' ($from -gt 0 -and $to -gt $from)
@@ -258,7 +262,7 @@ foreach ($survey in $true, $false) {
     $what = if ($survey) { 'survey' } else { 'reset' }
     Yes "B the box step for a $what parses" (-not $err -or $err.Count -eq 0)
     Yes "B and names the dev folder, its task and its stamp" ($box.Contains("`$Root = 'C:\Thornswood-Server-Dev'") -and $box.Contains("`$Task = 'Thornswood Dev Server'") -and $box.Contains("`$Stamp = '20261031-120000'") -and $box.Contains("`$Survey = `$$survey"))
-    Yes "B and carries the stop only for a reset" ($box.Contains('function Stop-ThornswoodProcessHeld') -ne $survey)
+    Yes "B and carries the stop and the hold only for a reset" ($box.Contains('function Stop-ThornswoodProcessHeld') -ne $survey -and $box.Contains('function Set-ThornswoodHold') -ne $survey)
 }
 
 Write-Host ''

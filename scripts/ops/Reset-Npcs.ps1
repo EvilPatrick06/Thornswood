@@ -31,11 +31,11 @@
   and moves nothing. Without it the server on that folder's own game port is
   opened, stopped and waited for until it has exited (StopAndMove.ps1, as
   Reset-Character.ps1 does), the NPCs are moved aside, and the task is
-  started again if the server was running, and waited for on both ports
-  (ServerReadyWait.ps1). If the server is found running again after the move
-  and before this started it, something else started it while the files
-  moved (the watchdog, #5155): that is said and the run fails, because the
-  NPCs it loaded will be saved back.
+  started again and waited for on both ports (ServerReadyWait.ps1). From
+  before the stop until it answers, the server is held (ServerHold.ps1,
+  #5155), so the watchdog does not start it while its files move. A server
+  that somebody else holds is stopped on purpose for their own work, and is
+  left as it is with nothing moved.
 
   It asks for RESET to be typed before it takes anything. -Yes answers that,
   for the deploy gate, which runs it as Reset-Npcs-Dev and Reset-Npcs-Main
@@ -67,6 +67,7 @@ $ErrorActionPreference = 'Stop'   # before any file loads, so one that is missin
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here 'NpcReset.ps1')
+. (Join-Path $Here '..\vps\ServerHold.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
@@ -91,7 +92,8 @@ $stamp = (Get-Date).ToString('yyyyMMdd-HHmmss')
 function Q([string]$s) { return "'" + ($s -replace "'", "''") + "'" }
 
 # What runs on the box, Windows PowerShell 5.1. The NPC reset's functions,
-# and for a reset the stop and the wait (Reset-Character.ps1's way, #2871).
+# and for a reset the hold, the stop and the wait (Reset-Character.ps1's
+# way, #2871 and #5155).
 $stopAndMove = [IO.File]::ReadAllText((Join-Path $Here '..\deploy\StopAndMove.ps1'))
 $readyWait = [IO.File]::ReadAllText((Join-Path $Here '..\deploy\ServerReadyWait.ps1'))
 $boxScript = @"
@@ -102,7 +104,7 @@ $ThornswoodNpcReset
 `$Want = $(Q $Server)
 `$Stamp = $(Q $stamp)
 `$Survey = `$$([bool]$Survey)
-"@ + "`r`n" + $(if ($Survey) { '' } else { $stopAndMove + "`r`n" + $readyWait }) + "`r`n" + @'
+"@ + "`r`n" + $(if ($Survey) { '' } else { (Get-ThornswoodHoldScript -Script 'Reset-Npcs.ps1') + $stopAndMove + "`r`n" + $readyWait }) + "`r`n" + @'
 $settings = Join-Path $Root 'server-settings.json'
 $cfg = $null
 try { $cfg = [IO.File]::ReadAllText($settings) -replace '^\uFEFF', '' | ConvertFrom-Json }
@@ -125,36 +127,38 @@ function Get-PortPids {
 $pids = @()
 try { $pids = Get-PortPids }
 catch { 'STOP|The UDP ports could not be listed to find the server on ' + $port + ': ' + $_.Exception.Message + '. Nothing was stopped or moved.'; exit 1 }
-$wasRunning = $pids.Count -gt 0
+# A hold already there is somebody else's stop on purpose (#5155).
+$other = Get-ThornswoodHoldFile -Target $Task
+if (Test-Path -LiteralPath $other) {
+  @(Get-ThornswoodHolds)
+  'STOP|' + $Task + ' is held by another stop on purpose, so it is left as it is. Nothing was stopped or moved.'
+  exit 1
+}
 $held = @(Get-ThornswoodProcessHeld $pids)
 if ($ThornswoodNotHeld.Count) {
   foreach ($l in $ThornswoodNotHeld) { $l }
   'STOP|The server could not be opened to wait for it. Nothing was stopped or moved.'
   exit 1
 }
+# Held from here until it answers again, so the watchdog does not start it
+# while its files move; every way out below takes the hold away.
+Set-ThornswoodHold -Target $Task -Why 'resetting the NPCs' -By $HoldBy
 Stop-ScheduledTask -TaskName $Task -EA SilentlyContinue
 foreach ($p in $held) { 'stopped pid ' + $p.Id + ', on UDP ' + $port }
 $still = @(Stop-ThornswoodProcessHeld $held)
 if ($still.Count) {
   foreach ($l in $still) { $l }
+  Clear-ThornswoodHold -Target $Task
   'STOP|The server has not exited, so nothing was moved and it was not started again.'
   exit 1
 }
-if (-not $wasRunning) { 'the server on UDP ' + $port + ' was not running, so it is left stopped afterwards' }
 $out = @(Invoke-ThornswoodNpcReset -Root $Root -Stamp $Stamp -Move)
 $out
 $bad = @($out | Where-Object { "$_" -like 'STOP|*' -or "$_" -like 'FAILED|*' }).Count -gt 0
-# Nothing here started it. A server on the port now was started by something
-# else while the files moved, and has loaded NPCs it will save back.
-$back = @()
-try { $back = Get-PortPids } catch { 'STOP|The UDP ports could not be listed after the move: ' + $_.Exception.Message; exit 1 }
-if ($back.Count) {
-  'STOP|Something started the server (pid ' + ($back -join ',') + ') while the NPCs were moved, and nothing in this run did. The NPCs it loaded before they were moved will be saved again. The watchdog starts a stopped server (#5155).'
-  exit 1
-}
-if (-not $wasRunning) { if ($bad) { exit 1 } else { exit 0 } }
+$startWhy = ''
 try { Start-ScheduledTask -TaskName $Task -EA Stop }
-catch { 'STOP|The task ' + $Task + ' would not start: ' + $_.Exception.Message; exit 1 }
+catch { $startWhy = $_.Exception.Message }
+if ($startWhy) { Clear-ThornswoodHold -Target $Task; 'STOP|The task ' + $Task + ' would not start: ' + $startWhy; exit 1 }
 $Wait = Get-ThornswoodServerReadyWait
 $until = (Get-Date).AddSeconds($Wait)
 $why = ''
@@ -171,6 +175,8 @@ while (-not $up) {
   if ($up -or (Get-Date) -gt $until) { break }
   Start-Sleep -Milliseconds 700
 }
+# Answering, or past the wait: from here the watchdog watches it as before.
+Clear-ThornswoodHold -Target $Task
 if ($up) { 'ANSWERED|' + $port + '|' + $resPort }
 else {
   $line = 'NOTANSWERED|' + $port + '|' + $resPort + '|' + $Wait
