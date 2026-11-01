@@ -20,6 +20,8 @@ sealed class FakeGitHub : HttpMessageHandler
     public readonly Dictionary<long, List<JsonObject>> StatusesById = new();
     public readonly Dictionary<string, JsonObject> Releases = new();
     public readonly Dictionary<long, byte[]> Files = new();
+    public readonly Dictionary<long, string> Names = new();
+    public readonly List<string> Downloaded = new();
     public Func<HttpRequestMessage, HttpResponseMessage>? Other { get; set; }
 
     public void AddRelease(string tag, Dictionary<string, byte[]> files)
@@ -31,6 +33,7 @@ sealed class FakeGitHub : HttpMessageHandler
             {
                 var id = nextId++;
                 Files[id] = b;
+                Names[id] = name;
                 assets.Add(new JsonObject { ["id"] = id, ["name"] = name, ["size"] = b.Length, ["url"] = $"{Api}/repos/O/R/releases/assets/{id}" });
             }
             Releases[tag] = new JsonObject { ["id"] = nextId++, ["tag_name"] = tag, ["draft"] = false, ["assets"] = assets };
@@ -120,7 +123,9 @@ sealed class FakeGitHub : HttpMessageHandler
             if (p.StartsWith("/repos/O/R/releases/assets/"))
             {
                 if (r.Headers.Accept.ToString() != "application/octet-stream") return new HttpResponseMessage(HttpStatusCode.UnsupportedMediaType);
-                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Files[long.Parse(p["/repos/O/R/releases/assets/".Length..])]) };
+                var aid = long.Parse(p["/repos/O/R/releases/assets/".Length..]);
+                Downloaded.Add(Names[aid]);
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Files[aid]) };
             }
             return Json(HttpStatusCode.NotFound, $"{{\"message\":\"no such path in the stand-in: {p}\"}}");
         }
@@ -157,6 +162,8 @@ sealed class FakeServer : IDisposable
     public const string EngineSays = "[thornswood] gamemode did not load; the error is above";
     public readonly string Root;
     public volatile bool Healthy = true;
+    /// <summary>Whether the process runs: a stopped server loads nothing.</summary>
+    public volatile bool Running = true;
     readonly CancellationTokenSource stop = new();
     readonly Task engine;
 
@@ -182,6 +189,7 @@ sealed class FakeServer : IDisposable
         while (!stop.IsCancellationRequested)
         {
             try { await Task.Delay(5, stop.Token); } catch (OperationCanceledException) { return; }
+            if (!Running) { try { last = Thornswood.DeployAgent.Files.ReadShared(gm); } catch (IOException) { } continue; }
             byte[] b;
             try { b = Thornswood.DeployAgent.Files.ReadShared(gm); } catch (IOException) { continue; }
             if (b.AsSpan().SequenceEqual(last)) continue;
@@ -196,12 +204,37 @@ sealed class FakeServer : IDisposable
 
     public string Read(string rel) => File.ReadAllText(Path.Combine(Root, rel));
 
+    /// <summary>The task started: an engine holding WONTSTART never answers;
+    /// any other loads the gamemode there and says so, as a start does.</summary>
+    public void Start()
+    {
+        if (Read(Path.Combine("dist_back", "skymp5-server.js")).Contains("WONTSTART")) return;
+        var gm = Path.Combine(Root, "gamemode.js");
+        var text = Read("gamemode.js");
+        var lines = text.Contains("BROKEN")
+            ? $"SyntaxError: Unexpected token\n{EngineSays}\n"
+            : $"[thornswood] gamemode.js is git blob {Thornswood.DeployAgent.Files.GamemodeBlob(gm)}, {text.Length} bytes\n[thornswood] gamemode client scripts abc (3), changed since the last load\n";
+        File.AppendAllText(Path.Combine(Root, "server.log"), "server started\n" + lines);
+        Running = true;
+    }
+
     public void Dispose()
     {
         stop.Cancel();
         try { engine.Wait(); } catch (AggregateException) { }
         try { Directory.Delete(Root, true); } catch (IOException) { }
     }
+}
+
+/// <summary>Stops and starts the stand-in server the way the box's task and
+/// its UDP port would, and counts what it was asked.</summary>
+sealed class FakeControl(FakeServer s) : IServerControl
+{
+    public int Stops, Starts;
+    public List<int> UdpHolders(int port) => s.Running ? [4242] : [];
+    public List<string> Stop(string task, IReadOnlyList<int> pids, TimeSpan within) { Stops++; s.Running = false; return []; }
+    public void Start(string task) { Starts++; s.Start(); }
+    public bool TcpAnswers(int port) => s.Running;
 }
 
 public sealed class AgentTests : IDisposable
@@ -267,10 +300,195 @@ public sealed class AgentTests : IDisposable
         env.LoadSeconds = 10;
         env.TurnSeconds = 10;
         var cfg = new Config { Repo = "O/R", Api = FakeGitHub.Api, Home = home, Environments = { ["dev"] = env } };
-        var server = new Server(env, http) { Tick = TimeSpan.FromMilliseconds(5) };
+        env.Watch = Temp();
+        env.StartSeconds = 2;
+        var server = new Server(env, http) { Tick = TimeSpan.FromMilliseconds(5), Control = new FakeControl(s) };
         var gh2 = new GitHub(FakeGitHub.Api, "O/R", new StaticToken("t"), http);
         var a = new Agent(cfg, gh2, v ?? new FakeVerifier(), new() { ["dev"] = server }, "1.0.0", "", l => { lock (said) said.Add(l); }) { Host = "box" };
         return (a, gh, s, server, cfg);
+    }
+
+
+    // ---- a new server build (an engine pin) ---------------------------------
+
+    const string ForkA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const string ForkB = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+    /// <summary>A server build: its fork files and the record of them, the
+    /// way records/server-build.json writes it.</summary>
+    static (Dictionary<string, byte[]> files, byte[] record) Build(string fork, string engineExtra = "", string[]? scripts = null, string? lie = null)
+    {
+        var files = new Dictionary<string, byte[]>
+        {
+            ["scam_native.node"] = B("native " + fork),
+            ["dist_back/skymp5-server.js"] = B($"console.log('{FakeServer.EngineSays}') // {fork} {engineExtra}"),
+            ["dist_back/skymp5-server.js.map"] = B("map " + fork),
+            ["package.json"] = B("{}"),
+            ["yarn.lock"] = B("lock"),
+            ["launch_server.bat"] = B("node dist_back/skymp5-server.js"),
+        };
+        foreach (var n in scripts ?? ["Actor.pex"]) files["data/scripts/" + n] = B("pex " + n + fork);
+        var rec = new JsonObject
+        {
+            ["binary"] = "scam_native.node",
+            ["sha256"] = Sha(files["scam_native.node"]),
+            ["source"] = new JsonObject { ["commit"] = fork },
+            ["files"] = new JsonObject(files.Select(kv => KeyValuePair.Create(kv.Key, (JsonNode?)new JsonObject
+            {
+                ["sha256"] = lie != null && kv.Key == lie ? new string('0', 64) : Sha(kv.Value),
+                ["bytes"] = kv.Value.Length,
+                ["commit"] = fork,
+            }))),
+        };
+        return (files, B(rec.ToJsonString(new JsonSerializerOptions { WriteIndented = true }).Replace("\r\n", "\n")));
+    }
+
+    static byte[] Zip(Dictionary<string, byte[]> files, byte[] record)
+    {
+        using var ms = new MemoryStream();
+        using (var za = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Create, true))
+        {
+            foreach (var (n, b) in files.Append(KeyValuePair.Create("server-build.json", record)).OrderBy(kv => kv.Key, StringComparer.Ordinal))
+            {
+                using var e = za.CreateEntry(n, System.IO.Compression.CompressionLevel.NoCompression).Open();
+                e.Write(b);
+            }
+        }
+        return ms.ToArray();
+    }
+
+    /// <summary>Puts a server build into the stand-in's folder as if a deploy had.</summary>
+    static void Install(FakeServer s, Dictionary<string, byte[]> files, byte[] record)
+    {
+        foreach (var (rel, b) in files)
+        {
+            var p = Path.Combine(s.Root, rel);
+            Directory.CreateDirectory(Path.GetDirectoryName(p)!);
+            File.WriteAllBytes(p, b);
+        }
+        File.WriteAllBytes(Path.Combine(s.Root, "server-build.json"), record);
+    }
+
+    static void PinRelease(FakeGitHub gh, string tag, string gamemode, Dictionary<string, byte[]> files, byte[] record, byte[]? zip = null)
+    {
+        var zipName = "server-" + Sha(record)[..12] + "-" + Sha(zip ?? Zip(files, record))[..16] + ".zip";
+        gh.AddRelease(tag, ReleaseFiles(tag, Commit, "", new()
+        {
+            ["gamemode"] = new() { ["gamemode.js"] = B(gamemode), ["thornswood-build.json"] = B("{\"commit\":\"new\"}") },
+            ["server"] = new() { ["server-build.json"] = record, [zipName] = zip ?? Zip(files, record) },
+        }));
+    }
+
+    [Fact]
+    public async Task AnEnginePinSwapsTheServerWithTheGamemodeUnderAHold()
+    {
+        var (a, gh, s, _, cfg) = Make();
+        var (oldFiles, oldRec) = Build(ForkA, scripts: ["Actor.pex", "Gone.pex"]);
+        Install(s, oldFiles, oldRec);
+        var (newFiles, newRec) = Build(ForkB);
+        PinRelease(gh, "build-7", "// gamemode for B\n", newFiles, newRec);
+        File.WriteAllText(Path.Combine(s.Root, "data", "restart.json"), "{}");
+        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-7\"}");
+        await a.Pass("dev", default);
+        var last = gh.Last(id)!;
+        Assert.Equal("success", (string)last["state"]!);
+        Assert.Contains("server build bbbbbbbbbbbb", (string)last["description"]!);
+        Assert.True(s.Running);
+        foreach (var (rel, b) in newFiles) Assert.Equal(Sha(b), Sha(File.ReadAllBytes(Path.Combine(s.Root, rel))));
+        Assert.Equal(newRec, File.ReadAllBytes(Path.Combine(s.Root, "server-build.json")));
+        Assert.Equal("// gamemode for B\n", s.Read("gamemode.js"));
+        Assert.False(File.Exists(Path.Combine(s.Root, "data", "scripts", "Gone.pex")), "a fork file of the old build was left beside the new one");
+        Assert.False(File.Exists(Path.Combine(s.Root, "data", "restart.json")), "a restart.json the old process never read was left for the new one");
+        var prev = Assert.Single(Directory.GetDirectories(s.Root, ".prev-*"));
+        Assert.Equal(oldRec, File.ReadAllBytes(Path.Combine(prev, "server-build.json")));
+        Assert.True(File.Exists(Path.Combine(prev, "data", "scripts", "Gone.pex")));
+        Assert.Empty(Directory.GetDirectories(s.Root, ".agent-stage-*"));
+        var log = s.Read(Path.Combine("data", $"deploy-{id}.log"));
+        Assert.Contains("held Thornswood Dev Server", log);
+        Assert.Contains("the hold on Thornswood Dev Server is taken away", log);
+        Assert.Empty(Directory.GetFiles(Path.Combine(cfg.Environments["dev"].Watch, "holds")));
+        Assert.Contains("server-", string.Join(",", gh.Downloaded));
+    }
+
+    [Fact]
+    public async Task TheSameServerBuildIsNotFetchedAndOnlyTheGamemodeReloads()
+    {
+        var (a, gh, s, server, _) = Make();
+        var (files, rec) = Build(ForkA);
+        Install(s, files, rec);
+        // The box's copy was checked out with CR LF: the same record.
+        File.WriteAllText(Path.Combine(s.Root, "server-build.json"), Encoding.UTF8.GetString(rec).Replace("\n", "\r\n"));
+        PinRelease(gh, "build-8", "// only the gamemode\n", files, rec);
+        Assert.Equal("success", (await a.DeployTag("dev", "build-8", default)).State);
+        Assert.Equal("// only the gamemode\n", s.Read("gamemode.js"));
+        var ctl = (FakeControl)server.Control;
+        Assert.Equal((0, 0), (ctl.Stops, ctl.Starts));
+        Assert.DoesNotContain(gh.Downloaded, n => n.EndsWith(".zip"));
+    }
+
+    [Fact]
+    public async Task ANewEngineThatDoesNotStartIsPutBackAndTheOldOneStarted()
+    {
+        var (a, gh, s, server, _) = Make();
+        var (oldFiles, oldRec) = Build(ForkA);
+        Install(s, oldFiles, oldRec);
+        var (newFiles, newRec) = Build(ForkB, engineExtra: "WONTSTART");
+        PinRelease(gh, "build-9", "// gamemode for B\n", newFiles, newRec);
+        var outc = await a.DeployTag("dev", "build-9", default);
+        Assert.Equal("failure", outc.State);
+        Assert.Contains("previous server build is back", outc.Summary);
+        Assert.True(s.Running);
+        Assert.Equal(oldRec, File.ReadAllBytes(Path.Combine(s.Root, "server-build.json")));
+        Assert.Equal(Sha(oldFiles["dist_back/skymp5-server.js"]), Sha(File.ReadAllBytes(Path.Combine(s.Root, "dist_back", "skymp5-server.js"))));
+        Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
+        Assert.Equal((2, 2), (((FakeControl)server.Control).Stops, ((FakeControl)server.Control).Starts));
+        Assert.Empty(Directory.GetDirectories(s.Root, ".prev-*"));
+        Assert.Empty(Directory.GetDirectories(s.Root, ".agent-stage-*"));
+    }
+
+    [Fact]
+    public async Task AGamemodeThatDoesNotLoadOnTheNewEngineIsPutBackWithIt()
+    {
+        var (a, gh, s, _, _) = Make();
+        var (oldFiles, oldRec) = Build(ForkA);
+        Install(s, oldFiles, oldRec);
+        var (newFiles, newRec) = Build(ForkB);
+        PinRelease(gh, "build-10", "BROKEN gamemode\n", newFiles, newRec);
+        var outc = await a.DeployTag("dev", "build-10", default);
+        Assert.Equal("failure", outc.State);
+        Assert.Contains("did not take", outc.Summary);
+        Assert.Equal(oldRec, File.ReadAllBytes(Path.Combine(s.Root, "server-build.json")));
+        Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
+    }
+
+    [Theory]
+    [InlineData("a file is not its record", "lie", "is not the build server-build.json records")]
+    [InlineData("the zip's record is another", "otherzip", "not the one the signed manifest names")]
+    [InlineData("no task named", "notask", "no scheduled task is named")]
+    public async Task AServerBuildIsRefusedBeforeAnythingStops(string name, string how, string want)
+    {
+        _ = name;
+        var (a, gh, s, server, cfg) = Make();
+        var (oldFiles, oldRec) = Build(ForkA);
+        Install(s, oldFiles, oldRec);
+        var (newFiles, newRec) = Build(ForkB, lie: how == "lie" ? "yarn.lock" : null);
+        byte[]? zip = null;
+        if (how == "otherzip") zip = Zip(newFiles, Build(ForkB, engineExtra: "x").record);
+        if (how == "notask") cfg.Environments["dev"].Task = "";
+        PinRelease(gh, "build-11", "// gamemode for B\n", newFiles, newRec, zip);
+        var outc = await a.DeployTag("dev", "build-11", default);
+        Assert.Equal("failure", outc.State);
+        Assert.Contains(want, outc.Summary);
+        Assert.Equal((0, 0), (((FakeControl)server.Control).Stops, ((FakeControl)server.Control).Starts));
+        Assert.Equal(oldRec, File.ReadAllBytes(Path.Combine(s.Root, "server-build.json")));
+        Assert.Empty(Directory.GetDirectories(s.Root, ".agent-stage-*"));
+    }
+
+    [Fact]
+    public void RecordSumReadsCrLfAsLf()
+    {
+        Assert.Equal(ServerBuild.RecordSum(B("{\n\"a\": 1\n}\n")), ServerBuild.RecordSum(B("{\r\n\"a\": 1\r\n}\r\n")));
+        Assert.NotEqual(ServerBuild.RecordSum(B("{\"a\": 1}")), ServerBuild.RecordSum(B("{\"a\": 2}")));
     }
 
     [Fact]
