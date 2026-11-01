@@ -23,7 +23,17 @@
 //  - New-LoadServer.js: the start points of each shape, and its refusals of
 //    a server build whose record is not the checkout's, a file that is not
 //    the record's, and a master that is not the one the fork's build holds
-//    it to, or is not there.
+//    it to, or is not there;
+//  - what else a bot does (--play): a swing is an attack animation and an
+//    unarmed hit on a person near it, both reliable; an NPC the server hands
+//    it (HostStart) is sent a move on its beat until HostStop; a trade ask is
+//    "/merchant <id>" for the nearest NPC, and the answers are counted;
+//  - the box's copy (New-LoadServer.js --from, against a stand-in for an
+//    installed server): its plugins by full path, its NPC switch and
+//    gameplay switches kept, nothing else of the server's settings, its own
+//    ports and pass key, and its refusals of the server's own port and a
+//    plugin that is not there; and Load-Test.js stops for anybody on a
+//    watched server, or one that does not answer.
 //
 // Read only, apart from temp folders it deletes. The proxy test binds UDP
 // sockets on 127.0.0.1 to 127.0.1.2, and the voice test a copy of the voice
@@ -38,7 +48,7 @@ const ROOT = path.join(__dirname, '..');
 const BOT = path.join(ROOT, 'scripts', 'bot');
 const { makeProxy, addressFor } = require(path.join(BOT, 'load-proxy.js'));
 const { LoadBot, MOVE_MS } = require(path.join(BOT, 'load-bots.js'));
-const { windowOf, perPerson, markdown, startVoice, siteThatSaysYes } = require(path.join(BOT, 'Load-Test.js'));
+const { windowOf, perPerson, markdown, startVoice, siteThatSaysYes, someoneOn, playCounts } = require(path.join(BOT, 'Load-Test.js'));
 const http = require('http');
 const net = require('net');
 const server = require(path.join(BOT, 'New-LoadServer.js'));
@@ -175,6 +185,143 @@ function botChecks() {
   yes('no answer in time fails it, naming the step', s.step === 'failed' && /no answer at step connecting/.test(s.why));
 }
 
+function playChecks() {
+  const addon = fakeAddon();
+  const b = new LoadBot(addon, { host: '127.0.0.1', port: 5000, name: 'p' });
+  b.profileId = 1900000500; b.play = ['fight', 'host', 'trade'];
+  b.client = addon.createBotClient('127.0.0.1', 5000);
+  const c = addon.made[0];
+  b.state = 'connected'; b.step = 'moving'; b.character = { idx: 7 }; b.center = [0, 0, 0]; b.cell = 0x3c; b.radius = 300; b.angle = 0;
+  const now = Date.now();
+  b.lastMove = now; b.nextHit = now + 100000; b.nextTrade = now + 100000;
+  b.ws = { send: (t) => { b.wsSent = (b.wsSent || []).concat([t]); } }; b.welcomed = true; b.passSentAt = now;
+  c.queue.push({ type: 'message', message: { t: 33, idx: 20, refrId: 0xff000123, transform: { pos: [300, 100, 0], worldOrCell: 0x3c } } });
+  c.queue.push({ type: 'message', message: { t: 33, idx: 21, refrId: 0x100000000 + 0x1981e, transform: { pos: [350, 0, 0], rot: [0, 0, 90], worldOrCell: 0x3c } } });
+  c.queue.push({ type: 'message', message: { t: 33, idx: 22, refrId: 0xff000999, transform: { pos: [90000, 0, 0], worldOrCell: 0x3c } } });
+  b.pump();
+  yes('it keeps where the actors it is sent are, by idx', b.others.size === 3 && b.others.get(21).refrId === 0x100000000 + 0x1981e);
+  b.nextHit = now; b.advance(now + 1);
+  const anim = c.sent.find((x) => x.m.t === 3); const hit = c.sent.find((x) => x.m.t === 17);
+  yes('a swing is an attack animation for its own idx, then an unarmed hit on the person in reach, both reliable',
+    anim && anim.m.idx === 7 && anim.m.data.animEventName === 'attackStart' && anim.reliable === true &&
+    hit && hit.m.data.aggressor === 0x14 && hit.m.data.source === 0x1f4 && hit.m.data.target === 0xff000123 && hit.reliable === true);
+  yes('it swings at people only, never at an NPC or somebody out of reach', c.sent.filter((x) => x.m.t === 17).every((x) => x.m.data.target === 0xff000123));
+  c.queue.push({ type: 'message', message: { t: 26, target: 0x100000000 + 0x1981e } });
+  b.pump();
+  yes('a HostStart for an actor it was sent is carried out', b.hosted.has(21) && b.played.hostStarts === 1);
+  c.sent.length = 0;
+  b.lastMove = now; b.advance(now + MOVE_MS + 2);
+  const hosted = c.sent.find((x) => x.m.t === 2 && x.m.idx === 21);
+  yes('the NPC it hosts is sent a move on the same beat, unreliable, standing where the server put it',
+    c.sent.some((x) => x.m.t === 2 && x.m.idx === 7) && hosted && hosted.reliable === false && hosted.m.data.pos[0] === 350 && hosted.m.data.runMode === 'Standing' && hosted.m.data.rot[2] === 90);
+  c.queue.push({ type: 'message', message: { t: 27, target: 0x100000000 + 0x1981e } });
+  b.pump();
+  yes('HostStop ends it', !b.hosted.has(21));
+  b.nextTrade = now; b.advance(now + MOVE_MS + 3);
+  yes('a trade ask is "/merchant <id>" for the nearest NPC, over the chat socket', (b.wsSent || []).some((t) => JSON.parse(t).text === '/merchant 1981e'));
+  b.heard(JSON.stringify({ t: 'chat', from: 0, text: 'Trading with Belethor in Whiterun. Purse 100.' }));
+  b.heard(JSON.stringify({ t: 'chat', from: 0, text: 'That is not a guild trader.' }));
+  yes('the answers are counted by what they say', b.played.tradeOpened === 1 && b.played.notATrader === 1 && b.played.tradeAsks === 1);
+  yes('the play counts of every worker add up', JSON.stringify(playCounts([{ play: { hits: 2 } }, { play: { hits: 3, tradeAsks: 1 } }, {}])) === '{"hits":5,"tradeAsks":1}');
+  const w = new LoadBot(addon, { host: '127.0.0.1', port: 5000, name: 'w' });
+  w.play = [];
+  w.client = addon.createBotClient('127.0.0.1', 5000);
+  addon.made[1].queue.push({ type: 'message', message: { t: 33, idx: 20, refrId: 0xff000123, transform: { pos: [1, 2, 3], worldOrCell: 0x3c } } });
+  w.pump();
+  yes('a bot that only walks keeps nobody\'s position', w.others.size === 0);
+}
+
+async function boxChecks() {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'test-4623-box-'));
+  try {
+    const inst = path.join(tmp, 'Thornswood-Server-Dev');
+    fs.mkdirSync(path.join(inst, 'dist_back'), { recursive: true });
+    fs.mkdirSync(path.join(inst, 'data'), { recursive: true });
+    fs.mkdirSync(path.join(inst, 'world'), { recursive: true });
+    fs.writeFileSync(path.join(inst, 'dist_back', 'skymp5-server.js'), '// the server');
+    fs.writeFileSync(path.join(inst, 'scam_native.node'), 'engine');
+    fs.writeFileSync(path.join(inst, 'package.json'), '{}');
+    fs.writeFileSync(path.join(inst, 'gamemode.js'), '// the gamemode');
+    fs.writeFileSync(path.join(inst, 'world', 'someone.json'), '{}');
+    for (const f of ['Skyrim.esm', 'JKs Skyrim.esp']) { fs.writeFileSync(path.join(inst, 'data', f), f); }
+    const theirs = { port: 7787, dataDir: 'data', loadOrder: ['Skyrim.esm', 'JKs Skyrim.esp'], npcEnabled: true, npcSettings: { x: 1 },
+      thornswoodNear: 3500, thornswoodHurtCare: true, thornswoodSite: 'https://example.invalid', discordWebhook: 'https://example.invalid/hook',
+      thornswoodLoadOrderRefuse: 'https://not-a-switch', password: 'theirs' };
+    fs.writeFileSync(path.join(inst, 'server-settings.json'), JSON.stringify(theirs));
+    const out = path.join(tmp, 'copy');
+    const r = server.fromInstalled({ from: inst, out, shape: 'crowd', seats: '50', port: '7797', 'voice-port': '7799' });
+    const st = JSON.parse(fs.readFileSync(path.join(out, 'server-settings.json'), 'utf8'));
+    yes('the copy names the server\'s plugins by their full paths, in order, and copies none',
+      st.loadOrder.length === 2 && st.loadOrder[1] === path.join(inst, 'data', 'JKs Skyrim.esp').replace(/\\/g, '/') && !fs.existsSync(path.join(out, 'data', 'Skyrim.esm')));
+    yes('it keeps the server\'s NPC switch and its plain gameplay switches', st.npcEnabled === true && st.npcSettings.x === 1 && st.thornswoodNear === 3500 && st.thornswoodHurtCare === true);
+    yes('and nothing else of its settings: no site, no webhook, no password, no switch that holds an address',
+      st.thornswoodSite === undefined && st.discordWebhook === undefined && st.password === undefined && st.thornswoodLoadOrderRefuse === undefined);
+    yes('its own ports, seats, a dev name, the pass held, and a pass key of its own', st.port === 7797 && st.thornswoodVoicePort === 7799 && st.maxPlayers === 50 &&
+      st.thornswoodServer === 'dev' && st.thornswoodRequirePass === true && /^[0-9a-f]{64}$/.test(JSON.parse(fs.readFileSync(path.join(out, 'private', 'door.json'), 'utf8')).passKey));
+    yes('the server\'s program and gamemode are copied, and not its world', fs.existsSync(path.join(out, 'dist_back', 'skymp5-server.js')) && fs.existsSync(path.join(out, 'gamemode.js')) &&
+      !fs.existsSync(path.join(out, 'world')) && /^[0-9a-f]{64}$/.test(r.engine));
+    let err = '';
+    try { server.fromInstalled({ from: inst, out: path.join(tmp, 'c2'), port: '7787', 'voice-port': '7799' }); } catch (e) { err = e.message; }
+    yes('the server\'s own port is refused', /port 7787 is one .* uses/.test(err) && !fs.existsSync(path.join(tmp, 'c2')));
+    err = '';
+    try { server.fromInstalled({ from: inst, out: path.join(tmp, 'c3'), port: '7797', 'voice-port': '7788' }); } catch (e) { err = e.message; }
+    yes('so is its resources port, as the engine works it out, for the copy\'s voice service too', /port 7788 is one/.test(err));
+    err = '';
+    try { server.fromInstalled({ from: inst, out: path.join(tmp, 'c5'), port: '7786', 'voice-port': '7799' }); } catch (e) { err = e.message; }
+    yes('and a port whose resources port would be the server\'s game port', /port 7787 is one/.test(err));
+    fs.unlinkSync(path.join(inst, 'data', 'JKs Skyrim.esp'));
+    err = '';
+    try { server.fromInstalled({ from: inst, out: path.join(tmp, 'c4'), port: '7797', 'voice-port': '7799' }); } catch (e) { err = e.message; }
+    yes('a plugin its loadOrder names that is not there is refused, by name', /names JKs Skyrim\.esp in its loadOrder/.test(err));
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+
+  const answer = (body, code) => new Promise((ok) => {
+    const srv = http.createServer((q, res) => { res.writeHead(code || 200); res.end(body); });
+    srv.listen(0, '127.0.0.1', () => ok(srv));
+  });
+  const empty = await answer('{"now":0,"max":30}');
+  const busy = await answer('{"now":2}');
+  const odd = await answer('nothing');
+  const url = (srv) => 'http://127.0.0.1:' + srv.address().port + '/online.json';
+  try {
+    yes('nobody on a watched server lets the run go on', (await someoneOn([url(empty)])) === '');
+    yes('somebody on one stops it, saying how many and where', /^2 people are on http:\/\/127\.0\.0\.1:\d+\/online\.json, so the run stopped$/.test(await someoneOn([url(empty), url(busy)])));
+    yes('one that gives no count stops it', /answered no count of people/.test(await someoneOn([url(odd)])));
+    const gone = url(odd).replace(/:\d+\//, ':1/');
+    yes('one that does not answer stops it', /could not be read .*nobody can say it is empty/.test(await someoneOn([gone])));
+    // Load-Box.ps1, the box's half, stops before it lays anything out.
+    const ps = require('child_process').spawnSync(process.platform === 'win32' ? 'where' : 'which', ['pwsh']);
+    if (ps.status !== 0) {
+      console.log('SKIP  Load-Box.ps1 under pwsh: there is no pwsh here');
+    } else {
+      const t2 = fs.mkdtempSync(path.join(os.tmpdir(), 'test-4623-ps-'));
+      try {
+        const box = path.join(BOT, 'Load-Box.ps1');
+        // Not spawnSync: the stand-in servers it asks are in this process.
+        const runBox = (extra) => new Promise((ok) => {
+          require('child_process').execFile('pwsh', ['-NoProfile', '-File', box, '-Out', path.join(t2, 'out'), '-ServersRoot', t2].concat(extra), { encoding: 'utf8' },
+            (e, stdout) => ok({ status: e ? e.code : 0, stdout: String(stdout) }));
+        });
+        let r = await runBox(['-Watch', url(empty)]);
+        yes('Load-Box.ps1 stops when the server it would copy is not installed', r.status === 1 && /LOAD TEST STOPPED: there is no server installed at/.test(r.stdout));
+        fs.mkdirSync(path.join(t2, 'Thornswood-Server-Dev'), { recursive: true });
+        fs.writeFileSync(path.join(t2, 'Thornswood-Server-Dev', 'server-settings.json'), '{}');
+        r = await runBox(['-Watch', url(empty) + ',' + url(busy)]);
+        yes('and when somebody is on a server people play on, before it lays anything out',
+          r.status === 1 && /LOAD TEST STOPPED: 2 on http/.test(r.stdout) && fs.readdirSync(t2).every((f) => !/^thornswood-load-/.test(f)));
+        r = await runBox(['-Watch', url(odd)]);
+        yes('and when one gives no count', r.status === 1 && /LOAD TEST STOPPED: .*has no "now" count|LOAD TEST STOPPED: .*could not be read/.test(r.stdout));
+      } finally {
+        fs.rmSync(t2, { recursive: true, force: true });
+      }
+    }
+  } finally {
+    for (const s2 of [empty, busy, odd]) { s2.close(); }
+  }
+}
+
 function mathChecks() {
   const reading = (at, cpuUs, rss, up, upD, down, downD, busy, total) => ({ at, server: { at, user: cpuUs, system: 0, rss, heap: 0 }, proxy: { up, upDatagrams: upD, down, downDatagrams: downD }, cpu: { busy, total } });
   const a = reading(0, 0, 100 * 1048576, 0, 0, 0, 0, 0, 0);
@@ -281,8 +428,10 @@ async function serverChecks() {
 (async () => {
   await proxyChecks();
   botChecks();
+  playChecks();
   mathChecks();
   await voiceChecks();
   await serverChecks();
+  await boxChecks();
   done();
 })().catch((err) => { console.log('FAIL  ' + (err && err.stack || err)); fail++; done(); });

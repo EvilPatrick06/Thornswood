@@ -37,12 +37,20 @@
 //     node Load-Test.js --root <server folder> --out <result.json>
 //         [--steps 10,20,40,60,80,100] [--settle 20] [--hold 60] [--workers 3]
 //         [--shape crowd] [--summary <markdown file>]
+//         [--play fight,host,trade] [--busy 0.6] [--watch <online.json url>,...]
+//
+// --play is what the bots do besides walking (load-bots.js). --busy is the
+// share of the machine's CPU a step stops at (0.9 on a runner of its own; the
+// box shares it with the game servers). --watch names the online.json of each
+// server people play on: anybody on one, or one that does not answer, stops
+// the run before its next step (Load-Box.ps1 on the box).
 //
 // Exit 0 when every step it got to was measured, 1 when the server did not
 // load, ended, or a measurement could not be made.
 'use strict';
 const childProcess = require('child_process');
 const fs = require('fs');
+const http = require('http');
 const os = require('os');
 const path = require('path');
 const { ServerRun, gitBlob } = require('./Bot-Pass.js');
@@ -206,7 +214,7 @@ function markdown(doc) {
   const out = [];
   out.push('### Load test, ' + doc.shape + ' (' + doc.started + ')');
   out.push('');
-  out.push('Engine ' + doc.engine + ', gamemode git blob ' + doc.blob.slice(0, 12) + ', ' + doc.cores + ' cores on the runner. ' +
+  out.push('Engine ' + doc.engine + ', gamemode git blob ' + doc.blob.slice(0, 12) + ', ' + doc.cores + ' cores on ' + (doc.cpuModel || 'the machine') + '. ' +
     'Each bot logs in over the game port and walks, a move every 130 ms. Bytes are on the wire, IPv4 and UDP headers included.');
   out.push('');
   out.push('Memory is the server process\'s private bytes; its working set, which Windows trims, is in result.json.');
@@ -232,6 +240,12 @@ function markdown(doc) {
       fixed(p.voiceDownKBps, 2), fixed(p.voiceUpKBps, 3)].join(' | ') + ' |');
   }
   out.push('');
+  if (doc.play && doc.play.length) {
+    out.push('What the bots did besides walking (' + doc.play.join(', ') + '), counted over each window:');
+    out.push('');
+    for (const st of doc.steps) { if (st.window) { out.push('- ' + st.people + ' people: ' + JSON.stringify(st.play || {})); } }
+    out.push('');
+  }
   for (const st of doc.steps) { if (st.stopped) { out.push('Stopped at ' + st.people + ': ' + st.stopped); } }
   if (doc.problem) { out.push('Problem: ' + doc.problem); }
   return out.join('\n') + '\n';
@@ -241,7 +255,7 @@ function args(argv) {
   const o = {};
   for (let i = 0; i < argv.length; i++) {
     const m = /^--([a-z]+)$/.exec(argv[i]);
-    if (!m || i + 1 >= argv.length) { throw new Error('what is "' + argv[i] + '"? Use --root, --out, --steps, --settle, --hold, --workers, --shape and --summary.'); }
+    if (!m || i + 1 >= argv.length) { throw new Error('what is "' + argv[i] + '"? Use --root, --out, --steps, --settle, --hold, --workers, --shape, --summary, --play, --busy and --watch.'); }
     o[m[1]] = argv[++i];
   }
   return o;
@@ -267,6 +281,46 @@ function child(file, argv, log) {
   return c;
 }
 
+// What the bots do besides walking (load-bots.js --play): fight, host the
+// NPCs the server hands them, and open the guild traders near them.
+const PLAYS = ['fight', 'host', 'trade'];
+
+// The play counts the bots reported over the window, added up.
+function playCounts(reports) {
+  const out = {};
+  for (const r of reports) { for (const k of Object.keys(r.play || {})) { out[k] = (out[k] || 0) + r.play[k]; } }
+  return out;
+}
+
+// On the box, the servers people are on: each url is an online.json, and
+// anybody on it stops the run, so a load copy never shares the box's cores
+// with a person. One that does not answer stops it too: nobody can say it
+// is empty.
+function someoneOn(urls) {
+  return Promise.all(urls.map((u) => new Promise((resolve) => {
+    const req = http.get(u, { timeout: 10000 }, (res) => {
+      let t = '';
+      res.on('data', (d) => { t += d; });
+      res.on('end', () => {
+        let n = NaN;
+        try { n = Number(JSON.parse(t).now); } catch (e) { n = NaN; }
+        if (!(n >= 0)) { resolve(u + ' answered no count of people (HTTP ' + res.statusCode + ')'); return; }
+        resolve(n > 0 ? n + ' ' + (n === 1 ? 'person is' : 'people are') + ' on ' + u + ', so the run stopped' : '');
+      });
+    });
+    req.on('timeout', () => { req.destroy(new Error('no answer in 10 s')); });
+    req.on('error', (e) => resolve(u + ' could not be read (' + e.message + '), so nobody can say it is empty'));
+  }))).then((rs) => rs.filter(Boolean).join('; '));
+}
+
+// The gamemode's own lines about the NPCs, merchants, quests and the load
+// order, from the server's log, so a run says whether they started.
+function gameLines(file) {
+  let text = '';
+  try { text = fs.readFileSync(file, 'utf8'); } catch (e) { return ['the server log could not be read: ' + e.message]; }
+  return text.split(/\r?\n/).filter((l) => /npc|merchant|quest|load order|loadorder/i.test(l)).slice(0, 60).map((l) => l.slice(0, 300));
+}
+
 async function run(o) {
   const root = path.resolve(o.root);
   const log = o.log || ((s) => console.log(s));
@@ -274,6 +328,10 @@ async function run(o) {
   const settleMs = (Number(o.settle) || 20) * 1000;
   const holdMs = (Number(o.hold) || 60) * 1000;
   const workerCount = Math.max(1, Number(o.workers) || 3);
+  const busyLimit = Number(o.busy) > 0 && Number(o.busy) < 1 ? Number(o.busy) : BUSY;
+  const play = String(o.play || '').split(',').filter(Boolean);
+  for (const p of play) { if (!PLAYS.includes(p)) { return { schema: 1, problem: '--play takes ' + PLAYS.join(', ') + ', not ' + p, steps: [] }; } }
+  const watch = String(o.watch || '').split(',').filter(Boolean);
   const settings = readJson(path.join(root, 'server-settings.json'));
   const port = Number(settings.port);
   const password = settings.password === undefined ? '' : String(settings.password);
@@ -282,7 +340,7 @@ async function run(o) {
   try { engine = String(readJson(path.join(root, 'server-build.json')).source.commit || ''); } catch (e) { engine = 'not named (no server-build.json beside it)'; }
   const doc = { schema: 1, shape: o.shape || 'crowd', started: new Date().toISOString(), engine, blob, cores: os.cpus().length,
     cpuModel: (os.cpus()[0] || {}).model || '', totalMemMB: Math.round(os.totalmem() / 1048576), settleS: settleMs / 1000, holdS: holdMs / 1000,
-    baseline: null, steps: [], problem: '', tail: [] };
+    baseline: null, steps: [], problem: '', tail: [], play, busyLimit, watched: watch, gameLines: [] };
   if (!(port > 0)) { doc.problem = 'server-settings.json names no port'; return doc; }
   try { passKeyOf(root); } catch (e) { doc.problem = 'the bots cannot hold join passes here: ' + e.message; return doc; }
   if (Number(settings.maxPlayers) < Math.max(...steps)) { doc.problem = 'maxPlayers is ' + settings.maxPlayers + ', fewer than the ' + Math.max(...steps) + ' bots asked for'; return doc; }
@@ -305,6 +363,8 @@ async function run(o) {
       voice = await startVoice(root, voicePort, site.url, sampler, voiceSamples, log);
       log('the voice service listens on 127.0.0.1:' + voicePort);
     }
+    const onBefore = await someoneOn(watch);
+    if (onBefore) { doc.problem = onBefore; return doc; }
     server.start();
     const why = await server.awaitLoad(blob, 600000);
     if (why) { doc.problem = why; return doc; }
@@ -313,7 +373,7 @@ async function run(o) {
     proxy = child(path.join(__dirname, 'load-proxy.js'), ['--target', '127.0.0.1:' + port], log);
     const proxyPort = await proxy.ask(null, 'listening', 10000);
     for (let i = 0; i < workerCount; i++) {
-      workers.push(child(path.join(__dirname, 'load-bots.js'), ['--root', root, '--port', String(proxyPort), '--password', password, '--voice', String(voicePort)], log));
+      workers.push(child(path.join(__dirname, 'load-bots.js'), ['--root', root, '--port', String(proxyPort), '--password', password, '--voice', String(voicePort)].concat(play.length ? ['--play', play.join(',')] : []), log));
     }
 
     const reading = async () => {
@@ -348,6 +408,8 @@ async function run(o) {
     for (const people of steps) {
       const step = { people, window: null, perPerson: null, stopped: '', failed: [], teleports: 0, counts: {} };
       doc.steps.push(step);
+      const on = await someoneOn(watch);
+      if (on) { step.stopped = on; log('  stopped: ' + on); break; }
       log('step ' + people + ': adding ' + (people - have) + ' bots');
       for (let k = have; k < people; k++) {
         workers[k % workers.length].send({ add: [next++] });
@@ -381,7 +443,10 @@ async function run(o) {
         ' KB/s, up ' + fixed(w.upWirePerS / 1024, 1) + ' KB/s, each bot read ' + fixed(w.movesReadPerBotPerS, 1) +
         ' moves a second, runner ' + fixed(w.machineBusy * 100, 0) + '% busy');
       if (failed.length) { step.failed = failed; step.stopped = failed.length + ' bots were dropped during the window; the first: ' + failed[0].why; break; }
-      if (w.machineBusy >= BUSY) { step.stopped = 'the runner was ' + fixed(w.machineBusy * 100, 0) + '% busy, so a larger step would measure the runner, not the server'; break; }
+      step.play = playCounts(m.bots);
+      if (w.machineBusy >= busyLimit) { step.stopped = 'the machine was ' + fixed(w.machineBusy * 100, 0) + '% busy, past the ' + fixed(busyLimit * 100, 0) + '% this run stops at'; break; }
+      const onAfter = await someoneOn(watch);
+      if (onAfter) { step.stopped = onAfter; log('  stopped: ' + onAfter); break; }
     }
     return doc;
   } catch (e) {
@@ -394,6 +459,7 @@ async function run(o) {
     if (voice) { voice.kill(); }
     if (site) { site.server.close(); }
     doc.tail = server.tail.slice(-30);
+    doc.gameLines = gameLines(path.join(root, 'load-test-server.log'));
     doc.ended = new Date().toISOString();
   }
 }
@@ -419,4 +485,4 @@ if (require.main === module) {
   main().then((code) => process.exit(code), (e) => { console.log('LOAD TEST FAILED: ' + (e && e.stack || e)); process.exit(1); });
 }
 
-module.exports = { windowOf, perPerson, markdown, samples, run, startVoice, siteThatSaysYes };
+module.exports = { windowOf, perPerson, markdown, samples, run, startVoice, siteThatSaysYes, someoneOn, playCounts, gameLines, PLAYS };
