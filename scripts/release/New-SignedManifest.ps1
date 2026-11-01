@@ -43,7 +43,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-if (-not $Repo) { $Repo = 'EvilPatrick06/Thornswood' }
+if (-not $Repo) { $Repo = 'ThornswoodRP/Thornswood' }
 if ($Commit -notmatch '^[0-9a-f]{40}$') { throw "commit $Commit is not 40 hex" }
 if ($Tag -notmatch '^(build-[A-Za-z0-9._-]{1,80}|agent-v\d+\.\d+\.\d+)$') { throw "tag $Tag is neither build-<...> nor agent-v<a.b.c>" }
 if ($Part -eq 'agent' -and $Tag -ne ('agent-v' + $Version)) { throw "an agent Release's tag is agent-v<version>, and $Tag does not say $Version" }

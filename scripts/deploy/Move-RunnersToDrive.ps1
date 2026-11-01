@@ -45,7 +45,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'RunnerDriveMove.ps1')
-$repository = 'EvilPatrick06/Thornswood'
+$repository = 'ThornswoodRP/Thornswood'
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $computer = [Environment]::MachineName.ToLower()
 

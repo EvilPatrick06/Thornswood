@@ -306,7 +306,7 @@
 param(
   [string]$VpsHost    = '',
   [string]$VpsUser    = '',
-  [string]$Repo       = 'EvilPatrick06/Thornswood',
+  [string]$Repo       = 'ThornswoodRP/Thornswood',
   # Which runner. 1 is the first, with the names below; from 2 up, the three
   # names after it get the number on the end unless they are given.
   [ValidateRange(1, 99)][int]$Number = 1,
@@ -371,7 +371,7 @@ if ($FromGate) {
   if ($env:THORNSWOOD_GATE -ne '1') { Write-Host 'STOP. -FromGate is for the deploy gate''s Install-Runner verb, which runs this on the box: scripts/vps/Box-Run.ps1 Install-Runner -Number <n>. Nothing was changed.' -ForegroundColor Red; exit 1 }
   $handPicked = @('Repo', 'Root', 'Account', 'RunnerName', 'Label', 'VpsHost', 'VpsUser', 'AlsoDeny') | Where-Object { $PSBoundParameters.ContainsKey($_) }
   if ($OffBox -or $Migrate -or $Remove -or $DryRunTo -or $DefenderSkip -or @($handPicked).Count) { Write-Host 'STOP. Through the gate a runner is installed, locked, read or given its network rules with the names and folders its number gives it, on the box, and never removed. Nothing was changed.' -ForegroundColor Red; exit 1 }
-  $Repo = 'EvilPatrick06/Thornswood-Ops'
+  $Repo = 'ThornswoodRP/Thornswood-Ops'
   . (Join-Path $Here '..\vps\admin\ShipAccess.ps1')
   # In this run's environment only: the gate starts every verb as a process
   # of its own, so the token goes with it, and GitHub ends it within the hour.

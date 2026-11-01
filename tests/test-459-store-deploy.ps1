@@ -87,7 +87,7 @@ function Record([string]$dir, [string]$path, [switch]$Light, [switch]$Crlf) {
     $files = [ordered]@{}
     foreach ($rel in @($sums.Keys | Sort-Object)) { $files[$rel] = [ordered]@{ sha256 = $sums[$rel]; bytes = 1; commit = $commit } }
     $rec = [ordered]@{ binary = 'scam_native.node'; sha256 = $sums['scam_native.node']; bytes = 1; builtUtc = '2026-10-16T00:00:00Z'
-                       source = [ordered]@{ repo = 'https://github.com/EvilPatrick06/skymp.git'; branch = 'thornswood/engine-changes'; commit = $commit; upstream = ''; upstreamBase = '' }
+                       source = [ordered]@{ repo = 'https://github.com/ThornswoodRP/skymp.git'; branch = 'thornswood/engine-changes'; commit = $commit; upstream = ''; upstreamBase = '' }
                        files = $files; recorded = '2026-10-16' }
     if ($Light) { $rec['lightPlugins'] = $true }
     $text = ($rec | ConvertTo-Json -Depth 5) + "`n"

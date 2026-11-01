@@ -227,7 +227,7 @@ const docs = [
   { name: 'Developer-Guide.md', text: flat(claudeRaw, false) },
   { name: '.github/CODEOWNERS', text: flat(coRaw, true) }
 ];
-const PROTECTION = 'gh api repos/EvilPatrick06/Thornswood/branches/main/protection';
+const PROTECTION = 'gh api repos/ThornswoodRP/Thornswood/branches/main/protection';
 
 docs.forEach(function (d) {
   const t = d.text;
@@ -315,7 +315,7 @@ if (!LIVE) {
   // holds an admin to none of main's rules" is true only while none reaches main.
   let rs = null;
   try {
-    rs = JSON.parse(execSync('gh api repos/EvilPatrick06/Thornswood/rules/branches/main', { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] }).toString('utf8'));
+    rs = JSON.parse(execSync('gh api repos/ThornswoodRP/Thornswood/rules/branches/main', { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] }).toString('utf8'));
   } catch (e) {
     console.log('      ' + String(e.message).split('\n')[0]);
   }
@@ -330,7 +330,7 @@ if (!LIVE) {
   }
   let auto = null;
   try {
-    auto = execSync('gh api repos/EvilPatrick06/Thornswood --jq .allow_auto_merge', { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] }).toString('utf8').trim();
+    auto = execSync('gh api repos/ThornswoodRP/Thornswood --jq .allow_auto_merge', { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] }).toString('utf8').trim();
   } catch (e) { }
   yes('live: auto-merge is on, as the guide says (#5182; GitHub says ' + auto + ')', auto === 'true');
 }

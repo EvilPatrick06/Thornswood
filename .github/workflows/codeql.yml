@@ -6,14 +6,14 @@
 # and the tests, the bot's Python, and these workflows themselves (actions).
 # Every one is read from source with build-mode none, so nothing is built and
 # no MSBuild or engine is needed. The engine submodule is not checked out:
-# the fork, EvilPatrick06/skymp, is its own repository. The one vendored
+# the fork, ThornswoodRP/skymp, is its own repository. The one vendored
 # script, site/public/marked-12.0.2.min.js, is left out, because a fault in
 # it is upstream's and THIRD-PARTY.md already says where it comes from.
 #
 # ONLY ONCE THE REPOSITORY IS PUBLIC. On a private repository owned by a
 # person, code scanning results can only be uploaded with GitHub Advanced
 # Security, which is paid; on a public one it is free. Measured 26 Oct 2026:
-# api.github.com/repos/EvilPatrick06/Thornswood says private: true. So the job
+# api.github.com/repos/ThornswoodRP/Thornswood says private: true. So the job
 # runs only when the event says the repository is not private, and until the
 # flip every run shows as skipped instead of failing on an upload that cannot
 # succeed. The same commit starts scanning the first push after the flip,

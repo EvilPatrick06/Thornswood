@@ -195,7 +195,7 @@ function Invoke-Status([string]$label, [string[]]$onIssue, [hashtable]$extra = @
         $env:ISSUE_NODE = 'I_issue2863'
         $env:ISSUE_STATE = 'open'
         $env:LABEL = $label
-        $env:GITHUB_REPOSITORY = 'EvilPatrick06/Thornswood'
+        $env:GITHUB_REPOSITORY = 'ThornswoodRP/Thornswood'
         $env:TS_CALLS = $calls
         $env:TS_OPTIONS = 'Todo|In Progress|Done'
         $env:TS_LABELS = ConvertTo-Json -InputObject @($onIssue) -Compress
@@ -238,7 +238,7 @@ function Invoke-Status([string]$label, [string[]]$onIssue, [hashtable]$extra = @
     $gone = @($made | Where-Object { $_.method -eq 'Delete' -and $_.uri -notlike '*/issues/*' } | ForEach-Object { [Uri]::UnescapeDataString(($_.uri -split '/labels/')[1]) })
     return [pscustomobject]@{ Code = $code; Out = $out; Calls = $made; Set = $set; Deleted = $dels; LabelGone = $gone }
 }
-$labelsUri = 'https://api.github.com/repos/EvilPatrick06/Thornswood/issues/2863/labels'
+$labelsUri = 'https://api.github.com/repos/ThornswoodRP/Thornswood/issues/2863/labels'
 
 try {
     $r = Invoke-Status 'board: In Progress' @('board: In Progress', 'area: GitHub & CI', 'claimed: Claude')
@@ -297,7 +297,7 @@ try {
         $r.Set.Count -eq 1 -and $r.Set[0].body.variables.f -eq 'PVTF_order' -and $r.Set[0].body.variables.v.number -eq 52.5 -and @($r.Set[0].body.variables.v.PSObject.Properties).Count -eq 1)
     Yes '  and says so' ($r.Out -match '#2863: Order set to 52.5')
     Yes ("  the order label is deleted from the repository, which takes it off the issue ({0})" -f ($r.LabelGone -join ', ')) ($r.LabelGone.Count -eq 1 -and $r.LabelGone[0] -eq 'order: 52.5')
-    Yes '  its name escaped into the address' (@($r.Calls | Where-Object { $_.method -eq 'Delete' -and $_.uri -eq 'https://api.github.com/repos/EvilPatrick06/Thornswood/labels/order%3A%2052.5' }).Count -eq 1)
+    Yes '  its name escaped into the address' (@($r.Calls | Where-Object { $_.method -eq 'Delete' -and $_.uri -eq 'https://api.github.com/repos/ThornswoodRP/Thornswood/labels/order%3A%2052.5' }).Count -eq 1)
     Yes '  and the board label and every other label are left alone' ($r.Deleted.Count -eq 0)
 
     $r = Invoke-Status 'Order:7' @('Order:7')

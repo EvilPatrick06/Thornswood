@@ -109,8 +109,8 @@ try {
         $repoA = Join-Path $work 'repoA'
         New-Item -ItemType Directory -Force -Path $repoA | Out-Null
         [void](Run-Git init -q $repoA)
-        [void](Run-Git -C $repoA remote add origin 'https://x-access-token:SECRET@github.com/EvilPatrick06/Thornswood')
-        Yes "Get-SourceRepo reads owner/name off an https origin with a token: '$(Get-SourceRepo $repoA)'" ((Get-SourceRepo $repoA) -eq 'EvilPatrick06/Thornswood')
+        [void](Run-Git -C $repoA remote add origin 'https://x-access-token:SECRET@github.com/ThornswoodRP/Thornswood')
+        Yes "Get-SourceRepo reads owner/name off an https origin with a token: '$(Get-SourceRepo $repoA)'" ((Get-SourceRepo $repoA) -eq 'ThornswoodRP/Thornswood')
 
         $repoB = Join-Path $work 'repoB'
         New-Item -ItemType Directory -Force -Path $repoB | Out-Null
@@ -121,13 +121,13 @@ try {
         $repoD = Join-Path $work 'repoD'
         New-Item -ItemType Directory -Force -Path $repoD | Out-Null
         [void](Run-Git init -q $repoD)
-        [void](Run-Git -C $repoD remote add origin 'ssh://git@ssh.github.com:443/EvilPatrick06/Thornswood.git')
-        Yes "Get-SourceRepo reads owner/name off the gate's ssh origin on port 443, not the port: '$(Get-SourceRepo $repoD)'" ((Get-SourceRepo $repoD) -eq 'EvilPatrick06/Thornswood')
+        [void](Run-Git -C $repoD remote add origin 'ssh://git@ssh.github.com:443/ThornswoodRP/Thornswood.git')
+        Yes "Get-SourceRepo reads owner/name off the gate's ssh origin on port 443, not the port: '$(Get-SourceRepo $repoD)'" ((Get-SourceRepo $repoD) -eq 'ThornswoodRP/Thornswood')
 
         $repoC = Join-Path $work 'repoC'
         New-Item -ItemType Directory -Force -Path $repoC | Out-Null
         [void](Run-Git init -q $repoC)
-        Yes "Get-SourceRepo falls back when there is no origin: '$(Get-SourceRepo $repoC)'" ((Get-SourceRepo $repoC) -eq 'EvilPatrick06/Thornswood')
+        Yes "Get-SourceRepo falls back when there is no origin: '$(Get-SourceRepo $repoC)'" ((Get-SourceRepo $repoC) -eq 'ThornswoodRP/Thornswood')
     } else {
         Write-Host 'SKIP  git is not on PATH, so Get-SourceRepo is not exercised'
     }
@@ -273,7 +273,7 @@ exit 9
 
     # 1. A good download verifies and leaves the exe in place.
     $env:TS_FAKE_GH_MODE = 'good'
-    $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
+    $why = Get-ReleaseLauncher 'ThornswoodRP/Thornswood' '1.2.3' $into
     Yes "a matching download verifies and returns nothing: '$why'" ($why -eq '')
     Yes '  and the exe is sitting in the folder' (Test-Path -LiteralPath (Join-Path $into 'Thornswood.exe'))
     $got = if (Test-Path -LiteralPath (Join-Path $into 'Thornswood.exe')) { [IO.File]::ReadAllBytes((Join-Path $into 'Thornswood.exe')) } else { @() }
@@ -281,26 +281,26 @@ exit 9
         $got.Length -eq $exeBytes.Length -and [Convert]::ToBase64String($got) -eq [Convert]::ToBase64String($exeBytes))
     $calls = Calls
     Yes ("  with no release.yml run holding them, found through the REST list of releases and downloaded by asset id, nothing else asked of gh: " + ($calls -join '; ')) (
-        $calls.Count -eq 4 -and $calls[0] -match '^gh api .*repos/EvilPatrick06/Thornswood/actions/workflows/release\.yml/runs\?' -and
-        $calls[1] -match '^gh api .*repos/EvilPatrick06/Thornswood/releases\?per_page=100&page=1$' -and
-        @($calls | Where-Object { $_ -match '^gh api -H Accept: application/octet-stream repos/EvilPatrick06/Thornswood/releases/assets/(11|13)$' }).Count -eq 2)
+        $calls.Count -eq 4 -and $calls[0] -match '^gh api .*repos/ThornswoodRP/Thornswood/actions/workflows/release\.yml/runs\?' -and
+        $calls[1] -match '^gh api .*repos/ThornswoodRP/Thornswood/releases\?per_page=100&page=1$' -and
+        @($calls | Where-Object { $_ -match '^gh api -H Accept: application/octet-stream repos/ThornswoodRP/Thornswood/releases/assets/(11|13)$' }).Count -eq 2)
     Yes '  and nothing in this folder is left beside them' (@(Get-ChildItem -LiteralPath $into -File | Where-Object { $_.Name -notin 'Thornswood.exe', 'SHA256SUMS' }).Count -eq 0)
 
     # 2. A checksum that does not match is refused, and says so.
     $env:TS_FAKE_GH_MODE = 'mismatch'
-    $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
+    $why = Get-ReleaseLauncher 'ThornswoodRP/Thornswood' '1.2.3' $into
     Yes 'a download whose checksum does not match is refused' ($why -ne '')
     Yes "  and the refusal names the mismatch: '$why'" ($why -match 'does not match its SHA256SUMS')
     Yes '  and says not to ship it' ($why -match 'Do not ship it')
 
     # 3. A SHA256SUMS with no line for the exe cannot be verified.
     $env:TS_FAKE_GH_MODE = 'noline'
-    $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
+    $why = Get-ReleaseLauncher 'ThornswoodRP/Thornswood' '1.2.3' $into
     Yes 'a SHA256SUMS with no Thornswood.exe line is refused' ($why -match 'no line for Thornswood\.exe')
 
     # 4. No release yet is the handoff: push the tag, wait for CI, Ship again.
     $env:TS_FAKE_GH_MODE = 'norelease'
-    $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
+    $why = Get-ReleaseLauncher 'ThornswoodRP/Thornswood' '1.2.3' $into
     Yes 'no release yet stops the ship' ($why -ne '')
     Yes "  and says this machine does not compile it: '$why'" ($why -match 'this machine does not compile it')
     Yes '  and hands over the exact tag commands' ($why -match 'git tag v1\.2\.3' -and $why -match 'git push origin v1\.2\.3')
@@ -310,7 +310,7 @@ exit 9
     # 4a. GitHub refusing gh (the 12 October rate limit) is not "no launcher":
     # it says what gh said and that the release is not the problem (#2432).
     $env:TS_FAKE_GH_MODE = 'fail'
-    $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
+    $why = Get-ReleaseLauncher 'ThornswoodRP/Thornswood' '1.2.3' $into
     Yes "gh failing stops the ship with what gh said: '$why'" ($why -match 'secondary rate limit' -and $why -match 'Nothing was published')
     Yes '  and does not say there is no launcher for the tag' ($why -notmatch 'There is no verified launcher' -and $why -notmatch 'git push origin')
     Yes '  in the house words' ($why -notmatch 'player' -and $why.IndexOf([char]0x2014) -lt 0)
@@ -319,33 +319,33 @@ exit 9
     # listed after the older one, whose hashes would not match.
     Remove-Item -LiteralPath $ghLog -Force -ErrorAction SilentlyContinue
     $env:TS_FAKE_GH_MODE = 'twodrafts'
-    $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
+    $why = Get-ReleaseLauncher 'ThornswoodRP/Thornswood' '1.2.3' $into
     Yes "two drafts for the tag: the newest is taken and verifies: '$why'" ($why -eq '')
     Yes '  its files, not the older draft''s' (@(Calls | Where-Object { $_ -match 'releases/assets/1[13]$' }).Count -ge 2 -and @(Calls | Where-Object { $_ -match 'releases/assets/5[13]$' }).Count -eq 0)
 
     # 4c. A draft on the second page of the list is still found.
     Remove-Item -LiteralPath $ghLog -Force -ErrorAction SilentlyContinue
     $env:TS_FAKE_GH_MODE = 'paged'
-    $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
+    $why = Get-ReleaseLauncher 'ThornswoodRP/Thornswood' '1.2.3' $into
     Yes "a draft on the second page of 100 is found: '$why'" ($why -eq '' -and @(Calls | Where-Object { $_ -match 'page=2$' }).Count -eq 1 -and @(Calls | Where-Object { $_ -match 'page=3$' }).Count -eq 0)
 
     # 4d. A file that comes down shorter than the release lists is refused and
     # not left in the folder.
     $env:TS_FAKE_GH_MODE = 'short'
-    $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
+    $why = Get-ReleaseLauncher 'ThornswoodRP/Thornswood' '1.2.3' $into
     Yes "a download shorter than the release lists is refused: '$why'" ($why -match 'came down as 518 bytes, and the release lists 525' -and $why -match 'Nothing was published')
     Yes '  and the short file is not left there' (-not (Test-Path -LiteralPath (Join-Path $into 'Thornswood.exe')))
 
     # 4e. The list answers and the download does not: said as that.
     $env:TS_FAKE_GH_MODE = 'dlfail'
-    $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
+    $why = Get-ReleaseLauncher 'ThornswoodRP/Thornswood' '1.2.3' $into
     Yes "a download gh could not make is refused with what gh said: '$why'" ($why -match 'could not download Thornswood\.exe' -and $why -match 'HTTP 502' -and $why -notmatch 'There is no verified launcher')
 
     # 4f. A green release.yml run for the tag holds the files (#2841): they
     # come from its artifact, the newest run's, and the draft is not asked.
     Remove-Item -LiteralPath $ghLog -Force -ErrorAction SilentlyContinue
     $env:TS_FAKE_GH_MODE = 'run'
-    $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
+    $why = Get-ReleaseLauncher 'ThornswoodRP/Thornswood' '1.2.3' $into
     Yes "the files of the newest green release.yml run for the tag verify: '$why'" ($why -eq '')
     $got = if (Test-Path -LiteralPath (Join-Path $into 'Thornswood.exe')) { [IO.File]::ReadAllBytes((Join-Path $into 'Thornswood.exe')) } else { @() }
     Yes '  byte for byte, out of the zip' ($got.Length -eq $exeBytes.Length -and [Convert]::ToBase64String($got) -eq [Convert]::ToBase64String($exeBytes))
@@ -358,13 +358,13 @@ exit 9
     # 4g. Its artifact past its days: the draft, as before.
     Remove-Item -LiteralPath $ghLog -Force -ErrorAction SilentlyContinue
     $env:TS_FAKE_GH_MODE = 'runexpired'
-    $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
+    $why = Get-ReleaseLauncher 'ThornswoodRP/Thornswood' '1.2.3' $into
     Yes "an expired artifact falls to the draft, which verifies: '$why'" ($why -eq '' -and @(Calls | Where-Object { $_ -match 'actions/artifacts/77/zip$' }).Count -eq 0 -and @(Calls | Where-Object { $_ -match '/releases\?per_page' }).Count -eq 1)
 
     # 4h. The artifact is listed and does not come down: said as that, with
     # what gh said, and not as "no launcher".
     $env:TS_FAKE_GH_MODE = 'runzipfail'
-    $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
+    $why = Get-ReleaseLauncher 'ThornswoodRP/Thornswood' '1.2.3' $into
     Yes "a zip gh could not download is refused with what gh said: '$why'" ($why -match 'could not download the files of release\.yml run 900' -and $why -match 'HTTP 500' -and $why -notmatch 'There is no verified launcher' -and $why -match 'Nothing was published')
     Yes '  and nothing half written is left' (@(Get-ChildItem -LiteralPath $into -Force).Count -eq 0)
 
@@ -373,45 +373,45 @@ exit 9
 
     # 5. The setup program CI built verifies and lands in the folder.
     $env:TS_FAKE_GH_MODE = 'good'
-    $why = Get-ReleaseStub 'EvilPatrick06/Thornswood' '1.2.3' $stubInto
+    $why = Get-ReleaseStub 'ThornswoodRP/Thornswood' '1.2.3' $stubInto
     Yes "the setup program CI built verifies and returns nothing: '$why'" ($why -eq '')
     Yes '  and setup-stub.exe is sitting in the folder' (Test-Path -LiteralPath (Join-Path $stubInto 'setup-stub.exe'))
     Yes '  and it is the one CI built, not a local one' ([IO.File]::ReadAllText((Join-Path $stubInto 'setup-stub.exe')) -eq 'the setup program CI built for this tag')
 
     # 6. A checksum that does not match is refused.
     $env:TS_FAKE_GH_MODE = 'mismatch'
-    $why = Get-ReleaseStub 'EvilPatrick06/Thornswood' '1.2.3' $stubInto
+    $why = Get-ReleaseStub 'ThornswoodRP/Thornswood' '1.2.3' $stubInto
     Yes "a setup program whose checksum does not match is refused: '$why'" ($why -match 'does not match its SHA256SUMS' -and $why -match 'Do not ship it')
 
     # 7. No line for it cannot be verified, and says how to get one.
     $env:TS_FAKE_GH_MODE = 'noline'
-    $why = Get-ReleaseStub 'EvilPatrick06/Thornswood' '1.2.3' $stubInto
+    $why = Get-ReleaseStub 'ThornswoodRP/Thornswood' '1.2.3' $stubInto
     Yes 'a SHA256SUMS with no setup-stub.exe line is refused' ($why -match 'no line for setup-stub\.exe')
 
     # 8. A release drafted before #932 has no setup program: build the tag again.
     $env:TS_FAKE_GH_MODE = 'nostub'
-    $why = Get-ReleaseStub 'EvilPatrick06/Thornswood' '1.2.3' $stubInto
+    $why = Get-ReleaseStub 'ThornswoodRP/Thornswood' '1.2.3' $stubInto
     Yes "a release with no setup program stops the ship before anything is published: '$why'" ($why -match 'no setup program' -and $why -match 'Nothing was published')
-    Yes '  and hands over the exact command that builds the tag again' ($why -match [regex]::Escape('gh workflow run release.yml --repo EvilPatrick06/Thornswood -f tag=v1.2.3'))
+    Yes '  and hands over the exact command that builds the tag again' ($why -match [regex]::Escape('gh workflow run release.yml --repo ThornswoodRP/Thornswood -f tag=v1.2.3'))
     Yes '  in the house words' ($why -notmatch 'player' -and $why.IndexOf([char]0x2014) -lt 0)
 
     $env:TS_FAKE_GH_MODE = 'norelease'
-    $why = Get-ReleaseStub 'EvilPatrick06/Thornswood' '1.2.3' $stubInto
+    $why = Get-ReleaseStub 'ThornswoodRP/Thornswood' '1.2.3' $stubInto
     Yes 'no release at all stops it too' ($why -match 'no setup program')
 
     # 8a. The setup program from the run's artifact (#2841), and a run whose
     # artifact has none falls to the draft, which has it.
     $env:TS_FAKE_GH_MODE = 'run'
-    $why = Get-ReleaseStub 'EvilPatrick06/Thornswood' '1.2.3' $stubInto
+    $why = Get-ReleaseStub 'ThornswoodRP/Thornswood' '1.2.3' $stubInto
     Yes "the setup program from the release.yml run verifies: '$why'" ($why -eq '' -and [IO.File]::ReadAllText((Join-Path $stubInto 'setup-stub.exe')) -eq 'the setup program CI built for this tag')
     Remove-Item -LiteralPath $ghLog -Force -ErrorAction SilentlyContinue
     $env:TS_FAKE_GH_MODE = 'runnostub'
-    $why = Get-ReleaseStub 'EvilPatrick06/Thornswood' '1.2.3' $stubInto
+    $why = Get-ReleaseStub 'ThornswoodRP/Thornswood' '1.2.3' $stubInto
     Yes "a run whose files have no setup program falls to the draft: '$why'" ($why -eq '' -and @(Calls | Where-Object { $_ -match '/releases\?per_page' }).Count -eq 1)
 
     # 9. GitHub refusing gh is said as that here too, not as a missing stub.
     $env:TS_FAKE_GH_MODE = 'fail'
-    $why = Get-ReleaseStub 'EvilPatrick06/Thornswood' '1.2.3' $stubInto
+    $why = Get-ReleaseStub 'ThornswoodRP/Thornswood' '1.2.3' $stubInto
     Yes "gh failing stops it with what gh said, not as no setup program: '$why'" ($why -match 'secondary rate limit' -and $why -notmatch 'no setup program' -and $why -match 'Nothing was published')
 }
 finally {

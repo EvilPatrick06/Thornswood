@@ -2,7 +2,7 @@
   ops-access.js
 
   An installation token of the "Thornswood box admin" App for one change to
-  the private ops repository, EvilPatrick06/Thornswood-Ops, where the box's
+  the private ops repository, ThornswoodRP/Thornswood-Ops, where the box's
   runners are registered and the box's keys are kept (#2862, Patrick's A on
   q-retire-box-keys, 31 Oct 2026: runners and keys are renewed from the
   cloud, through the deploy gate, never made new). Run as SYSTEM under the
@@ -38,7 +38,7 @@ const { call, said } = require('./ship-access.js');
 
 const STATE = process.env.THORNSWOOD_ADMIN_STATE || 'C:\\Thornswood-Admin\\state';
 const API = (process.env.THORNSWOOD_ADMIN_GITHUB_API || 'https://api.github.com').replace(/\/$/, '');
-const OWNER = 'EvilPatrick06';
+const OWNER = 'ThornswoodRP'; // the repositories' owner since the move (#5184)
 const REPOS = ['Thornswood-Ops'];
 // What each ask may do, and nothing else is ever asked for.
 const ASKS = {

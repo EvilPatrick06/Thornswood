@@ -5,7 +5,7 @@
   "bytes": 5941760,
   "builtUtc": "2026-10-31T22:15:09Z",
   "source": {
-    "repo": "https://github.com/EvilPatrick06/skymp.git",
+    "repo": "https://github.com/ThornswoodRP/skymp.git",
     "branch": "thornswood/engine-changes",
     "commit": "50736fe6183409b640218ac131742d16d738d550",
     "upstream": "https://github.com/skyrim-multiplayer/skymp.git",

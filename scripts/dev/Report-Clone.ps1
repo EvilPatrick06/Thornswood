@@ -67,7 +67,7 @@ param(
     [Parameter(ParameterSetName = 'Send')][string]$Clone,
     # Define the functions and stop, which is how the harness loads them.
     [Parameter(ParameterSetName = 'Load', Mandatory = $true)][switch]$Load,
-    [string]$GitHubRepo = 'EvilPatrick06/Thornswood'
+    [string]$GitHubRepo = 'ThornswoodRP/Thornswood'
 )
 
 Set-StrictMode -Version Latest
