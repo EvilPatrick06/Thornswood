@@ -221,9 +221,28 @@ jobs:
       - name: Build the game files over dev's last release
         id: game
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIOUS: ${{ steps.names.outputs.previous }}
+          PREVIOUS_MANIFEST: ${{ steps.names.outputs.previous_manifest }}
         run: |
           $out = Join-Path $env:RUNNER_TEMP 'game'
-          ./scripts/release/Build-GameFiles.ps1 -Out $out -Root (Join-Path $env:RUNNER_TEMP 'game-root') -Commit $env:GITHUB_SHA
+          $a = @{ Out = $out; Root = (Join-Path $env:RUNNER_TEMP 'game-root'); Commit = $env:GITHUB_SHA }
+          if ($env:PREVIOUS_MANIFEST) {
+            # The list of the Release before, held to its manifest, for what
+            # this one no longer ships (Build-GameFiles.ps1, WHAT IS GONE).
+            $pm = Get-Content -LiteralPath $env:PREVIOUS_MANIFEST -Raw | ConvertFrom-Json
+            $pf = @($pm.parts.PSObject.Properties | Where-Object Name -eq 'game' | ForEach-Object { $_.Value } | Where-Object { $_.name -eq 'game-files.json' })
+            if ($pf.Count -ne 1) { Write-Host "::error::the game part of $($env:PREVIOUS) lists no game-files.json"; exit 1 }
+            $pdir = Join-Path $env:RUNNER_TEMP 'previous-game'
+            New-Item -ItemType Directory -Force -Path $pdir | Out-Null
+            gh release download $env:PREVIOUS -R $env:GITHUB_REPOSITORY -p 'game-files.json' -D $pdir --clobber
+            $plist = Join-Path $pdir 'game-files.json'
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $plist -PathType Leaf)) { Write-Host "::error::game-files.json of $($env:PREVIOUS) could not be downloaded"; exit 1 }
+            if ((Get-FileHash -LiteralPath $plist -Algorithm SHA256).Hash.ToLowerInvariant() -ne ([string]$pf[0].sha256).ToLowerInvariant()) { Write-Host "::error::game-files.json of $($env:PREVIOUS) is not the one its manifest names"; exit 1 }
+            $a['PreviousList'] = $plist
+          }
+          ./scripts/release/Build-GameFiles.ps1 @a
           if ($LASTEXITCODE -ne 0) { exit 1 }
           $zip = Join-Path $out 'game.zip'
           if (-not (Test-Path -LiteralPath $zip -PathType Leaf)) { Write-Host "::error::Build-GameFiles.ps1 left no game.zip in $out"; exit 1 }
