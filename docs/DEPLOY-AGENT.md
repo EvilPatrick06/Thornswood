@@ -86,12 +86,20 @@ the App holds Deployments.
    LF read as LF, the way the deploy scripts compare records); then the
    steps are the ones under "A new server build" instead of 4 to 6.
 4. The agent takes the server folders' turn, keeps the running
-   `gamemode.js`, `thornswood-build.json`, `server-settings.json` and the
-   deploy record in `.prev-<stamp>`, and moves the new stamp and then the new
-   gamemode in, one rename each.
-5. `server.log` has to say the new gamemode's git blob loaded (the reload
-   Reload.ps1 uses, #3196), and then the health address has to answer.
-6. If either does not happen, the old files go back the same way and the
+   `gamemode.js`, `thornswood-build.json`, `server-settings.json`, the
+   deploy record and the `gamemode-tables` folder in `.prev-<stamp>`, and
+   moves the new tables folder, then the new stamp, then the new gamemode in,
+   one rename each. The tables are the files game/gamemode-tables/<NAME>.json
+   the gamemode reads as it loads (#5191), carried in the Release as
+   `gamemode-tables.zip` and held to the manifest like the other files; a
+   Release without that zip leaves the folder as it is.
+5. `server.log` has to say the new gamemode's git blob loaded, and the git
+   tree id of its tables folder too when that gamemode reads tables (it
+   carries the line that logs them; one from before #5191 does not, whatever
+   folder is beside it) (the reload Reload.ps1 uses, #3196), and then the
+   health address has to answer.
+6. If either does not happen, the old files go back, the tables folder first
+   so the reload the old gamemode.js starts reads the old tables, and the
    old gamemode has to load again. The Deployment says **failure** and that
    the previous gamemode is back. If even that does not take, it says
    **error**, and dev needs `Deploy-DevGamemode.ps1 -PutBack`.
@@ -123,7 +131,8 @@ the build and the gamemode in together, the way Swap.ps1 swaps a server:
    for until it has exited, and a `restart.json` it never read removed.
 4. One rename per file. What each replaces goes to `.prev-<stamp>`, and so
    does any fork file the new record does not list, so the folder holds one
-   build.
+   build. The `gamemode-tables` folder, when the Release carries it, goes
+   aside and in whole, and step 5 waits for its tree id as well.
 5. The start, then both ports from the box (UDP, and the resources port
    taking a connection) within 170 seconds (ServerReadyWait.ps1's wait),
    then `server.log` saying the new gamemode's git blob loaded, then the
