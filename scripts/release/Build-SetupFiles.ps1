@@ -185,7 +185,7 @@ Say ("  SOURCE CODE.txt, the GPL and AGPL texts and {0} library licence texts" -
 # ---- the launcher's libraries' licence texts
 # Everything built into the launcher or shipped with it (.NET, Avalonia,
 # SkiaSharp and Skia, HarfBuzz, ANGLE, Velopack and its Rust crates, the voice
-# libraries, NLayer): installer\licences\README.txt says where each text is
+# libraries, NLayer, the voice's HRTF code and data): installer\licences\README.txt says where each text is
 # from. InstallSteps.LicenceFiles names the same files, copies them into the
 # install folder and Uninstall.cs removes them (#4823).
 $launcherLicences = @(
@@ -193,7 +193,8 @@ $launcherLicences = @(
     'dotnet-LICENSE.txt', 'dotnet-THIRD-PARTY-NOTICES.txt',
     'Avalonia-LICENSE.txt', 'MicroCom-LICENSE.txt', 'Tmds.DBus-LICENSE.txt',
     'SkiaSharp-LICENSE.txt', 'SkiaSharp-THIRD-PARTY-NOTICES.txt', 'ANGLE-LICENSE.txt',
-    'Velopack-LICENSE.txt', 'Velopack-Rust-crates.txt', 'NLayer-LICENSE.txt'
+    'Velopack-LICENSE.txt', 'Velopack-Rust-crates.txt', 'NLayer-LICENSE.txt',
+    'Chromium-HRTF-LICENSE.txt', 'IRCAM-Listen-HRTF.txt'
 )
 foreach ($lic in $launcherLicences) {
     $from = Join-Path $RepoDir (Join-Path 'installer\licences' $lic)

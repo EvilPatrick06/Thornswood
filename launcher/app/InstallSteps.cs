@@ -530,7 +530,7 @@ namespace Thornswood
         /// The licence texts the package carries beside SOURCE CODE.txt and the
         /// install puts beside it in Root: the GPL and AGPL of the SkyMP files,
         /// and the texts of every library built into the launcher or shipped
-        /// with it (#421, #4823). Build-SetupFiles.ps1 packs the same names
+        /// with it, and of the voice's HRTF code and data (#421, #4823, #963). Build-SetupFiles.ps1 packs the same names
         /// from installer\licences, whose README.txt says where each is from,
         /// and Uninstall.cs removes them.
         /// </summary>
@@ -542,6 +542,7 @@ namespace Thornswood
             "Avalonia-LICENSE.txt", "MicroCom-LICENSE.txt", "Tmds.DBus-LICENSE.txt",
             "SkiaSharp-LICENSE.txt", "SkiaSharp-THIRD-PARTY-NOTICES.txt", "ANGLE-LICENSE.txt",
             "Velopack-LICENSE.txt", "Velopack-Rust-crates.txt", "NLayer-LICENSE.txt",
+            "Chromium-HRTF-LICENSE.txt", "IRCAM-Listen-HRTF.txt",
         };
 
         static void CopyIfThere(string from, string to)

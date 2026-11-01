@@ -301,6 +301,50 @@ notice to go with every copy, so the repository's `LICENSE` at that commit is
 reproduced in full at the end of this file and on the public credits page,
 and goes with the install as `NLayer-LICENSE.txt`.
 
+## The voice's HRTF panner and its impulse responses, inside the launcher
+
+Every voice the launcher plays is placed around the head the way the voice
+page placed it in a browser: Web Audio's PannerNode with `panningModel`
+`'HRTF'`, which Patrick settled for every voice panner on 28 September (#963
+point 4). Since voice moved out of the web view (#4823) the launcher does it
+itself, in `launcher\app\VoiceHrtf.cs`, compiled into `Thornswood.exe`.
+
+The code is a C# port of Chromium's, at Chromium commit `dd2ed7a2` (in full,
+`dd2ed7a22c23f9c9a85e9514c8c3308bf6ae4fbe`,
+https://chromium.googlesource.com/chromium/src): Blink's `hrtf_panner.cc`,
+`hrtf_database.cc`, `hrtf_elevation.cc`, `hrtf_kernel.cc`, `fft_frame.cc`,
+`fft_convolver.cc` and `delay.cc` in `third_party/blink/renderer/platform/audio`,
+the FFT's packing and scaling from `rustfft_ffi.rs` beside them, the azimuth
+and elevation from `third_party/blink/renderer/modules/webaudio/panner_handler.cc`,
+and `media/base/sinc_resampler.cc`, which brings the responses to 48 kHz.
+`tests\test-voice-hrtf.js` renders one signal through it and through Chrome's
+own PannerNode and compares them sample by sample.
+
+| File | Where it is from | sha256 |
+|---|---|---|
+| `launcher\hrtf-composite.wav` | Chromium's `third_party/blink/renderer/platform/audio/resources/Composite.flac` at `dd2ed7a2`, decoded to 16-bit PCM unchanged | `a25fc99a6e875f659aaa9d107c791aeff250030e0d7f16458baf3a00943394e3` |
+| `Composite.flac`, as Chromium has it | | `40bda2ad9170fa2bcdc2d5f20cdd98c70609ad33a94df49fe7d6007cacab2ada` |
+
+The impulse responses are 240 stereo responses of 256 frames at 44.1 kHz,
+the concatenation of Chromium's `IRC_Composite_C_R0195_T*_P*.wav`. The
+launcher embeds the file and builds its filters from it on first use, off the
+audio thread. Firefox ships the same samples, and says of them that they
+were derived for WebKit by Chris Rogers by averaging impulse responses from
+the IRCAM Listen HRTF Database, and were granted to the public domain.
+
+Licences: the Blink files carry BSD notices from Google (two wordings, one
+with Apple's no-endorsement clause), and the rest Chromium's BSD `LICENSE`;
+each asks for its notice to go with the binary. The impulse responses have
+no licence file in Chromium. Firefox records them as public domain, and the
+IRCAM Listen HRTF Database, whose work they come from, says it "is public and
+available for any use" and asks for an acknowledgment, which this section,
+the credits page and the installed text give. IRCAM's own page
+(http://recherche.ircam.fr/equipes/salles/listen/) could not be reached on
+1 November 2026, so its words are as the Ambisonic Toolkit's licensing notes
+quote them. Every text is reproduced in full at the end of this file and on
+the public credits page, and goes with the install as
+`Chromium-HRTF-LICENSE.txt` and `IRCAM-Listen-HRTF.txt`.
+
 ## zlib 1.3, translated into C# inside the launcher
 
 `launcher\app\FromGameDeflate.cs` is `deflate.c` and `trees.c` of zlib 1.3
@@ -1539,7 +1583,8 @@ fork.
 The GPL and AGPL texts go with the files they cover. The installer hands
 `GPL-3.0.txt` and `AGPL-3.0.txt` into the install folder beside
 `SOURCE CODE.txt`, and with them the licence texts of every library inside
-the launcher or shipped with it: the three voice libraries, NLayer, .NET,
+the launcher or shipped with it: the three voice libraries, NLayer, the
+voice's HRTF code and data, .NET,
 Avalonia, SkiaSharp and HarfBuzzSharp with Skia's and HarfBuzz's notices,
 ANGLE, MicroCom, Tmds.DBus and Velopack with its Rust crates (the Velopack
 package carries them from `installer\licences`, Build-SetupFiles.ps1; the
@@ -1714,6 +1759,125 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
+
+## Chromium HRTF licence
+
+The notices of the Chromium files the launcher's HRTF panner is ported from,
+at Chromium commit `dd2ed7a2`. `hrtf_panner.cc` and `delay.cc`:
+
+```
+Copyright (C) 2010, Google Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+1.  Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+2.  Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS'' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+DAMAGE.
+```
+
+`hrtf_elevation.cc`, `hrtf_kernel.cc`, `hrtf_database.cc`, `fft_frame.cc` and
+`fft_convolver.cc`:
+
+```
+Copyright (C) 2010 Google Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+1.  Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+2.  Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+    its contributors may be used to endorse or promote products derived
+    from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY APPLE AND ITS CONTRIBUTORS "AS IS" AND ANY
+EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL APPLE OR ITS CONTRIBUTORS BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+`media/base/sinc_resampler.cc`, `rustfft_ffi.rs` and `panner_handler.cc`, under
+Chromium's `LICENSE` at that commit:
+
+```
+// Copyright 2015 The Chromium Authors
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//    * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//    * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//    * Neither the name of Google LLC nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+## IRCAM Listen HRTF terms
+
+What Firefox's copy of the impulse responses says of them
+(`dom/media/webaudio/blink/IRC_Composite_C_R0195-incl.cpp`):
+
+```
+"The sample data in the arrays here was derived for Webkit by Chris Rogers
+through averaging of impulse responses from the IRCAM Listen HRTF
+Database. The responses here are half the length of the Listen responses.
+This sample data has been granted to the Public Domain."
+```
+
+The IRCAM Listen HRTF Database's terms, as the Ambisonic Toolkit's licensing
+notes quote them (IRCAM's own page could not be reached on 1 November 2026):
+
+```
+"Copyright (c) 2002 IRCAM (Institut de Recherche et Coordination
+Acoustique/Musique). All Rights Reserved"
+
+"Use of Materials: The Listen database is public and available for any
+use. We would however appreciate an acknowledgment of the database
+somewhere in the description of your work (e.g. paper) or in your
+development."
 ```
 
 ## .NET licence

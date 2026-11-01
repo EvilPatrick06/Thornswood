@@ -147,6 +147,15 @@ Gailly and Mark Adler, under the zlib licence. It is translated into C# so
 that the main menu the launcher makes from your game comes out the same on
 every machine.
 
+Its voice places everybody around your head with Chromium's HRTF panner, the
+one the game's browser uses, ported into the launcher from Chromium (commit
+`dd2ed7a2`), by Google and the Chromium authors under the BSD licence. It
+filters each voice with impulse responses derived by Chris Rogers from the
+[IRCAM Listen HRTF Database](http://recherche.ircam.fr/equipes/salles/listen/),
+by IRCAM (Institut de Recherche et Coordination Acoustique/Musique), which
+is public and available for any use. The notices and terms are at the bottom
+of this page.
+
 **The launcher is built on** .NET 10 by Microsoft and the .NET Foundation,
 compiled into it so you need nothing installed, under the MIT licence;
 Avalonia 12.1.4, by the AvaloniaUI project, its window and controls, under
@@ -358,6 +367,125 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
+
+## Chromium HRTF licence
+
+The notices of the Chromium files the launcher's HRTF panner is ported from,
+at Chromium commit `dd2ed7a2`. `hrtf_panner.cc` and `delay.cc`:
+
+```
+Copyright (C) 2010, Google Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+1.  Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+2.  Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS'' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+DAMAGE.
+```
+
+`hrtf_elevation.cc`, `hrtf_kernel.cc`, `hrtf_database.cc`, `fft_frame.cc` and
+`fft_convolver.cc`:
+
+```
+Copyright (C) 2010 Google Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+1.  Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+2.  Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+    its contributors may be used to endorse or promote products derived
+    from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY APPLE AND ITS CONTRIBUTORS "AS IS" AND ANY
+EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL APPLE OR ITS CONTRIBUTORS BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+`media/base/sinc_resampler.cc`, `rustfft_ffi.rs` and `panner_handler.cc`, under
+Chromium's `LICENSE` at that commit:
+
+```
+// Copyright 2015 The Chromium Authors
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//    * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//    * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//    * Neither the name of Google LLC nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+## IRCAM Listen HRTF terms
+
+What Firefox's copy of the impulse responses says of them
+(`dom/media/webaudio/blink/IRC_Composite_C_R0195-incl.cpp`):
+
+```
+"The sample data in the arrays here was derived for Webkit by Chris Rogers
+through averaging of impulse responses from the IRCAM Listen HRTF
+Database. The responses here are half the length of the Listen responses.
+This sample data has been granted to the Public Domain."
+```
+
+The IRCAM Listen HRTF Database's terms, as the Ambisonic Toolkit's licensing
+notes quote them (IRCAM's own page could not be reached on 1 November 2026):
+
+```
+"Copyright (c) 2002 IRCAM (Institut de Recherche et Coordination
+Acoustique/Musique). All Rights Reserved"
+
+"Use of Materials: The Listen database is public and available for any
+use. We would however appreciate an acknowledgment of the database
+somewhere in the description of your work (e.g. paper) or in your
+development."
 ```
 
 ## .NET licence

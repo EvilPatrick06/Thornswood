@@ -101,6 +101,27 @@ sits in the launcher.
     THIRD-PARTY.md under "NLayer licence". The MP3 decoder for the menu
     theme, compiled into the launcher.
 
+  Chromium-HRTF-LICENSE.txt
+    The launcher's HRTF panner (launcher\app\VoiceHrtf.cs) is a C# port of
+    Chromium's Web Audio HRTF panning at Chromium commit dd2ed7a2 (in full,
+    dd2ed7a22c23f9c9a85e9514c8c3308bf6ae4fbe). The file carries, word for
+    word, the two BSD notices at the top of the Blink files it ports
+    (hrtf_panner.cc and delay.cc; hrtf_elevation.cc, hrtf_kernel.cc,
+    hrtf_database.cc, fft_frame.cc and fft_convolver.cc) and Chromium's own
+    LICENSE at that commit (sinc_resampler.cc, rustfft_ffi.rs and
+    panner_handler.cc's azimuth), with a list of which covers which (#963).
+
+  IRCAM-Listen-HRTF.txt
+    The impulse responses the panner filters with, launcher\hrtf-composite.wav:
+    Chromium's resources/Composite.flac at the same commit, decoded to
+    16-bit PCM unchanged. Chromium gives them no licence file of their own.
+    The file quotes word for word what Firefox's copy says of them (derived
+    by Chris Rogers from the IRCAM Listen HRTF Database and granted to the
+    public domain) and IRCAM's terms for that database ("public and
+    available for any use", with an acknowledgment asked for), as the
+    Ambisonic Toolkit's licensing notes quote them, IRCAM's own page being
+    unreachable on 1 November 2026 (#963).
+
 When a library's version moves in launcher/app/Thornswood.csproj (or vpk's
 VPK_VERSION in .github/workflows/merge-release.yml), refresh its text here
 from the new package or commit in the same pull request.
