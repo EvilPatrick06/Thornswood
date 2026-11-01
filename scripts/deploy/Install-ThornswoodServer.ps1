@@ -208,7 +208,12 @@ function Say([string]$m, [string]$c = 'Gray') { Write-Host $m -ForegroundColor $
 # StopServer) goes here, whatever the outcome: started and answering, rolled
 # back, or given up on and left to the watchdog.
 $script:heldTask = ''
+$script:openTrace = $null
 function Finish([string]$marker, [int]$code) {
+    # The trace of who opens the server's folder (#5211) is stopped on every
+    # way out, read or not. Remove-ThornswoodOpenTrace is in the
+    # StopAndMove.ps1 copy below, loaded before anything starts the trace.
+    if ($script:openTrace) { Remove-ThornswoodOpenTrace $script:openTrace; $script:openTrace = $null }
     if ($script:heldTask) { Say (Clear-ThornswoodHold -Target $script:heldTask) 'DarkGray' }
     Write-Host ''; Write-Host $marker; exit $code
 }
@@ -1188,6 +1193,123 @@ function Move-ThornswoodPath([string]$From, [string]$To) {
   $script:ThornswoodMoveWhy = ('{0}: {1} (0x{2:X8}); open under it then: {3}' -f $what, $msg, (0x80070000 -bor $err), (Get-ThornswoodPathHolders $From))
   return $false
 }
+
+# ---- who opened a folder itself, recorded as it happened (#5211) ----------
+#
+# WHY. On 31 Oct 2026 at 7:00 PM box time Publish-Server-Main could not open
+# C:\Thornswood-Server to rename it (error 32), and the look taken the instant
+# after (Get-ThornswoodPathHolders) found nothing holding it: no process but
+# the installer had it open, and no handle on it in any process it could look
+# into. The same refusal named nothing on 22 Oct (#3262). Read through the
+# gate on the running server (Read-ServerHolders, 1 Nov), the folder itself is
+# open only in the cmd and the two nodes StopServer stops and waits for; the
+# task's launcher and conhost do not have it open. So what refused the rename
+# opened the folder during the install and let go within milliseconds, and no
+# look afterwards can name it. Windows can: its own trace of every open
+# (Microsoft-Windows-Kernel-File, Create events, which name the process
+# whatever it is, a protected one or the kernel's own included) and of every
+# process started and ended (Microsoft-Windows-Kernel-Process). These record
+# both from before the stop to just after the move, and when the move is
+# refused, say every open of the folder itself in that time: when, by which
+# process, and what it shares. It changes nothing: a trace session is read
+# only, stopped on every way out, and its file removed.
+$ThornswoodTraceWhy = ''
+function Start-ThornswoodOpenTrace([string]$Name) {
+  $script:ThornswoodTraceWhy = ''
+  if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { $script:ThornswoodTraceWhy = 'Windows has this trace and this is not Windows'; return $null }
+  $logman = Join-Path $env:SystemRoot 'System32\logman.exe'
+  $etl = Join-Path $env:TEMP ($Name + '.etl')
+  $pf = Join-Path $env:TEMP ($Name + '.providers')
+  Remove-Item -LiteralPath $etl, $pf -Force -EA SilentlyContinue
+  # Opens (the create keyword, 0x80) and process starts and ends (0x10).
+  [IO.File]::WriteAllLines($pf, [string[]]@('"Microsoft-Windows-Kernel-File" 0x80 0x5', '"Microsoft-Windows-Kernel-Process" 0x10 0x5'))
+  $eap = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try { $said = @(& $logman start $Name -pf $pf -o $etl -bs 1024 -nb 64 512 -ets 2>&1 | ForEach-Object { "$_".Trim() } | Where-Object { $_ }) }
+  finally { $ErrorActionPreference = $eap }
+  Remove-Item -LiteralPath $pf -Force -EA SilentlyContinue
+  if ($LASTEXITCODE -ne 0) { $script:ThornswoodTraceWhy = 'logman would not start it (exit ' + $LASTEXITCODE + '): ' + ($said -join ' '); return $null }
+  return @{ Name = $Name; Etl = $etl; Logman = $logman; Stopped = $false }
+}
+
+# Stops the trace. Nothing comes back; Read-ThornswoodOpenTrace reads it.
+function Stop-ThornswoodOpenTrace($Trace) {
+  if (-not $Trace -or $Trace.Stopped) { return }
+  $eap = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try { $null = & $Trace.Logman stop $Trace.Name -ets 2>&1 } finally { $ErrorActionPreference = $eap }
+  $Trace.Stopped = $true
+}
+
+# Every open of $Path itself in the trace, in time order, then every
+# process started or ended in the three seconds before this process's last
+# open of it (the refused one) and the second after; then removes the
+# trace's file.
+function Read-ThornswoodOpenTrace($Trace, [string]$Path) {
+  if (-not $Trace) { return @('no trace was recorded: ' + $ThornswoodTraceWhy) }
+  Stop-ThornswoodOpenTrace $Trace
+  $lines = @()
+  try {
+    $leaf = '\' + (Split-Path -Leaf ([IO.Path]::GetFullPath($Path)))
+    $names = @{}
+    try { foreach ($r in [ThornswoodOpeners]::Running()) { $names[[int]$r[0]] = [string]$r[3] } } catch { }
+    $events = @(Get-WinEvent -Path $Trace.Etl -Oldest -ErrorAction Stop)
+    $opens = 0
+    $procs = @()
+    $found = @()
+    $anchor = $null
+    foreach ($e in $events) {
+      if ([string]$e.ProviderName -eq 'Microsoft-Windows-Kernel-Process') {
+        if ($e.Id -ne 1 -and $e.Id -ne 2) { continue }
+        $d = @{}
+        foreach ($x in @(([xml]$e.ToXml()).Event.EventData.Data)) { $d[[string]$x.Name] = [string]$x.'#text' }
+        $id = 0
+        if ($d['ProcessID']) { $id = [int]$d['ProcessID'] }
+        if ($d['ImageName'] -and $id) { $names[$id] = Split-Path -Leaf $d['ImageName'] }
+        $procs += , @($e.TimeCreated, $id, $(if ($e.Id -eq 1) { 'started' } else { 'ended' }), $d['ParentProcessID'])
+        continue
+      }
+      $opens++
+      $hit = $false
+      foreach ($v in @($e.Properties)) { if (([string]$v.Value).EndsWith($leaf, [StringComparison]::OrdinalIgnoreCase)) { $hit = $true; break } }
+      if (-not $hit) { continue }
+      $d = @{}
+      foreach ($x in @(([xml]$e.ToXml()).Event.EventData.Data)) { $d[[string]$x.Name] = [string]$x.'#text' }
+      $raw = [string]$d['ShareAccess']
+      $share = -1
+      try { $share = if ($raw -like '0x*') { [Convert]::ToInt32($raw.Substring(2), 16) } else { [int]$raw } } catch { }
+      $shares = if ($share -lt 0) { 'shares ' + $raw } else {
+        'shares ' + $(@(@(1, 'read'), @(2, 'write'), @(4, 'delete')) | Where-Object { $share -band $_[0] } | ForEach-Object { $_[1] }) -join ', ' +
+        $(if (-not ($share -band 4)) { ' (NOT delete: a rename is refused while it is open)' } else { '' }) }
+      $id = [int]$e.ProcessId
+      if ($id -eq $PID) { $anchor = $e.TimeCreated }
+      $found += , @($e.TimeCreated, $id, ('opened ' + $d['FileName'] + ', ' + $shares + ', options ' + $d['CreateOptions'] + ', thread ' + $d['IssuingThreadId']))
+    }
+    if (-not $anchor -and $events.Count) { $anchor = $events[$events.Count - 1].TimeCreated }
+    foreach ($p in $procs) {
+      if ($anchor -and $p[0] -ge $anchor.AddSeconds(-3) -and $p[0] -le $anchor.AddSeconds(1)) {
+        $found += , @($p[0], $p[1], ($p[2] + $(if ($p[3]) { ', parent ' + $p[3] } else { '' })))
+      }
+    }
+    $lines += ('the trace holds ' + $opens + ' open(s) on the box, ' + $procs.Count + ' process start(s) and end(s), from ' +
+      $(if ($events.Count) { $events[0].TimeCreated.ToString('h:mm:ss.fff tt') + ' to ' + $events[$events.Count - 1].TimeCreated.ToString('h:mm:ss.fff tt') } else { 'nothing' }) +
+      '; this process is ' + $PID + ', and its last open of the folder, the refused one, was at ' + $(if ($anchor) { $anchor.ToString('h:mm:ss.fff tt') } else { '(not in the trace)' }))
+    foreach ($f in @($found | Sort-Object { $_[0] })) {
+      $id = [int]$f[1]
+      $who = 'process ' + $id + ' ' + $(if ($names.ContainsKey($id)) { $names[$id] } elseif ($id -eq 4) { 'System' } else { '?' })
+      $lines += ('  ' + $f[0].ToString('h:mm:ss.fff tt') + '  ' + $who + ' ' + $f[2])
+    }
+  } catch { $lines += ('the trace could not be read: ' + $_.Exception.Message) }
+  finally { Remove-Item -LiteralPath $Trace.Etl -Force -EA SilentlyContinue }
+  return $lines
+}
+
+# Stops the trace and removes its file unread: the move went through.
+function Remove-ThornswoodOpenTrace($Trace) {
+  if (-not $Trace) { return }
+  Stop-ThornswoodOpenTrace $Trace
+  Remove-Item -LiteralPath $Trace.Etl -Force -EA SilentlyContinue
+}
 # ---- end StopAndMove.ps1 ----
 
 # The server folders' turn, which the nightly backup takes too (#3247). A copy
@@ -1798,6 +1920,16 @@ if ($TaskOnly) {
     Finish 'INSTALL ROLLED BACK' 1
 }
 
+# ---- Windows's own record of who opens the server's folder (#5211) ----------
+# From here until the folder is moved: when the move is refused, every open
+# of the folder itself in that time is said, by which process and sharing
+# what, which no look taken after the refusal could name (StopAndMove.ps1,
+# Start-ThornswoodOpenTrace). Reads only; Finish stops it on every way out.
+if (Test-Path -LiteralPath $Root) {
+    $script:openTrace = Start-ThornswoodOpenTrace ('thornswood-install-' + $PID)
+    if (-not $script:openTrace) { Say ("Windows's open trace is not running, so a refused move can only say what holds the folder afterwards: " + $ThornswoodTraceWhy) 'DarkGray' }
+}
+
 # ---- the stage: nothing running is touched -----------------------------------
 if (-not $PutBack) {
     $bad = @()
@@ -2054,15 +2186,24 @@ if ($hadRoot) {
     }
     Say 'stopping the server' 'Cyan'
     StopServer $Root
-    if (-not (MoveDir $Root $aside)) {
+    $movedAside = MoveDir $Root $aside
+    Stop-ThornswoodOpenTrace $script:openTrace
+    if (-not $movedAside) {
         # MoveDir has said what holds it. Start the old one again, and stop
         # rather than half installing. The old folder is exactly as it was.
         Say "could not move $Root aside, so nothing was swapped." 'Red'
         if (-not $PutBack) { Remove-Item -LiteralPath $stageDir -Recurse -Force -ErrorAction SilentlyContinue }
         if ($StartNow -and -not $NoTask) { Start-ScheduledTask -TaskName $TaskName; Say 'the old server was started again, as it was' 'Yellow' }
+        # Read once the old server is starting again, since reading takes
+        # seconds and nobody should wait on it.
+        Say ("what opened $Root itself from the stage to the refused move, from Windows's own trace (#5211):") 'Yellow'
+        foreach ($l in @(Read-ThornswoodOpenTrace $script:openTrace $Root)) { Say ('  ' + $l) 'Yellow' }
+        $script:openTrace = $null
         Finish 'INSTALL REFUSED' 1
     }
 }
+Remove-ThornswoodOpenTrace $script:openTrace
+$script:openTrace = $null
 if (-not (MoveDir $candidate $Root)) {
     Say "COULD NOT MOVE $candidate TO $Root" 'Red'
     if ($hadRoot -and (MoveDir $aside $Root)) {
