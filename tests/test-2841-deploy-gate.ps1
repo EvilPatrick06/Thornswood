@@ -438,6 +438,12 @@ Yes '  and the installer no longer puts a verbs.json beside the broker, and take
     (Text 'scripts/deploy/Install-Gate.ps1') -notmatch "\$Files = @\([^)]*verbs\.json" -and (Text 'scripts/deploy/Install-Gate.ps1').Contains('Remove-Item -LiteralPath (Join-Path `$root ''verbs.json'') -Force'))
 Yes 'what runs is the tip of main: fetched into origin/main and checked out from it' (
     $brokerCode.Contains("'+refs/heads/main:refs/remotes/origin/main'") -and $brokerCode.Contains("'--detach', 'refs/remotes/origin/main'") -and $brokerCode.Contains("'clean', '-ffdxq'"))
+Yes '  with the checkout''s origin set to gate.json''s remote first, and each fetched submodule pointed at main''s .gitmodules before it moves (#5184)' (
+    $brokerCode.Contains("'remote', 'set-url', 'origin', ([string]`$Cfg.remote)") -and
+    $brokerCode.IndexOf("'remote', 'set-url', 'origin'") -lt $brokerCode.IndexOf("'fetch', '--quiet'") -and
+    $brokerCode.Contains("'submodule', 'sync', '--quiet'") -and
+    $brokerCode.IndexOf("'submodule', 'sync'") -gt $brokerCode.IndexOf("'--detach', 'refs/remotes/origin/main'") -and
+    $brokerCode.IndexOf("'submodule', 'sync'") -lt $brokerCode.IndexOf("'submodule', 'update'"))
 Yes '  and each fetched submodule is brought to main''s pin after the checkout, never left at the old one' (
     $brokerCode.Contains("'submodule', 'update', '--checkout', '--force', '--depth', '1'") -and -not $brokerCode.Contains("'submodule', 'update', '--init'") -and
     $brokerCode.IndexOf("'submodule', 'update'") -gt $brokerCode.IndexOf("'--detach', 'refs/remotes/origin/main'"))
@@ -474,6 +480,21 @@ if (-not $gitExe) { Write-Host 'SKIP: the submodule move needs git' -ForegroundC
         $after = ((SmGit (Join-Path $gate 'engine/skymp') rev-parse HEAD).Out -join '').Trim()
         $status = (SmGit $gate status --porcelain).Out -join ' '
         Yes '  the move takes the fetched submodule to the new pin, and leaves no change behind' ($r.Code -eq 0 -and $after -eq $pinB -and -not $status.Trim())
+        # The fork moves (#5184): main's .gitmodules names its new address, and
+        # sync points the fetched submodule there before it is moved.
+        $moved = Join-Path $sm 'moved-fork'
+        Copy-Item -LiteralPath $fork -Destination $moved -Recurse
+        Set-Content -LiteralPath (Join-Path $moved 'a.txt') -Value 'three'; [void](SmGit $moved commit -qam three)
+        $pinC = ((SmGit $moved rev-parse HEAD).Out -join '').Trim()
+        [void](SmGit $up config -f .gitmodules submodule.engine/skymp.url $moved)
+        [void](SmGit $up submodule sync -q); [void](SmGit (Join-Path $up 'engine/skymp') fetch -q origin); [void](SmGit (Join-Path $up 'engine/skymp') checkout -q $pinC)
+        [void](SmGit $up add .gitmodules engine/skymp); [void](SmGit $up commit -qm moved)
+        foreach ($st in $steps) { [void](SmGit $gate @st) }
+        $sync = SmGit $gate submodule sync --quiet
+        $r3 = SmGit $gate submodule update --checkout --force --depth 1
+        $url = ((SmGit (Join-Path $gate 'engine/skymp') remote get-url origin).Out -join '').Trim()
+        $at = ((SmGit (Join-Path $gate 'engine/skymp') rev-parse HEAD).Out -join '').Trim()
+        Yes '  a fork that moved is fetched from its new address, at the new pin' ($pinC -ne $pinB -and $sync.Code -eq 0 -and $r3.Code -eq 0 -and $url -eq $moved -and $at -eq $pinC)
         $bare = Join-Path $sm 'gate2'
         [void](SmGit $sm clone -q --depth 1 --no-tags --branch main ('file://' + $up.Replace('\', '/')) $bare)
         $r2 = SmGit $bare submodule update --checkout --force --depth 1
@@ -693,6 +714,18 @@ $kept = @(Get-ChildItem -LiteralPath (Join-Path $groot 'update') -Directory)
 Yes '  and keeps the files it replaced' ($kept.Count -eq 1 -and [IO.File]::ReadAllText((Join-Path $kept[0].FullName 'Gate.ps1')) -eq "# the old Gate.ps1`n")
 $o = & pwsh -NoProfile -File $ug -Root $groot -NoRestart 2>&1 | Out-String
 Yes '  a second run changes nothing' ($LASTEXITCODE -eq 0 -and $o -match 'ALREADY')
+# The repository's name (#5184): when GitHub names it differently, the
+# remote takes the new name; when GitHub cannot be asked, it stays.
+$cfgAt = Join-Path $groot 'gate.json'
+[IO.File]::WriteAllText($cfgAt, '{"commit":"' + $head + '","git":"git","remote":"ssh://git@ssh.github.com:443/EvilPatrick06/Thornswood.git"}')
+$o = & pwsh -NoProfile -File $ug -Root $groot -NoRestart -FullName 'ThornswoodRP/Thornswood' 2>&1 | Out-String
+Yes '  a repository GitHub names differently now goes into gate.json''s remote' ($LASTEXITCODE -eq 0 -and $o -match "CHANGED the gate's remote from ssh://git@ssh\.github\.com:443/EvilPatrick06/Thornswood\.git to ssh://git@ssh\.github\.com:443/ThornswoodRP/Thornswood\.git" -and
+    ([IO.File]::ReadAllText($cfgAt) | ConvertFrom-Json).remote -ceq 'ssh://git@ssh.github.com:443/ThornswoodRP/Thornswood.git')
+$o = & pwsh -NoProfile -File $ug -Root $groot -NoRestart -FullName 'ThornswoodRP/Thornswood' 2>&1 | Out-String
+Yes '  and once it has, the next run changes nothing' ($LASTEXITCODE -eq 0 -and $o -match 'ALREADY' -and $o -match 'the repository is ThornswoodRP/Thornswood, as GitHub names it')
+$o = & pwsh -NoProfile -File $ug -Root $groot -NoRestart -FullName 'not a name' 2>&1 | Out-String
+Yes '  an answer that is not owner/name changes nothing' ($LASTEXITCODE -eq 0 -and $o -match 'ALREADY' -and $o -match 'not owner/name' -and
+    ([IO.File]::ReadAllText($cfgAt) | ConvertFrom-Json).remote -ceq 'ssh://git@ssh.github.com:443/ThornswoodRP/Thornswood.git')
 $o = & pwsh -NoProfile -File $ug -Root $groot 2>&1 | Out-String
 Yes '  outside the gate it refuses' ($LASTEXITCODE -eq 1 -and $o -match 'Nothing was changed')
 Remove-Item -LiteralPath $groot -Recurse -Force
@@ -703,7 +736,7 @@ Yes '  its restart task starts at once and waits for the broker to end, never fo
     $ugt -notmatch 'New-ScheduledTaskTrigger' -and $ugt -notmatch 'Start-Sleep -Seconds 3')
 Yes 'the broker ends once a request has changed its files on disk, without opening the pipe again' ($gb.Contains('$StartedOn = Get-ThornswoodGateFileLine $Root') -and
     $gb.Contains("Log ('BROKER handing over: its files on disk are now ' + `$onDisk); break") -and $gb.IndexOf('BROKER handing over') -gt $gb.IndexOf('$pipe.Dispose()'))
-Yes 'Update-Gate is a verb that takes nothing' ((Words 'Update-Gate') -eq '' -and (Words 'Update-Gate -Root x') -eq 'REFUSED' -and (Words 'Update-Gate -NoRestart') -eq 'REFUSED')
+Yes 'Update-Gate is a verb that takes nothing' ((Words 'Update-Gate') -eq '' -and (Words 'Update-Gate -Root x') -eq 'REFUSED' -and (Words 'Update-Gate -NoRestart') -eq 'REFUSED' -and (Words 'Update-Gate -FullName x/y') -eq 'REFUSED')
 Yes '  with the host keys held to the checkout''s pins, in a known_hosts of the run''s own' ($br.Contains('Get-ThornswoodVpsCommitted') -and $br.Contains("UserKnownHostsFile=`$knownHosts") -and $br.Contains("'-F', 'none'"))
 Yes '  and prints none of the verb''s output into the run''s log' ($br -notmatch 'Write-Host \$Matches\[1\]' -and $br.Contains("[IO.File]::AppendAllText(`$out, `$Matches[1]"))
 
