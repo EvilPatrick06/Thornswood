@@ -572,8 +572,15 @@ function send(method, url, headers, body) {
     req.end();
   });
 }
+// What GitHub answered, with its reasons. A 422 says only "Validation
+// Failed" in message; why is in errors, as strings (rulesets) or as
+// { resource, field, code, message } objects, and leaving them out hid why
+// the release tag ruleset was refused on 1 Nov 2026 (#5296).
 function said(a) {
-  return 'HTTP ' + a.status + (a.body && a.body.message ? ': ' + a.body.message : '');
+  const b = a.body || {};
+  const why = (Array.isArray(b.errors) ? b.errors : []).map(e =>
+    typeof e === 'string' ? e : (e && (e.message || [e.resource, e.field, e.code].filter(Boolean).join(' '))) || '').filter(Boolean);
+  return 'HTTP ' + a.status + (b.message ? ': ' + b.message : '') + (why.length ? ' (' + why.join('; ') + ')' : '');
 }
 
 function readApp() {
@@ -1333,5 +1340,5 @@ function serve() {
   return server;
 }
 
-module.exports = { driftBody, CHANGING_ASKS, DRIFT_TITLE, MACHINE_ACTORS, verifyOidc, appJwt, call, botToken, BOT_PERMISSIONS, planCollaborators, planLabels, planLeftovers, checkRecords, checkAbout, planAbout, runnerNumber, checkRulesets, checkSettings, planRulesets, rulesetBody, says, manifest, RULES, ASKS, REPO, RUNNERS_REPO, SETTINGS_REPOS, SCANNING_KEYS, MERGE_KEYS, SETTINGS_PERMISSIONS, SETTINGS_EXTRA, serve };
+module.exports = { said, driftBody, CHANGING_ASKS, DRIFT_TITLE, MACHINE_ACTORS, verifyOidc, appJwt, call, botToken, BOT_PERMISSIONS, planCollaborators, planLabels, planLeftovers, checkRecords, checkAbout, planAbout, runnerNumber, checkRulesets, checkSettings, planRulesets, rulesetBody, says, manifest, RULES, ASKS, REPO, RUNNERS_REPO, SETTINGS_REPOS, SCANNING_KEYS, MERGE_KEYS, SETTINGS_PERMISSIONS, SETTINGS_EXTRA, serve };
 if (require.main === module) serve();
