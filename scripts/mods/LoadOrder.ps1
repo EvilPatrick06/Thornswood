@@ -122,7 +122,7 @@ function Import-VortexStateReader {
     if ('Thornswood.VortexProfileState' -as [type]) { return }
     $source = Join-Path $PSScriptRoot '..\..\launcher\app\VortexProfileState.cs'
     if ($PSVersionTable.PSVersion.Major -le 5) {
-        Add-Type -LiteralPath $source -ReferencedAssemblies System.dll,System.Core.dll,System.Xml.dll,System.Runtime.Serialization.dll
+        Add-Type -LiteralPath $source -ReferencedAssemblies System.dll,System.Core.dll,System.Xml.dll
     } else { Add-Type -LiteralPath $source }
 }
 <#

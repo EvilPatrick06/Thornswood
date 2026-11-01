@@ -16,9 +16,9 @@ everything this file lists, and holds the terms every contributor agrees to
 once (#1331).
 
 `tests\test-third-party.js` checks this file against the build. It covers every
-resource Build-Launcher.ps1 compiles into the launcher, the header of every
-file of the launcher's and the setup stub's source, every file under
-`launcher\lib`, every font and minified script the site serves from
+resource Thornswood.csproj embeds in the launcher, the header of every
+file of the launcher's source, every package the project references and the
+native libraries that go beside the exe, every font and minified script the site serves from
 `site\public`, every fixture under `tests\fixtures` that is large or
 carries somebody else's notice, the six client files and the commits in
 `records\client-build.json` and `records\server-build.json`, the two
@@ -32,8 +32,11 @@ or the build check goes red.
 
 ## How it reaches people
 
-- **The launcher**, `Thornswood.exe`, from the update feed and inside the
-  installer. Build-Launcher.ps1 compiles everything it needs into the one file.
+- **The launcher**, `Thornswood.exe`, in the Velopack package that Setup.exe
+  installs and every launcher update brings (#4825). Build-Launcher.ps1
+  publishes it with Native AOT, so the .NET runtime and every library it uses
+  are compiled into the one file, and three native libraries go beside it
+  with Velopack's own `Update.exe`.
 - **The client runtime**, the six files in `records\client-build.json`. They go
   out as `client-runtime-<commit>.zip` on the feed (Publish-Update.ps1), and
   in game packs and the installer. The zip carries a `README.txt` saying where
@@ -66,11 +69,14 @@ or the build check goes red.
 The launcher's code is Thornswood's own but for one file: `FromGameDeflate.cs`
 is zlib's compressor translated into C#, under zlib's licence ("zlib 1.3,
 translated into C# inside the launcher", below, which also says why the other
-launcher files that name outside work are not taken from it). Of the resources
-Build-Launcher.ps1 compiles into the launcher, everything is Thornswood's
-own: `logo.png`, `logo-dev.png`, `launcher-header.jpg`,
-`launcher-header.mp4`, `app.ico`, `app-dev.ico`,
-`Thornswood.ini`, `client-build.json`, `skyrim-files.json`, the list of
+launcher files that name outside work are not taken from it). The libraries
+compiled in with it are other people's, each under its own section below. Of
+the resources `launcher\app\Thornswood.csproj` embeds in the launcher,
+everything is Thornswood's own: `logo.png`, `logo-dev.png`,
+`launcher-header.jpg`, `launcher-header.webp` (the moving strip behind the
+title, an animated WebP made from `launcher\launcher-header.mp4`, which stays
+in the repository as its source and is not built in), `app.ico`,
+`app-dev.ico`, `Thornswood.ini`, `client-build.json`, `skyrim-files.json`, the list of
 the pinned Skyrim build's own file names, sizes and SHA-1s read out of Steam's
 depot manifests (no Bethesda file is in it), `ui-gone.json`, the Daedric
 menu set and unused fork assets a refresh must not copy back, and
@@ -85,6 +91,134 @@ its video for Thornswood, and the rest of Thornswood's art too (the site's
 pictures, the main menu backdrop's picture, the start screen's scrolls and
 the Discord pictures), under the contributor terms in `LICENSE` (Patrick,
 15 Oct 2026, #2177). `records\asset-provenance.json` has each file.
+
+## .NET, Avalonia, SkiaSharp and Velopack, inside the launcher
+
+Since #4823 the launcher is an Avalonia program on .NET 10, published with
+Native AOT and self-contained (`scripts\release\Build-Launcher.ps1`), and
+since #4825 it is installed and updated by Velopack. So `Thornswood.exe`
+carries code it did not carry as a .NET Framework program: the .NET runtime
+and class libraries, which Windows used to provide, and every library below,
+compiled into the exe with the launcher's own code. Native AOT keeps only the
+code the launcher can reach, and which of these packages' code survives in
+the exe was not measured, so every package the build takes code from is
+credited here. Each comes from nuget.org; `launcher\app\Thornswood.csproj`
+names the ones in the first table, and the others come with them.
+
+| Package | Version | What the launcher uses it for | Licence | sha256 of the .nupkg |
+|---|---|---|---|---|
+| Microsoft.NETCore.App.Runtime.NativeAOT.win-x64 | 10.0.14 | The .NET class libraries, compiled into the exe | MIT, the package's `LICENSE.TXT` | `76c0f133981113273a0e50dba97a6107eead821f707565443e787f0aa9f9fc69` |
+| runtime.win-x64.Microsoft.DotNet.ILCompiler | 10.0.14 | The Native AOT compiler and the runtime it links into the exe (the garbage collector, threads, exceptions) | MIT | `e4279d8ed9bcc01b1d8a3a9b2c7db16f3249e098dc3081e15c6d93ef462e1bce` |
+| System.Security.Cryptography.ProtectedData | 10.0.14 | DPAPI, for the keys the launcher keeps on the PC (Secrets.cs); part of the framework on .NET Framework | MIT | `6ada18646ef345d3e43e25ea52973d5cba98cf9103df14df0a18feb685fa7f35` |
+| Avalonia | 12.1.4 | The window, its controls and the compiled markup | MIT | `90cf963a0e5fed7fc0e5cd9cefe3c159b78de086272c3ddde94c75cb83f9c4ac` |
+| Avalonia.Desktop | 12.1.4 | Picks the Windows platform at start | MIT | `5da57df4f56d32f3894475da869d3555a968085f5d93b73b3f5ae89f70a5cd58` |
+| Avalonia.Themes.Fluent | 12.1.4 | The controls' base look (App.axaml) | MIT | `0b2c317ee4dbc9b12c9cb564d4f99b10872b655a450c91a66ac063d9056a3c38` |
+| Velopack | 1.2.161 | The install's hand over at the first start, the update check, download and apply (Velo*.cs) | MIT | `d57275692b299751a12ee3e18283b5f7fe3e55339f96b1623345da095dc484ed` |
+
+Brought in by those:
+
+| Package | Version | What it is | Licence | sha256 of the .nupkg |
+|---|---|---|---|---|
+| Avalonia.Win32 | 12.1.4 | Avalonia on Windows | MIT | `743abeae210f287b846a42d292b2d8cc85b345bef8df13a01e481d252090b81b` |
+| Avalonia.Skia | 12.1.4 | Avalonia's drawing, on Skia | MIT | `f42e12d06df92ae116e5baaac5e0319cec090d990a303edc1afd0e7c202a6e69` |
+| Avalonia.HarfBuzz | 12.1.4 | Avalonia's text shaping, on HarfBuzz | MIT | `f52e5c1b6a00886ef46816ed2fc9a2c28844289b1af30bd7ea247e220d20c0cb` |
+| Avalonia.Remote.Protocol | 12.1.4 | Avalonia's designer protocol, which Avalonia names; the launcher never opens it | MIT | `e115f5143ef0fc745cf171bb926ad1083ed4c833ca977a0eb11bdb0c41605f5c` |
+| Avalonia.FreeDesktop | 12.1.4 | Avalonia on Linux desktops, which Avalonia.Desktop names; the launcher runs on Windows only | MIT | `e689791338533943a246d3522055edb44229aa19eb7a8233801f0d89fb63da72` |
+| Avalonia.FreeDesktop.AtSpi | 12.1.4 | Accessibility on Linux, the same | MIT | `d8d29680c17ae46e887775e6840f96c37e68016f9edacbbb7b62d453e5685649` |
+| Avalonia.X11 | 12.1.4 | Avalonia on X11, the same | MIT | `c10179d2da3d0d7dfa75ba698a80674a3bed9b51a4d3a44ec829832c68e6d696` |
+| Avalonia.Native | 12.1.4 | Avalonia on macOS, the same | MIT | `418dbf45252748c5295a948436d646ed90d54a5872e8352467d181587bc1b51d` |
+| Avalonia.Angle.Windows.Natives | 2.1.27548.20260419 | ANGLE, OpenGL ES on Direct3D, which Avalonia draws through on Windows (`av_libglesv2.dll`) | ANGLE's three-clause BSD licence, the package's `LICENSE` file | `76d67901097e9173d155efc4c2b7d2c8e3122f2c2e0415028eb0c88478a386f9` |
+| SkiaSharp | 3.119.4 | Skia for .NET: Avalonia's drawing, the header strip's WebP frames (Art.cs) and the gallery's smaller copies (Gallery.cs) | MIT | `e32a449d31945c0b9d169eb5bc676e1e3f589aab69888e49d703fdc1c384c176` |
+| SkiaSharp.NativeAssets.Win32 | 3.119.4 | Skia itself, built for Windows (`libSkiaSharp.dll`) | MIT, with Skia's three-clause BSD licence and the others in its `THIRD-PARTY-NOTICES.txt` | `5a5698b1b4e1fdc9ffe9868df6874db5fa69f21a4de76ba71a01a542e9b43391` |
+| HarfBuzzSharp | 8.3.1.3 | HarfBuzz for .NET | MIT | `ffe644863a4eb3c078b4c3f0def0f2b90a861991c9116bf2dd668a31a0f09ab5` |
+| HarfBuzzSharp.NativeAssets.Win32 | 8.3.1.3 | HarfBuzz itself, built for Windows (`libHarfBuzzSharp.dll`) | MIT, with HarfBuzz's "Old MIT" licence in its `THIRD-PARTY-NOTICES.txt` | `58d51098b595152c01293f71ed47614b3f53d8503bc226efc23b8f7b0ff7c943` |
+| MicroCom.Runtime | 0.11.6 | The COM calls Avalonia makes on Windows | MIT | `453af6d34477b19bb2c62d17436e68c76a75915b7947509b1ff601b36d7e78d8` |
+| Tmds.DBus.Protocol | 0.94.1 | D-Bus, for Avalonia on Linux; the launcher never calls it | MIT, its repository's `COPYING` | `4f71d06ac40e725ffbcf1b79853dd93218695a84f23d36fafc85f477a4c9580f` |
+
+Avalonia.BuildServices 11.3.2 and Microsoft.NET.ILLink.Tasks 10.0.14 run
+during the build only; nothing of either goes into the exe.
+
+Three of these are native libraries that go beside `Thornswood.exe` as files
+of their own, in the folder Build-Launcher.ps1 publishes and in every
+Velopack package of it, each signed for Thornswood by the build before it is
+packed (VeloPackage.cs refuses an update with a program in it that
+Thornswood did not sign):
+
+| File | Where it sits in the package | sha256 |
+|---|---|---|
+| `av_libglesv2.dll` | Avalonia.Angle.Windows.Natives, `runtimes\win-x64\native` | `53191a77fe783cd757ca7767077c2a64a662e7043777a5b4ab74980d4a0b73e3` |
+| `libSkiaSharp.dll` | SkiaSharp.NativeAssets.Win32, `runtimes\win-x64\native` | `7dec3ba900ab353491e6446f0083739924c6f8dd668832e2f09d38ebffdbbe1c` |
+| `libHarfBuzzSharp.dll` | HarfBuzzSharp.NativeAssets.Win32, `runtimes\win-x64\native` | `145ade963eba427027d5e1381db5d51a0ef9e98e9fef9efbfa6074ca20da246f` |
+
+Those are the bytes as nuget.org serves them; the signature the build adds
+changes the files Thornswood hands out, not their code.
+
+Velopack also puts programs of its own in the install, which the launcher's
+build does not compile: `Update.exe` and the small `Thornswood.exe` that
+starts the launcher from `current\`, which `vpk` 1.2.161 packs
+(`.github\workflows\merge-release.yml`, `VPK_VERSION`), and `Setup.exe`, the
+download that installs it. They are Velopack's own, written in Rust, under
+the same MIT licence as the package, and built with Rust crates of others
+(221, counting the ones used only while building). Velopack's repository carries no notices file for those, so
+`installer\licences\Velopack-Rust-crates.txt` was made from its `Cargo.lock`
+at the commit below (cargo tree for `velopack_bins` with its windows feature,
+target `x86_64-pc-windows-msvc`): each crate, its version and licence, and
+every licence text, which goes with the install. The licences are MIT,
+Apache-2.0, BSD, ISC, Zlib, Unicode-3.0, CDLA-Permissive-2.0 and the
+Unlicense, each alone or as a choice; `self_cell` offers Apache-2.0 or
+GPL-2.0 and is used under Apache-2.0. `fs_at` 0.2.1 and `intl_pluralrules`
+7.0.2 publish no licence file anywhere; their Cargo.toml says Apache-2.0,
+whose text the file carries.
+
+Downloaded from nuget.org and read on 1 November 2026. Their sources, as each
+nuspec names them:
+
+- .NET (the runtime packages and ProtectedData), by Microsoft and the .NET
+  Foundation: https://github.com/dotnet/dotnet at commit `0427b9ab` (in
+  full, `0427b9abbead3fa64c6655eb4290c537397131fa`).
+- Avalonia (every Avalonia package at 12.1.4), by the AvaloniaUI project:
+  https://github.com/AvaloniaUI/Avalonia at commit `2d79ba55` (in full,
+  `2d79ba55fae1b1e71c69f93a668080c9029e6a31`). Its ANGLE build:
+  https://github.com/AvaloniaUI/angle at commit `1c898059` (in full,
+  `1c89805903c1482166356d3b950d474973180e61`).
+- SkiaSharp 3.119.4, by Microsoft: https://github.com/mono/SkiaSharp at
+  commit `f568ac94` (in full, `f568ac94dd768ef9a2f593537cfde2dd0d348ef5`).
+  HarfBuzzSharp 8.3.1.3 is from the same repository at commit `2888c737` (in
+  full, `2888c737ad016d584c74525e2d35db5097ea8576`). Skia itself is Google's
+  (https://github.com/google/skia) and HarfBuzz is
+  https://github.com/harfbuzz/harfbuzz.
+- Velopack, by Velopack Ltd, Caelan Sayler and Kevin Bost:
+  https://github.com/velopack/velopack at commit `92d6a1c9` (in full,
+  `92d6a1c91716729d449034df5c50307dcce39493`).
+- MicroCom.Runtime, by Nikita Tsukanov: https://github.com/kekekeks/MicroCom
+  at commit `76785efc` (in full, `76785efcafd91b5902fd19dd11145f6dd655b7b4`).
+- Tmds.DBus.Protocol, by Tom Deseyn: https://github.com/tmds/Tmds.DBus at
+  commit `b4a7fed0` (in full, `b4a7fed0b878f74cb54f7cca84d2889af4e596ba`).
+  Avalonia.FreeDesktop brings it in, and the win-x64 restore lists its
+  `lib\net9.0` file. Whether the native build keeps any of it in
+  `Thornswood.exe` was not measured (the build runs on Windows only), so its
+  text goes with the install either way.
+
+Licences: MIT asks for its notice in all copies, and the BSD licences of
+Skia and ANGLE ask for theirs with every binary copy, so the licences of
+.NET, Avalonia, SkiaSharp and HarfBuzzSharp, Skia, HarfBuzz, ANGLE, Velopack
+and MicroCom are reproduced in full at the end of this file and on the
+public credits page. Avalonia's package carries no licence file; its text is
+`licence.md` at the commit above. Velopack's and MicroCom's are `LICENSE` at
+theirs. The .NET runtime packages and the two SkiaSharp native packages also
+carry a `THIRD-PARTY-NOTICES` file for the code inside them that others wrote
+(the .NET one is 1418 lines, sha256 `6d15e10a101c6bfff2ab4429ed061bf76c456fc4b23ad6b03e0d0f8377148a21`;
+SkiaSharp's and HarfBuzzSharp's are the same 2716 lines, sha256
+`21504c46c4c58aa64c1055bd2dcbc5f9a136b4b8c412ed3cc6740e22c5b127f5`).
+Tmds.DBus.Protocol's package carries no licence file; its text is `COPYING`
+at its commit (MIT).
+
+Every one of these texts, the two `THIRD-PARTY-NOTICES` files and the Rust
+crates' notices also goes with the install as a file of its own beside
+`SOURCE CODE.txt`: they are in `installer\licences`, whose `README.txt` says
+where each is from, the Velopack package carries them (Build-SetupFiles.ps1),
+the install copies them (`InstallSteps.LicenceFiles`) and Uninstall removes
+them.
 
 ## Concentus, SharpSRTP and BouncyCastle, inside the launcher
 
@@ -164,7 +298,8 @@ contributors.
 Licence: MIT, which the package's nuspec names
 (`<license type="expression">MIT</license>`). The MIT licence asks for its
 notice to go with every copy, so the repository's `LICENSE` at that commit is
-reproduced in full at the end of this file and on the public credits page.
+reproduced in full at the end of this file and on the public credits page,
+and goes with the install as `NLayer-LICENSE.txt`.
 
 ## zlib 1.3, translated into C# inside the launcher
 
@@ -1254,7 +1389,6 @@ certificate, and has no row here (#3761).
 |---|---|---|---|---|
 | `tests\fixtures\ui-front-build.js` | The 64 asset modules of the shipped `Data\Platform\UI\build.js`, verbatim: the stub webpack writes for each picture, sound and font, with the hashed name it was given and the source path it came from. 53,999 bytes. | First cut on 26 October 2026 (#3761) from the whole development build of `skymp5-front` that was the fixture until then (2,451,499 bytes, sha256 `5e70e4d7de167fac71522416c59ee4e1f7d5274ecfe30161cbedc46d8a4e9ea2`), and cut again the same way on 31 October from the fork's build at `befb8364` (2,444,820 bytes, sha256 `a67a1a146f104891d879d360c06d40e7c9051aac859bd6fd4d207f432be4416f`), the build "SkyMP's interface, built from the fork" describes. The cut leaves out the front's own code and the npm code bundled with it (React, Redux and the rest, under MIT and BSD notices); `tests\fixtures\ui-front-build.assets.txt` names its sha256. | GNU General Public License version 3, `skymp5-front`'s, as the build it was cut from | `tests\fixtures\ui-front.ps1`, `tests\test-ship-rules.ps1` (#1318) |
 | `tests\fixtures\3111-roots.pem` | Eight public root certificates and their comment lines, no key. 223 lines. | Copied from certifi 2026.7.22's `cacert.pem` (#3111): four of eMudhra's emSign roots and the four the bot needs. | Mozilla Public License 2.0, certifi's, as "The Discord bot, on the VPS" gives it | `tests\test-3111-emudhra-trust.js` |
-| `tests\fixtures\webview2-setup-chain.txt` | Three public certificates, no key: the signing certificate and issuer of Microsoft's WebView2 setup program, and the root. | Read out of the Authenticode signature of `MicrosoftEdgeWebview2Setup.exe` as Microsoft handed it out on 5 October 2026, and the root from the address the issuer names (#1330). | None given: they are Microsoft's public certificates, which every copy of that program carries | `tests\test-1330-webview2-signature.js` |
 
 The whole 2.4 MB build is still in the repository's history until the history
 rewrite takes it out (#3684).
@@ -1404,11 +1538,13 @@ fork.
 
 The GPL and AGPL texts go with the files they cover. The installer hands
 `GPL-3.0.txt` and `AGPL-3.0.txt` into the install folder beside
-`SOURCE CODE.txt`, and with them `Concentus-LICENSE.txt`,
-`SharpSRTP-LICENSE.txt` and `BouncyCastle-LICENSE.txt`, the notices of the
-three voice libraries compiled into the launcher (Package-Thornswood.ps1
-stages them from `installer\licences`, Setup copies them, Uninstall removes
-them). The update
+`SOURCE CODE.txt`, and with them the licence texts of every library inside
+the launcher or shipped with it: the three voice libraries, NLayer, .NET,
+Avalonia, SkiaSharp and HarfBuzzSharp with Skia's and HarfBuzz's notices,
+ANGLE, MicroCom, Tmds.DBus and Velopack with its Rust crates (the Velopack
+package carries them from `installer\licences`, Build-SetupFiles.ps1; the
+install in the launcher's first start copies them,
+`InstallSteps.LicenceFiles`; Uninstall removes them). The update
 feed's client runtime zip and every pack that carries a SkyMP file hand the
 GPL and AGPL texts with a note naming the recorded commit (Source-Notice.ps1).
 Updates stopped going to GitHub release pages on 28 September (#907); the
@@ -1560,6 +1696,262 @@ The text of `LICENSE` in https://github.com/naudio/NLayer at commit `046c7ce4`.
 MIT License
 
 Copyright (c) 2018 Mark Heath, Andrew Ward & Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## .NET licence
+
+The text of `LICENSE.TXT` in Microsoft.NETCore.App.Runtime.NativeAOT.win-x64 10.0.14, as the package carries it; the other .NET packages above name the same licence.
+
+```
+The MIT License (MIT)
+
+Copyright (c) .NET Foundation and Contributors
+
+All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## Avalonia licence
+
+The text of `licence.md` in https://github.com/AvaloniaUI/Avalonia at commit `2d79ba55`, the commit every Avalonia 12.1.4 package names.
+
+```
+The MIT License (MIT)
+
+Copyright (c) AvaloniaUI OÜ
+All Rights Reserved
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## SkiaSharp and HarfBuzzSharp licence
+
+The text of `LICENSE.txt` in SkiaSharp 3.119.4, as the package carries it; HarfBuzzSharp 8.3.1.3 and the two native packages carry the same file.
+
+```
+Copyright (c) 2015-2016 Xamarin, Inc.
+Copyright (c) 2017-2018 Microsoft Corporation.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+## Skia licence
+
+Skia's notice as `THIRD-PARTY-NOTICES.txt` in SkiaSharp.NativeAssets.Win32 3.119.4 gives it.
+
+```
+// Copyright (c) 2011 Google Inc. All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//    * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//    * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//    * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+## HarfBuzz licence
+
+HarfBuzz's notice as `THIRD-PARTY-NOTICES.txt` in HarfBuzzSharp.NativeAssets.Win32 8.3.1.3 gives it.
+
+```
+HarfBuzz is licensed under the so-called "Old MIT" license.  Details follow.
+For parts of HarfBuzz that are licensed under different licenses see individual
+files names COPYING in subdirectories where applicable.
+
+Copyright © 2010,2011,2012  Google, Inc.
+Copyright © 2012  Mozilla Foundation
+Copyright © 2011  Codethink Limited
+Copyright © 2008,2010  Nokia Corporation and/or its subsidiary(-ies)
+Copyright © 2009  Keith Stribley
+Copyright © 2009  Martin Hosken and SIL International
+Copyright © 2007  Chris Wilson
+Copyright © 2006  Behdad Esfahbod
+Copyright © 2005  David Turner
+Copyright © 2004,2007,2008,2009,2010  Red Hat, Inc.
+Copyright © 1998-2004  David Turner and Werner Lemberg
+
+For full copyright notices consult the individual files in the package.
+
+
+Permission is hereby granted, without written agreement and without
+license or royalty fees, to use, copy, modify, and distribute this
+software and its documentation for any purpose, provided that the
+above copyright notice and the following two paragraphs appear in
+all copies of this software.
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE TO ANY PARTY FOR
+DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN
+IF THE COPYRIGHT HOLDER HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH
+DAMAGE.
+
+THE COPYRIGHT HOLDER SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING,
+BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ON AN "AS IS" BASIS, AND THE COPYRIGHT HOLDER HAS NO OBLIGATION TO
+PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+```
+
+## ANGLE licence
+
+The text of `LICENSE` in Avalonia.Angle.Windows.Natives 2.1.27548.20260419, as the package carries it.
+
+```
+// Copyright 2018 The ANGLE Project Authors.
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//
+//     Redistributions of source code must retain the above copyright
+//     notice, this list of conditions and the following disclaimer.
+//
+//     Redistributions in binary form must reproduce the above
+//     copyright notice, this list of conditions and the following
+//     disclaimer in the documentation and/or other materials provided
+//     with the distribution.
+//
+//     Neither the name of TransGaming Inc., Google Inc., 3DLabs Inc.
+//     Ltd., nor the names of their contributors may be used to endorse
+//     or promote products derived from this software without specific
+//     prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+// FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+// COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+// INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+// BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+// LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+// LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+// ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+```
+
+## Velopack licence
+
+The text of `LICENSE` in https://github.com/velopack/velopack at commit `92d6a1c9`, the commit Velopack 1.2.161's nuspec names.
+
+```
+Copyright © 2021 Caelan Sayler
+Copyright © 2024 Velopack Ltd.
+
+Permission is hereby granted,  free of charge,  to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to  use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+## MicroCom licence
+
+The text of `LICENSE` in https://github.com/kekekeks/MicroCom at commit `76785efc`, the commit MicroCom.Runtime 0.11.6's nuspec names.
+
+```
+MIT License
+
+Copyright (c) 2021 Nikita Tsukanov
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
