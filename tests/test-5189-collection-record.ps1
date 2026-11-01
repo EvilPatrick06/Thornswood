@@ -21,8 +21,8 @@
        records\collection-plugins.json is, and is written in the record's
        own layout (a mod and a plugin to a line)
     C  the check, run as a child process on a planted repository: YES on a
-       good record, and NO, naming it, on a rule naming a plugin the list
-       does not enable, a list that breaks a rule, a rule that loops with
+       good record, and NO, naming it, on a rule naming a plugin the record
+       does not install, a list that breaks a rule, a rule that loops with
        the order the game sets, a full plugin no rule holds, a mod whose
        page has not been read, a plugin the servers load taken out without
        dropped, a full plugin moved to another index without wipe (a new
@@ -82,9 +82,9 @@ try {
         $text = [IO.File]::ReadAllText($real)
         Yes 'R3 it is written in the record''s own layout, a mod and a plugin to a line' ($text -ceq (ConvertTo-CollectionRecordText $rr)) 'write it with ConvertTo-CollectionRecordText (New-CollectionRecord.ps1 does)'
         $cpNames = @(@($cp.plugins) | Where-Object { -not (Test-CollectionName $script:CollectionGameOwn $_.name) } | ForEach-Object { ([string]$_.name).ToLowerInvariant() } | Sort-Object)
-        $rrNames = @(@($rr.plugins) | Where-Object { -not (Test-CollectionName $script:CollectionOurs $_.name) -and $_.enabled -ne $false } | ForEach-Object { ([string]$_.name).ToLowerInvariant() } | Sort-Object)
+        $rrNames = @(@($rr.plugins) | Where-Object { -not (Test-CollectionName $script:CollectionOurs $_.name) } | ForEach-Object { ([string]$_.name).ToLowerInvariant() } | Sort-Object)
         $dropNames = @(@($rr.dropped) | Where-Object { $_ } | ForEach-Object { ([string]$_.name).ToLowerInvariant() })
-        Yes 'R4 with no change on its way, its plugins on are collection-plugins.json''s (dropped names a change on its way)' ($dropNames.Count -or (($cpNames -join '|') -eq ($rrNames -join '|')))
+        Yes 'R4 with no change on its way, the plugins it installs are collection-plugins.json''s (dropped names a change on its way)' ($dropNames.Count -or (($cpNames -join '|') -eq ($rrNames -join '|')))
     }
 
     # ---------------------------------------------------------------- C ----
@@ -141,7 +141,22 @@ try {
     Yes 'C1 a good record: YES' ($r.Code -eq 0 -and $r.Out -match 'YES') $r.Out
 
     $r = Invoke-Check (New-Fixture 'missing' { param($c) (Find $c 'C.esp').after = @('Nowhere.esp') })
-    Yes 'C2 a rule naming a plugin the list does not enable: NO' ($r.Code -eq 1 -and $r.Out -match 'C\.esp is to load after Nowhere\.esp, which the list does not enable') $r.Out
+    Yes 'C2 a rule naming a plugin the record does not install: NO' ($r.Code -eq 1 -and $r.Out -match 'C\.esp is to load after Nowhere\.esp, which the record does not install') $r.Out
+
+    # Revision 6's shape: its own list leaves a plugin out, so it is installed
+    # switched off, and the servers load it, as the launcher's plugin list
+    # switches it on. A rule may name it and chain through it, and it is not
+    # taken out.
+    $r = Invoke-Check (New-Fixture 'off' { param($c)
+            $m = @($c.Record.mods)
+            $c.Record.mods = @($m[0], $m[1], $m[2], [pscustomobject][ordered]@{ modId = 400; fileId = 4000; name = 'Delta'; plugins = @('Off.esp') }, $m[3])
+            $c.Record.plugins = @($c.Record.plugins) + @([pscustomobject][ordered]@{ name = 'Off.esp'; enabled = $false; master = $false; light = $false; masters = @('Skyrim.esm'); after = @('B.esp') })
+            (Find $c 'C.esp').after = @('Off.esp')
+            $pm = @($c.Permissions.mods)
+            $c.Permissions.mods = @($pm[0], $pm[1], $pm[2], [ordered]@{ modId = 400; name = 'Delta'; author = 'd'; files = @(@{ fileId = 4000 }); plugins = @('Off.esp'); page = 'https://www.nexusmods.com/skyrimspecialedition/mods/400?tab=description'; ours = $true; reading = $null }, $pm[3], $pm[4])
+            $c.Plugins.plugins = @($c.Plugins.plugins) + @([ordered]@{ name = 'Off.esp'; size = 1; sha256 = ('0' * 64) })
+            $c.Last.loadOrder = @('Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm', '_ResourcePack.esl', 'A.esm', 'L.esl', 'B.esp', 'Off.esp', 'C.esp', 'Thornswood-Content.esp') })
+    Yes 'C2b a plugin installed switched off that the servers load: a rule may name it and chain through it, and it is not taken out' ($r.Code -eq 0 -and $r.Out -match 'YES') $r.Out
 
     $r = Invoke-Check (New-Fixture 'broken' { param($c)
             $p = @($c.Record.plugins); $c.Record.plugins = @($p[0], $p[1], $p[3], $p[2], $p[4]) })

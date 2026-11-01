@@ -184,7 +184,7 @@ function Get-CollectionRecordHeaders($R) {
 # What is wrong with the load order the record gives, one line each: the
 # five things Check-CollectionRules.ps1 says NO to on an installed
 # collection, read from the record instead of a Data folder.
-#   - a rule naming a plugin the list does not enable (or itself);
+#   - a rule naming a plugin the record does not install (or itself);
 #   - a rule the list's order breaks;
 #   - a rule that goes round with the order the game sets (PluginRuleLoops);
 #   - two full plugins next to each other that no chain of rules keeps in
@@ -192,27 +192,36 @@ function Get-CollectionRecordHeaders($R) {
 #     plugin with no rule floats).
 # Light plugins are left out of the last, as there: the servers' position
 # check leaves them out, and LOOT moving one changes nothing it counts.
+#
+# A plugin the record installs switched off (enabled false) is still in Data,
+# with its mod, and the game runs it whenever the servers load it: the
+# launcher writes the plugin list the servers were built against and
+# switches on every plugin in it (Verify.cs, the golden plugins.txt).
+# Revision 6 is so: its own list leaves out CBBE.esp and
+# RaceMenuMorphsCBBE.esp, which the servers load, and CommonClothes.esp's
+# rule names the second. So a rule may name such a plugin, and its rules are
+# links in a chain like any other; it has no place in the list to break.
 function Get-CollectionRecordOrderProblems($R) {
     $out = New-Object Collections.Generic.List[string]
     $enabled = @(@($R.plugins) | Where-Object { $_.enabled -ne $false })
     $pos = @{}
     for ($i = 0; $i -lt $enabled.Count; $i++) { $pos[([string]$enabled[$i].name).ToLowerInvariant()] = $i }
     $canon = @{}
-    foreach ($p in $enabled) { $canon[([string]$p.name).ToLowerInvariant()] = [string]$p.name }
+    foreach ($p in @($R.plugins)) { $canon[([string]$p.name).ToLowerInvariant()] = [string]$p.name }
     foreach ($b in $script:CollectionBaseMasters) { $canon[$b.ToLowerInvariant()] = $b }
     # Rule edges, "a loads before b", by lower case name.
     $next = @{}
     $rules = New-Object Collections.Generic.List[object]
-    foreach ($p in $enabled) {
+    foreach ($p in @($R.plugins)) {
         $k = ([string]$p.name).ToLowerInvariant()
         $after = @()
         foreach ($a in @($p.after)) {
             if (-not $a) { continue }
             $ak = ([string]$a).ToLowerInvariant()
             if ($ak -eq $k) { $out.Add("$($p.name) is to load after itself"); continue }
-            if (-not $canon.ContainsKey($ak)) { $out.Add("$($p.name) is to load after $a, which the list does not enable"); continue }
+            if (-not $canon.ContainsKey($ak)) { $out.Add("$($p.name) is to load after $a, which the record does not install"); continue }
             if (Test-CollectionName $script:CollectionBaseMasters $a) { $after += $canon[$ak]; continue }
-            if ($pos[$ak] -gt $pos[$k]) { $out.Add("the list puts $($p.name) above $($canon[$ak]), which its rule says it loads after") }
+            if ($pos.ContainsKey($k) -and $pos.ContainsKey($ak) -and $pos[$ak] -gt $pos[$k]) { $out.Add("the list puts $($p.name) above $($canon[$ak]), which its rule says it loads after") }
             if (-not $next.ContainsKey($ak)) { $next[$ak] = New-Object Collections.Generic.List[string] }
             $next[$ak].Add($k)
             $after += $canon[$ak]
@@ -282,6 +291,10 @@ function Get-CollectionRecordProblems($R, $Ctx) {
     if ($null -ne $Ctx.Last -and $null -ne $Ctx.Plugins) {
         $recPlugins = @{}
         foreach ($p in @($R.plugins)) { if ($p.enabled -ne $false) { $recPlugins[([string]$p.name).ToLowerInvariant()] = $p } }
+        # Installed switched off is not taken out: the launcher switches on
+        # what the servers load (Get-CollectionRecordOrderProblems says why).
+        $installed = @{}
+        foreach ($p in @($R.plugins)) { $installed[([string]$p.name).ToLowerInvariant()] = $true }
         $published = @{}
         foreach ($p in @($Ctx.Plugins.plugins)) { $published[([string]$p.name).ToLowerInvariant()] = $true }
         $published['thornswood-content.esp'] = $true
@@ -296,7 +309,7 @@ function Get-CollectionRecordProblems($R, $Ctx) {
             # The game's own and the Last plugin are no collection's to take
             # out; Thornswood-Content.esp is, as mod 192001.
             if ((Test-CollectionName $script:CollectionGameOwn $n) -or $k -eq 'thornswood-last.esp') { continue }
-            if ($recPlugins.ContainsKey($k)) { continue }
+            if ($installed.ContainsKey($k)) { continue }
             if (-not $published.ContainsKey($k)) { continue }
             $goes[$k] = $n
             if (-not $dropped.ContainsKey($k)) { $out.Add("the servers load $n and the record takes it out: name it under dropped, with why every form it added can go from a world that keeps running") }

@@ -17,7 +17,10 @@ any more.
 - `plugins`: every plugin of the collection in its load order: `name`,
   `master` and `light` (what the game reads it as), `masters` (what its
   header names), `after` (the collection's load-after rule for it), and
-  `"enabled": false` only for a plugin that is installed but switched off.
+  `"enabled": false` only for a plugin the collection's own list leaves out,
+  so it is installed but switched off. Revision 6 has two, `CBBE.esp` and
+  `RaceMenuMorphsCBBE.esp`. The servers load both, and the launcher's plugin
+  list switches them on, so a rule may name them.
 - `dropped`: the plugins the servers load that this change takes out, each
   with `name`, `mod` and `why` (why every form it added can go from a world
   that keeps running). Empty when nothing goes.
