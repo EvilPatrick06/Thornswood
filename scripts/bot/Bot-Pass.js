@@ -16,10 +16,12 @@
 //              git blob it names is this file's), and takes a connection;
 //   login      a bot logs in as a profile nobody has, the way the game does,
 //              and is sent its character (createActor with isMe);
-//   new        that character is new: the race menu is open;
-//   face       the bot sends a face (UpdateAppearance) and the gamemode moves
-//              it on, as the game would see it: the race menu closes and the
-//              plain clothes arrive (gamemode.js beginChoosing);
+//   new        that character is new: the race menu is open, and the
+//              gamemode starts creation, which the bot sees as the plain
+//              clothes arriving (gamemode.js beginAppearance and giveShift);
+//   face       only then the bot sends a face (UpdateAppearance), and the
+//              gamemode moves it on: the race menu closes (gamemode.js
+//              onUpdateAppearanceAttempt, beginChoosing, closeRaceMenu);
 //   saved      the world on disk holds the character with that name;
 //   restart    the server is stopped and started again and loads again;
 //   loads back a second bot logs in as the same profile and is sent the same
@@ -42,6 +44,9 @@ const BLOB = /gamemode\.js is git blob ([0-9a-f]{40})/;
 // A Nord, the race the game's own race menu opens on (NordRace,
 // 0x13746:Skyrim.esm), with the shape unit/TestUtils.hpp sends.
 const NORD = 0x13746;
+// Gold (0xf:Skyrim.esm). The gamemode counts what a character carries apart
+// from gold to tell a new character (nothing) from a returning one.
+const GOLD = 0xf;
 
 function readJson(file) {
   return JSON.parse(String(fs.readFileSync(file, 'utf8')).replace(/^﻿/, ''));
@@ -200,20 +205,45 @@ async function pass(opts) {
     } catch (e) { say('login', false, e.message); return result(); }
     const me = first.character;
     const props = me.props || {};
-    if (!say('new', props.isRaceMenuOpen === true, props.isRaceMenuOpen === true
-      ? 'a new character, with the race menu open'
-      : 'the character was sent with the race menu ' + (props.isRaceMenuOpen === undefined ? 'not named' : 'closed') + ', so it was not made new')) {
+    if (props.isRaceMenuOpen !== true) {
+      say('new', false, 'the character was sent with the race menu ' + (props.isRaceMenuOpen === undefined ? 'not named' : 'closed') + ', so it was not made new');
+      return result();
+    }
+    // The face waits for creation to start. The engine takes one face per
+    // race menu (ActionListener::OnUpdateAppearance closes it on the first),
+    // and the gamemode starts creation only once a new arrival has settled
+    // (SETTLE_MS): it records the face the character stands in as the one
+    // to tell the made face from, and moves the character on when a face
+    // arrives while creation is open. A face sent before that is recorded
+    // as the starting face, and the race menu never closes: the first real
+    // pass, Deployment 7475814060, failed at face that way. What says
+    // creation has started is the plain clothes (giveShift runs once the
+    // stage is saved), the first thing but gold in the character's pack.
+    const clothed = (m) => m.t === MSG.SetInventory && m.inventory && Array.isArray(m.inventory.entries) &&
+      m.inventory.entries.some((e) => e && Number(e.baseId) !== GOLD);
+    const closed = (m) => m.t === MSG.SetRaceMenuOpen && m.open === false;
+    let started = null;
+    try {
+      started = await first.until(() => {
+        for (const x of first.inbox) {
+          if (!x.message) { continue; }
+          if (clothed(x.message)) { return 'clothes'; }
+          if (closed(x.message)) { return 'closed'; }
+        }
+        return null;
+      }, stepMs, 'creation starting (the plain clothes) for the new character');
+    } catch (e) { say('new', false, e.message); return result(); }
+    if (!say('new', started === 'clothes', started === 'clothes'
+      ? 'a new character: the race menu is open and creation started with the plain clothes'
+      : 'the race menu closed before creation started, so the gamemode took the character for a returning one')) {
       return result();
     }
 
     const sentAt = first.inbox.length;
     first.send({ t: 4, idx: me.idx, data: face(name) }, true);
     try {
-      const after = (test) => first.inbox.slice(sentAt).some((x) => x.message && test(x.message));
-      await first.until(() => after((m) => m.t === MSG.SetRaceMenuOpen && m.open === false), stepMs, 'the race menu closing after the face was sent');
-      await first.until(() => after((m) => m.t === MSG.SetInventory && m.inventory && Array.isArray(m.inventory.entries) && m.inventory.entries.length > 0),
-        stepMs, 'the plain clothes after the face was sent');
-      say('face', true, 'the race menu closed and the clothes arrived');
+      await first.until(() => first.inbox.slice(sentAt).some((x) => x.message && closed(x.message)), stepMs, 'the race menu closing after the face was sent');
+      say('face', true, 'the face was taken and the race menu closed');
     } catch (e) { say('face', false, e.message); return result(); }
 
     let form = null;
