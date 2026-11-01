@@ -193,7 +193,7 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   yes('  on a push only, so a manual run always builds', /\n    if: \$\{\{ github\.event_name == 'push' \}\}\n/.test(tj));
   // #3551: the build waits for this answer, so it asks on GitHub's runner.
   const runsOn = (/\n    runs-on: ([^\n]*)\n/.exec(tj) || ['', ''])[1];
-  yes('  on GitHub\'s hosted runner, not the box (#3551): ' + runsOn, runsOn === 'ubuntu-latest' && !/self-hosted|thornswood-/.test(runsOn));
+  yes('  on GitHub\'s hosted runner, not the box (#3551): ' + runsOn, runsOn === 'ubuntu-24.04-arm' && !/self-hosted|thornswood-/.test(runsOn));
   yes('  with no fallback on the box (#4983)', build.indexOf('\n  tested-vps:\n') < 0 && build.indexOf('\n  launcher-vps:\n') < 0);
   yes('  with only actions, contents and pull-requests read', /\n    permissions:\n      actions: read\n      contents: read\n      pull-requests: read\n    outputs:/.test(tj));
   yes('  and no secrets', !/secrets\./.test(tj));
@@ -229,8 +229,8 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   yes('  the pick waits for "tested" as the launcher job does, and the shares for both', pj > 0 && pj < gj &&
       /\n    needs: tested\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' \}\}\n/.test(pickJob) &&
       /\n    needs: \[tested, pick\]\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && needs\.pick\.result == 'success' \}\}\n/.test(gateJob));
-  yes('  the pick runs Run-Gate.ps1 -Pick on Linux, with the token, and hands on its plan',
-      /\n    runs-on: ubuntu-latest\n/.test(pickJob) && /\.\/scripts\/dev\/Run-Gate\.ps1 -Pick \(\[int\]\$env:SHARES\)\n/.test(pickJob) &&
+  yes('  the pick runs Run-Gate.ps1 -Pick on GitHub\'s arm64 Linux runner, with the token, and hands on its plan',
+      /\n    runs-on: ubuntu-24\.04-arm\n/.test(pickJob) && /\.\/scripts\/dev\/Run-Gate\.ps1 -Pick \(\[int\]\$env:SHARES\)\n/.test(pickJob) &&
       /\n          GATE_MAP_TOKEN: \$\{\{ github\.token \}\}\n/.test(pickJob) && /\n      whole: \$\{\{ steps\.pick\.outputs\.whole \}\}\n/.test(pickJob));
   yes('the gate step is "gate", and runs its share of the plan through Run-Gate.ps1', /\n        id: gate\n/.test(gateStep) &&
       /\.\\scripts\\dev\\Run-Gate\.ps1 -Shard \$env:SHARD -Of \$env:OF /.test(gateStep) &&
