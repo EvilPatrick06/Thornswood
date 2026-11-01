@@ -39,12 +39,22 @@
          Build-Launcher.ps1 passes -p:Version. A bare build is 0.0.0. -->
     <Version Condition="'$(Version)' == ''">0.0.0</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Turns on the trim and native-code analyzers in every build, so code
+         that would break in the native exe (reflection, a serializer that
+         reads types at run time, the runtime's own COM) is a warning on a
+         plain `dotnet build` too, not only when Build-Launcher.ps1 publishes. -->
+    <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.1.4" />
     <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    <!-- The menu theme's MP3 decoder (MenuMusic.cs), MIT, THIRD-PARTY.md. -->
+    <PackageReference Include="NLayer" Version="3.0.0" />
+    <!-- DPAPI for the keys the launcher keeps on this PC (Secrets.cs); on
+         .NET Framework ProtectedData was part of the framework. -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.14" />
   </ItemGroup>
 
   <!-- Every resource under the name the code asks for. -->

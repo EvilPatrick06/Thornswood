@@ -68,7 +68,7 @@ is zlib's compressor translated into C#, under zlib's licence ("zlib 1.3,
 translated into C# inside the launcher", below, which also says why the other
 launcher files that name outside work are not taken from it). Of the resources
 Build-Launcher.ps1 compiles into the launcher, everything but the WebView2 files
-and `NLayer.dll` is Thornswood's own: `ui.xaml`, `logo.png`, `logo-dev.png`, `launcher-header.jpg`,
+is Thornswood's own: `ui.xaml`, `logo.png`, `logo-dev.png`, `launcher-header.jpg`,
 `launcher-header.mp4`, `app.ico`, `app-dev.ico`, `voice-host.html`,
 `Thornswood.ini`, `client-build.json`, `skyrim-files.json`, the list of
 the pinned Skyrim build's own file names, sizes and SHA-1s read out of Steam's
@@ -115,21 +115,23 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 ## NLayer, inside the launcher
 
-`NLayer.dll` from `launcher\lib\nlayer`, the MP3 decoder the launcher plays
-its menu theme with (MenuMusic.cs, since #3207, so the theme plays from the
-launcher's own process and the Windows Volume Mixer lists it as the launcher).
-Build-Launcher.ps1 references it for the compile and embeds it as a resource,
-and MenuMusic.cs hands it to the runtime from memory, the same way as the two
-managed WebView2 files.
+NLayer, the MP3 decoder the launcher plays its menu theme with (MenuMusic.cs,
+since #3207, so the theme plays from the launcher's own process and the
+Windows Volume Mixer lists it as the launcher). Since the launcher moved to
+.NET 10 (#4823) it is the NuGet package `NLayer` 3.0.0, which
+`launcher\app\Thornswood.csproj` references and the native build compiles
+into `Thornswood.exe` with the launcher's own code. No copy of it is kept in
+the repository and no file of it goes beside the exe.
 
 | File | Where it sits in the package | sha256 |
 |---|---|---|
-| `NLayer.dll` | `lib\netstandard2.0` | `f1db8b641171799231aee40712b01ed439611ebdeda9324d4f5a524c34454e11` |
+| `NLayer.dll` | `lib\net8.0` | `2cb48f87143445245a8161e9a823a83aa5b369dccae977a2311d0b42685caffa` |
 
-Version 3.0.0 (file version 3.0.0.0). Byte for byte the file in NLayer 3.0.0
-as nuget.org serves it (the .nupkg's sha256 is
-`625b215f76453180d499c203f711aceedcce6e855c86a65716c0b1275afcb9c6`),
-downloaded and compared on 26 October 2026. Its source is
+Version 3.0.0 (file version 3.0.0.0), as nuget.org serves it (the .nupkg's
+sha256 is
+`625b215f76453180d499c203f711aceedcce6e855c86a65716c0b1275afcb9c6`, the same
+package whose `netstandard2.0` file the launcher embedded from 26 October
+2026). Its source is
 https://github.com/naudio/NLayer at commit `046c7ce4` (in full,
 `046c7ce422970f8f0f0bc205d6c6341bcb7debf1`), the commit the package's nuspec
 and the file's own product version name. By Mark Heath, Andrew Ward and
