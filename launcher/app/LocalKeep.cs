@@ -25,8 +25,9 @@ namespace Thornswood
     ///
     /// Uninstall's "Keep this build's saves and settings" kept the whole
     /// Profile folder, so the log, the Discord sign-in, name and picture, and
-    /// the browser folders voice and the music ran in stayed on the PC under a box that named
-    /// none of them. NotSaves lists what goes whatever the box says.
+    /// the browser folders voice and the music ran in stayed on the PC under a
+    /// box that named none of them. NotSaves lists what goes whatever the box
+    /// says.
     /// </summary>
     static class LocalKeep
     {
@@ -149,9 +150,10 @@ namespace Thornswood
         /// <summary>
         /// What is in Profile that is not a save or a setting: the launcher's
         /// log, the support zips, the Discord sign-in with the name and picture
-        /// kept beside it. An
-        /// uninstall removes these even when it keeps the saves and settings,
-        /// and the farewell names any that could not be removed.
+        /// kept beside it, and the folders of the browsers voice and the menu
+        /// music once ran in. An uninstall removes these even when it keeps the
+        /// saves and settings, and the farewell names any that could not be
+        /// removed.
         /// </summary>
         public static string[] NotSaves()
         {
@@ -159,6 +161,12 @@ namespace Thornswood
             all.Add(Paths.LogFile);
             all.Add(Diag.ReportDir);
             all.AddRange(Discord.AccountFiles(Paths.ProfileDir));
+            // Voice ran in a WebView2 until #4823 made it native, and that
+            // browser's cache and storage are in Profile\VoiceBrowser, which
+            // nothing reads now. The privacy page and the box under "Keep this
+            // build's saves and settings" promise an uninstall removes that
+            // browser's data, so it goes too.
+            all.Add(Path.Combine(Paths.ProfileDir, "VoiceBrowser"));
             // The menu music ran in a WebView2 of its own until #3207 moved it
             // to NLayer, and that browser's cache and storage were left in
             // Profile\MusicBrowser, which nothing reads now. It is the

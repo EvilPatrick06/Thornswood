@@ -3761,8 +3761,9 @@ namespace Thornswood
             return where + ", on " + theirs + ", and Thornswood is in " + Paths.Root + ", on " + here +
                    ". A hard link is the same file under a second name, and Windows cannot make one across two drives, " +
                    "so the folder cannot be made while they are apart. Either of these puts them on one drive. " +
-                   "Install Thornswood on " + theirs + " by running the Thornswood setup program again, the one from the " +
-                   "Downloads page, and choosing " + theirs + " when it asks where to put it, which installs it in " +
+                   "Install Thornswood on " + theirs + " by running Thornswood-Setup.exe again, the one from the " +
+                   "Downloads page, letting it replace the launcher already installed, and choosing " + theirs +
+                   " when Thornswood's install window asks where to put it, which installs it in " +
                    theirs + "\\Thornswood. Or " + move + ".";
         }
 

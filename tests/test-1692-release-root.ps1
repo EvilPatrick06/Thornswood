@@ -22,8 +22,8 @@
      other channel, and leaves a file that does not read as it is.
   3. Ship.ps1, Check-ShipReady.ps1, Setup-ShipMachine.ps1 and
      Build-Generated.ps1 all ask Where.ps1 and none keeps its own rule; Ship
-     refuses a folder Vortex deploys into before the version moves or
-     anything is built, and asks whether the collection builds the
+     refuses a folder Vortex deploys into before the version is worked
+     out or anything is built, and asks whether the collection builds the
      animation and body files (#3715) before the launcher is built or
      installed. tests\test-ship-dry-run.ps1 runs Ship on both
      (G, H and I).
@@ -138,11 +138,11 @@ try {
     $ship = $texts['Ship.ps1']
     $vortex = $ship.IndexOf("Test-Path -LiteralPath (Join-Path `$Root 'Game\Data\vortex.deployment.json')")
     Yes 'Ship refuses a folder Vortex deploys into' ($vortex -gt 0)
-    # The version is worked out once, by Get-LauncherVersion; since #4825 it goes
-    # into the build as -p:Version and no file is changed for it (Unbump went).
-    $versionAt = $ship.IndexOf('try { $current = Get-LauncherVersion -RepoDir $RepoDir }')
+    # The version section starts where Ship reads the launcher's number
+    # (#5179); until #4825 it was Unbump, which wrote it into Updater.cs.
+    $version = $ship.IndexOf('try { $current = Get-LauncherVersion -RepoDir $RepoDir }')
     Yes '  before the version is worked out and before anything is built' (
-        $vortex -gt 0 -and $versionAt -gt 0 -and $vortex -lt $versionAt -and $vortex -lt $ship.IndexOf("'Build-Launcher.ps1') -Root"))
+        $vortex -gt 0 -and $version -gt 0 -and $vortex -lt $version -and $vortex -lt $ship.IndexOf("'Build-Launcher.ps1') -Root"))
     $gen = $ship.IndexOf("Head 'Animation and body files'")
     Yes 'Ship asks whether the collection builds the animation and body files before the launcher is built or installed' (
         $gen -gt 0 -and $gen -lt $ship.IndexOf("'Build-Launcher.ps1') -Root") -and $gen -lt $ship.IndexOf("'Install-Launcher.ps1')") -and

@@ -519,13 +519,9 @@ namespace Thornswood
             // install folder is never empty and the farewell calls our own
             // note "not Thornswood's".
             leave.Add(Path.Combine(Paths.Root, "SOURCE CODE.txt"));
-            // Licence texts Package stages beside SOURCE CODE.txt (issue #421).
-            leave.Add(Path.Combine(Paths.Root, "GPL-3.0.txt"));
-            leave.Add(Path.Combine(Paths.Root, "AGPL-3.0.txt"));
-            // The voice libraries' licences beside them (#4823).
-            leave.Add(Path.Combine(Paths.Root, "Concentus-LICENSE.txt"));
-            leave.Add(Path.Combine(Paths.Root, "SharpSRTP-LICENSE.txt"));
-            leave.Add(Path.Combine(Paths.Root, "BouncyCastle-LICENSE.txt"));
+            // The licence texts the install puts beside SOURCE CODE.txt: the GPL
+            // and AGPL (issue #421) and the launcher's libraries' (#4823).
+            foreach (string lic in InstallSteps.LicenceFiles) leave.Add(Path.Combine(Paths.Root, lic));
             // The libraries' licence texts SOURCE CODE.txt lists (issue #3099).
             leave.Add(Path.Combine(Paths.Root, "licences"));
 

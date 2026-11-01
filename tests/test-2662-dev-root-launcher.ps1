@@ -145,11 +145,11 @@ try {
         $vortex = $shipText.IndexOf("Test-Path -LiteralPath (Join-Path `$Root 'Game\Data\vortex.deployment.json')")
         $rootAt = $shipText.IndexOf("Where.ps1') `$(if (`$Dev) { 'ShipRootDev' } else { 'ShipRoot' })")
         Yes '  after the folder is worked out, and before the Vortex refusal' ($rootAt -gt 0 -and $at -gt $rootAt -and $vortex -gt $at)
-        # The version is worked out once, by Get-LauncherVersion; since #4825 it
-        # goes into the build as -p:Version and no file is changed for it.
-        $versionAt = $shipText.IndexOf('try { $current = Get-LauncherVersion -RepoDir $RepoDir }')
+        # The version section starts where Ship reads the launcher's number
+        # (#5179); until #4825 it was Unbump, which wrote it into Updater.cs.
+        $version = $shipText.IndexOf('try { $current = Get-LauncherVersion -RepoDir $RepoDir }')
         Yes '  and before the version is worked out or the launcher is built' (
-            $versionAt -gt 0 -and $at -lt $versionAt -and $at -lt $shipText.IndexOf("'Build-Launcher.ps1') -Root"))
+            $version -gt 0 -and $at -lt $version -and $at -lt $shipText.IndexOf("'Build-Launcher.ps1') -Root"))
         Yes '  and the old refusal of every folder is gone from it' ($block.Extent.Text -notmatch 'if \(-not \(Test-Path \(Join-Path \$Root ''Launcher''\)\)\)')
         $stubDir = Join-Path $T 'stub'
         Put (Join-Path $stubDir 'Where.ps1') @'

@@ -362,12 +362,7 @@ stays the same when the three day certificate renews. Only then does it look
 for `ExpectedSigner` in the Subject. `scripts\release\Assert-PublishSigned.ps1`
 runs the same class before a Ship publishes, and
 `tests\test-signer-check.ps1` compiles it on its own and points it at signed,
-unsigned, self-signed and changed files. `Signature.cs:410 MicrosoftRefusal()`
-asks the same of a program Microsoft signed itself: the same Windows check,
-then the chain must end at Microsoft Root Certificate Authority 2011 and the
-certificate must be Microsoft Corporation's, for signing programs. It was for
-the WebView2 installer voice downloaded (issue #1330); voice needs no WebView2
-since #4823, and nothing in the launcher calls it now.
+unsigned, self-signed and changed files.
 
 **ReleaseManifest** (ReleaseManifest.cs, FeedManifest.cs). Whether the
 release's signed manifest vouches for every asset the feed names (#2163,
@@ -787,7 +782,9 @@ farewell names any it could not.
 
 **DevBuild** (DevBuild.cs). The second launcher in `<Root>-DevBuild`, made
 from the main one's files with the channel set to dev and the dev ports (game
-7787, voice 7789). It is installed and opened from the Server card on the main
+7787, voice 7789). Its program is copied from the folder the running exe is
+in (Velopack's `current\`), the `.exe` and `.dll` files only, into
+`<Root>-DevBuild\Launcher`. It is installed and opened from the Server card on the main
 build's Play page (`Shell.cs DrawServerPick()`, `SwitchToDev()`), which checks
 the person's Discord roles before it offers the install (#605); `MainRoot` and
 `MainExe` are the way back the dev build's own Server card opens the main

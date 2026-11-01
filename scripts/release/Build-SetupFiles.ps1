@@ -26,6 +26,10 @@
       GPL-3.0.txt,      GNU GPL and AGPL texts, and the licence texts of the
       AGPL-3.0.txt,     libraries inside those files (Source-Notice.ps1, kind
       licences\         setup; #421, #3099)
+      *-LICENSE.txt,    the licence texts of the libraries inside the
+      *-NOTICES.txt,    launcher and shipped with it, from installer\licences
+      Velopack-Rust-    (its README.txt says where each is from;
+      crates.txt        InstallSteps.LicenceFiles names them; #4823)
 
   merge-release.yml packs every one of them at the top of the package, beside
   Thornswood.exe and Game, and setup-files.<channel>.json lists each with its
@@ -177,6 +181,26 @@ $entries = @(Get-SourceNoticeEntries (Join-Path $RepoDir 'records\client-build.j
 if ($entries.Count -eq 0) { throw 'The game files carry none of the SkyMP files, so there is no source to name. That is not a release this builds.' }
 Write-SourceNoticeToFolder $files $entries
 Say ("  SOURCE CODE.txt, the GPL and AGPL texts and {0} library licence texts" -f (@($entries).Count - 3)) 'Green'
+
+# ---- the launcher's libraries' licence texts
+# Everything built into the launcher or shipped with it (.NET, Avalonia,
+# SkiaSharp and Skia, HarfBuzz, ANGLE, Velopack and its Rust crates, the voice
+# libraries, NLayer): installer\licences\README.txt says where each text is
+# from. InstallSteps.LicenceFiles names the same files, copies them into the
+# install folder and Uninstall.cs removes them (#4823).
+$launcherLicences = @(
+    'Concentus-LICENSE.txt', 'SharpSRTP-LICENSE.txt', 'BouncyCastle-LICENSE.txt',
+    'dotnet-LICENSE.txt', 'dotnet-THIRD-PARTY-NOTICES.txt',
+    'Avalonia-LICENSE.txt', 'MicroCom-LICENSE.txt', 'Tmds.DBus-LICENSE.txt',
+    'SkiaSharp-LICENSE.txt', 'SkiaSharp-THIRD-PARTY-NOTICES.txt', 'ANGLE-LICENSE.txt',
+    'Velopack-LICENSE.txt', 'Velopack-Rust-crates.txt', 'NLayer-LICENSE.txt'
+)
+foreach ($lic in $launcherLicences) {
+    $from = Join-Path $RepoDir (Join-Path 'installer\licences' $lic)
+    if (-not (Test-Path -LiteralPath $from)) { throw "installer\licences\$lic is missing. Each library inside the launcher has its licence text go with the install (#4823)." }
+    Copy-Item -LiteralPath $from -Destination (Join-Path $files $lic) -Force
+}
+Say ("  {0} licence texts of the launcher's libraries" -f $launcherLicences.Count) 'Green'
 
 # ---- the list
 $list = foreach ($f in @(Get-ChildItem -LiteralPath $files -Recurse -File -Force)) {
