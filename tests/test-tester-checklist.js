@@ -5,7 +5,7 @@
 //
 // WHY THIS EXISTS. Entry 295 on the To Do List: the first thing the checklist
 // asked a tester to check was "Build 1.0.193 and up." Main was on 1.1.47 when
-// the entry was written and launcher/app/Updater.cs says 1.1.92 today, so the one
+// the entry was written and launcher/app/Updater.cs said 1.1.92 by then, so the one
 // line meant to stop a stale report was itself the stalest line on the page.
 // The entry's words: "Either take the version out of the checklist entirely,
 // which is the better answer, or generate that line from the feed." It was
@@ -57,13 +57,16 @@ pinned.forEach(function (p) { console.log('      ' + p); });
 yes('no line of the checklist names a build number', pinned.length === 0);
 yes('no line sets a build floor ("Build N and up")', !/\bbuild\s+\d/i.test(md) && !/\band up\b/i.test(md));
 
-// The version Ship reads today, so a reader can see what the old line was
-// behind. Not compared with anything in the checklist, because the checklist
-// should carry no number at all.
+// Where the launcher's number lives. Since #4825 no source file holds it: the
+// build gives the exe its version (scripts/release/LauncherVersion.ps1 works
+// it out from git, year.monthday.hourminute) and Updater reads it back off
+// the exe, so there is no number in the sources to copy into the checklist.
+// Every shape it takes, 1.1.92 then and 2026.1101.1745 now, is three dotted
+// numbers, which the check above already refuses on any line.
 const upd = read(path.join(ROOT, 'launcher', 'app', 'Updater.cs'));
-const m = /const string Version = "([^"]+)"/.exec(upd);
-yes('Updater.cs carries the launcher version (' + (m ? m[1] : 'not found') + '), the one place it lives', !!m);
-yes('that version is not written into the checklist', !m || md.indexOf(m[1]) < 0);
+yes('Updater takes the launcher version from the build, the one place it lives',
+  /public static readonly string Version = BuiltVersion\(\);/.test(upd) && /GetName\(\)\.Version/.test(upd) &&
+  !/const string Version = "/.test(upd));
 
 // The old name.
 yes('the checklist does not name Gavin', !/\bGavin\b/.test(md));
