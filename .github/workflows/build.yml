@@ -315,17 +315,11 @@ jobs:
       - name: Parse every PowerShell script
         shell: pwsh
         run: |
-          $bad = 0
-          Get-ChildItem -Path scripts, tests, installer -Filter *.ps1 -Recurse -File | ForEach-Object {
-            $tokens = $null; $errors = $null
-            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors)
-            foreach ($e in $errors) {
-              $bad++
-              Write-Host ("::error file={0},line={1}::{2}" -f $_.FullName, $e.Extent.StartLineNumber, $e.Message)
-            }
-          }
-          if ($bad) { exit 1 }
-          Write-Host "every script parses"
+          # The list of what is parsed is in scripts\dev\Check-Parse.ps1, which
+          # the pre-push hook runs too (#5291), so a script the hook passed
+          # parses here as well.
+          .\scripts\dev\Check-Parse.ps1 -What PowerShell
+          exit $LASTEXITCODE
 
       - name: Check the writing rules
         shell: pwsh
@@ -537,21 +531,11 @@ jobs:
       - name: Parse every game script
         shell: pwsh
         run: |
-          $bad = 0
           # game\ since the reorganisation's phase 6 (issue #440): the gamemode,
-          # the plugins and the overlays.
-          $files = @(Get-ChildItem -Path scripts -Filter *.js -File -Recurse) + @(Get-ChildItem -Path game -Filter *.js -File) +
-                   @(Get-ChildItem -Path game\plugins, game\ui -Filter *.js -File -ErrorAction SilentlyContinue) +
-                   @(Get-ChildItem -Path site\server.js, voice\voice-server.js -File)
-          foreach ($f in $files) {
-            & node --check $f.FullName 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-              $bad++
-              Write-Host ("::error file={0}::does not parse" -f $f.FullName)
-            }
-          }
-          if ($bad) { exit 1 }
-          Write-Host ("{0} game script(s) parse" -f $files.Count)
+          # the plugins and the overlays, with node --check. The list is in
+          # scripts\dev\Check-Parse.ps1, which the pre-push hook runs too (#5291).
+          .\scripts\dev\Check-Parse.ps1 -What Scripts
+          exit $LASTEXITCODE
 
       - name: Check the Python names what exists
         shell: pwsh

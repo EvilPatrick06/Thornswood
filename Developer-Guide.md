@@ -284,6 +284,14 @@ git status
 
 `git status` should say you are on `main` and the working tree is clean. If the clone asks for a login and then fails, you are not a collaborator yet. Stop and say so in Discord.
 
+Then turn on the checks that run before every push:
+
+```powershell
+git config core.hooksPath .githooks
+```
+
+It prints nothing. From then on `git push` first checks that every script parses and that the writing rules hold in what you are pushing, in about twenty seconds (#5291). When one fails, the push stops and names the file and line; fix it, commit, and push again. A cloud session turns this on by itself.
+
 From here on, the commands assume PowerShell is inside your clone. If you used another folder, `cd` there first.
 
 #### Open the folder in Visual Studio Code
