@@ -390,6 +390,7 @@ public sealed class AppTests : IDisposable
         ["trust.py"] = "# trust",
         ["card.py"] = "# card",
         ["staff-channel.txt"] = "1549254991082946570",
+        ["dev-channel.txt"] = "1550000000000000000",
         ["requirements.txt"] = req,
         ["factions.json"] = "{}",
         ["assets/join-card.png"] = "PNG",
@@ -408,7 +409,7 @@ public sealed class AppTests : IDisposable
             ["webhooks/news.txt"] = "x",
             ["sample.py"] = "copied by hand",
             ["assets/sample.png"] = "copied by hand",
-            ["dev-channel.txt"] = "no longer sent",
+            ["notes.txt"] = "copied by hand",
         });
     }
 
@@ -429,7 +430,8 @@ public sealed class AppTests : IDisposable
         Assert.True(Has(r.Root, "webhooks/news.txt"));
         Assert.False(Has(r.Root, "sample.py"));
         Assert.False(Has(r.Root, "assets/sample.png"));
-        Assert.False(Has(r.Root, "dev-channel.txt"));
+        Assert.False(Has(r.Root, "notes.txt"));
+        Assert.Equal("1550000000000000000", Read(r.Root, "dev-channel.txt"));
         var prev = Directory.GetDirectories(r.Root, ".prev-*").Single();
         Assert.Equal("# bot v1", Read(prev, "bot.py"));
         Assert.Equal("copied by hand", Read(prev, "sample.py"));

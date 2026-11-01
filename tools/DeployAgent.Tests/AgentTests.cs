@@ -686,7 +686,7 @@ public sealed class AgentTests : IDisposable
     {
         var (a, gh, s, vc, vroot) = MakeWithVoice();
         VoiceRelease(gh, "build-21", "// new gamemode\n", "const BUILD = 'new-2';\n");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-21\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-21\"}");
         await a.Pass("dev", default);
         HasStates(gh, s, id, "in_progress,success");
         Assert.Contains("voice runs it too", (string)gh.Last(id)!["description"]!);
@@ -707,7 +707,7 @@ public sealed class AgentTests : IDisposable
     {
         var (a, gh, s, vc, vroot) = MakeWithVoice();
         VoiceRelease(gh, "build-22", "// new gamemode\n", "const BUILD = 'new-3'; // DEAD\n");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-22\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-22\"}");
         await a.Pass("dev", default);
         HasStates(gh, s, id, "in_progress,failure");
         var why = (string)gh.Last(id)!["description"]!;
@@ -723,7 +723,7 @@ public sealed class AgentTests : IDisposable
     {
         var (a, gh, s, _, _) = Make();
         VoiceRelease(gh, "build-23", "// new gamemode\n", "const BUILD = 'new-4';\n");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-23\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-23\"}");
         await a.Pass("dev", default);
         HasStates(gh, s, id, "in_progress,success");
         Assert.Contains("voice, which this agent does not apply yet; left alone", s.Read(Path.Combine("data", $"deploy-{id}.log")));

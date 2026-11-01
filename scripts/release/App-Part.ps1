@@ -20,7 +20,8 @@
              boards and everything the site writes are the site's own and
              never ride a Release.
     discord  bot.py, _pyguard.py, trust.py, card.py, staff-channel.txt,
-             requirements.txt, factions.json, assets\join-card.png
+             dev-channel.txt (where dev news goes), requirements.txt,
+             factions.json, assets\join-card.png
              (C:\Thornswood-Bot). The list Install-Bot.ps1 -CodeOnly sends.
              The token, the settings, the records and the libraries are the
              bot's own and never ride a Release.
@@ -90,7 +91,7 @@ switch ($Part) {
     Add-Tree 'site/data/site' 'data/site'
   }
   'discord' {
-    foreach ($f in 'bot.py', '_pyguard.py', 'trust.py', 'card.py', 'staff-channel.txt', 'requirements.txt', 'factions.json') { Add-One $f ('bot/' + $f) }
+    foreach ($f in 'bot.py', '_pyguard.py', 'trust.py', 'card.py', 'staff-channel.txt', 'dev-channel.txt', 'requirements.txt', 'factions.json') { Add-One $f ('bot/' + $f) }
     Add-One 'assets/join-card.png' 'bot/assets/join-card.png'
   }
   'voice' {
