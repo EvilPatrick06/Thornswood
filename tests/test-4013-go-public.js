@@ -48,7 +48,7 @@ function token() {
   const t = now();
   const claims = {
     iss: 'https://token.actions.githubusercontent.com', aud: 'thornswood-admin', iat: t - 5, nbf: t - 5, exp: t + 300,
-    repository: 'EvilPatrick06/Thornswood-Ops', ref: 'refs/heads/main',
+    repository: 'EvilPatrick06/Thornswood-Ops', repository_id: '1435123931', ref: 'refs/heads/main',
     job_workflow_ref: 'EvilPatrick06/Thornswood-Ops/.github/workflows/github-admin.yml@refs/heads/main',
     event_name: 'workflow_dispatch', run_id: '4013', actor: 'EvilPatrick06',
   };

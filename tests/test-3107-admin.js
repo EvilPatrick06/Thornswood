@@ -11,7 +11,8 @@
 //      GitHub's published keys serves: a hand-started run of the ops
 //      repository's github-admin.yml on main passes; a push's run, a token
 //      from another workflow, another branch, a pull request, another
-//      repository (this one included), another
+//      repository (this one included, and one with the ops repository's
+//      name but not its id), another
 //      audience or issuer, an expired one, one signed by a key GitHub does
 //      not publish, one whose body was changed after signing, and one that
 //      says it needs no signature, each fail;
@@ -30,6 +31,9 @@
 //      an empty, too long or two-line description, a website that is not
 //      https, and a topic in capitals, twice, or past GitHub's 20 each stop;
 //      topics compare in any order;
+//   3c. redirects (#5184): a read GitHub moved (301) and a change it sends on
+//      (307) are followed, a change answered 301 is not, nor a redirect to
+//      another host, and a loop stops after five;
 //   4. admin.js spawned against a stand-in GitHub: anything through Caddy
 //      (X-Forwarded-For) but the setup pages is the plain 404; no token, a
 //      branch's token, and a token for another audience are 403 with nothing
@@ -122,7 +126,7 @@ function good(over) {
   const t = now();
   return Object.assign({
     iss: 'https://token.actions.githubusercontent.com', aud: 'thornswood-admin', iat: t - 5, nbf: t - 5, exp: t + 300,
-    repository: 'EvilPatrick06/Thornswood-Ops', ref: 'refs/heads/main',
+    repository: 'EvilPatrick06/Thornswood-Ops', repository_id: '1435123931', ref: 'refs/heads/main',
     job_workflow_ref: 'EvilPatrick06/Thornswood-Ops/.github/workflows/github-admin.yml@refs/heads/main',
     workflow_ref: 'EvilPatrick06/Thornswood-Ops/.github/workflows/github-admin.yml@refs/heads/main',
     event_name: 'workflow_dispatch', run_id: '4242', actor: 'EvilPatrick06',
@@ -135,9 +139,16 @@ function why(token) {
 // ---- 1. the OIDC check ----------------------------------------------------------
 console.log('the OIDC check');
 yes('a hand-started run of the ops repository\'s github-admin.yml on main passes', why(sign(good())) === '');
-yes('the rules name the ops repository for the runners and this one for the records', admin.RULES.repository === 'EvilPatrick06/Thornswood-Ops' && admin.RUNNERS_REPO === 'EvilPatrick06/Thornswood-Ops' && admin.REPO === 'EvilPatrick06/Thornswood');
+yes('the rules name the ops repository for the runners and this one for the records', admin.RULES.repositoryId === '1435123931' && admin.RUNNERS_REPO === 'EvilPatrick06/Thornswood-Ops' && admin.REPO === 'EvilPatrick06/Thornswood');
 yes('one a push started fails, since a push here cannot start it there (#4013)', /started by push/.test(why(sign(good({ event_name: 'push' })))));
-yes('this repository\'s own github-admin.yml on main fails', /from EvilPatrick06\/Thornswood$/.test(why(sign(good({ repository: 'EvilPatrick06/Thornswood', job_workflow_ref: 'EvilPatrick06/Thornswood/.github/workflows/github-admin.yml@refs/heads/main' })))));
+yes('this repository\'s own github-admin.yml on main fails', /from EvilPatrick06\/Thornswood \(repository id 1365246621\)$/.test(why(sign(good({ repository: 'EvilPatrick06/Thornswood', repository_id: '1365246621', job_workflow_ref: 'EvilPatrick06/Thornswood/.github/workflows/github-admin.yml@refs/heads/main' })))));
+// #5184: the ops repository is known by its id, so its move into the
+// Thornswood organization changes nothing here.
+yes('the ops repository moved into the organization still passes, by its id', why(sign(good({ repository: 'Thornswood/Thornswood-Ops',
+  job_workflow_ref: 'Thornswood/Thornswood-Ops/.github/workflows/github-admin.yml@refs/heads/main', workflow_ref: 'Thornswood/Thornswood-Ops/.github/workflows/github-admin.yml@refs/heads/main' }))) === '');
+yes('  but a repository with its old name and another id fails', /repository id 999/.test(why(sign(good({ repository_id: '999' })))));
+yes('  and a token with no repository id fails', /repository id undefined/.test(why(sign(good({ repository_id: undefined })))));
+yes('  and the workflow from another repository, called from it, fails', /workflow/.test(why(sign(good({ job_workflow_ref: 'EvilPatrick06/Thornswood/.github/workflows/github-admin.yml@refs/heads/main' })))));
 yes('  with the audience as a list too', why(sign(good({ aud: ['x', 'thornswood-admin'] }))) === '');
 yes('another workflow on main fails', /workflow/.test(why(sign(good({ job_workflow_ref: 'EvilPatrick06/Thornswood-Ops/.github/workflows/build.yml@refs/heads/main' })))));
 yes('github-admin.yml from a branch fails',
@@ -146,7 +157,7 @@ yes('  even with a ref claim that says main', /workflow/.test(why(sign(good({ jo
 yes('a pull request\'s run fails',
   why(sign(good({ ref: 'refs/pull/3323/merge', event_name: 'pull_request', job_workflow_ref: 'EvilPatrick06/Thornswood-Ops/.github/workflows/github-admin.yml@refs/pull/3323/merge' }))) !== '');
 yes('  and a pull_request_target run on main, by its event', /started by/.test(why(sign(good({ event_name: 'pull_request_target' })))));
-yes('another repository fails', /from EvilPatrick06\/skymp/.test(why(sign(good({ repository: 'EvilPatrick06/skymp' })))));
+yes('another repository fails', /from EvilPatrick06\/skymp/.test(why(sign(good({ repository: 'EvilPatrick06/skymp', repository_id: '1375283516' })))));
 yes('another audience fails', /audience/.test(why(sign(good({ aud: 'sigstore' })))));
 yes('another issuer fails', /issued by/.test(why(sign(good({ iss: 'https://example.com' })))));
 yes('an expired token fails', why(sign(good({ exp: now() - 1 }))) === 'expired');
@@ -578,6 +589,47 @@ function start(stateDir, ghPort) {
   const bearer = t => ({ Authorization: 'Bearer ' + t });
   const ask4 = (headers, body) => ask(P, 'POST', '/converge', headers, body === undefined ? { what: 'runner-labels' } : body);
   try {
+    // #5184: a repository that moved answers with a redirect to where it is
+    // now; call follows it the way GitHub's REST guide says, on the same
+    // host only and at most five times.
+    console.log('redirects');
+    const seen = [];
+    const mover = http.createServer((q, s) => {
+      const c = [];
+      q.on('data', d => c.push(d));
+      q.on('end', () => {
+        seen.push({ method: q.method, url: q.url, auth: q.headers.authorization || '', body: Buffer.concat(c).toString('utf8') });
+        const go = (code, to) => { s.writeHead(code, { Location: to }); s.end(); };
+        if (q.url === '/repos/EvilPatrick06/Thornswood-Ops/x') return go(301, '/repositories/1435123931/x');
+        if (q.url === '/repos/EvilPatrick06/Thornswood-Ops/y') return go(307, '/repositories/1435123931/y');
+        if (q.url === '/away') return go(301, 'http://other.example/x');
+        if (q.url.startsWith('/loop')) return go(302, '/loop' + q.url.length);
+        s.writeHead(200, { 'Content-Type': 'application/json' });
+        s.end(JSON.stringify({ at: q.url, method: q.method }));
+      });
+    });
+    await new Promise(r => mover.listen(0, '127.0.0.1', r));
+    const M = 'http://127.0.0.1:' + mover.address().port;
+    try {
+      let a = await admin.call('GET', M + '/repos/EvilPatrick06/Thornswood-Ops/x', { Authorization: 'Bearer t' });
+      yes('a read that GitHub moved (301) is followed to where it is now', a.status === 200 && a.body.at === '/repositories/1435123931/x' &&
+        seen[seen.length - 1].auth === 'Bearer t');
+      seen.length = 0;
+      a = await admin.call('POST', M + '/repos/EvilPatrick06/Thornswood-Ops/y', { Authorization: 'Bearer t' }, { labels: ['a'] });
+      yes('  a change sent on with 307 is followed with the same method and body', a.status === 200 && a.body.method === 'POST' &&
+        seen.length === 2 && seen[1].body === '{"labels":["a"]}');
+      a = await admin.call('POST', M + '/repos/EvilPatrick06/Thornswood-Ops/x', {}, { labels: ['a'] });
+      yes('  a change answered 301 is not turned into a read; the 301 comes back', a.status === 301);
+      seen.length = 0;
+      a = await admin.call('GET', M + '/away', { Authorization: 'Bearer t' });
+      yes('  a redirect to another host is not followed, so the token goes nowhere else', a.status === 301 && /another host/.test(a.body.message) && seen.length === 1);
+      seen.length = 0;
+      a = await admin.call('GET', M + '/loop', {});
+      yes('  a loop stops after five', a.status === 302 && /more than 5/.test(a.body.message) && seen.length === 6);
+    } finally {
+      mover.close();
+    }
+
     console.log('the service');
     let r = await ask(P, 'GET', '/', {});
     yes('a plain request is the plain 404, which says which service it is', r.status === 404 && r.text === 'box admin: not here');
