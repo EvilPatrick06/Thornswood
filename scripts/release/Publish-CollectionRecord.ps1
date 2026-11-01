@@ -195,11 +195,14 @@ Head "Drafting revision $($published + 1)"
 $code = Invoke-RecordStep 'New-NexusRevision' $params
 $q = '{ collection(slug: "' + $want.collection + '", domainName: "' + $want.game + '") { draftRevisionNumber } }'
 $draft = 0
-try { $draft = [int](Get-NexusField (Get-NexusField (Invoke-NexusGraph $q $null 'Reading the draft') 'collection') 'draftRevisionNumber') } catch { }
+$draftUnread = ''
+try { $draft = [int](Get-NexusField (Get-NexusField (Invoke-NexusGraph $q $null 'Reading the draft') 'collection') 'draftRevisionNumber') }
+catch { $draftUnread = $_.Exception.Message }
 if ($code -ne 0) {
     if ($draft -gt $published) { $script:OnNexus.Add("draft revision $draft, which New-NexusRevision.ps1 left when it stopped") }
     Stop-Record "New-NexusRevision.ps1 stopped (exit $code) and the revision was not drafted."
 }
+if ($draftUnread) { Stop-Record "New-NexusRevision.ps1 finished, and Nexus could not be asked which revision is the draft: $draftUnread" }
 if ($draft -ne $published + 1) { Stop-Record "New-NexusRevision.ps1 finished, and Nexus names draft revision $draft, not $($published + 1)." }
 $script:OnNexus.Add("draft revision $draft")
 Say "  draft revision $draft" 'Green'
