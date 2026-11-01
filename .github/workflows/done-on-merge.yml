@@ -142,12 +142,13 @@ jobs:
               Invoke-RestMethod -Method Post -Uri ("$api/issues/" + $t.issue + '/labels') -Headers $bh -Body (@{ labels = @('board: Done') } | ConvertTo-Json -Compress) -ContentType 'application/json' | Out-Null
               $steps = (($t.rest -join "`n").Trim())
               # A Dev test task is for developers and goes up as soon as a dev
-              # release carries the work; a Main one when a main Ship does. The
-              # main Ship closes the issue either way, and writes this block on it
-              # unless a test task of the same kind was written after the merge
-              # (Developer-Guide.md, "Test tasks and known issues").
+              # release carries the work, written by that dev Ship (#5199); a
+              # Main one when a main Ship does. The main Ship closes the issue
+              # either way, and writes this block on it unless a test task of
+              # the same kind was written after the merge (Developer-Guide.md,
+              # "Test tasks and known issues").
               if ($steps -match '^\s*Server\s*:\s*Dev\s*(\n|$)') {
-                $when = 'This test task is for developers. When a dev release carries it, write a comment holding exactly this, with its Build: line naming that release, and the bot posts it in #dev-test-tasks. The main Ship that carries it closes this issue (scripts/release/Close-ShippedIssues.ps1), and writes this on it if nobody has:'
+                $when = 'This test task is for developers. The dev Ship that carries it writes it on this issue with its Build: line naming that release, and the bot posts it in #dev-test-tasks (scripts/release/Close-ShippedIssues.ps1 -Dev). The main Ship that carries it closes this issue, and writes this on it if nobody has:'
               } else {
                 $when = 'The main Ship that carries it closes this issue with a comment holding exactly this (scripts/release/Close-ShippedIssues.ps1):'
               }

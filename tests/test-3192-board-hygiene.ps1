@@ -266,7 +266,7 @@ try {
         $dev = "Refs #616.`n`nTest task for #616: A forged number is refused`nServer: Dev`nBuild: dev release 20261022-070758-dev`n1. Edit the number.`nWhat should happen: refused."
         $r = Run-Flow $f @{ 'GET /commits/eee/pulls' = @(@{ number = 3302; merged_at = (Ago 0); base = @{ ref = 'main' }; merge_commit_sha = 'abcdef0123456789'; body = $dev }); 'GET /issues/616' = @{ number = 616; state = 'open' } } @{ BOARD_TOKEN = 'board-token'; COMMITS = '["eee"]' }
         $c = @($r.Writes | Where-Object { $_ -like 'POST /issues/616/comments *' })
-        Yes '  a Dev test task''s comment says to post it when a dev release carries it, and that the main Ship closes the issue' ($c.Count -eq 1 -and $c[0] -match 'When a dev release carries it' -and $c[0] -match 'dev-test-tasks' -and $c[0] -match 'The main Ship that carries it closes this issue \(scripts/release/Close-ShippedIssues\.ps1\), and writes this on it if nobody has' -and $c[0] -match 'Server: Dev\\nBuild: dev release')
+        Yes '  a Dev test task''s comment says the dev Ship that carries it writes it, and that the main Ship closes the issue (#5199)' ($c.Count -eq 1 -and $c[0] -match 'The dev Ship that carries it writes it on this issue with its Build: line naming that release' -and $c[0] -match 'dev-test-tasks' -and $c[0] -match 'Close-ShippedIssues\.ps1 -Dev' -and $c[0] -match 'The main Ship that carries it closes this issue, and writes this on it if nobody has' -and $c[0] -match 'Server: Dev\\nBuild: dev release')
 
         # A merge the push run missed (#1626, #3273), started by hand.
         $seen = @{ user = @{ login = 'github-actions[bot]' }; body = 'Pull request #3300 merged (0123456789ab), so this is in Done and stays open: ...' }
