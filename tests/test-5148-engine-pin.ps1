@@ -163,7 +163,7 @@ Yes 'no-build: the fork has no build of the head' ((Step $w).Step -eq 'no-build'
 $E = '4444444444444444444444444444444444444444'
 $O = '5555555555555555555555555555555555555555'
 function Fork-Run([long]$id, [string]$sha, [string]$status, $conclusion) {
-    return [pscustomobject]@{ id = $id; status = $status; conclusion = $conclusion; head_sha = $sha; head_branch = 'thornswood/engine-changes'; event = 'push'; html_url = "https://example/$id"; repository = [pscustomobject]@{ full_name = 'EvilPatrick06/skymp' }; head_repository = [pscustomobject]@{ full_name = 'EvilPatrick06/skymp' } }
+    return [pscustomobject]@{ id = $id; status = $status; conclusion = $conclusion; head_sha = $sha; head_branch = 'thornswood/engine-changes'; event = 'push'; html_url = "https://example/$id"; repository = [pscustomobject]@{ id = 1375283516; full_name = 'EvilPatrick06/skymp' }; head_repository = [pscustomobject]@{ full_name = 'EvilPatrick06/skymp' } }
 }
 function New-Building {
     $w = New-World
