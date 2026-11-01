@@ -456,6 +456,7 @@ public sealed class App(EnvConfig env, HttpClient http, IAppControl control)
     public List<string> Expand(string zip, string dir)
     {
         Directory.CreateDirectory(dir);
+        var full = Path.GetFullPath(dir) + Path.DirectorySeparatorChar;
         var outList = new List<string>();
         using var za = ZipFile.OpenRead(zip);
         foreach (var ze in za.Entries)
@@ -466,7 +467,10 @@ public sealed class App(EnvConfig env, HttpClient http, IAppControl control)
             if (segs.Any(s => !Segment.IsMatch(s))) throw new InvalidDataException($"the zip holds {rel}, which is not a plain path under the {Name}'s folder");
             if (!Allowed(rel)) throw new InvalidDataException($"the zip holds {rel}, which is not one of the {Name}'s files a Release may carry");
             if (outList.Contains(rel, StringComparer.OrdinalIgnoreCase)) throw new InvalidDataException($"the zip holds {rel} twice");
-            var to = At(dir, rel);
+            // The plain names above already keep it inside; this says so of
+            // the path the file is written to, as ServerBuild's expand does.
+            var to = Path.GetFullPath(At(dir, rel));
+            if (!to.StartsWith(full, StringComparison.Ordinal)) throw new InvalidDataException($"the zip names {rel}, which is outside the {Name}'s folder");
             Directory.CreateDirectory(Path.GetDirectoryName(to)!);
             using (var s = ze.Open())
             using (var f = new FileStream(to, FileMode.CreateNew, FileAccess.Write, FileShare.None))
