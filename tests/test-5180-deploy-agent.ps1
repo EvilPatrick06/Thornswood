@@ -14,7 +14,8 @@
     - gamemode-release.yml runs when the server build record changes too,
       fetches CI's build of the pin and puts its zip on the Release.
     - The gate has the verbs Deploy-Release (-Tag build-<...> only, dev
-      fixed) and Install-DeployAgent (-Status and -Tag only).
+      fixed) and Install-DeployAgent (-Status, -Tag, -NoBotPass and -EndHung
+      only).
     - Deploy-Release.ps1 and Install-DeployAgent.ps1 send the box scripts that
       parse; the install one carries the signer read from Updater.cs, the
       launcher's own Signature.cs and the repository it was given, and no
@@ -112,7 +113,7 @@ try {
     Yes '  -Tag takes build-<...> and nothing else' (('build-20261101.12' -match $d.params.Tag) -and -not ('build-1; rm' -match $d.params.Tag) -and -not ('agent-v1.0.1' -match $d.params.Tag))
     $v = $verbs.verbs.'Install-DeployAgent'
     Yes 'the gate has Install-DeployAgent' ($null -ne $v -and $v.script -eq 'scripts/deploy/Install-DeployAgent.ps1')
-    Yes '  with -Status, -Tag and -NoBotPass only, and -NoPause fixed' ((@($v.params.PSObject.Properties.Name) -join ',') -eq 'Status,Tag,NoBotPass' -and (@($v.fixed) -join ',') -eq '-NoPause' -and $v.params.NoBotPass -eq 'switch')
+    Yes '  with -Status, -Tag, -NoBotPass and -EndHung only, and -NoPause fixed' ((@($v.params.PSObject.Properties.Name) -join ',') -eq 'Status,Tag,NoBotPass,EndHung' -and (@($v.fixed) -join ',') -eq '-NoPause' -and $v.params.NoBotPass -eq 'switch' -and $v.params.EndHung -eq 'switch')
     Yes '  -Tag takes agent-v<a.b.c> and nothing else' (('agent-v1.0.12' -match $v.params.Tag) -and -not ('agent-v1.0.12; rm' -match $v.params.Tag) -and -not ('build-1' -match $v.params.Tag))
 
     # ---- the scripts they send the box ---------------------------------------------
@@ -149,6 +150,9 @@ try {
             Yes '  and the launcher''s own Signature.cs' ($r.Text.Contains($b64))
             Yes '  and writes the repository it was given into agent.json' ($r.Text.Contains("-NotePropertyName repo -NotePropertyValue 'O/R'"))
             Yes '  and runs the service as LocalSystem with restart on an error exit' ($r.Text.Contains('obj= LocalSystem') -and $r.Text.Contains('failureflag'))
+            Yes '  and refuses a service stuck stopping unless -EndHung is given' ($r.Text.Contains("`$endHung = ''") -and $r.Text.Contains("'StopPending' -and -not `$endHung) { Refuse"))
+            $h = Probe 'Install-DeployAgent.ps1' 'INSTALLED: probe' @('-Repo', 'O/R', '-EndHung')
+            Yes '  and with -EndHung ends only a stuck service''s own process' ($null -ne $h -and $h.Parses -and $h.Text.Contains("`$endHung = '1'") -and $h.Text.Contains("Win32_Service -Filter `"Name='`$agentSvc'`"") -and $h.Text.Contains("`$svc.Status -eq 'StopPending' -and `$endHung"))
             # The bot pass (#5196): its own task, never SYSTEM.
             $t = $r.Text
             Yes '  and registers the bot pass task as LOCAL SERVICE with its own SID, never SYSTEM' (
