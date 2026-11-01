@@ -20,7 +20,8 @@
        1,000 units or more from every bench (#2337); a salt quarry at each of
        the four hold capitals on the Sea of Ghosts; a hive at each named farm
        with 5 crop plots or more in its claim circle; a lab in the apothecary
-       of each of the nine hold capitals, indoors
+       of each of the nine hold capitals, indoors; a study desk in each of
+       the College's four halls (#1387)
     C  no two stations stand on top of each other
     B  the table was built against the collection's own bytes, and leaves
        out the content plugin it is written into; Thornswood's two plugins
@@ -46,6 +47,7 @@ const BASES = {
   kiln: '1547e:Thornswood-Content.esp', salt: 'dde4ef:Thornswood-Content.esp',
   hive: 'dbf8b3:Thornswood-Content.esp', lab: '42e69:Thornswood-Content.esp',
   well: '18030:Thornswood-Content.esp', river: '18031:Thornswood-Content.esp',
+  study: '18032:Thornswood-Content.esp',
 };
 
 let pass = 0, fail = 0;
@@ -129,9 +131,14 @@ yes('K6 a lab for each of the nine hold capitals, indoors beside Skyrim\'s own l
     ['Whiterun', 'Solitude', 'Windhelm', 'Riften', 'Markarth', 'Falkreath', 'Dawnstar', 'Morthal', 'Winterhold']
       .every((t) => placesOf('lab').some((w) => w.indexOf(t) >= 0)));
 
+yes('K9 a study desk for each of the College\'s four halls, indoors in that hall (' + of('study').length + ' placed, #1387)',
+    placesOf('study').length === 4 && of('study').every((n) => sites[n].interior && sites[n].space === sites[n].cell &&
+      ['1380e:Skyrim.esm', '1380f:Skyrim.esm', 'cab91:Skyrim.esm', '13810:Skyrim.esm'].indexOf(sites[n].cell) >= 0) &&
+    new Set(of('study').map((n) => sites[n].cell)).size === of('study').length);
+
 yes("K7 Patrick's B: a kiln may stand among small plants and a salt vein is set into rock, and no other kind loosens",
     table.kinds.kiln.amongPlants === true && table.kinds.salt.setIntoRock === true &&
-    ['hive', 'lab'].every((k) => table.kinds[k].amongPlants === false && table.kinds[k].setIntoRock === false) &&
+    ['hive', 'lab', 'study'].every((k) => table.kinds[k].amongPlants === false && table.kinds[k].setIntoRock === false) &&
     table.kinds.kiln.setIntoRock === false && table.kinds.salt.amongPlants === false);
 yes("K8 only Solitude's and Markarth's kilns look 20,000 units out for a chopping block",
     kilns.every((n) => (sites[n].townReach || 0) === 0 || ['Solitude', 'Markarth'].indexOf(sites[n].where) >= 0));
