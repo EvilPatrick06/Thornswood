@@ -5,8 +5,10 @@
 //
 //   A semester grants the written points once: a mage 2, somebody a Master
 //   mage taught 1 for a Novice spell of their school, once in 24 hours of
-//   real time, only in the College's rooms, and the clock survives a relog
-//   and a restart. Nobody types it: the College page on K sends it.
+//   real time, only at a study desk in the College halls, and the clock
+//   survives a relog and a restart. Nobody types it: E at the desk is the
+//   semester (Patrick, 22 Oct 2026, A), and the College page on K says
+//   where the desks are.
 //   An off-book spell does not stay: a tome refuses it, one a tome taught
 //   before comes off at login, and one a mod's menu put in a hand is taken
 //   back.
@@ -67,7 +69,7 @@ if (!ok) { done(); }
 
 // ------------------------------------------------------- a fake load order --
 const PLUG = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm',
-              'Apocalypse - Magic of Skyrim.esp', 'PlayFluteLuteDrum.esp'];
+              'Apocalypse - Magic of Skyrim.esp', 'PlayFluteLuteDrum.esp', 'Thornswood-Content.esp'];
 function idOf(desc) {
   const at = String(desc).indexOf(':');
   if (at < 0) { return parseInt(String(desc), 16) >>> 0; }   // a form the server made, as the engine writes it
@@ -130,8 +132,7 @@ const POWER = spell('44444:Apocalypse - Magic of Skyrim.esp', 'A Power Of Fire',
 const LUTE = spell('9456:PlayFluteLuteDrum.esp', 'Play Instrument', 0, 'illusion');
 const SCROLL = scroll('a44a7:Skyrim.esm', 'Scroll of Dead Thrall', REANIMATE);
 const RSTAFF = staff('29b76:Skyrim.esm', '55555:Apocalypse - Magic of Skyrim.esp', REANIMATE);
-const DOORS = ['177f3:Skyrim.esm', '8392e:Skyrim.esm', '177f9:Skyrim.esm', '83929:Skyrim.esm',
-               '177f1:Skyrim.esm', '107f00:Skyrim.esm', '107f01:Skyrim.esm'];
+const DESK_BASE = '18032:Thornswood-Content.esp';
 const TAMRIEL = '3c:Skyrim.esm';
 
 /* One server process over a store; a second one over the same store is a restart. */
@@ -205,7 +206,12 @@ function server(store, opts) {
       return due.length;
     },
     told: function (id) { return said.filter(function (x) { return x.id === id; }).map(function (x) { return x.text; }); },
-    /* The Study button: 'skills:pick study' reaches the server as this line. */
+    /* E at a study desk: mp.onActivate hands the college block the press. */
+    desk: function (id, deskId, base) {
+      said.length = 0;
+      return this.CO.deskActivated(deskId, id, base || DESK_BASE);
+    },
+    /* A K panel's line, as the front plugin sends it on. */
     pick: function (id, words) {
       said.length = 0;
       const parts = ('/pick ' + words).split(/\s+/);
@@ -233,11 +239,16 @@ function person(srv, id, pid, prof, halfOrSchools, change) {
   srv.C.writeState(id, s);
   return id;
 }
-// The doors out of the halls, in Tamriel. Two exterior cells, side by side.
-DOORS.forEach(function (d, i) {
-  store[idOf(d)] = { worldOrCellDesc: JSON.stringify(TAMRIEL),
-                     pos: JSON.stringify([139000 + (i % 2) * 4096 + 100, 102500 + 100, 9000]) };
+// The study desks the content plugin stands, one in each hall, and one
+// stood anywhere else, which a desk never is.
+const DESKS = { arcanaeum: '18150:Thornswood-Content.esp', attainment: '18151:Thornswood-Content.esp',
+                countenance: '18152:Thornswood-Content.esp', elements: '18153:Thornswood-Content.esp',
+                stray: '18154:Thornswood-Content.esp' };
+[['arcanaeum', '13810:Skyrim.esm'], ['attainment', 'cab91:Skyrim.esm'], ['countenance', '1380f:Skyrim.esm'],
+ ['elements', '1380e:Skyrim.esm'], ['stray', TAMRIEL]].forEach(function (d) {
+  store[idOf(DESKS[d[0]])] = { worldOrCellDesc: JSON.stringify(d[1]), pos: JSON.stringify([0, 0, 0]) };
 });
+const deskId = function (k) { return idOf(DESKS[k]); };
 
 let srv = server(store);
 const P = srv.P;
@@ -251,20 +262,11 @@ yes('A: the numbers are the pages\': a mage 2, a taught outsider 1, a semester 2
     L.collegeSemester === 2 && L.outsiderSemester === 1 && L.semesterHours === 24 && L.outsiderSpells === 2 &&
     /A semester is 24 hours of real time/.test(page.magic) && /A mage receives 2 spell points/.test(page.magic) &&
     /A person a master has taught receives 1/.test(page.magic) && /hold 2 spells at most/.test(page.magic));
-yes('A: the four halls are the cells doors.json names, and every outside door leads into one of them',
+yes('A: the four halls are the cells doors.json names, and the desk is the content plugin\'s activator',
     doors.cells['1380e:Skyrim.esm'].name === 'Hall of the Elements' && doors.cells['1380f:Skyrim.esm'].name === 'Hall of Countenance' &&
     doors.cells['cab91:Skyrim.esm'].name === 'Hall of Attainment' && doors.cells['13810:Skyrim.esm'].name === 'The Arcanaeum' &&
     Object.keys(srv.CO.HALLS).length === 4 && Object.keys(srv.CO.HALLS).every(function (c) { return !!doors.cells[c]; }) &&
-    srv.CO.OUTSIDE_DOORS.every(function (d) {
-      const door = doors.doors[d];
-      return door && door.cell === 'd74:Skyrim.esm' && !!door.to && Object.prototype.hasOwnProperty.call(srv.CO.HALLS, doors.doors[door.to].cell);
-    }));
-yes('A: and no door out of the four halls into open ground is left out',
-    Object.keys(doors.doors).filter(function (d) {
-      const door = doors.doors[d];
-      return door.cell === 'd74:Skyrim.esm' && door.to && doors.doors[door.to] &&
-             Object.prototype.hasOwnProperty.call(srv.CO.HALLS, doors.doors[door.to].cell);
-    }).sort().join() === srv.CO.OUTSIDE_DOORS.slice().sort().join());
+    srv.CO.DESK_BASE === DESK_BASE);
 
 // ------------------------------------------------------- B. the rules --
 {
@@ -331,50 +333,48 @@ person(srv, OUT, 13, 'smith', 'platewright', function (s) {
   Object.keys(t).forEach(function (k) { s[k] = t[k]; });
 });
 {
-  place(MAGE, 'whiterun:Skyrim.esm');
   let lines = srv.pick(MAGE, 'study');
   const st0 = srv.C.stateOf(MAGE);
-  yes('C1: Study outside the College is refused, and names the rooms (' + lines.join(' ') + ')',
-      /^No: you can only study in the College of Winterhold: the Hall of the Elements, the courtyard, the Hall of Countenance, the Hall of Attainment or the Arcanaeum\.$/.test(lines[0]) &&
+  yes('C1: the old K panel\'s Study is refused, and says where the desks are (' + lines.join(' ') + ')',
+      /^No: a semester is taken at a study desk in one of the College's halls: press E at the desk\.$/.test(lines[0]) &&
       P.spellPoints(st0) === 2 && !st0.studied && st0.note && st0.note.about === 'study');
-  place(MAGE, '13810:Skyrim.esm');
-  lines = srv.pick(MAGE, 'study');
+  yes('C1: any other press is none of the College\'s business', srv.desk(MAGE, deskId('arcanaeum'), '18030:Thornswood-Content.esp') === null &&
+      P.spellPoints(srv.C.stateOf(MAGE)) === 2);
+  let line = srv.desk(MAGE, deskId('stray'));
+  yes('C1: a desk outside the halls hands out nothing (' + line + ')',
+      line === 'No: this desk is not in one of the College\'s halls.' && P.spellPoints(srv.C.stateOf(MAGE)) === 2);
+  line = srv.desk(MAGE, deskId('arcanaeum'));
   const st1 = srv.C.stateOf(MAGE);
-  yes('C1: in the Arcanaeum a mage receives 2 spell points (' + lines.join(' ') + ')',
+  yes('C1: at the Arcanaeum\'s desk a mage receives 2 spell points, wherever they were said to stand (' + line + ')',
       P.spellPoints(st1) === 4 && st1.studied === srv.now() && !st1.note &&
-      /in the Arcanaeum: 2 spell points\. You have 4 to spend\. The next semester opens in 24 hours\./.test(lines.join(' ')));
-  yes('C1: and the K panel is told when the next one opens', st1.panel && st1.panel.college &&
+      /^A semester at the College, in the Arcanaeum: 2 spell points\. You have 4 to spend\. The next semester opens in 24 hours\.$/.test(line));
+  yes('C1: and the K panel is told when the next one opens, and which halls have a desk', st1.panel && st1.panel.college &&
       st1.panel.college.gain === 2 && st1.panel.college.school === null && st1.panel.college.opens === srv.now() + 24 * HOUR &&
-      st1.panel.college.rooms.length === 5);
+      st1.panel.college.halls.join() === 'the Hall of the Elements,the Hall of Countenance,the Hall of Attainment,the Arcanaeum' &&
+      !st1.panel.college.rooms);
   srv.at(srv.now() + 5 * HOUR);
-  lines = srv.pick(MAGE, 'study');
-  yes('C2: Study again five hours later is refused, wherever they stand (' + lines.join(' ') + ')',
-      /next one opens in 19 hours/.test(lines[0]) && P.spellPoints(srv.C.stateOf(MAGE)) === 4);
+  line = srv.desk(MAGE, deskId('countenance'));
+  yes('C2: a desk again five hours later is refused, at any desk (' + line + ')',
+      /^No: .*next one opens in 19 hours\.$/.test(line) && P.spellPoints(srv.C.stateOf(MAGE)) === 4);
   // A restart: a new server over the same store.
   srv = server(store, { clock: srv.now() + 4 * HOUR });
-  place(MAGE, '1380e:Skyrim.esm');
-  lines = srv.pick(MAGE, 'study');
-  yes('C2: after a restart the clock still holds (' + lines.join(' ') + ')', /next one opens in 15 hours/.test(lines[0]) && P.spellPoints(srv.C.stateOf(MAGE)) === 4);
+  line = srv.desk(MAGE, deskId('elements'));
+  yes('C2: after a restart the clock still holds (' + line + ')', /next one opens in 15 hours/.test(line) && P.spellPoints(srv.C.stateOf(MAGE)) === 4);
   srv.at(srv.now() + 15 * HOUR);
-  lines = srv.pick(MAGE, 'study');
-  yes('C2: and once 24 hours have passed, the Hall of the Elements gives the next 2', /in the Hall of the Elements: 2 spell points/.test(lines.join(' ')) &&
+  line = srv.desk(MAGE, deskId('elements'));
+  yes('C2: and once 24 hours have passed, the Hall of the Elements\' desk gives the next 2', /in the Hall of the Elements: 2 spell points/.test(line) &&
       P.spellPoints(srv.C.stateOf(MAGE)) === 6);
-  // The courtyard is open ground: the cells the halls' outside doors stand in.
-  place(OUT, TAMRIEL, [139000 + 4096 - 500, 102500 + 3000, 9000]);
-  lines = srv.pick(OUT, 'study');
+  line = srv.desk(OUT, deskId('attainment'));
   const so = srv.C.stateOf(OUT);
-  yes('C3: in the courtyard somebody a Master taught receives 1, for a Novice spell of their school (' + lines.join(' ') + ')',
-      /in the courtyard: 1 spell point, for a Novice spell of Restoration from its tome\. You have 1 to spend\./.test(lines.join(' ')) &&
+  yes('C3: at the Hall of Attainment\'s desk somebody a Master taught receives 1, for a Novice spell of their school (' + line + ')',
+      /in the Hall of Attainment: 1 spell point, for a Novice spell of Restoration from its tome\. You have 1 to spend\./.test(line) &&
       P.spellPoints(so) === 1 && so.panel.college.gain === 1 && so.panel.college.school === 'restoration');
-  place(SMITH, TAMRIEL, [139000 + 9000, 102500, 9000]);
-  const smithLines = srv.pick(SMITH, 'study');
-  yes('C3: somebody magic is not open to is told so, and gets no College page', /magic is not yours yet/.test(smithLines[0]) && !srv.C.stateOf(SMITH).panel.college);
-  place(MAGE, TAMRIEL, [139000 + 3 * 4096, 102500, 9000]);
-  yes('C3: one cell past the doors is not the courtyard, nor is a hall of another College',
-      srv.CO.placeOf(MAGE) === '' && (place(MAGE, '16a0c:Skyrim.esm'), srv.CO.placeOf(MAGE) === ''));
-  yes('C4: nobody is told to type it: the K panel sends it, and the server\'s help line does not list it',
-      /send\('college', 'study'\)/.test(ui) && /'study': 'college'/.test(ui) && /label = .*'Study'/.test(ui.replace(/\n\s*/g, ' ')) &&
-      /Pick what\? class, profession, spell, staffspell or town\./.test(CHARACTER) && !/\/study/.test(COLLEGE));
+  line = srv.desk(SMITH, deskId('countenance'));
+  yes('C3: somebody magic is not open to is told so at the desk, and gets no College page', /magic is not yours yet/.test(line) && !srv.C.stateOf(SMITH).panel.college);
+  yes('C4: nobody is told to type it, and the K panel sends nothing for it: the desk is the semester',
+      !/send\('college'/.test(ui) && !/'Study'/.test(ui) && !/'study': 'college'/.test(ui) &&
+      /Pick what\? class, profession, spell, staffspell or town\./.test(CHARACTER) && !/\/study/.test(COLLEGE) &&
+      !/courtyard/.test(COLLEGE));
 }
 
 // --------------------------------------------------- D. only the book --
@@ -632,7 +632,7 @@ person(srv, OUT, 13, 'smith', 'platewright', function (s) {
 // ------------------------------------------------------------ G. the pages --
 {
   const where = function (p) { return p.slice(p.indexOf('## Where this is')); };
-  yes('G: magic.md says the semester, the take back and the refusal are in the server', /Study/.test(where(page.magic)) && !/neither is applied/.test(page.magic) && !/does not take it back yet/.test(page.magic));
+  yes('G: magic.md says the semester, at the study desks, the take back and the refusal are in the server', /at the study desks/.test(where(page.magic)) && !/courtyard/.test(page.magic) && !/neither is applied/.test(page.magic) && !/does not take it back yet/.test(page.magic));
   yes('G: conjuration.md says the server refuses it now', !/Nothing in the server yet\s+refuses Dead Thrall/.test(page.conj));
   yes('G: apprenticeship.md no longer says the semester is missing', !/`\/study` is not\./.test(page.appr));
   yes('G: and no page tells anybody to type /study', !/`\/study`/.test(page.magic + page.appr));
@@ -703,26 +703,18 @@ person(srv, OUT, 13, 'smith', 'platewright', function (s) {
     row.onclick();
     yes('H2: the page says what a semester hands this mage, where, and that one is open (' + body.textContent + ')',
         /A semester is 24 hours\. Each one hands you 2 spell points, for the spell book\./.test(body.textContent) &&
-        /The rooms that count: the Hall of the Elements, the courtyard, the Hall of Countenance, the Hall of Attainment and the Arcanaeum\./.test(body.textContent) &&
+        /A study desk stands in the Hall of the Elements, the Hall of Countenance, the Hall of Attainment and the Arcanaeum\. Press E at one to study\./.test(body.textContent) &&
         /A semester is open to you now\./.test(body.textContent));
-    yes('H2: the button reads Study and is lit', confirmBtn.textContent === 'Study' && !/off/.test(confirmBtn.className));
+    yes('H2: the page has no button, and its line says to press E at a desk (' + status.textContent + ')',
+        confirmBtn.style.display === 'none' &&
+        status.textContent === 'Press E at a study desk in one of the College\'s halls. The College answers in the chat.');
     sent.length = 0;
-    confirmBtn.onclick();
-    yes('H3: Study sends skills:pick study, which the front plugin sends on as /pick study (' + sent.join(' | ') + ')',
-        sent.indexOf('skills:pick study') !== -1 && /off/.test(confirmBtn.className));
-    place(MAGE2, 'cab91:Skyrim.esm');
-    srv.pick(MAGE2, 'study');
+    srv.desk(MAGE2, deskId('attainment'));
     api.setData(null, { panel: panelOf(MAGE2) });
-    yes('H3: the server\'s answer reads as studied, with the next semester (' + status.textContent + ')',
-        /^Studied\. The next semester opens (today|tomorrow|\d+ [A-Z][a-z]+) at \d\d:\d\d\.$/.test(status.textContent) &&
-        /A semester is open to you now/.test(body.textContent) === false);
-    sent.length = 0;
-    confirmBtn.onclick();
-    srv.pick(MAGE2, 'study');
-    const st = srv.C.stateOf(MAGE2);
-    api.setData(null, { panel: Object.assign(panelOf(MAGE2), { note: st.note }) });
-    yes('H4: a second press is refused by the server, and the refusal is shown on the page (' + status.textContent + ')',
-        /^No: a semester is 24 hours, and your next one opens in 24 hours\.$/.test(status.textContent));
+    const row2 = nav.children.filter(function (r) { return /navrow/.test(r.className) && r.children[0].textContent === 'College'; })[0];
+    yes('H3: after a desk, the page says when the next semester opens, and nothing was sent (' + body.textContent + ')',
+        /Your next semester opens (today|tomorrow|\d+ [A-Z][a-z]+) at \d\d:\d\d\./.test(body.textContent) &&
+        !/A semester is open to you now/.test(body.textContent) && !!row2 && /next /.test(row2.textContent) && sent.length === 0);
   }
 }
 

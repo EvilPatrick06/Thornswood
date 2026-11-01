@@ -88,8 +88,8 @@
  "counts": {
   "ACTI remade": 1,
   "BOOK gone before #2553": 15,
-  "CELL Bethesda's": 8,
-  "CELL dropped": 93,
+  "CELL Bethesda's": 9,
+  "CELL dropped": 92,
   "COBJ remade": 6,
   "CONT dropped": 1,
   "FLOR remade": 1,
@@ -2300,11 +2300,12 @@
    "formId": "1380e:Skyrim.esm",
    "type": "CELL",
    "editorId": "WinterholdCollegeHallofTheElements",
-   "disposition": "dropped",
-   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "disposition": "Bethesda's",
+   "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
    "dataSha256": [
     "e4a1792d1e06708f3f5c2a2229c05a9c6509095510202c9eb92e29f3e657e5da"
-   ]
+   ],
+   "bethesdaSha256": "a7eaceb2cb1dcdc30a9b0b2521129a47de6faeb98f45f6a14c544439e05d4022"
   },
   {
    "formId": "4d097:Thornswood-Content.esp",

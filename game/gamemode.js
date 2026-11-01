@@ -9339,6 +9339,24 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
 
 
   /*
+    A STUDY DESK IN THE COLLEGE HALLS (#1387): a semester at the College,
+    which is the desk's whole use. The college block answers null for any
+    other press, which goes on down the chain.
+  */
+  try {
+    const collegeDesk = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodCollege;
+    const deskLine = (collegeDesk && collegeDesk.deskActivated)
+      ? collegeDesk.deskActivated(refrId, casterRefrId, baseDesc) : null;
+    if (deskLine !== null) {
+      notify(casterRefrId, deskLine);
+      say(casterRefrId, deskLine);
+      return false;
+    }
+  } catch (eDesk) {
+    log('the study desk at', Number(refrId).toString(16), 'threw:', eDesk);
+  }
+
+  /*
     A NOTICE BOARD OR ITS DROP BOX (#2516, #2298): the server's own
     references. The board opens only the board's panel and the box only the
     box's, and nothing else in this chain sees the press.
@@ -56331,14 +56349,14 @@ return module.exports;
         if (r.ok) { staffPicked = r.spell; }
       } else if (what === 'study') {
         /*
-          A semester at the College (#1387): the Study button on the K
-          panel's College page sends this. The college block says whether
-          they are in one of the rooms, and the rules hand out the points.
+          A semester at the College (#1387) is taken by pressing E at a
+          study desk in one of its halls (Patrick, 22 October 2026, A), never
+          picked: the college block's deskActivated hands out the points. A
+          K panel from before the desks still sends this from its Study
+          button, and is told where the desks are.
         */
         about = 'study';
-        var CO = g.__thornswoodCollege;
-        r = (CO && CO.study) ? CO.study(actorId, s)
-          : { ok: false, why: 'the College is not running on this server right now' };
+        r = { ok: false, why: 'a semester is taken at a study desk in one of the College\'s halls: press E at the desk' };
       } else if (what === 'weave') {
         // A Master Weaver's pick on the profession card (#1398): see weaveOf.
         about = 'weave';
@@ -56476,7 +56494,6 @@ return module.exports;
       with no form id yet is in the book and not in the hands, which
       grantSpell says in the log and nothing else notices.
     */
-    if (about === 'study' && r.line) { toProfile(profileId, r.line); }
     if (about === 'weave' && r.line) { toProfile(profileId, r.line); }
 
     if (spellPicked) {
@@ -59205,13 +59222,13 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
 
   A SEMESTER. Studying at the College hands out spell points once a
   semester; P.study holds the numbers and the clock, and keeps the moment on
-  the character, so a relog or a restart does not reset it. This block says
-  whether somebody is in a room magic.md names: the Hall of the Elements,
-  the courtyard, the Hall of Countenance, the Hall of Attainment or the
-  Arcanaeum. Anywhere else refuses. Nobody types anything: the College page
-  on K has a Study button, which reaches the server as /pick study, the way
-  the rest of that panel's buttons do (Patrick, 4 Oct: no commands for
-  things people do).
+  the character, so a relog or a restart does not reset it. It is taken at a
+  study desk in the College halls (Patrick, 22 October 2026, A on #1387: a
+  desk, not a command). Thornswood-Content.esp stands one in each of the
+  four halls, the Hall of the Elements, the Hall of Countenance, the Hall of
+  Attainment and the Arcanaeum, and pressing E at one is the semester
+  (deskActivated, from mp.onActivate). The College page on K says where the
+  desks are and when the next semester opens; it has no button for it.
 
   ONLY THE BOOK IS GRANTED. A spell of the five schools that the book
   (SPELLS, by its form id in SPELL_IDS) does not list is not a college spell
@@ -59303,87 +59320,45 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
     try { if (typeof say === 'function') { say(actorId, line); } } catch (e) { }
   }
 
-  // ----------------------------------------------------------- the rooms --
+  // ----------------------------------------------------------- the desks --
   /*
-    The four halls are interior cells, read out of game/data/doors.json (the
-    cells table there is built from the plugins by tools/Build-DoorTable.py).
+    THE STUDY DESK. Thornswood-Content.esp's activator
+    ThornswoodActivatorStudyDesk, wearing Skyrim's NobleDesk01, stands in
+    each hall where game/data/station-sites.json, kind study, measures it
+    (scripts/dev/Build-StationSites.py, the way the stations of #2553 are
+    placed). The halls are interior cells, read out of game/data/doors.json
+    (the cells table there is built from the plugins by
+    tools/Build-DoorTable.py), and the hall a semester is taken in is the
+    one the pressed desk stands in.
   */
+  var DESK_BASE = '18032:Thornswood-Content.esp';
   var HALLS = {
     '1380e:Skyrim.esm': 'the Hall of the Elements',
     '1380f:Skyrim.esm': 'the Hall of Countenance',
     'cab91:Skyrim.esm': 'the Hall of Attainment',
     '13810:Skyrim.esm': 'the Arcanaeum'
   };
-  var ROOM_LIST = ['the Hall of the Elements', 'the courtyard', 'the Hall of Countenance',
-                   'the Hall of Attainment', 'the Arcanaeum'];
-  var ROOMS = ROOM_LIST.slice(0, -1).join(', ') + ' or ' + ROOM_LIST[ROOM_LIST.length - 1];
+  var HALL_LIST = ['the Hall of the Elements', 'the Hall of Countenance', 'the Hall of Attainment', 'the Arcanaeum'];
 
-  /*
-    THE COURTYARD is open ground in Tamriel, with no cell of its own to ask
-    for. The doors out of the four halls stand in it, and Skyrim's open
-    ground comes in cells 4096 units a side, so the courtyard is the cells
-    those doors stand in, measured off the doors themselves the first time
-    anybody studies. Every door below is the outside half of a door into one
-    of the four halls (game/data/doors.json: its 'to' is a door in a hall).
-  */
-  var OUTSIDE_DOORS = [
-    '177f3:Skyrim.esm', '8392e:Skyrim.esm',   // the Hall of Countenance
-    '177f9:Skyrim.esm',                       // the Hall of the Elements
-    '83929:Skyrim.esm', '177f1:Skyrim.esm',   // the Hall of Attainment
-    '107f00:Skyrim.esm', '107f01:Skyrim.esm'  // the Arcanaeum
-  ];
-  var CELL = 4096;
-  var yard = null;
-
-  function courtyard() {
-    if (yard) { return yard; }
-    var world = '', x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, n = 0;
-    for (var i = 0; i < OUTSIDE_DOORS.length; i++) {
-      var id = idOfDesc(OUTSIDE_DOORS[i]);
-      var p = null, w = '';
-      try { p = mp.get(id, 'pos'); w = String(mp.get(id, 'worldOrCellDesc') || ''); } catch (e) { p = null; }
-      if (!id || !p || !w) { continue; }
-      if (world && w !== world) { continue; }
-      world = w;
-      var gx = Math.floor(p[0] / CELL), gy = Math.floor(p[1] / CELL);
-      x0 = Math.min(x0, gx); x1 = Math.max(x1, gx); y0 = Math.min(y0, gy); y1 = Math.max(y1, gy);
-      n++;
-    }
-    if (!n) {
-      clog('none of the doors out of the halls could be read, so the courtyard is not counted yet');
-      return null;
-    }
-    yard = { world: world, x0: x0, x1: x1, y0: y0, y1: y1 };
-    clog('the courtyard is', world, 'cells', x0 + '..' + x1, 'by', y0 + '..' + y1, 'from', n, 'doors');
-    return yard;
-  }
-
-  /** The room somebody is standing in, as a person would say it, or '' outside the College. */
-  function placeOf(actorId) {
+  /** The hall a reference stands in, as a person would say it, or '' outside the four. */
+  function hallOf(refrId) {
     var cell = '';
-    try { cell = String(mp.get(actorId, 'worldOrCellDesc') || ''); } catch (e) { return ''; }
-    if (own(HALLS, cell)) { return HALLS[cell]; }
-    var y = courtyard();
-    if (!y || cell !== y.world) { return ''; }
-    var p = null;
-    try { p = mp.get(actorId, 'pos'); } catch (e) { return ''; }
-    if (!p) { return ''; }
-    var gx = Math.floor(p[0] / CELL), gy = Math.floor(p[1] / CELL);
-    return (gx >= y.x0 && gx <= y.x1 && gy >= y.y0 && gy <= y.y1) ? 'the courtyard' : '';
+    try { cell = String(mp.get(refrId, 'worldOrCellDesc') || ''); } catch (e) { return ''; }
+    return own(HALLS, cell) ? HALLS[cell] : '';
   }
 
   // ---------------------------------------------------------- a semester --
   /*
-    The Study button. Answers what P.study answers, with line, the words for
-    the chat, on a yes. The rules go first, so somebody with no magic, or a
-    semester that is not open yet, is told that wherever they are.
+    A semester at the desk deskId. Answers what P.study answers, with line,
+    the words for the chat, on a yes. The rules go first, so somebody with
+    no magic, or a semester that is not open yet, is told that at any desk.
   */
-  function study(actorId, s) {
+  function study(actorId, s, deskId) {
     var r = P.study(s, now());
     if (!r.ok) { return r; }
-    var where = placeOf(actorId);
+    var where = hallOf(deskId);
     if (!where) {
-      return { ok: false, why: 'you can only study in the College of Winterhold: ' + ROOMS };
+      return { ok: false, why: 'this desk is not in one of the College\'s halls' };
     }
     var left = P.spellPoints(r.state);
     var got = r.gained + (r.gained === 1 ? ' spell point' : ' spell points');
@@ -59394,6 +59369,24 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
       ' The next semester opens in ' + L.semesterHours + ' hours.';
     clog(hex(actorId), 'studied in', where, '+' + r.gained);
     return r;
+  }
+
+  /*
+    A press in the world (mp.onActivate). Answers null for anything that is
+    not a study desk, which goes on down the chain; for a desk, the line to
+    say to the person who pressed it, the semester or why not. A yes is
+    written to the character, which tells the K panel the next semester's
+    clock; a refusal changes nothing.
+  */
+  function deskActivated(refrId, actorId, baseDesc) {
+    if (String(baseDesc || '') !== DESK_BASE) { return null; }
+    var C = char();
+    if (!C || !C.stateOf || !C.writeState) { return 'The College is not running on this server right now.'; }
+    var r = study(actorId, C.stateOf(actorId), refrId);
+    if (!r.ok) { return 'No: ' + r.why + '.'; }
+    r.state.note = null;
+    C.writeState(actorId, r.state);
+    return r.line;
   }
 
   /** What the College page on K draws, or null for somebody magic is not open to. */
@@ -59407,7 +59400,7 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
       school: mage ? null : schools[0],
       opens: P.semesterOpens(s),
       hours: L.semesterHours,
-      rooms: ROOM_LIST.slice()
+      halls: HALL_LIST.slice()
     };
   }
 
@@ -59884,9 +59877,9 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
   }
 
   g.__thornswoodCollege = {
-    HALLS: HALLS, OUTSIDE_DOORS: OUTSIDE_DOORS, STRAIN: STRAIN, REANIMATE: REANIMATE,
+    HALLS: HALLS, DESK_BASE: DESK_BASE, STRAIN: STRAIN, REANIMATE: REANIMATE,
     TAKE_PROPERTY: TAKE_PROPERTY, LAYDOWN_PROPERTY: LAYDOWN_PROPERTY,
-    placeOf: placeOf, courtyard: courtyard, study: study, view: view,
+    hallOf: hallOf, study: study, deskActivated: deskActivated, view: view,
     spellKind: spellKind, offBook: offBook, cleanAtLogin: cleanAtLogin, equipped: equipped,
     reanimates: reanimates, hit: hit,
     isRestoration: isRestoration, cast: cast, effects: effects, strain: strain,
@@ -85538,7 +85531,7 @@ module.exports.orchardPlots = ORCHARD_PLOTS;
 module.exports.orchardSources = function () { return {"version":1,"quest":"orchard","sources":[{"reference":"141084:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32734.08984375,-10301.1953125,-4197.89208984375],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"141083:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32458.767578125,-10103.2978515625,-4139.51171875],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"141082:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32243.041015625,-11261.99609375,-4217.8154296875],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"141080:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32016.349609375,-11102.0615234375,-4172.181640625],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1699d7:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32340.267578125,-12131.546875,-4276.1220703125],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831a6:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[29450.37890625,-12450.99609375,-4248.1787109375],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831a3:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[30332.349609375,-12917.0849609375,-4313.6650390625],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1699d6:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[32620.939453125,-12295.2822265625,-4265.97998046875],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831a0:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[30051.677734375,-12753.349609375,-4311.63037109375],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831ad:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[29923.47265625,-13003.6845703125,-4364.17578125],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0}]}; };
 module.exports.createQuestOrchardSources = QUEST_FISHING_SOURCES.createQuestOrchardSources;
 module.exports.huntBundles = QUEST_HUNT_BUNDLES;
-module.exports.retrievalSources = function () { return {"version":1,"loadOrderSha256":"17597555b8c439898714ebf725435a36a7102aa84d9ccbfba7a1796b6f6148b5","contentSha256":"5f9dc1a9badc23fcb169ce03815f9d2f29775a0ad243757d0bd4110b67ac4323","sources":[{"quest":"satchel","reference":"17dfdc:JK's Whiterun's Outskirts.esp","base":"97f54:Skyrim.esm","baseType":"CONT","cell":"961b:Skyrim.esm","world":"3c:Skyrim.esm","spaceType":"WRLD","position":[17712.54296875,-9893.69921875,-4385.83154296875],"item":"17000:Thornswood-Content.esp","itemType":"MISC","merchant":"1a681:Skyrim.esm","destination":"1a681:Skyrim.esm","role":"Woodworker","hold":"Whiterun","destinationHold":"whiterun","gold":20,"hours":3,"provenance":{"fileIndex":23,"plugin":"JK's Whiterun's Outskirts.esp","pluginSha256":"c5cf1d6649be524627917fa5ebdcb64a082a16da150605e6387dd478f1512c04","recordSha256":"a311f2019f6136c9ce29a1092545f9d4bd54ad2211d0708249e0b5670e04f164","rawId":85450716}},{"quest":"ledger","reference":"17208:Thornswood-Content.esp","base":"17100:Thornswood-Content.esp","baseType":"ACTI","cell":"133c9:Skyrim.esm","world":"133c9:Skyrim.esm","spaceType":"CELL","position":[173.47137451171875,-99.40931701660156,329.3854064941406],"item":"17001:Thornswood-Content.esp","itemType":"MISC","merchant":"1a672:Skyrim.esm","destination":"1a672:Skyrim.esm","role":"Enchanter","hold":"Whiterun","destinationHold":"whiterun","gold":30,"hours":6,"provenance":{"fileIndex":52,"plugin":"Thornswood-Content.esp","pluginSha256":"5f9dc1a9badc23fcb169ce03815f9d2f29775a0ad243757d0bd4110b67ac4323","recordSha256":"c5ac0bc9fba89a9ac07e7c2622993cc6e105658e82544f201268c56c2fa0870a","rawId":83980808}},{"quest":"signet","reference":"c2a35:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15224:Skyrim.esm","world":"15224:Skyrim.esm","spaceType":"CELL","position":[557.8475341796875,2999.47119140625,-48.614261627197266],"item":"17002:Thornswood-Content.esp","itemType":"MISC","merchant":"1a67c:Skyrim.esm","destination":"1a67c:Skyrim.esm","role":"Smith","hold":"Whiterun","destinationHold":"whiterun","gold":40,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ab3c0c3a3f2e1c4092eae7ba559fde2ebacc1fa9d09b7e5fb7ee20f9e2501439","rawId":797237}},{"quest":"locket","reference":"3906d:Skyrim.esm","base":"1c4ac:Skyrim.esm","baseType":"CONT","cell":"371de:Skyrim.esm","world":"371de:Skyrim.esm","spaceType":"CELL","position":[1996.83251953125,-3406.302001953125,-1791.9287109375],"item":"17003:Thornswood-Content.esp","itemType":"MISC","merchant":"1939ba:aaaGraniteHill.esp","destination":"1939ba:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","destinationHold":"falkreath","gold":45,"hours":10,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ba7c8317b892d3c59ad19624377802f95f9eb7b7b3ded3e6562ab798d9a1679d","rawId":233581}},{"quest":"case","reference":"ea73b:Skyrim.esm","base":"ea722:Skyrim.esm","baseType":"CONT","cell":"165a0:Skyrim.esm","world":"165a0:Skyrim.esm","spaceType":"CELL","position":[-47.07603073120117,575.0079345703125,84.99999237060547],"item":"17004:Thornswood-Content.esp","itemType":"MISC","merchant":"1a684:Skyrim.esm","destination":"1a684:Skyrim.esm","role":"Tailor","hold":"Whiterun","destinationHold":"whiterun","gold":50,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"c3639954bd7aa4372ef9ecd715f466d5e19d31e074563d32be0b5cf5c516a681","rawId":960315}},{"quest":"dispatch","reference":"547e8:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"43fab:Skyrim.esm","world":"43fab:Skyrim.esm","spaceType":"CELL","position":[1555.78857421875,643.3175659179688,-715.6051635742188],"item":"17005:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66e:Skyrim.esm","destination":"1b11a:Skyrim.esm","role":"Cook","hold":"Whiterun","destinationHold":"windhelm","gold":60,"hours":12,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"7d3da1377ca635164f431cc9e31220472ab68a30066c62d81144b5a7afcc2a0f","rawId":346088}},{"quest":"seal","reference":"53ff6:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15211:Skyrim.esm","world":"15211:Skyrim.esm","spaceType":"CELL","position":[1207.1614990234375,-1561.430419921875,64.8089828491211],"item":"17006:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66d:Skyrim.esm","destination":"1a66d:Skyrim.esm","role":"Alchemist","hold":"Whiterun","destinationHold":"whiterun","gold":70,"hours":14,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"17d7ec3629d485d898445318a98003736ecfae5743e2da886b3e52a6bea0424d","rawId":344054}}]}; };
+module.exports.retrievalSources = function () { return {"version":1,"loadOrderSha256":"17597555b8c439898714ebf725435a36a7102aa84d9ccbfba7a1796b6f6148b5","contentSha256":"d60f6410a2c20f6114ec20f40e9c00f80913e2cc71e60505ff1af2616199105b","sources":[{"quest":"satchel","reference":"17dfdc:JK's Whiterun's Outskirts.esp","base":"97f54:Skyrim.esm","baseType":"CONT","cell":"961b:Skyrim.esm","world":"3c:Skyrim.esm","spaceType":"WRLD","position":[17712.54296875,-9893.69921875,-4385.83154296875],"item":"17000:Thornswood-Content.esp","itemType":"MISC","merchant":"1a681:Skyrim.esm","destination":"1a681:Skyrim.esm","role":"Woodworker","hold":"Whiterun","destinationHold":"whiterun","gold":20,"hours":3,"provenance":{"fileIndex":23,"plugin":"JK's Whiterun's Outskirts.esp","pluginSha256":"c5cf1d6649be524627917fa5ebdcb64a082a16da150605e6387dd478f1512c04","recordSha256":"a311f2019f6136c9ce29a1092545f9d4bd54ad2211d0708249e0b5670e04f164","rawId":85450716}},{"quest":"ledger","reference":"17208:Thornswood-Content.esp","base":"17100:Thornswood-Content.esp","baseType":"ACTI","cell":"133c9:Skyrim.esm","world":"133c9:Skyrim.esm","spaceType":"CELL","position":[173.47137451171875,-99.40931701660156,329.3854064941406],"item":"17001:Thornswood-Content.esp","itemType":"MISC","merchant":"1a672:Skyrim.esm","destination":"1a672:Skyrim.esm","role":"Enchanter","hold":"Whiterun","destinationHold":"whiterun","gold":30,"hours":6,"provenance":{"fileIndex":52,"plugin":"Thornswood-Content.esp","pluginSha256":"d60f6410a2c20f6114ec20f40e9c00f80913e2cc71e60505ff1af2616199105b","recordSha256":"c5ac0bc9fba89a9ac07e7c2622993cc6e105658e82544f201268c56c2fa0870a","rawId":83980808}},{"quest":"signet","reference":"c2a35:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15224:Skyrim.esm","world":"15224:Skyrim.esm","spaceType":"CELL","position":[557.8475341796875,2999.47119140625,-48.614261627197266],"item":"17002:Thornswood-Content.esp","itemType":"MISC","merchant":"1a67c:Skyrim.esm","destination":"1a67c:Skyrim.esm","role":"Smith","hold":"Whiterun","destinationHold":"whiterun","gold":40,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ab3c0c3a3f2e1c4092eae7ba559fde2ebacc1fa9d09b7e5fb7ee20f9e2501439","rawId":797237}},{"quest":"locket","reference":"3906d:Skyrim.esm","base":"1c4ac:Skyrim.esm","baseType":"CONT","cell":"371de:Skyrim.esm","world":"371de:Skyrim.esm","spaceType":"CELL","position":[1996.83251953125,-3406.302001953125,-1791.9287109375],"item":"17003:Thornswood-Content.esp","itemType":"MISC","merchant":"1939ba:aaaGraniteHill.esp","destination":"1939ba:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","destinationHold":"falkreath","gold":45,"hours":10,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ba7c8317b892d3c59ad19624377802f95f9eb7b7b3ded3e6562ab798d9a1679d","rawId":233581}},{"quest":"case","reference":"ea73b:Skyrim.esm","base":"ea722:Skyrim.esm","baseType":"CONT","cell":"165a0:Skyrim.esm","world":"165a0:Skyrim.esm","spaceType":"CELL","position":[-47.07603073120117,575.0079345703125,84.99999237060547],"item":"17004:Thornswood-Content.esp","itemType":"MISC","merchant":"1a684:Skyrim.esm","destination":"1a684:Skyrim.esm","role":"Tailor","hold":"Whiterun","destinationHold":"whiterun","gold":50,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"c3639954bd7aa4372ef9ecd715f466d5e19d31e074563d32be0b5cf5c516a681","rawId":960315}},{"quest":"dispatch","reference":"547e8:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"43fab:Skyrim.esm","world":"43fab:Skyrim.esm","spaceType":"CELL","position":[1555.78857421875,643.3175659179688,-715.6051635742188],"item":"17005:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66e:Skyrim.esm","destination":"1b11a:Skyrim.esm","role":"Cook","hold":"Whiterun","destinationHold":"windhelm","gold":60,"hours":12,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"7d3da1377ca635164f431cc9e31220472ab68a30066c62d81144b5a7afcc2a0f","rawId":346088}},{"quest":"seal","reference":"53ff6:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15211:Skyrim.esm","world":"15211:Skyrim.esm","spaceType":"CELL","position":[1207.1614990234375,-1561.430419921875,64.8089828491211],"item":"17006:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66d:Skyrim.esm","destination":"1a66d:Skyrim.esm","role":"Alchemist","hold":"Whiterun","destinationHold":"whiterun","gold":70,"hours":14,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"17d7ec3629d485d898445318a98003736ecfae5743e2da886b3e52a6bea0424d","rawId":344054}}]}; };
 module.exports.scarceLongfin = function () { return {"version":1,"quest":"longfin","label":"Haafingar northern sea","sources":[{"reference":"17200:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143811.796875,143993.71875,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17201:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143934.40625,143937.03125,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17202:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143814.453125,143875.390625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17203:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-144130,143301.265625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17204:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-150180.328125,141408.5625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17205:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-150292.5,141505.890625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17206:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-128727.5390625,141360.34375,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17207:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-124530.8671875,145979.84375,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240}]}; };
 module.exports.scarceGeodes = function () { return {"version":1,"quest":"geode","label":"Blackreach geodes","loadOrderSha256":"17597555b8c439898714ebf725435a36a7102aa84d9ccbfba7a1796b6f6148b5","sources":[{"reference":"10fc57:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[10850.224609375,6743.7685546875,1174.552734375],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10eb24:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[4929.0908203125,18396.95703125,1021.5740966796875],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e994:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[7638.52783203125,17578.05078125,1624.3555908203125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e955:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6554.4755859375,17093.744140625,1441.29345703125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e8bb:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6002.3837890625,17703.9375,1296.7362060546875],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10fc4c:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[14032.8125,-3727.707763671875,-1492.2423095703125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30}]}; };
 module.exports.scarceHarvest = function () { return {"version":1,"quest":"crimson","label":"Blackreach","loadOrderSha256":"17597555b8c439898714ebf725435a36a7102aa84d9ccbfba7a1796b6f6148b5","sources":[{"reference":"f3b51:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6737.6865234375,7109.41552734375,985.5054321289062],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b54:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[1864.7017822265625,1518.39697265625,992.927490234375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b5d:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22377.798828125,13522.2265625,1997.456787109375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffac:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22487.3359375,11976.064453125,2067.111572265625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffaf:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[20627.134765625,7700.14599609375,1233.974609375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffb0:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[17847.103515625,6733.818359375,1515.8726806640625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b56:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[20210.73828125,5823.5986328125,970.6233520507812],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffa9:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22159.330078125,16684.431640625,1486.5172119140625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10}]}; };
