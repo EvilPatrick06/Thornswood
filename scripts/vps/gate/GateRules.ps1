@@ -157,3 +157,26 @@ function Join-ThornswoodGateArgs([string[]]$Words) {
     }
     return ($out -join ' ')
 }
+
+# The gate's own three files in one line, "Gate.ps1=<sha256> GateBroker.ps1=
+# <sha256> GateRules.ps1=<sha256>", each hashed with its carriage returns
+# taken out, so a checkout that writes CRLF and one that writes LF give the
+# same line. The broker's ping prints it for the copies it runs from, and
+# Box-Run.ps1 -OnTheBox compares it with main's before every verb, so a
+# merged change to the gate reaches the box with the next run (Update-Gate)
+# and never waits for a person on One. A file that is not there is "none".
+$ThornswoodGateFiles = @('Gate.ps1', 'GateBroker.ps1', 'GateRules.ps1')
+function Get-ThornswoodGateFileLine([string]$Dir) {
+    $parts = @()
+    foreach ($n in $ThornswoodGateFiles) {
+        $p = Join-Path $Dir $n
+        $sha = 'none'
+        if (Test-Path -LiteralPath $p) {
+            $text = [IO.File]::ReadAllText($p).Replace("`r", '')
+            $h = (New-Object Security.Cryptography.SHA256Managed).ComputeHash((New-Object Text.UTF8Encoding($false)).GetBytes($text))
+            $sha = [BitConverter]::ToString($h).Replace('-', '').ToLowerInvariant()
+        }
+        $parts += ($n + '=' + $sha)
+    }
+    return ($parts -join ' ')
+}

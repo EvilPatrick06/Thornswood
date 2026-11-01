@@ -52,6 +52,16 @@
 # token, never to none); no secret of this repository goes near the fork,
 # and no runner here ever runs a job of the fork's.
 #
+# THE BUILD IS SIGNED (#5153). Since fork #136 the fork's push build signs
+# a GitHub artifact attestation of its fork-build.json, the list of every
+# file of the build by sha256, with its run's OIDC identity. Before anything
+# is recorded, gh attestation verify holds the fork-build.json taken here to
+# that signature: made by the fork's thornswood-pr-windows.yml, from this
+# commit, on thornswood/engine-changes, on GitHub's own runner. So a pin is
+# proven to be the fork's build of the commit, not only a build a run id
+# named. A build from before fork #136 has no attestation and is not
+# recorded; a pin names the head, which the fork built after it.
+#
 # WHERE IT RUNS: GitHub's hosted windows-2022, the image the fork's own
 # build uses. From 15 Oct (Patrick's decision on #459) the box took the
 # records when the hosted job did not succeed; that fallback went at the
@@ -165,6 +175,7 @@ jobs:
         env:
           COMMIT: ${{ steps.which.outputs.commit }}
           GH_TOKEN: ${{ github.token }}
+          FORK_REPO: EvilPatrick06/skymp
         run: |
           # Header, THE FORK'S OWN BUILD, AND ONLY IT: the fork's build goes in
           # engine\skymp\build, and with none, one still running or one red
@@ -185,6 +196,11 @@ jobs:
           $m = Expand-ForkEngineBuild -Zip $zip -Commit $env:COMMIT -RunId $f.Run.id -Digest ([string]$f.Artifact.digest) -Fork engine\skymp -Scratch $scratch
           $kept = Join-Path $env:RUNNER_TEMP 'fork-build.json'
           Copy-Item -LiteralPath (Join-Path $scratch 'fork-build.json') -Destination $kept -Force
+          # Header, THE BUILD IS SIGNED (#5153): the fork's own workflow, at
+          # this commit, on its branch, on GitHub's runner, made this
+          # fork-build.json, which names every file just held to it.
+          gh attestation verify $kept --repo $env:FORK_REPO --signer-workflow "$env:FORK_REPO/.github/workflows/thornswood-pr-windows.yml" --source-ref refs/heads/thornswood/engine-changes --source-digest $env:COMMIT --deny-self-hosted-runners
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::the fork's fork-build.json for $env:COMMIT has no attestation from its thornswood-pr-windows.yml push build at that commit, so this build is not recorded (#5153)"; exit 1 }
           Write-Host ("the fork's build of {0}, {1} files held to fork-build.json, is in engine\skymp\build" -f $env:COMMIT.Substring(0, 12), @($m.files.PSObject.Properties).Count)
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ('run=' + $f.Run.html_url)
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ('manifest=' + $kept)

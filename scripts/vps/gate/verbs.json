@@ -3,6 +3,12 @@
   "what": "Every verb the deploy gate runs, and all it runs (scripts/vps/gate/GateRules.ps1 reads this). A verb is one script of main, run on the box by the gate broker from a checkout of origin/main, with only the parameters named here. A parameter's rule is 'switch' (no value), 'text' (the text rule below) or a pattern its value must match whole. 'fixed' goes on every run of that verb; a fixed word with no hyphen is the value of the fixed parameter before it, so a verb can be held to one channel. 'build': true marks a live verb: its line must name main's full commit with -Build, and the broker runs it only when main is at exactly that commit (the build Patrick gave his word for); -Build never reaches the script. 'out' is the parameter that names the folder the verb writes its files into: the broker sets it to a folder of the run's own and sends back what lands there.",
   "text": "^[A-Za-z0-9][A-Za-z0-9 .,:;'()!?_+-]{0,159}$",
   "verbs": {
+    "Update-Gate": {
+      "script": "scripts/vps/gate/Update-Gate.ps1",
+      "timeoutMinutes": 5,
+      "fixed": [],
+      "params": {}
+    },
     "Get-Logs": {
       "script": "scripts/vps/Get-Logs.ps1",
       "timeoutMinutes": 15,
@@ -88,6 +94,26 @@
         "RestartFollows": "switch"
       }
     },
+    "Watch-Services": {
+      "script": "scripts/vps/Watch-Services.ps1",
+      "timeoutMinutes": 10,
+      "fixed": ["-NoPause"],
+      "params": {
+        "Install": "switch"
+      }
+    },
+    "Hold-Server": {
+      "script": "scripts/vps/Hold-Server.ps1",
+      "timeoutMinutes": 5,
+      "fixed": ["-NoPause"],
+      "params": {
+        "Service": "^(game|dev|voice|devvoice|site|caddy|bridge|bot|gate|admin)$",
+        "Why": "text",
+        "Minutes": "^[0-9]{1,3}$",
+        "Clear": "switch",
+        "List": "switch"
+      }
+    },
     "Read-LauncherStarts": {
       "script": "scripts/vps/Read-LauncherStarts.ps1",
       "timeoutMinutes": 10,
@@ -124,6 +150,45 @@
       "timeoutMinutes": 20,
       "fixed": [],
       "params": {}
+    },
+    "Read-Availability": {
+      "script": "scripts/vps/Read-Availability.ps1",
+      "timeoutMinutes": 10,
+      "fixed": [
+        "-NoPause"
+      ],
+      "params": {
+        "Days": "^[0-9]{1,3}$"
+      }
+    },
+    "Check-Site": {
+      "script": "scripts/vps/Check-Site.ps1",
+      "timeoutMinutes": 10,
+      "fixed": [
+        "-NoPause"
+      ],
+      "params": {}
+    },
+    "Install-Bridge": {
+      "script": "scripts/deploy/Install-Bridge.ps1",
+      "timeoutMinutes": 15,
+      "fixed": [
+        "-NoPause"
+      ],
+      "params": {
+        "Status": "switch",
+        "Record": "switch",
+        "Wait": "^[0-9]{1,4}$"
+      }
+    },
+    "Setup-Domain": {
+      "script": "scripts/deploy/Setup-Domain.ps1",
+      "timeoutMinutes": 20,
+      "fixed": [],
+      "params": {
+        "TaskOnly": "switch",
+        "SkipDnsCheck": "switch"
+      }
     },
     "Publish-Server": {
       "script": "scripts/release/Publish-ServerOnBox.ps1",

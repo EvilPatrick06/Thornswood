@@ -76,6 +76,8 @@ $ProgressPreference    = 'SilentlyContinue'
 
 $Here    = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $Here '..\vps\Vps.ps1')
+# The hold the voice restart writes while voice is stopped (#5155).
+. (Join-Path $Here '..\vps\ServerHold.ps1')
 # Text from the repo goes in with CRLF line endings on every machine, as every
 # release has carried it (ShippedBytes.ps1, #2903).
 . (Join-Path $Here 'ShippedBytes.ps1')
@@ -656,8 +658,10 @@ if (-not $SkipServer) {
   if (Test-Path -LiteralPath $vsrc) {
     Invoke-ThornswoodNative { & scp -o BatchMode=yes -o StrictHostKeyChecking=yes $vsrc "$User@${Vps}:C:/Thornswood-Voice/voice-server.js" } 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0) {
-      $restart = @'
+      $restart = (Get-ThornswoodHoldScript -Script 'Go.ps1') + @'
 $ProgressPreference = 'SilentlyContinue'
+# Held from the stop until it is started again (#5155, ServerHold.ps1).
+Set-ThornswoodHold -Target 'Thornswood Voice' -Why 'restarting voice on the new voice-server.js' -By $HoldBy
 Stop-ScheduledTask -TaskName 'Thornswood Voice' -EA SilentlyContinue
 Get-CimInstance Win32_Process |
   Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like '*voice-server*' } |
@@ -669,12 +673,13 @@ for ($i = 0; $i -lt 20; $i++) {
   # empty answer. A list that cannot be read stops this run, said, before
   # the task is started into a port that may still be taken.
   try { $busy = @(Get-NetTCPConnection -State Listen -ErrorAction Stop | Where-Object { $_.LocalPort -eq 7778 }).Count -gt 0 }
-  catch { 'could not list the ports in use, so the voice task was not started again: ' + $_.Exception.Message; exit 1 }
+  catch { Clear-ThornswoodHold -Target 'Thornswood Voice'; 'could not list the ports in use, so the voice task was not started again: ' + $_.Exception.Message; exit 1 }
   if (-not $busy) { break }
   Start-Sleep -Milliseconds 500
 }
 Start-ScheduledTask -TaskName 'Thornswood Voice' -EA SilentlyContinue
 Start-Sleep -Seconds 2
+Clear-ThornswoodHold -Target 'Thornswood Voice'
 try { (Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:7778/health' -TimeoutSec 5).Content }
 catch { 'voice did not answer its own health check' }
 '@

@@ -653,10 +653,14 @@ function Why {
 $taskOnlyBlock = @'
 $Rolling = $false
 $wantBuild = Build
+# Held while it is stopped (#5155, ServerHold.ps1), so the watchdog leaves
+# it; every way out below takes the hold away.
+Set-ThornswoodHold -Target $HoldTarget -Why 'registering voice''s task again' -By $HoldBy
 StopIt
-if (-not (StoppedAll)) { 'what the stop ended has not all exited, so voice was not started again'; 'TASK NOT STARTED'; exit 1 }
+if (-not (StoppedAll)) { Clear-ThornswoodHold -Target $HoldTarget; 'what the stop ended has not all exited, so voice was not started again'; 'TASK NOT STARTED'; exit 1 }
 StartIt
 if (Healthy) {
+  Clear-ThornswoodHold -Target $HoldTarget
   'PASS: ' + (Answer)
   foreach ($p in @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue)) {
     $up = Get-CimInstance Win32_Process -Filter ("ProcessId=" + $p.ParentProcessId) -EA SilentlyContinue
@@ -677,6 +681,7 @@ $Rolling = $true
 StartIt
 if (Healthy) { 'the task it had is back and it is answering again: ' + (Answer) }
 else { 'THE TASK IT HAD IS BACK AND IT STILL IS NOT ANSWERING'; Why }
+Clear-ThornswoodHold -Target $HoldTarget
 'TASK ROLLED BACK'
 exit 1
 '@
@@ -707,10 +712,15 @@ if (-not (Get-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue)) { 'ther
 try { `$m = [regex]::Match([IO.File]::ReadAllText(`$vs), "const\s+BUILD\s*=\s*'([^']+)'"); if (`$m.Success) { `$wantBuild = `$m.Groups[1].Value } }
 catch { 'could not read ' + `$vs + ': ' + `$_.Exception.Message }
 if (-not `$wantBuild) { `$vs + ' names no build, so only that port $Port answers is checked' }
+# Held while it is stopped (#5155, ServerHold.ps1), so the watchdog leaves
+# it; every way out below takes the hold away.
+Set-ThornswoodHold -Target `$HoldTarget -Why 'restarting voice' -By `$HoldBy
 StopIt
-if (-not (StoppedAll)) { 'what the stop ended has not all exited, so voice was not started again'; 'RESTART FAILED'; exit 1 }
+if (-not (StoppedAll)) { Clear-ThornswoodHold -Target `$HoldTarget; 'what the stop ended has not all exited, so voice was not started again'; 'RESTART FAILED'; exit 1 }
 StartIt
-if (Healthy) { 'PASS: ' + (Answer); 'RESTART OK'; exit 0 }
+`$ok = Healthy
+Clear-ThornswoodHold -Target `$HoldTarget
+if (`$ok) { 'PASS: ' + (Answer); 'RESTART OK'; exit 0 }
 'FAIL: it did not answer within ' + `$Wait + ' seconds of being started'
 Why
 'RESTART FAILED'
@@ -752,7 +762,8 @@ if (Test-Path -LiteralPath '$Root') {
 # end to end, $remote's last line and -TaskOnly's first were one line the box
 # could not parse (#2952, 20 Oct).
 if ($Restart) {
-    $vars = (ServiceSwapVars $Root 'none' 'none' $Wait ([ordered]@{}) @()) + '$KeepTask = $true' + "`r`n"
+    # The hold the restart writes while voice is stopped (#5155) goes with the values.
+    $vars = $ThornswoodHoldText + (ServiceSwapVars $Root 'none' 'none' $Wait ([ordered]@{}) @() $TaskName) + '$KeepTask = $true' + "`r`n"
     $restartOut = @(Remote (@($vars, $ThornswoodStopAndMoveText, $voiceTools, $restartBlock) -join "`r`n") | ForEach-Object { Say "  $_"; "$_".Trim() })
     if ($restartOut -notcontains 'RESTART OK') { Die 'voice was not restarted. The lines above say what is running.' }
     Say 'restarted, and voice answers again' 'Green'
@@ -770,7 +781,7 @@ if ($Remove) {
 }
 
 if ($TaskOnly) {
-    $vars = (ServiceSwapVars $Root 'none' 'none' $Wait ([ordered]@{}) @()) + '$KeepTask = $false' + "`r`n"
+    $vars = $ThornswoodHoldText + (ServiceSwapVars $Root 'none' 'none' $Wait ([ordered]@{}) @() $TaskName) + '$KeepTask = $false' + "`r`n"
     $taskOut = @(Remote (@($vars, $ThornswoodStopAndMoveText, $voiceTools, $remote, $taskOnlyBlock) -join "`r`n") | ForEach-Object { Say "  $_"; "$_".Trim() })
     if ($taskOut -notcontains 'TASK OK') { Die 'voice was not restarted under a new task. The lines above say what is running.' }
     Say 'registered again, and voice answers under the new task' 'Green'
@@ -781,7 +792,7 @@ if ($TaskOnly) {
 $keepTask = '$KeepTask = $false'
 $pick = ''
 if ($PutBack) { $keepTask = '$KeepTask = $true'; $pick = $putBackPick }
-$vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @()) + $keepTask + "`r`n" + $pick
+$vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @() $TaskName) + $keepTask + "`r`n" + $pick
 $swapOut = @(Remote (@($vars, $voiceTools, $remote, $serviceSwapBlock) -join "`r`n") | ForEach-Object { Say "  $_"; "$_".Trim() })
 if (-not (Show-SwapResult $swapOut "$Root\.prev-<stamp>")) { Die 'voice was not swapped in. The lines above say what is running.' }
 

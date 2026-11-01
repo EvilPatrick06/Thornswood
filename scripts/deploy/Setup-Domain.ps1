@@ -86,6 +86,8 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here '..\vps\Lock-Folder.ps1')
 . (Join-Path $Here 'ServiceAccount.ps1')
+# The hold it writes while it has Caddy stopped (#5155).
+. (Join-Path $Here '..\vps\ServerHold.ps1')
 # Where the box keeps its firewall rules, and the refresh that makes the
 # firewall take a change to them (#3896).
 . (Join-Path $Here '..\vps\BoxFirewall.ps1')
@@ -304,6 +306,10 @@ if ((Test-Path -LiteralPath `$kept) -and -not (Test-Path -LiteralPath (Join-Path
   'copied what Caddy kept as SYSTEM into ' + `$data
 }
 
+# Held from the stop until it is started again (#5155, ServerHold.ps1), so
+# the watchdog does not start the old Caddy in the middle.
+$(Get-ThornswoodHoldScript -Script 'Setup-Domain.ps1')
+Set-ThornswoodHold -Target 'Thornswood Web' -Why 'putting Caddy on its new task and settings' -By `$HoldBy
 Stop-ScheduledTask -TaskName 'Thornswood Web' -EA SilentlyContinue
 Get-Process caddy -EA SilentlyContinue | Stop-Process -Force -EA SilentlyContinue
 
@@ -406,6 +412,7 @@ if (`$chk) {
 Start-ScheduledTask -TaskName 'Thornswood Web'
 # The first start asks Let's Encrypt for a certificate, which takes a moment.
 Start-Sleep -Seconds 12
+Clear-ThornswoodHold -Target 'Thornswood Web'
 `$p = Get-Process caddy -EA SilentlyContinue
 if (`$p) { 'caddy up, pid ' + `$p.Id } else { 'CADDY DID NOT START'; exit 1 }
 "@

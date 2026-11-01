@@ -8,6 +8,8 @@
       "immutable_releases": true,
       "secret_scanning": true,
       "secret_scanning_push_protection": true,
+      "allow_auto_merge": true,
+      "allow_auto_merge_why": "Patrick's A on #5182, 31 Oct 2026: a pull request merges itself once Build check result is green, so nobody waits to press merge. The main ruleset below requires that check and has no bypass, so auto-merge can never merge past red, for the owner either. Each pull request's author turns auto-merge (squash) on when it opens.",
       "collaborators": ["WiccanDjinn"],
       "collaborators_why": "Everybody besides the owner who may push here, as the team is on 31 Oct 2026. A person who leaves the team is a pull request taking them off this list, and the next run takes them off GitHub. A person who joins is invited by Patrick by hand and then added here.",
       "rulesets": [

@@ -6,7 +6,9 @@
   Administrator: Install-Bot.ps1 sends this in front of its own script, the
   way it sends Write-BotToken.ps1, with scripts\deploy\StopAndMove.ps1 in
   front of it, because every stop here waits for what it stopped to have
-  exited (#2928).
+  exited (#2928), and scripts\vps\ServerHold.ps1, because each stop here is
+  on purpose and holds the bot while it lasts, so the watchdog does not start
+  it in the middle (#5155).
 
       Install-ThornswoodBotService   build the service program, put the
                                      service in place of the old loop, grant
@@ -567,19 +569,21 @@ function Install-ThornswoodBotService {
   $out += 'built the service program from ' + (Split-Path -Leaf $Source)
 
   # Stopped by name, then the old loop, then any copy started by hand, each
-  # waited for until it has exited.
+  # waited for until it has exited. Held from the stop until the start below,
+  # or until this gives up and leaves the bot to the watchdog (#5155).
   $svc = Get-Service -Name $Name -EA SilentlyContinue
+  $out += @(Set-ThornswoodHold -Target $Name -Why 'putting in the bot''s service program' -By $HoldBy -Root $WatchRoot)
   if ($svc -and "$($svc.Status)" -ne 'Stopped') {
     try { $out += @(Stop-ThornswoodBotService $Name) }
-    catch { return @{ Ok = $false; Lines = $out + @('COULD NOT STOP the service ' + $Name + ': ' + $_.Exception.Message) } }
-    if (Test-ThornswoodBotStopLeft) { return @{ Ok = $false; Lines = $out + @('THE SERVICE PROGRAM HAS NOT EXITED, so it was not replaced. The bot is stopped; the line above names the process.') } }
+    catch { return @{ Ok = $false; Lines = $out + @('COULD NOT STOP the service ' + $Name + ': ' + $_.Exception.Message) + @(Clear-ThornswoodHold -Target $Name -Root $WatchRoot) } }
+    if (Test-ThornswoodBotStopLeft) { return @{ Ok = $false; Lines = $out + @('THE SERVICE PROGRAM HAS NOT EXITED, so it was not replaced. The bot is stopped; the line above names the process.') + @(Clear-ThornswoodHold -Target $Name -Root $WatchRoot) } }
   }
   $out += @(Remove-ThornswoodBotLoop -Root $Root -Task $Task)
   $out += @(Stop-ThornswoodBotStrays $Root)
 
   # The new program over the old, once: everything that ran it has exited.
   try { Move-Item -LiteralPath $new -Destination $exe -Force -ErrorAction Stop }
-  catch { return @{ Ok = $false; Lines = $out + @('COULD NOT REPLACE ' + $exe + ' (' + $_.Exception.Message + '; open in it then: ' + (Get-ThornswoodPathHolders $exe) + '). The bot is stopped.') } }
+  catch { return @{ Ok = $false; Lines = $out + @('COULD NOT REPLACE ' + $exe + ' (' + $_.Exception.Message + '; open in it then: ' + (Get-ThornswoodPathHolders $exe) + '). The bot is stopped.') + @(Clear-ThornswoodHold -Target $Name -Root $WatchRoot) } }
   Write-ThornswoodBotHostJson (Join-Path $dir 'host.json') $Root $Python
 
   # The service. Its program path has no spaces in it, and every setting on
@@ -590,7 +594,7 @@ function Install-ThornswoodBotService {
       New-Service -Name $Name -BinaryPathName $exe -DisplayName 'Thornswood Bot' -StartupType Automatic `
         -Description 'The Thornswood Discord bot. Installed by Install-Bot.ps1; bot.log is in the data folder under its folder.' -ErrorAction Stop | Out-Null
       $out += 'made the service ' + $Name
-    } catch { return @{ Ok = $false; Lines = $out + @('COULD NOT MAKE the service ' + $Name + ': ' + $_.Exception.Message) } }
+    } catch { return @{ Ok = $false; Lines = $out + @('COULD NOT MAKE the service ' + $Name + ': ' + $_.Exception.Message) + @(Clear-ThornswoodHold -Target $Name -Root $WatchRoot) } }
   }
   foreach ($c in @(
       @('config', $Name, 'binPath=', $exe, 'start=', 'auto', 'obj=', $account),
@@ -602,7 +606,7 @@ function Install-ThornswoodBotService {
       # this does not undo.
       @('failure', $Name, 'reset=', '3600', 'actions=', 'restart/60000/restart/300000'))) {
     $said = & sc.exe @c 2>&1
-    if ($LASTEXITCODE -ne 0) { return @{ Ok = $false; Lines = $out + @('COULD NOT SET ' + $c[0] + ' on ' + $Name + ': ' + (($said | Out-String).Trim())) } }
+    if ($LASTEXITCODE -ne 0) { return @{ Ok = $false; Lines = $out + @('COULD NOT SET ' + $c[0] + ' on ' + $Name + ': ' + (($said | Out-String).Trim())) + @(Clear-ThornswoodHold -Target $Name -Root $WatchRoot) } }
   }
   $out += 'the service runs as ' + $account + ', with one privilege, and restarts itself if it crashes'
 
@@ -614,8 +618,11 @@ function Install-ThornswoodBotService {
   $out += @(Move-ThornswoodBotRecords $Root)
   $out += @(Grant-ThornswoodBotAccess -Sid $sid -Root $Root -WatchRoot $WatchRoot -DocsData $DocsData -ServerRoots $ServerRoots)
 
+  $started = ''
   try { Start-Service -Name $Name -ErrorAction Stop; $out += 'started the service ' + $Name }
-  catch { return @{ Ok = $false; Lines = $out + @('THE SERVICE DID NOT START: ' + $_.Exception.Message) } }
+  catch { $started = $_.Exception.Message }
+  $out += @(Clear-ThornswoodHold -Target $Name -Root $WatchRoot)
+  if ($started) { return @{ Ok = $false; Lines = $out + @('THE SERVICE DID NOT START: ' + $started) } }
   $w = Get-CimInstance Win32_Service -Filter ("Name = '" + $Name + "'") -EA SilentlyContinue
   if ($w) { $out += 'service ' + $Name + ': ' + $w.State + ', as ' + $w.StartName }
   return @{ Ok = $true; Lines = $out }
@@ -623,14 +630,16 @@ function Install-ThornswoodBotService {
 
 # Stop by name, the sweep, start by name. What -CodeOnly does after sending
 # the code. $null when there is no service yet, which means the full install
-# has not been run on this box.
-function Restart-ThornswoodBotService([string]$Name = 'ThornswoodBot', [string]$Root = 'C:\Thornswood-Bot') {
+# has not been run on this box. Held from the stop to the start (#5155).
+function Restart-ThornswoodBotService([string]$Name = 'ThornswoodBot', [string]$Root = 'C:\Thornswood-Bot', [string]$WatchRoot = 'C:\Thornswood-Watch') {
   if (-not (Get-Service -Name $Name -EA SilentlyContinue)) { return $null }
   $out = @()
+  $out += @(Set-ThornswoodHold -Target $Name -Why 'restarting the bot' -By $HoldBy -Root $WatchRoot)
   try { $out += @(Stop-ThornswoodBotService $Name) }
   catch { $out += 'COULD NOT STOP the service ' + $Name + ': ' + $_.Exception.Message }
   $out += @(Stop-ThornswoodBotStrays $Root)
   try { Start-Service -Name $Name -ErrorAction Stop; $out += 'started the service ' + $Name }
   catch { $out += 'THE SERVICE DID NOT START: ' + $_.Exception.Message }
+  $out += @(Clear-ThornswoodHold -Target $Name -Root $WatchRoot)
   return $out
 }

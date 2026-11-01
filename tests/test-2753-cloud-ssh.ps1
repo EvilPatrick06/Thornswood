@@ -160,10 +160,11 @@ Yes 'StopIt stops only what names bridge.log, and the child it started' ($stopIt
 # #2928: each opened before the task stops, waited for until it has exited,
 # with StopAndMove.ps1 sent in front of it, and a stop that left one running
 # is refused rather than read as true because the function said a line.
+# Since #5155 the refusal also takes away the hold written before the stop.
 Yes '  and waits for each to exit, with StopAndMove.ps1 sent in front, and is refused on $stopOk' (
     $stopIt -match 'Get-ThornswoodProcessHeld' -and $stopIt -match 'Stop-ThornswoodProcessHeld' -and $stopIt -notmatch 'Start-Sleep' -and
     $install.Contains("`$stopIt = [IO.File]::ReadAllText((Join-Path `$Here 'StopAndMove.ps1')) + ") -and
-    $installCode -match "StopIt\r?\nif \(-not \`$stopOk\) \{ 'BRIDGE REFUSED'; exit 1 \}")
+    $installCode -match "StopIt\r?\nif \(-not \`$stopOk\) \{ Clear-ThornswoodHold -Target 'Thornswood Bridge'; 'BRIDGE REFUSED'; exit 1 \}")
 # #2875: the site's own 404 says "not here" too, so every check that the
 # bridge answers looks for its whole line, never a status code or "not here".
 $bridgeJs = Text (P 'scripts', 'vps', 'bridge', 'bridge.js')

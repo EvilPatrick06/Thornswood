@@ -63,7 +63,7 @@ function Import-Functions([string]$rel, [string[]]$names) {
 }
 
 $gateFiles = @('scripts/vps/gate/Gate.ps1', 'scripts/vps/gate/GateBroker.ps1', 'scripts/vps/gate/GateRules.ps1')
-$all = $gateFiles + @('scripts/deploy/Install-Gate.ps1', 'scripts/vps/Box-Run.ps1', 'scripts/vps/Grant-BoxAccess.ps1')
+$all = $gateFiles + @('scripts/vps/gate/Update-Gate.ps1', 'scripts/deploy/Install-Gate.ps1', 'scripts/vps/Box-Run.ps1', 'scripts/vps/Grant-BoxAccess.ps1')
 
 # ---- 1. parses, and plain ASCII where 5.1 reads it ---------------------------
 foreach ($f in $all) {
@@ -100,6 +100,15 @@ foreach ($check in 'Read-Online', 'Check-LiveGamemode', 'Check-ServiceOwners', '
 Yes '  Check-LiveGamemode never waits for Enter, and Check-ProdParity collects into the run''s folder' ((Words 'Check-LiveGamemode') -eq '-NoPause' -and
     (Words 'Check-ProdParity') -eq '-Collect' -and (Test-ThornswoodGateRequest -Line 'Check-ProdParity' -Verbs $verbs).Out -eq '-Out' -and
     (Words 'Check-ProdParity -Facts x') -eq 'REFUSED' -and (Words 'Check-ProdParity -Record x') -eq 'REFUSED')
+# The box installs and reads that only One could run before (#2862): each
+# runs main's script with fixed words, and takes no host, user, folder,
+# address or webhook from the caller.
+Yes 'Install-Bridge takes -Status, -Record and -Wait, never -Remove or a site' ((Words 'Install-Bridge -Record') -eq '-NoPause|-Record' -and (Words 'Install-Bridge -Status') -eq '-NoPause|-Status' -and
+    (Words 'Install-Bridge -Remove') -eq 'REFUSED' -and (Words 'Install-Bridge -Site x') -eq 'REFUSED' -and (Words 'Install-Bridge -AsSystem') -eq 'REFUSED')
+Yes 'Setup-Domain takes -TaskOnly and -SkipDnsCheck, never a domain, an address or another Caddy' ((Words 'Setup-Domain -TaskOnly') -eq '-TaskOnly' -and
+    (Words 'Setup-Domain -Domain x.net') -eq 'REFUSED' -and (Words 'Setup-Domain -Email a') -eq 'REFUSED' -and (Words 'Setup-Domain -CaddyVersion 1') -eq 'REFUSED' -and (Words 'Setup-Domain -AsSystem') -eq 'REFUSED')
+Yes 'Read-Availability reads the box''s own alerts.jsonl over -Days, never a path' ((Words 'Read-Availability -Days 28') -eq '-NoPause|-Days|28' -and (Words 'Read-Availability -Path x') -eq 'REFUSED')
+Yes 'Check-Site takes nothing of the caller''s' ((Words 'Check-Site') -eq '-NoPause' -and (Words 'Check-Site -Who 1') -eq 'REFUSED' -and (Words 'Check-Site -Site x') -eq 'REFUSED')
 # Publish-Server through the gate is the dev server's, from the box's store,
 # and nothing else (#4987): main stays with a Main run Patrick approves.
 Yes 'Publish-Server is held to -Channel dev' ((Words 'Publish-Server') -eq '-Channel|dev' -and
@@ -596,7 +605,60 @@ $small = [Security.Cryptography.RSA]::Create(2048)
 $threw = $false; try { [void](Protect-ThornswoodSealed $plain ([Convert]::ToBase64String($small.ExportSubjectPublicKeyInfo()))) } catch { $threw = $true }
 Yes '  a recipient key under 3072 bits is refused' $threw
 $br = Text 'scripts/vps/Box-Run.ps1'
-Yes 'the box half uses the Microsoft-signed ssh.exe by its full path' ($br.Contains("& `$sshExe @sshArgs (`$GateUser + '@127.0.0.1') `$Line") -and $br.Contains('Get-AuthenticodeSignature') -and $br.Contains("O=Microsoft Corporation"))
+Yes 'the box half uses the Microsoft-signed ssh.exe by its full path' ($br.Contains("& `$sshExe @sshArgs (`$GateUser + '@127.0.0.1') `$GateLine") -and $br.Contains('Get-AuthenticodeSignature') -and $br.Contains("O=Microsoft Corporation"))
+# The gate follows main (#5178): the broker's ping names the copies of its
+# three files it runs, and Box-Run sends Update-Gate before any verb when they
+# are not main's, so a merged gate fix needs nobody on One.
+$fdir = Join-Path ([IO.Path]::GetTempPath()) ('gate-files-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path (Join-Path $fdir 'lf'), (Join-Path $fdir 'crlf') | Out-Null
+foreach ($n in 'Gate.ps1', 'GateBroker.ps1', 'GateRules.ps1') {
+    [IO.File]::WriteAllText((Join-Path $fdir "lf/$n"), "line one`nline two $n`n")
+    [IO.File]::WriteAllText((Join-Path $fdir "crlf/$n"), "line one`r`nline two $n`r`n")
+}
+$lfLine = Get-ThornswoodGateFileLine (Join-Path $fdir 'lf')
+Yes 'the gate''s file line names all three files with a sha256 each' ($lfLine -match '^Gate\.ps1=[0-9a-f]{64} GateBroker\.ps1=[0-9a-f]{64} GateRules\.ps1=[0-9a-f]{64}$')
+Yes '  a CRLF checkout and an LF one give the same line' ($lfLine -ceq (Get-ThornswoodGateFileLine (Join-Path $fdir 'crlf')))
+[IO.File]::WriteAllText((Join-Path $fdir 'crlf/GateRules.ps1'), "line one`nline three`n")
+Yes '  a changed file changes it' ($lfLine -cne (Get-ThornswoodGateFileLine (Join-Path $fdir 'crlf')))
+Remove-Item -LiteralPath (Join-Path $fdir 'crlf/Gate.ps1')
+Yes '  and a missing one is none' ((Get-ThornswoodGateFileLine (Join-Path $fdir 'crlf')) -match '^Gate\.ps1=none ')
+Remove-Item -LiteralPath $fdir -Recurse -Force
+$gb = Text 'scripts/vps/gate/GateBroker.ps1'
+Yes 'the broker''s ping prints the line for the copies it runs from' ($gb.Contains("Send ('| GATE FILES ' + (Get-ThornswoodGateFileLine `$Root))") -and $gb.IndexOf('GATE FILES') -lt $gb.IndexOf("Log 'PING'"))
+$pi = $br.IndexOf("Invoke-GateLine 'ping'"); $ui = $br.IndexOf("Invoke-GateLine 'Update-Gate'"); $li = $br.IndexOf('Invoke-GateLine $Line')
+Yes 'Box-Run pings, then sends Update-Gate when the copies are not main''s, then the verb' ($pi -gt 0 -and $ui -gt $pi -and $li -gt $ui -and
+    $br.Contains("Get-ThornswoodGateFileLine (Join-Path `$Here 'gate')") -and $br.Contains('if ($have -ne $want)'))
+Yes '  never for ping or Update-Gate itself, and it sends no verb when the gate is still behind after one Update-Gate' (
+    $br.Contains("if (`$req.Verb -cne 'ping' -and `$req.Verb -cne 'Update-Gate')") -and $br.Contains('if (-not $refused) {') -and
+    ([regex]::Matches($br, "Invoke-GateLine 'Update-Gate'")).Count -eq 1)
+# Update-Gate (#5178): main's three files go into the installed ones, which
+# keep their access lists, the old copies are kept, and the broker hands
+# over by itself once the request that changed its files has answered.
+$ug = Join-Path $Repo 'scripts/vps/gate/Update-Gate.ps1'
+$groot = Join-Path ([IO.Path]::GetTempPath()) ('update-gate-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $groot | Out-Null
+foreach ($n in 'Gate.ps1', 'GateBroker.ps1', 'GateRules.ps1') { [IO.File]::WriteAllText((Join-Path $groot $n), "# the old $n`n") }
+[IO.File]::WriteAllText((Join-Path $groot 'gate.json'), '{"commit":"' + ('0' * 40) + '","git":"git"}')
+$o = & pwsh -NoProfile -File $ug -Root $groot -NoRestart 2>&1 | Out-String
+$head = (& git -C $Repo rev-parse HEAD).Trim()
+Yes 'Update-Gate puts main''s three files in place and records main''s commit' ($LASTEXITCODE -eq 0 -and $o -match 'CHANGED Gate\.ps1, GateBroker\.ps1, GateRules\.ps1' -and
+    (Get-ThornswoodGateFileLine $groot) -ceq (Get-ThornswoodGateFileLine (Join-Path $Repo 'scripts/vps/gate')) -and
+    ([IO.File]::ReadAllText((Join-Path $groot 'gate.json')) | ConvertFrom-Json).commit -eq $head)
+$kept = @(Get-ChildItem -LiteralPath (Join-Path $groot 'update') -Directory)
+Yes '  and keeps the files it replaced' ($kept.Count -eq 1 -and [IO.File]::ReadAllText((Join-Path $kept[0].FullName 'Gate.ps1')) -eq "# the old Gate.ps1`n")
+$o = & pwsh -NoProfile -File $ug -Root $groot -NoRestart 2>&1 | Out-String
+Yes '  a second run changes nothing' ($LASTEXITCODE -eq 0 -and $o -match 'ALREADY')
+$o = & pwsh -NoProfile -File $ug -Root $groot 2>&1 | Out-String
+Yes '  outside the gate it refuses' ($LASTEXITCODE -eq 1 -and $o -match 'Nothing was changed')
+Remove-Item -LiteralPath $groot -Recurse -Force
+$ugt = Text 'scripts/vps/gate/Update-Gate.ps1'
+Yes '  each new file must parse first, and the old ones go back when the new broker does not start' ($ugt.Contains('[Management.Automation.Language.Parser]::ParseFile($src') -and
+    $ugt.Contains("did not start, so the files it replaced were put back from") -and $ugt.Contains("[IO.FileMode]::Truncate"))
+Yes '  its restart task starts at once and waits for the broker to end, never for a set time' ($ugt.Contains("Start-ScheduledTask -TaskName 'Thornswood Gate Update'") -and
+    $ugt -notmatch 'New-ScheduledTaskTrigger' -and $ugt -notmatch 'Start-Sleep -Seconds 3')
+Yes 'the broker ends once a request has changed its files on disk, without opening the pipe again' ($gb.Contains('$StartedOn = Get-ThornswoodGateFileLine $Root') -and
+    $gb.Contains("Log ('BROKER handing over: its files on disk are now ' + `$onDisk); break") -and $gb.IndexOf('BROKER handing over') -gt $gb.IndexOf('$pipe.Dispose()'))
+Yes 'Update-Gate is a verb that takes nothing' ((Words 'Update-Gate') -eq '' -and (Words 'Update-Gate -Root x') -eq 'REFUSED' -and (Words 'Update-Gate -NoRestart') -eq 'REFUSED')
 Yes '  with the host keys held to the checkout''s pins, in a known_hosts of the run''s own' ($br.Contains('Get-ThornswoodVpsCommitted') -and $br.Contains("UserKnownHostsFile=`$knownHosts") -and $br.Contains("'-F', 'none'"))
 Yes '  and prints none of the verb''s output into the run''s log' ($br -notmatch 'Write-Host \$Matches\[1\]' -and $br.Contains("[IO.File]::AppendAllText(`$out, `$Matches[1]"))
 
