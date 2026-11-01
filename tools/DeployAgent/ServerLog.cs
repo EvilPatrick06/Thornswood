@@ -1,4 +1,5 @@
 #nullable enable
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -28,7 +29,73 @@ public static class Files
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var tmp = path + ".agent-new";
         File.WriteAllBytes(tmp, bytes);
-        File.Move(tmp, path, true);
+        Replace(tmp, path);
+    }
+
+    /// <summary>Renames <paramref name="from"/> over <paramref name="to"/>
+    /// while somebody may be reading <paramref name="to"/>.
+    ///
+    /// On Windows a plain rename over a file (File.Move with overwrite,
+    /// MoveFileEx) is refused with "Access to the path is denied" while any
+    /// handle to it is open, even one that shares delete: the old name stays
+    /// in use until the last handle closes. The game server watches
+    /// gamemode.js, statting and reading it, and the agent's gate tests'
+    /// stand-in reads it every 5 ms, so the gamemode swap failed whenever a
+    /// look landed on the rename (main's Build check, 1 Nov 2:41 PM, and two
+    /// branches after it). A rename with POSIX semantics (Windows 10 1809 and
+    /// Server 2019 on, NTFS) takes the name at once and leaves an open reader
+    /// the bytes it opened, as rename() does on Linux, which is what
+    /// File.Move does there. tests: FilesReplaceGoesThroughWithTheFileOpen.</summary>
+    public static void Replace(string from, string to)
+    {
+        if (!OperatingSystem.IsWindows()) { File.Move(from, to, true); return; }
+        PosixRename.Over(Path.GetFullPath(from), Path.GetFullPath(to));
+    }
+
+    static class PosixRename
+    {
+        const uint Delete = 0x00010000, Synchronize = 0x00100000;
+        const uint ShareAll = 0x7, OpenExisting = 3;
+        const int FileRenameInfoEx = 22;
+        const uint ReplaceIfExists = 0x1, PosixSemantics = 0x2;
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern Microsoft.Win32.SafeHandles.SafeFileHandle CreateFileW(string name, uint access, uint share,
+            IntPtr security, uint disposition, uint flags, IntPtr template);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool SetFileInformationByHandle(Microsoft.Win32.SafeHandles.SafeFileHandle file, int infoClass,
+            IntPtr info, uint size);
+
+        public static void Over(string from, string to)
+        {
+            using var h = CreateFileW(@"\\?\" + from, Delete | Synchronize, ShareAll, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
+            if (h.IsInvalid) throw new IOException($"could not open {from} to rename it: {Marshal.GetPInvokeErrorMessage(Marshal.GetLastPInvokeError())}");
+            // FILE_RENAME_INFO: a 4 byte Flags (in a union with a BOOLEAN),
+            // the RootDirectory handle at pointer alignment, the name's
+            // length in bytes, then the name itself, NUL ended.
+            var name = Encoding.Unicode.GetBytes(@"\\?\" + to);
+            int rootAt = IntPtr.Size, lengthAt = rootAt + IntPtr.Size, nameAt = lengthAt + 4;
+            int size = nameAt + name.Length + 2;
+            var info = Marshal.AllocHGlobal(size);
+            try
+            {
+                Marshal.Copy(new byte[size], 0, info, size);
+                Marshal.WriteInt32(info, 0, unchecked((int)(ReplaceIfExists | PosixSemantics)));
+                Marshal.WriteIntPtr(info, rootAt, IntPtr.Zero);
+                Marshal.WriteInt32(info, lengthAt, name.Length);
+                Marshal.Copy(name, 0, info + nameAt, name.Length);
+                if (!SetFileInformationByHandle(h, FileRenameInfoEx, info, (uint)size))
+                {
+                    var code = Marshal.GetLastPInvokeError();
+                    // 5 is access denied, the word File.Move used, so a caller's
+                    // message reads the same.
+                    if (code == 5) throw new UnauthorizedAccessException($"Access to the path is denied: {to}");
+                    throw new IOException($"could not rename {from} over {to}: {Marshal.GetPInvokeErrorMessage(code)}");
+                }
+            }
+            finally { Marshal.FreeHGlobal(info); }
+        }
     }
 
     /// <summary>A copy that inherits the folder it lands in, flushed to disk.</summary>

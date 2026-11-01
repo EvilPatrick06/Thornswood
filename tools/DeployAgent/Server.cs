@@ -182,7 +182,7 @@ public sealed class Server(EnvConfig env, HttpClient http)
         }
         foreach (var rel in why == "" ? ReloadFiles : [])
         {
-            try { File.Move(Path.Combine(stage, rel), Path.Combine(Root, rel), true); placed.Add(rel); }
+            try { Files.Replace(Path.Combine(stage, rel), Path.Combine(Root, rel)); placed.Add(rel); }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { why = $"could not put the new {rel} in place: {e.Message}"; break; }
         }
         var wait = TimeSpan.FromSeconds(env.LoadSeconds);
@@ -241,7 +241,7 @@ public sealed class Server(EnvConfig env, HttpClient http)
             try
             {
                 Files.Copy(kept, Path.Combine(stage, rel));
-                File.Move(Path.Combine(stage, rel), Path.Combine(Root, rel), true);
+                Files.Replace(Path.Combine(stage, rel), Path.Combine(Root, rel));
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
