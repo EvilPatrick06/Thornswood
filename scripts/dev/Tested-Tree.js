@@ -14,8 +14,11 @@
 // prints one line in its job's log, TESTED-TREE <tree> and the commit, the
 // pull request and its head. It is the last step, so it is only there when
 // every check before it passed. The gate harnesses run beside it in shares
-// (31 Oct 2026), each a share of the whole gate with no map, so the note
-// counts only when every share of the same run passed too. Until then it was
+// (31 Oct 2026), so the note counts only when every share of the same run
+// passed too, and each was a share of the whole gate: since #5183 a pull
+// request's shares run only what its change can reach, from main's nightly
+// map, and then each says so in its name ("Gate harnesses (n of N, what the
+// change reaches)"), and main builds and runs the whole gate. Until then it was
 // written only when the gate step ran every gate harness (#3114: a pull
 // request built on the VPS could run only those its change could reach, and
 // then main built in full and was traced), and only on GitHub's hosted
@@ -35,7 +38,8 @@
 // WHAT COUNTS AS TESTED. A TESTED-TREE line naming this tree, in the log of a
 // Launcher builds job that ended success with its "Write down the tree these
 // checks passed on" step success, beside every share of the gate ("Gate
-// harnesses (n of N)" for each n, since 31 Oct 2026) ended success, in a run of .github/workflows/build-pr.yml
+// harnesses (n of N)" for each n, since 31 Oct 2026, each a share of the
+// whole gate) ended success, in a run of .github/workflows/build-pr.yml
 // for a pull_request whose head is this repository (a fork's run could name
 // any tree it liked), for the head of a
 // pull request merged as this commit. Anything less, or any answer from
@@ -60,8 +64,10 @@ const WORKFLOW = '.github/workflows/build-pr.yml';
 const JOBS = ['Launcher builds'];
 const STEP = 'Write down the tree these checks passed on';
 // The gate runs beside the launcher job in shares since 31 Oct 2026 (build.yml,
-// the job "gate"): "Gate harnesses (n of N)", one job for each n from 1 to N.
-const GATE = /^Gate harnesses \((\d+) of (\d+)\)$/;
+// the job "gate"): "Gate harnesses (n of N)", one job for each n from 1 to N,
+// with ", what the change reaches" before the bracket when the pick gave the
+// shares only that (#5183).
+const GATE = /^Gate harnesses \((\d+) of (\d+)(, what the change reaches)?\)$/;
 
 // '' when the run's jobs hold every share of the gate, each passed, or why not.
 function gateShares(jobs) {
@@ -72,6 +78,7 @@ function gateShares(jobs) {
   for (const s of shares) {
     if (Number(s.m[2]) !== of) { return 'its gate shares do not agree how many there are'; }
     if (s.x.conclusion !== 'success') { return 'gate share ' + s.m[1] + ' of ' + of + ' did not pass'; }
+    if (s.m[3]) { return 'its gate ran only what its change can reach, so main runs the whole gate'; }
     seen.add(Number(s.m[1]));
   }
   for (let n = 1; n <= of; n++) { if (!seen.has(n)) { return 'gate share ' + n + ' of ' + of + ' is not in it'; } }

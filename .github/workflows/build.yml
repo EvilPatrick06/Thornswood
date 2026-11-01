@@ -134,25 +134,68 @@ jobs:
 
   # THE GATE, IN FIVE SHARES (31 Oct 2026). Every gate harness, split over
   # five of GitHub's hosted Windows runners at once, beside the launcher job.
-  # Since #5119 no build runs on the box, so no main build is traced and no
-  # map of what a change can reach is handed on, and every pull request ran
-  # the whole gate on one runner's four cores: 707 harnesses, 3741 s of
+  # Since #5119 no build runs on the box, and every pull request ran the
+  # whole gate on one runner's four cores: 707 harnesses, 3741 s of
   # processor, the gate step 1104 s of a 20.7 minute build (run 41231641217),
   # and 1186 s of 21 minutes on a slower runner (41233444404, 4061 s of
   # processor for the same harnesses). Patrick's mark is under ten minutes
   # for a pull request's checks, and over twenty means something is wrong.
-  # scripts\dev\Run-Gate.ps1 -Shard n -Of 5 takes harness number i of the
-  # gate list when i mod 5 is n - 1, the way nightly.yml splits its own, so
-  # every gate harness runs in exactly one share. The runners are free on a
-  # public repository; each share costs about a minute to start. The check
-  # main's ruleset requires, "Build check result", needs this job and the
-  # launcher job both (scripts\dev\Build-PrWorkflow.js), and
-  # scripts\dev\Tested-Tree.js counts a pull request's tree as tested only
-  # when every share of its run passed.
-  gate:
-    name: Gate harnesses (${{ matrix.shard }} of ${{ strategy.job-total }})
+  # The runners are free on a public repository; each share costs about a
+  # minute to start. The check main's ruleset requires, "Build check
+  # result", needs this job and the launcher job both
+  # (scripts\dev\Build-PrWorkflow.js).
+  #
+  # THE PICK (#5183). One job first, on Linux, picks what the shares run and
+  # splits it (scripts\dev\Run-Gate.ps1 -Pick): on a pull request the
+  # harnesses its change can reach, from main's newest nightly map
+  # (gate-map.yml traces the whole gate on GitHub's Windows runner and keeps
+  # it as an artifact; Gate-Map.ps1 -Fetch reads it with this job's token,
+  # actions: read), each with why in its log; on main the whole gate. The
+  # split is by the seconds each harness took when traced, so the shares end
+  # together. Every share runs its part of that one plan; a share fetching
+  # the map for itself could read a different one, or none, and a harness
+  # would run twice or not at all. With no map the pull request runs the
+  # whole gate, split by place in the list. How many shares there are is
+  # SHARES below, and nowhere else.
+  pick:
+    name: Pick the gate harnesses
     needs: tested
     if: ${{ !cancelled() && needs.tested.outputs.run == '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      plan: ${{ steps.pick.outputs.plan }}
+      shares: ${{ steps.pick.outputs.shares }}
+      whole: ${{ steps.pick.outputs.whole }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Pick and split the gate harnesses
+        id: pick
+        shell: pwsh
+        env:
+          SHARES: '5'
+          GATE_MAP_TOKEN: ${{ github.token }}
+        run: |
+          ./scripts/dev/Run-Gate.ps1 -Pick ([int]$env:SHARES)
+          exit $LASTEXITCODE
+
+  # Each share runs its part of the pick's plan. A share of what a change can
+  # reach says so in its name, and scripts\dev\Tested-Tree.js counts a pull
+  # request's tree as tested only when every share of its run passed and was
+  # a share of the whole gate, so main runs the whole gate after a pull
+  # request that ran less.
+  gate:
+    name: Gate harnesses (${{ matrix.shard }} of ${{ strategy.job-total }}${{ needs.pick.outputs.whole != 'true' && ', what the change reaches' || '' }})
+    needs: [tested, pick]
+    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.pick.result == 'success' }}
     runs-on: windows-latest
     timeout-minutes: 30
     strategy:
@@ -160,7 +203,7 @@ jobs:
       # the others would have found.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5]
+        shard: ${{ fromJSON(needs.pick.outputs.shares) }}
     steps:
       # Every commit and tree, no old file contents (about a second more than
       # a shallow one, measured 1 Nov 2026): the harnesses run the release
@@ -184,6 +227,7 @@ jobs:
         env:
           SHARD: ${{ matrix.shard }}
           OF: ${{ strategy.job-total }}
+          GATE_PLAN: ${{ needs.pick.outputs.plan }}
         run: |
           # Issue #3009. The gate is every tests\test-*.js and tests\test-*.ps1
           # that tests\gate-excluded.txt does not name, read from the files by
@@ -223,15 +267,10 @@ jobs:
           # before the job could be cancelled. A share takes about five
           # minutes, so a share near its budget is a fault to find, and one
           # past it is red and names what did not run.
-          # ONLY WHAT A CHANGE CAN REACH (#3114, Patrick's option A on
-          # q-3114-map-refresh, 22 Oct 2026). scripts\dev\Run-Gate.ps1 runs
-          # all of that. On main, on the VPS, the trace task on the box
-          # traces the gate as it runs (scripts\dev\Trace-Gate-Task.ps1);
-          # on a pull request built on the VPS, the newest traced map says
-          # which harnesses its change can reach, and only those run, each
-          # with why. Only a main build on the box handed a map on
-          # (scripts\dev\Gate-Map.ps1), and none runs there since #4983, so
-          # a share reads no map: each runs its part of the whole gate.
+          # ONLY WHAT A CHANGE CAN REACH (#3114, #5183). scripts\dev\Run-Gate.ps1
+          # runs this share's part of the plan the job "Pick the gate
+          # harnesses" made, in GATE_PLAN, having checked it was made for
+          # this many shares from this checkout's gate. It fetches no map.
           if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
             Write-Host '::error::no node on this runner, so the .js gate harnesses were not run'
             exit 1

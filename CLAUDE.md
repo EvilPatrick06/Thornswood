@@ -22,7 +22,9 @@ long form of every step, and CONTRIBUTING.md says how a change is sent.
   and exits with 1 when any check fails. Its header says what it checks.
 - A harness that needs Windows PowerShell 5.1 or a Windows tool prints SKIP
   for those checks elsewhere.
-- The whole gate, as the build check runs it:
+- Before a push, what the change can reach, picked as the build check picks
+  it, once the change is committed: `pwsh scripts\dev\Check-Change.ps1`.
+- The whole gate, on this machine:
   `.\scripts\dev\Run-Gate.ps1 -Throttle 6`.
 - The writing in every file people read: `pwsh scripts\dev\Check-Words.ps1`.
 

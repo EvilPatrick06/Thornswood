@@ -64,10 +64,14 @@ function build(src) {
   const tested = /\n  # ALREADY TESTED \(#3182[\s\S]*?\n  tested:\n[\s\S]*?\n\n(?=  # )/.exec(body);
   if (!tested) { fail('build.yml no longer has its "tested" job before the gate and launcher jobs'); }
   body = body.replace(tested[0], '\n');
-  // The gate's shares and the launcher job both wait for it in build.yml.
+  // The gate's pick and the launcher job both wait for it in build.yml, and
+  // the gate's shares wait for it and the pick (#5183).
   const waits = "    needs: tested\n    if: ${{ !cancelled() && needs.tested.outputs.run == '' }}\n";
-  if (body.split(waits).length !== 3) { fail('build.yml no longer has the tested condition on exactly the gate and launcher jobs'); }
+  if (body.split(waits).length !== 3) { fail('build.yml no longer has the tested condition on exactly the pick and launcher jobs'); }
   body = body.split(waits).join('');
+  const shareWaits = "    needs: [tested, pick]\n    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.pick.result == 'success' }}\n";
+  if (body.split(shareWaits).length !== 2) { fail('build.yml no longer has the gate\'s shares waiting for the tested and pick jobs'); }
+  body = body.replace(shareWaits, '    needs: pick\n');
   if (/needs\.tested|needs: \[?tested|^  tested:/m.test(code(body))) { fail('the pull request build still names the tested job'); }
   /*
     THE ONE CHECK MAIN'S PROTECTION REQUIRES (#3683, Patrick's A on
@@ -117,7 +121,8 @@ function build(src) {
     '# Every pull request runs the same checks as build.yml, on GitHub\'s hosted\n' +
     '# windows-latest runner (#1306, #4983). No secrets, no live folders: every\n' +
     '# scratch path is under RUNNER_TEMP. The job keeps the name "Launcher builds",\n' +
-    '# and the gate runs beside it in shares, "Gate harnesses (n of 5)".\n';
+    '# and the gate runs beside it in shares, "Gate harnesses (n of 5)", after\n' +
+    '# the job "Pick the gate harnesses" says what each runs.\n';
 
   return head + body;
 }

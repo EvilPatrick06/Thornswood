@@ -788,7 +788,7 @@ If the stop was a rebase rather than a merge, the last step is `git rebase --con
 
 #### Merge your own pull request
 
-Wait until the check named `Build check result` is green on the commit you are merging. It passes only when `Launcher builds` and the five `Gate harnesses (n of 5)` checks all passed. Main also requires `Test tasks in the pull request`, which holds the test tasks in the body to the bot's rules; when it is red, fix the body, and the edit runs it again. Pending means it is still running. A red check means the branch is not ready. Fix it on the same branch and push again.
+Wait until the check named `Build check result` is green on the commit you are merging. It passes only when `Launcher builds` and the five `Gate harnesses (n of 5)` checks all passed (on a pull request their names end in ", what the change reaches" when they ran only that). Main also requires `Test tasks in the pull request`, which holds the test tasks in the body to the bot's rules; when it is red, fix the body, and the edit runs it again. Pending means it is still running. A red check means the branch is not ready. Fix it on the same branch and push again.
 
 ```powershell
 gh pr merge --auto --squash
@@ -1581,7 +1581,14 @@ The short form of the rules. The same decisions, with the dates they were made, 
   `tests\gate-excluded.txt` does not name, side by side through
   `scripts\dev\Nightly-Harnesses.ps1`, issues #3009 and #3114) in five shares
   on five hosted runners at once, `Gate harnesses (1 of 5)` to `(5 of 5)`,
-  so a pull request's checks take under ten minutes.
+  so a pull request's checks take under ten minutes. First the job "Pick the
+  gate harnesses" says what each share runs (#5183): on a pull request only
+  the harnesses its change can reach, from the map main's nightly trace keeps
+  (`.github\workflows\gate-map.yml`), and then the shares' names end in
+  ", what the change reaches"; on main the whole gate. It splits them by the
+  seconds each took when traced, so the shares end together, and its log
+  says why each one runs. Main runs the whole gate after a pull request that
+  ran less.
 - The checks are **Launcher builds** and the five **Gate harnesses**, on
   GitHub's hosted Windows runners, and on a pull request **Build check
   result** passes only when all of them did (#3683).
@@ -1592,8 +1599,11 @@ The short form of the rules. The same decisions, with the dates they were made, 
   "Already tested in its pull request" instead of building again (#3182).
   Red means the branch would stop Ship at the build step; fix that, and merge
   once it is green and you are confident in the change; a merge
-  gets no line in #staff-updates. Nothing in GitHub's settings is required. Run the
-  test harnesses your change touches yourself. All
+  gets no line in #staff-updates. Nothing in GitHub's settings is required. Before you
+  push, commit and run `pwsh scripts\dev\Check-Change.ps1`: it runs the
+  harnesses your change can reach, picked from the same map the shares use,
+  and with `-Body <file>` holds the pull request's test tasks to the bot's
+  rules too (#5183). All
   ~410 of them (tests/, bot, and voice), and a look for stray pull requests
   and branches run every night on GitHub's runner (.github/workflows/nightly.yml,
   03:00 Mountain); a failure there opens an issue on the board, "Nightly
