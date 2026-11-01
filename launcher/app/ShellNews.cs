@@ -1,8 +1,10 @@
 using System;
 using System.Threading;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Media;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Avalonia.Threading;
 
 namespace Thornswood
 {
@@ -48,7 +50,7 @@ namespace Thornswood
                 string got = null, why = null;
                 try { got = Updater.MainLauncherVersion(cfg); }
                 catch (Exception ex) { why = ex.Message; }
-                win.Dispatcher.BeginInvoke(new Action(delegate { MainVersionRead(got, why); }));
+                Dispatcher.UIThread.Post(delegate { MainVersionRead(got, why); });
             });
         }
 
@@ -110,7 +112,7 @@ namespace Thornswood
 
                 var ht = new TextBlock();
                 ht.Text = DevHeadText();
-                ht.FontSize = 13.5; ht.FontWeight = FontWeights.SemiBold;
+                ht.FontSize = 13.5; ht.FontWeight = FontWeight.SemiBold;
                 ht.Foreground = Res("Ink"); ht.TextWrapping = TextWrapping.Wrap;
                 head.Children.Add(ht);
                 newsHead = ht;
@@ -119,7 +121,7 @@ namespace Thornswood
                 // shown (#2434). BuildNews also runs when a check lands and
                 // after a theme change; the read goes out only while the tab is
                 // the page in front of somebody.
-                if (pages != null && pages[PageNews].Visibility == Visibility.Visible) ReadMainVersion();
+                if (pages != null && pages[PageNews].IsVisible) ReadMainVersion();
 
                 var hb = new TextBlock();
                 if (ahead == 0)
@@ -160,7 +162,7 @@ namespace Thornswood
                     {
                         var d = new TextBlock();
                         d.Text = n.DateText.ToUpperInvariant();
-                        d.FontSize = 9.5; d.FontWeight = FontWeights.SemiBold;
+                        d.FontSize = 9.5; d.FontWeight = FontWeight.SemiBold;
                         d.Foreground = Res("Accent");
                         d.VerticalAlignment = VerticalAlignment.Center;
                         stamp.Children.Add(d);
@@ -172,7 +174,7 @@ namespace Thornswood
                     {
                         var ct = new TextBlock();
                         ct.Text = "DEV";
-                        ct.FontSize = 8.5; ct.FontWeight = FontWeights.Bold;
+                        ct.FontSize = 8.5; ct.FontWeight = FontWeight.Bold;
                         ct.Foreground = Res("Warn");
 
                         var chip = new Border();
@@ -190,7 +192,7 @@ namespace Thornswood
                 }
 
                 var t = new TextBlock();
-                t.Text = n.title; t.FontSize = 15; t.FontWeight = FontWeights.SemiBold;
+                t.Text = n.title; t.FontSize = 15; t.FontWeight = FontWeight.SemiBold;
                 t.Foreground = Res("Ink"); t.TextWrapping = TextWrapping.Wrap;
                 sp.Children.Add(t);
 
@@ -239,13 +241,13 @@ namespace Thornswood
                 if (n.files != null && n.files.Length > 0)
                 {
                     var toggle = new Button();
-                    toggle.Style = (Style)win.Resources["Ghost"];
+                    toggle.Theme = Look("Ghost");
                     toggle.Content = "Show the " + n.files.Length + " file" + (n.files.Length == 1 ? "" : "s");
                     toggle.HorizontalAlignment = HorizontalAlignment.Left;
                     toggle.Margin = new Thickness(0, 12, 0, 0);
 
                     var filesBox = new StackPanel();
-                    filesBox.Visibility = Visibility.Collapsed;
+                    filesBox.IsVisible = false;
                     filesBox.Margin = new Thickness(0, 10, 0, 0);
                     for (int i = 0; i < n.files.Length; i++)
                     {
@@ -264,8 +266,8 @@ namespace Thornswood
                     string[] capturedFiles = n.files;
                     toggle.Click += delegate
                     {
-                        bool open = captured.Visibility == Visibility.Visible;
-                        captured.Visibility = open ? Visibility.Collapsed : Visibility.Visible;
+                        bool open = captured.IsVisible;
+                        captured.IsVisible = !open;
                         capturedButton.Content = (open ? "Show the " : "Hide the ") + capturedFiles.Length
                                                + " file" + (capturedFiles.Length == 1 ? "" : "s");
                     };
