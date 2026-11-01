@@ -11,8 +11,9 @@
       and refuses a tag that is not build-<...> or agent-v<a.b.c>. With
       -ServerZip it adds the server part: the zip and the record it carries,
       as server-build.json, each with its sha256 (#5219).
-    - gamemode-release.yml runs when the server build record changes too,
-      fetches CI's build of the pin and puts its zip on the Release.
+    - merge-release.yml runs when the records change (the server build
+      record among them), fetches CI's build of the pin and puts its zip on
+      the Release.
     - The gate has the verbs Deploy-Release (-Tag build-<...> only, dev
       fixed) and Install-DeployAgent (-Status, -Tag, -NoBotPass and -EndHung
       only).
@@ -24,8 +25,8 @@
       with one array, takes the newest agent-v tag by version.
     - The agent compiles launcher/app/Signature.cs in from where it lives,
       and keeps no copy of its own.
-    - The agent's Deployments use "Dev server" on both sides, never Dev or
-      Main, which hold the release records (Record-Deployment.ps1).
+    - The agent's Deployments use "Dev" on both sides (#5179 retired the
+      release records Record-Deployment.ps1 wrote there), never Main.
     - Both workflows sign through Sign-OnRunner.ps1 in the release
       environment and publish from a draft (releases are immutable).
     - runner-isolation.json keeps runner accounts out of the agent's folder.
@@ -33,7 +34,7 @@
       SERVICE with a SID of its own, never SYSTEM, below normal priority, on
       demand, after the fail-safe, and names its folder in agent.json only
       then; -NoBotPass leaves it off; New-SignedManifest.ps1 -BotFiles adds
-      the bot part gamemode-release.yml puts in every gamemode Release, with
+      the bot part merge-release.yml puts in every Release, with
       the same files the agent asks for.
     - dotnet test on tools/DeployAgent.Tests, from the locked packages, when
       dotnet is on PATH; SKIP otherwise (the Deploy agent workflow runs them
@@ -200,8 +201,8 @@ $h = @{}; $want = ''
     Yes 'New-SignedManifest.ps1 -BotFiles adds a bot part beside the gamemode' ($LASTEXITCODE -eq 0 -and @($m2.parts.gamemode).Count -eq 1 -and (@($m2.parts.bot | ForEach-Object { $_.name }) -join ',') -eq 'Bot-Pass.js,bot.js')
     $null = & pwsh -NoProfile -Command "& '$(Join-Path $Repo 'scripts\release\New-SignedManifest.ps1')' -Out '$out2' -Tag build-1.3 -Commit $commit -Part gamemode -Files '$gmf' -BotFiles '$gmf' -Repo O/R -NoCatalog" 2>&1
     Yes '  and refuses two files of one name, which the agent puts in one folder' ($LASTEXITCODE -ne 0)
-    $wf = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\gamemode-release.yml'))
-    Yes 'gamemode-release.yml puts the bot pass in every gamemode Release' ($wf.Contains('-BotFiles $bot') -and $wf.Contains("@('Bot-Pass.js', 'bot.js', 'character.js')") -and $wf.Contains("- 'scripts/bot/Bot-Pass.js'"))
+    $wf = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\merge-release.yml'))
+    Yes 'merge-release.yml puts the bot pass in every Release' ($wf.Contains('-BotFiles $bot') -and $wf.Contains("@('Bot-Pass.js', 'bot.js', 'character.js')") -and $wf.Contains("- 'scripts/bot/Bot-Pass.js'"))
     $cs = [IO.File]::ReadAllText((Join-Path $Repo 'tools\DeployAgent\BotPass.cs'))
     Yes '  the same three files the agent asks the bot part for' ($cs.Contains('BotFiles = ["Bot-Pass.js", "bot.js", "character.js"]'))
     $r = Probe 'Deploy-Release.ps1' 'DEPLOYED: probe' @('-Tag', 'build-20261101.3')
@@ -218,12 +219,13 @@ $h = @{}; $want = ''
     Yes 'the agent compiles launcher\app\Signature.cs in from where it lives' ($proj.Contains('<Compile Include="..\..\launcher\app\Signature.cs" Link="Signature.cs" />'))
     Yes '  and keeps no copy of its own' (@(Get-ChildItem -LiteralPath (Join-Path $Repo 'tools\DeployAgent') -Filter 'Signature*.cs' -File).Count -eq 0)
     $cfg = [IO.File]::ReadAllText((Join-Path $Repo 'tools\DeployAgent\AgentConfig.cs'))
-    $gw = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\gamemode-release.yml'))
-    Yes 'the agent watches "Dev server" and the workflow asks "Dev server"' ($cfg.Contains('GitHubEnvironment = "Dev server"') -and $gw.Contains("environment = 'Dev server'"))
-    Yes 'gamemode-release.yml runs when the server build record changes (an engine pin)' ($gw -match "(?m)^\s+- 'records/server-build\.json'\s*$")
+    $gw = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\merge-release.yml'))
+    Yes 'the agent watches "Dev" and the workflow asks "Dev"' ($cfg.Contains('GitHubEnvironment = "Dev"') -and $gw.Contains("environment = 'Dev'"))
+    Yes '  and nothing records a second Deployment there (Record-Deployment is retired)' (-not ([IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\release-files.yml'))).Contains('deployments: write'))
+    Yes 'merge-release.yml runs when the server build record changes (an engine pin)' ($gw -match "(?m)^\s+- 'records/(server-build\.json|\*\*)'\s*$")
     Yes '  fetches CI''s build of the pin and puts its zip on the Release' ($gw.Contains('./scripts/release/Get-EngineArtifact.ps1 -NoPause') -and $gw.Contains('-ServerZip $env:SERVER_ZIP'))
     $aw = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\deploy-agent.yml'))
-    foreach ($w in @(@{ N = 'deploy-agent.yml'; T = $aw }, @{ N = 'gamemode-release.yml'; T = $gw })) {
+    foreach ($w in @(@{ N = 'deploy-agent.yml'; T = $aw }, @{ N = 'merge-release.yml'; T = $gw })) {
         Yes ("$($w.N) signs through Sign-OnRunner.ps1 in the release environment") ($w.T.Contains('Sign-OnRunner.ps1') -and $w.T -match '(?m)^\s+environment: release\s*$')
         Yes ("  and publishes from a draft, never as latest") ($w.T.Contains('--draft') -and $w.T.Contains('--draft=false') -and $w.T.Contains('--latest=false'))
     }
