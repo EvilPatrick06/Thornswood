@@ -44,9 +44,12 @@ public static class Files
     /// <summary>The git blob id of a gamemode.js, worked out the way the
     /// gamemode works it out as it loads (game/gamemode.js, gamemodeId) and
     /// Reload.ps1 does: every CR LF made LF, then git's blob hash.</summary>
-    public static string GamemodeBlob(string path)
+    public static string GamemodeBlob(string path) => GamemodeBlob(ReadShared(path));
+
+    /// <summary>The same for bytes already read, so a reader that holds one
+    /// read of the file names that read and not a later one.</summary>
+    public static string GamemodeBlob(byte[] b)
     {
-        var b = ReadShared(path);
         var lf = new MemoryStream(b.Length);
         for (int i = 0; i < b.Length; i++)
         {
