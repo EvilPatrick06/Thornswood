@@ -9,7 +9,8 @@
   runs scripts\dev\Check-Parse.ps1 and scripts\dev\Check-Words.ps1 from that
   commit. This pushes for real, from a scratch clone with
   core.hooksPath .githooks to a scratch bare repository, with the real hook,
-  Check-Push.ps1, Check-Parse.ps1 and Get-ScratchDir.ps1, and a stand-in
+  Check-Push.ps1, Check-Parse.ps1 (with Harness-Files.ps1, which it reads)
+  and Get-ScratchDir.ps1, and a stand-in
   Check-Words.ps1 that fails on a file holding the word BREAK (the real one is
   held by tests\test-check-words.ps1), and checks that:
 
@@ -71,7 +72,7 @@ try {
     $env:THORNSWOOD_SCRATCH_ROOT = $tmpRoot
 
     $null = New-Item -ItemType Directory -Force -Path (Join-Path $sr 'scripts/dev'), (Join-Path $sr 'scripts/release'), (Join-Path $sr '.githooks'), (Join-Path $sr 'game'), (Join-Path $sr 'site'), (Join-Path $sr 'voice'), (Join-Path $sr 'tests')
-    foreach ($f in 'Check-Push.ps1', 'Check-Parse.ps1') { Copy-Item -LiteralPath (Join-Path $repo "scripts/dev/$f") -Destination (Join-Path $sr 'scripts/dev') }
+    foreach ($f in 'Check-Push.ps1', 'Check-Parse.ps1', 'Harness-Files.ps1') { Copy-Item -LiteralPath (Join-Path $repo "scripts/dev/$f") -Destination (Join-Path $sr 'scripts/dev') }
     Copy-Item -LiteralPath (Join-Path $repo 'scripts/release/Get-ScratchDir.ps1') -Destination (Join-Path $sr 'scripts/release')
     Copy-Item -LiteralPath (Join-Path $repo '.githooks/pre-push') -Destination (Join-Path $sr '.githooks')
     # The stand-in writing check: fails on any tracked file holding BREAK, and

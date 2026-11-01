@@ -8,7 +8,9 @@
       .\scripts\dev\Nightly-Harnesses.ps1 -Shard 1 -Of 2
       .\scripts\dev\Nightly-Harnesses.ps1 -Shard 2 -Of 2
 
-  The harnesses are every tests\test-*.js and tests\test-*.ps1, then every
+  The harnesses are every test-*.js and test-*.ps1 in tests\ and in each
+  product's own tests folder (launcher\tests\), as
+  scripts\dev\Harness-Files.ps1 lists and names them, then every
   voice\test-*.js, in name order. Harness number n (from 0) belongs to share
   (n mod Of) + 1, so every harness is in exactly one share and the slow ones
   spread out by name.
@@ -546,13 +548,11 @@ function Write-Report($results, $notRun) {
     Write-Host ('report: {0} checks in {1} harnesses, {2} failed, {3} skipped, in {4}' -f $all, $rows.Count, $bad, $skip, $Report)
 }
 
-# Every harness, in one order every share agrees on.
-$every = @()
-$tests = Join-Path $Root 'tests'
-if (Test-Path -LiteralPath $tests) {
-    $every += @(Get-ChildItem -LiteralPath $tests -File | Where-Object { $_.Name -like 'test-*.js' -or $_.Name -like 'test-*.ps1' } |
-                Sort-Object Name | ForEach-Object { [pscustomobject]@{ Name = $_.Name; File = $_ } })
-}
+# Every harness, in one order every share agrees on: those in tests\ and in
+# each product's tests folder, as scripts\dev\Harness-Files.ps1 lists and
+# names them for the gate too, then voice's, which sit beside its service.
+. (Join-Path $PSScriptRoot 'Harness-Files.ps1')
+$every = @(Get-Harnesses $Root)
 $voice = Join-Path $Root 'voice'
 if (Test-Path -LiteralPath $voice) {
     $every += @(Get-ChildItem -LiteralPath $voice -Filter 'test-*.js' -File | Sort-Object Name |

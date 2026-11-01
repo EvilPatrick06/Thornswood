@@ -1619,7 +1619,8 @@ The short form of the rules. The same decisions, with the dates they were made, 
   `docs`, `site` or `bot` skips it, because nothing it checks reads those
   folders (`scripts\dev\Launcher-Reach.ps1`, #5292). Beside them, the job
   "gate" runs
-  the gate harnesses (every `tests\test-*.js` and `tests\test-*.ps1` that
+  the gate harnesses (every `test-*.js` and `test-*.ps1` in `tests` or in a
+  product's own `tests` folder, such as `launcher\tests`, that
   `tests\gate-excluded.txt` does not name, side by side through
   `scripts\dev\Nightly-Harnesses.ps1`, issues #3009 and #3114) in up to five
   shares on hosted Windows runners at once, `Gate harnesses (1 of 5)` to

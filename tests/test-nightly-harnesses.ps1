@@ -88,12 +88,14 @@ try {
         Put (Join-Path $a 'tests\test-f.ps1') "exit 0`n"
         Put (Join-Path $a 'tests\not-a-harness.js') "process.exit(1);`n"
         Put (Join-Path $a 'voice\test-v.js') "process.exit(0);`n"
+        Put (Join-Path $a 'launcher\tests\test-l.js') "process.exit(0);`n"
+        Put (Join-Path $a 'launcher\tests\helper.js') "process.exit(1);`n"
         $r1 = Run $a @('-Shard', '1', '-Of', '2')
         $r2 = Run $a @('-Shard', '2', '-Of', '2')
         $one = @(Ran $r1.Said); $two = @(Ran $r2.Said)
         $all = @($one + $two | Sort-Object)
-        $want = @('test-a.js', 'test-b.js', 'test-c.js', 'test-d.js', 'test-e.js', 'test-f.ps1', 'voice/test-v.js' | Sort-Object)
-        Yes ("two shares between them run every harness once (" + ($all -join ', ') + ")") (($all -join ',') -eq ($want -join ','))
+        $want = @('test-a.js', 'test-b.js', 'test-c.js', 'test-d.js', 'test-e.js', 'test-f.ps1', 'voice/test-v.js', 'launcher/tests/test-l.js' | Sort-Object)
+        Yes ("two shares between them run every harness once, a product's own by its path (" + ($all -join ', ') + ")") (($all -join ',') -eq ($want -join ','))
         Yes '  and no harness in both' (-not @($one | Where-Object { $two -contains $_ }).Count)
         Yes ("  each share some of them ({0} and {1})" -f $one.Count, $two.Count) ($one.Count -ge 3 -and $two.Count -ge 3)
         Yes '  a file that is not test-* is no harness' (-not ($all -contains 'not-a-harness.js'))

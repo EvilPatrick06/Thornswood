@@ -137,17 +137,11 @@ jobs:
         if: ${{ !cancelled() }}
         shell: pwsh
         run: |
-          $bad = 0
-          Get-ChildItem -Path scripts, tests, installer -Filter *.ps1 -Recurse -File | ForEach-Object {
-            $tokens = $null; $errors = $null
-            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors)
-            foreach ($e in $errors) {
-              $bad++
-              Write-Host ("::error file={0},line={1}::{2}" -f $_.FullName, $e.Extent.StartLineNumber, $e.Message)
-            }
-          }
-          if ($bad) { exit 1 }
-          Write-Host "every script parses"
+          # The folders it parses are one list, in scripts/dev/Check-Parse.ps1,
+          # which the build check and the pre-push hook run too (#5291); this
+          # step had its own copy, which missed a product's tests folder.
+          ./scripts/dev/Check-Parse.ps1 -What PowerShell
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Check the writing rules
         if: ${{ !cancelled() }}

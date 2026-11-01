@@ -77,7 +77,11 @@ function yes(what, cond) {
 
 // ------------------------------------------------------------ the harnesses
 const files = [];
-for (const dir of ['tests', 'voice']) {
+// And each product's own tests folder, beside its code (plan line 42).
+const beside = fs.readdirSync(REPO_DIR, { withFileTypes: true })
+  .filter(d => d.isDirectory() && d.name !== 'tests' && d.name !== 'node_modules' && fs.existsSync(path.join(REPO_DIR, d.name, 'tests')))
+  .map(d => d.name + '/tests').sort();
+for (const dir of ['tests', 'voice'].concat(beside)) {
   for (const n of fs.readdirSync(path.join(REPO_DIR, dir)).sort()) {
     if (/^test-.*\.js$/.test(n)) { files.push(dir + '/' + n); }
   }
