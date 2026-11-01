@@ -113,6 +113,10 @@ Yes 'Send-Backups installs with an IPv4 address only, reads its status, or sends
     (Words 'Send-Backups -Install -VmHost vm.example') -eq 'REFUSED' -and (Words 'Send-Backups -Root x') -eq 'REFUSED' -and
     (Words 'Send-Backups -WatchRoot x') -eq 'REFUSED' -and (Words 'Send-Backups -Days 400') -eq 'REFUSED')
 Yes 'Start-Backup takes nothing: it starts the nightly''s own task' ((Words 'Start-Backup') -eq '-NoPause' -and (Words 'Start-Backup -TaskName x') -eq 'REFUSED' -and (Words 'Start-Backup -Minutes 1') -eq 'REFUSED')
+Yes 'Rehearse-Restore takes -Which and a profile id in digits, never another backup, key, folder or port' ((Words 'Rehearse-Restore -Which dev -ProfileId 1909688825') -eq '-NoPause|-Which|dev|-ProfileId|1909688825' -and
+    (Words 'Rehearse-Restore -ProfileId 12a') -eq 'REFUSED' -and (Words 'Rehearse-Restore -Which test -ProfileId 1') -eq 'REFUSED' -and
+    (Words 'Rehearse-Restore -ProfileId 1 -Backup x') -eq 'REFUSED' -and (Words 'Rehearse-Restore -ProfileId 1 -KeyFile x') -eq 'REFUSED' -and
+    (Words 'Rehearse-Restore -ProfileId 1 -Root x') -eq 'REFUSED' -and (Test-ThornswoodGateRequest -Line 'Rehearse-Restore -ProfileId 1' -Verbs $verbs).Out -eq '-Out')
 Yes 'Set-InboundRules takes -Check and -Own, never another box, user, record or known_hosts' ((Words 'Set-InboundRules -Own -Check') -eq '-NoPause|-Own|-Check' -and
     (Words 'Set-InboundRules -Vps x') -eq 'REFUSED' -and (Words 'Set-InboundRules -Record x') -eq 'REFUSED' -and (Words 'Set-InboundRules -KnownHosts x') -eq 'REFUSED')
 Yes 'Setup-Discord runs on the box and only audits or checks: -Prune, -Posts, -Give and another guild wait for Patrick' ((Words 'Setup-Discord -Audit') -eq '-OnBox|-Audit' -and

@@ -325,6 +325,16 @@
       "fixed": ["-NoPause"],
       "params": {}
     },
+    "Rehearse-Restore": {
+      "script": "scripts/vps/Rehearse-OnBox.ps1",
+      "timeoutMinutes": 40,
+      "fixed": ["-NoPause"],
+      "params": {
+        "Which": "^(live|dev)$",
+        "ProfileId": "^[0-9]{1,10}$"
+      },
+      "out": "-Out"
+    },
     "Set-InboundRules": {
       "script": "scripts/vps/Set-InboundRules.ps1",
       "timeoutMinutes": 15,
