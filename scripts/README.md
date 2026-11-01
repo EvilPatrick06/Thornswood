@@ -310,6 +310,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [vps/Read-Online.ps1](vps/Read-Online.ps1) | Says how many people are on each game server, live and dev, from the online.json each server announces on its resources port (3000 live, 7788 dev), the same file Restart-Server.ps1 and the launcher read. |
 | [vps/Remote.ps1](vps/Remote.ps1) | Runs a bit of PowerShell on the VPS, properly. |
 | [vps/Remove-HandMadeTasks.ps1](vps/Remove-HandMadeTasks.ps1) | Takes the two SYSTEM tasks somebody made by hand on the box, and the folders they run from, off the box (issue #3288). |
+| [vps/Renew-BoxKey.ps1](vps/Renew-BoxKey.ps1) | Gives one of the two keys a workflow of the ops repository holds a new key pair, on the box, and puts the new private half straight into that workflow's GitHub environment (#2862, Patrick's A on the report page's q-retire-box-keys, 31 Oct 2026: box keys are renewed from the cloud, never made new, and never from One). |
 | [vps/Request-Restart.ps1](vps/Request-Restart.ps1) | Tells the live server to warn everybody and then clear them out, without needing to be standing in the world to type /restart. |
 | [vps/Restart-Server.ps1](vps/Restart-Server.ps1) | Restarts a Thornswood service on the VPS. Nothing is copied and nothing is built: this only stops it and starts it again. |
 | [vps/Restore-Backup.ps1](vps/Restore-Backup.ps1) | Opens one of the nightly backups: checks it has not been tampered with, decrypts it, and unpacks it into a folder you name. |
@@ -317,6 +318,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [vps/Restore-Server.ps1](vps/Restore-Server.ps1) | Puts a nightly backup's world back into a game server folder and checks the result would start: the load order resolves and the characters are there. |
 | [vps/Roll-Log.ps1](vps/Roll-Log.ps1) | Rolls a log just before the service that writes it starts. |
 | [vps/Seal.ps1](vps/Seal.ps1) | How a secret held by GitHub reaches the box without passing through any session, chat or log in a form anybody can read (#3216, Patrick's A of 22 Oct 2026). |
+| [vps/Send-Backups.ps1](vps/Send-Backups.ps1) | Sends each night's encrypted backup off the box to the Oracle VM, where it goes on to Google Drive (Patrick, 31 Oct 2026, #2862). |
 | [vps/Send-Script.ps1](vps/Send-Script.ps1) | The one way a script here runs PowerShell on the VPS. |
 | [vps/Send-Secret.ps1](vps/Send-Secret.ps1) | How a secret goes to the VPS: on ssh's standard input, never on a command line. |
 | [vps/ServerHold.ps1](vps/ServerHold.ps1) | A hold: a server stopped on purpose says so, and the watchdog leaves it stopped until the hold ends (#5155). |
@@ -328,6 +330,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [vps/Setup-CloudSsh.ps1](vps/Setup-CloudSsh.ps1) | Sets up ssh to the box from a cloud Claude thread (#2753). |
 | [vps/Setup-SshKey.ps1](vps/Setup-SshKey.ps1) | Sets a PC up to reach the box over ssh, through the bridge, with a key and a token of its own (#2891). |
 | [vps/Show-BotLog.ps1](vps/Show-BotLog.ps1) | What the bot has been saying, without redeploying it to find out. |
+| [vps/Start-Backup.ps1](vps/Start-Backup.ps1) | Takes a backup now, on the box, with the nightly's own task, and waits for that run to end (#2862). |
 | [vps/Strip-Uploads.ps1](vps/Strip-Uploads.ps1) | Takes what each picture and recording already in the site's uploads says about where and when it was made out of it, the way the site now does to every upload as it lands (#3648). |
 | [vps/Upgrade-OpenSsh.ps1](vps/Upgrade-OpenSsh.ps1) | Upgrades the box's OpenSSH for Windows to a release with a post-quantum key exchange, keeping the pinned host keys: proves key login, swaps sshd on the box, proves a new login with the pinned key negotiates a post-quantum key exchange, and only then keeps it. |
 | [vps/vps-capture-443.ps1](vps/vps-capture-443.ps1) | Captures the SYN and RST packets on port 443 at the box's network card for a set time, so #2946 can see whether the TLS connects from a cloud session that stall and then reset ever reach the box, and whether the box answers them. |

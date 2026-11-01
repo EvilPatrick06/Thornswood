@@ -18,6 +18,22 @@
                                                     the outbound firewall rules alone for
                                                     the fourth VPS runner's account (#2161)
 
+  THROUGH THE DEPLOY GATE (-FromGate; #2862, Patrick's A on the report
+  page's q-retire-box-keys, 31 Oct 2026: runners are renewed from the cloud,
+  never from One). The gate's verb Install-Runner runs this on the box as
+  SYSTEM, with -FromGate, the box's VPS names for -Number, and -AllowHost for
+  the package feeds records\runner-isolation.json's decision names, so a
+  cloud session puts a box runner back with
+      pwsh scripts/vps/Box-Run.ps1 Install-Runner -Number 2
+  (-Status, -Lock and -NetworkOnly go the same way). It reaches the box over
+  loopback as every gate verb does, and GitHub with a token the box admin App
+  mints for that run alone (scripts\vps\admin\ops-access.js runners:
+  Administration write on the ops repository and nothing more), in GH_TOKEN
+  for that run. The runners are the ops repository's (#4013), so that is the
+  repository, whatever was asked. Renew only: an install names a runner the
+  build records list or one already registered there; -Remove, -OffBox,
+  -Migrate and hand-picked names and folders are refused.
+
   OFF THE BOX (-OffBox, issue #1306). build.yml sends a pull request to the
   label thornswood-pr, which no runner on the VPS carries, so code nobody has
   merged never runs beside the live server. -OffBox puts that runner on the
@@ -321,6 +337,9 @@ param(
   # Write the scripts it would run to this file and run none of them; every gh
   # call gets a stand-in answer. For tests\test-runner-offbox.ps1.
   [string]$DryRunTo = '',
+  # Run on the box by the deploy gate's Install-Runner verb (THROUGH THE
+  # DEPLOY GATE above), with the box admin App's token.
+  [switch]$FromGate,
   [switch]$NoPause
 )
 
@@ -347,6 +366,18 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # Where the box keeps its firewall rules, and the refresh that makes the
 # firewall take a change to them (#3896).
 . (Join-Path $Here '..\vps\BoxFirewall.ps1')
+# THROUGH THE DEPLOY GATE (-FromGate, the header's section of that name).
+if ($FromGate) {
+  if ($env:THORNSWOOD_GATE -ne '1') { Write-Host 'STOP. -FromGate is for the deploy gate''s Install-Runner verb, which runs this on the box: scripts/vps/Box-Run.ps1 Install-Runner -Number <n>. Nothing was changed.' -ForegroundColor Red; exit 1 }
+  $handPicked = @('Repo', 'Root', 'Account', 'RunnerName', 'Label', 'VpsHost', 'VpsUser', 'AlsoDeny') | Where-Object { $PSBoundParameters.ContainsKey($_) }
+  if ($OffBox -or $Migrate -or $Remove -or $DryRunTo -or $DefenderSkip -or @($handPicked).Count) { Write-Host 'STOP. Through the gate a runner is installed, locked, read or given its network rules with the names and folders its number gives it, on the box, and never removed. Nothing was changed.' -ForegroundColor Red; exit 1 }
+  $Repo = 'EvilPatrick06/Thornswood-Ops'
+  . (Join-Path $Here '..\vps\admin\ShipAccess.ps1')
+  # In this run's environment only: the gate starts every verb as a process
+  # of its own, so the token goes with it, and GitHub ends it within the hour.
+  try { $env:GH_TOKEN = Get-ThornswoodOpsAccess -Repo ([IO.Path]::GetFullPath((Join-Path $Here '..\..'))) -For runners }
+  catch { Write-Host ('STOP. The box admin App gave no token for the runners of ' + $Repo + ': ' + $_.Exception.Message + ' Nothing was changed.') -ForegroundColor Red; exit 1 }
+}
 if (-not $OffBox) {
   if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
   if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
@@ -1297,6 +1328,19 @@ if ($Migrate) {
 }
 
 # ----------------------------------------------------------------- install --
+# RENEW ONLY through the gate (THROUGH THE DEPLOY GATE): an install there is
+# for a runner records\build-runners.json or records\pr-build-runners.json
+# names, or one GitHub already has registered under this name, put back in
+# its place. A runner nobody wrote down is a pull request to a record first.
+if ($FromGate) {
+  $named = @(@($buildRecord.runners) + @($prRecord.runners) | ForEach-Object { [int]$_ }) -contains $Number
+  if (-not $named) {
+    $known = @()
+    try { $known = @(((Invoke-Gh api "repos/$Repo/actions/runners" --paginate --slurp | Out-String) | ConvertFrom-Json) | ForEach-Object { $_.runners } | ForEach-Object { [string]$_.name }) }
+    catch { Write-Host ('STOP. GitHub did not list the runners of ' + $Repo + ': ' + $_.Exception.Message + ' Nothing was changed.') -ForegroundColor Red; exit 1 }
+    if ($known -notcontains $RunnerName) { Write-Host ('STOP. ' + $RunnerName + ' is in no runner record and not registered on ' + $Repo + ', and the gate only puts back a runner that is. A new runner goes into records\build-runners.json by pull request first. Nothing was changed.') -ForegroundColor Red; exit 1 }
+  }
+}
 Head 'The runner release'
 # Pin (#1372): do not follow releases/latest. Bump these two together after
 # checking https://github.com/actions/runner/releases and the win-x64 SHA in
