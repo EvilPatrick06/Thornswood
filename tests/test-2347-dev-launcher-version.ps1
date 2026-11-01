@@ -25,8 +25,8 @@
   It carries the launcher's own IsNewer, so "offered" means what a launcher
   would do. Each run answers the number Ship chose and whether it builds a
   launcher at all, or the sentence it stopped with. A stop here is before
-  anything is built, signed or sent: the cut ends before the version is
-  written into Updater.cs.
+  anything is built, signed or sent: the cut ends where Ship says the number
+  it chose, before the build that takes it as -p:Version (#4825).
 
   Read only apart from files under its own temp folder.
 #>
