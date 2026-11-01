@@ -14,6 +14,17 @@
       pwsh scripts/deploy/Install-Tunnel.ps1 -Status    what runs on the box; only reads
       pwsh scripts/deploy/Install-Tunnel.ps1 -Remove    take cloudflared off the box again
 
+  From a cloud thread or the Desk, where box work goes only through the
+  deploy gate (#2841), add -ThroughGate to any of them but -Remove:
+
+      pwsh scripts/deploy/Install-Tunnel.ps1 -ThroughGate
+      pwsh scripts/deploy/Install-Tunnel.ps1 -ThroughGate -Switch
+
+  It asks the gate for the box's public seal key (the verb's -SealKey), has
+  tunnel-token.yml seal the API token to it, and hands the gate the sealed
+  form (-Sealed), so the gate runs this same script on the box, which opens
+  it. Without -ThroughGate it runs from a machine with gh and the box's ssh.
+
   Run it from anywhere with gh and the box's ssh: a cloud thread, the Desk, a
   developer's PC. Everything it does is written down in
   records\cloudflare-tunnel.json: the account, the zone, the tunnel's name,
@@ -96,6 +107,13 @@ param(
     [switch]$Remove,
     # The workflow's half; nothing else runs it.
     [switch]$SealOnGitHub,
+    # From a cloud thread or the Desk: every box half goes through the deploy
+    # gate (Box-Run.ps1), which runs this script on the box itself.
+    [switch]$ThroughGate,
+    # The gate's halves: print the box's public seal key, and run with the
+    # API token sealed to it, as tunnel-token.yml left it.
+    [switch]$SealKey,
+    [ValidatePattern('^$|^[A-Za-z0-9+/]{400,560}={0,2}$')][string]$Sealed = '',
     # Register the task as SYSTEM, Highest: the way back if cloudflared will
     # not run as LOCAL SERVICE.
     [switch]$AsSystem,
@@ -139,7 +157,7 @@ function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
 
-if (@($Switch, $Back, $Status, $Remove | Where-Object { $_ }).Count -gt 1) { Die 'One of -Switch, -Back, -Status or -Remove, not more. Nothing was sent.' }
+if (@($Switch, $Back, $Status, $Remove, $SealKey | Where-Object { $_ }).Count -gt 1) { Die 'One of -Switch, -Back, -Status, -Remove or -SealKey, not more. Nothing was sent.' }
 
 # ------------------------------------------------------------- the record --
 # Read whole and checked here, before the box is asked anything.
@@ -172,6 +190,46 @@ function Read-ThornswoodTunnelRecord([string]$Path) {
 if (-not $RecordPath) { $RecordPath = Join-Path $Here '..\..\records\cloudflare-tunnel.json' }
 try { $rec = Read-ThornswoodTunnelRecord $RecordPath } catch { Die ($_.Exception.Message + '. Nothing was sent.') }
 $recB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(($rec | ConvertTo-Json -Depth 10 -Compress)))
+
+# ---------------------------------------------------- through the gate ---
+# Box work from the cloud goes only through the gate's verbs (#2841), so
+# this side runs none of the box halves itself: it asks the gate for the
+# box's seal key, has tunnel-token.yml seal the API token to it, and hands
+# the gate the sealed form, which only the box can open.
+if ($ThroughGate) {
+    . (Join-Path $Here '..\ops\WorkflowRun.ps1')
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { Die 'there is no gh here to start the gate and the tunnel-token workflow with. Nothing was sent.' }
+    $boxRun = Join-Path $Here '..\vps\Box-Run.ps1'
+    $pwsh = [Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+    function Gate([string]$Line, [switch]$Quiet) {
+        $o = @(& $pwsh -NoProfile -File $boxRun -Line $Line 2>&1 | ForEach-Object { $l = "$_"; if (-not $Quiet) { Say "  $l" }; $l })
+        return @{ Lines = $o; Code = $LASTEXITCODE }
+    }
+    # The gate never takes -Remove or -AsSystem (test-2841 holds the words a
+    # verb may not have): taking cloudflared off, or running it as SYSTEM,
+    # is done from a machine with the box's ssh.
+    if ($Remove -or $AsSystem) { Die '-Remove and -AsSystem are not gate words; run them from a machine with the box''s ssh, without -ThroughGate. Nothing was sent.' }
+    $mode = if ($Switch) { ' -Switch' } elseif ($Back) { ' -Back' } elseif ($Status) { ' -Status' } else { '' }
+    $extra = ''
+    if ($PSBoundParameters.ContainsKey('Wait')) { $extra += ' -Wait ' + $Wait }
+    if ($Status) { $g = Gate 'Install-Tunnel -Status'; exit $g.Code }
+    Head 'The API token, through the gate'
+    Say '1. The box''s seal key'
+    $g = Gate 'Install-Tunnel -SealKey' -Quiet
+    $km = [regex]::Match(($g.Lines -join "`n"), 'SEAL KEY (<RSAKeyValue><Modulus>[A-Za-z0-9+/=]+</Modulus><Exponent>[A-Za-z0-9+/=]+</Exponent></RSAKeyValue>)')
+    if ($g.Code -ne 0 -or -not $km.Success) { Die ('the gate gave no seal key: ' + (($g.Lines | Select-Object -Last 5) -join ' ') + '. Nothing was sent.') }
+    Say '2. The workflow seals the token to it'
+    try { $s = Start-ThornswoodWorkflow -Repo $GitHubRepo -Workflow 'tunnel-token.yml' -Inputs ([ordered]@{ seal_key = $km.Groups[1].Value }) }
+    catch { Die ($_.Exception.Message + '. Nothing was sent to the box.') }
+    if (-not $s.Run) { Die ('GitHub started the workflow but named no run, so its answer cannot be read here: ' + $s.Url + '. Nothing was sent to the box.') }
+    Say ('  ' + $s.Url) 'DarkGray'
+    $a = Read-ThornswoodRunAnswer -Repo $GitHubRepo -Workflow 'tunnel-token.yml' -Run $s.Run -Title 'Tunnel' -WaitMinutes 15 -Started -Say { param($m) Say $m 'DarkGray' }
+    if ($a.State -ne 'answer' -or $a.Text -notmatch '^[A-Za-z0-9+/]{400,560}={0,2}$') { Die ('the workflow gave no sealed token (' + $a.State + '). Nothing was sent to the box.') }
+    Say '3. The gate runs it on the box'
+    $line = 'Install-Tunnel -Sealed ' + $a.Text + $mode + $extra
+    $g = Gate $line
+    exit $g.Code
+}
 
 $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
 . (Join-Path $Here '..\vps\Vps.ps1')
@@ -319,24 +377,42 @@ if (Get-ScheduledTask -TaskName `$task -EA SilentlyContinue) { 'STILL THERE' } e
     exit 0
 }
 
+# --------------------------------------------------- the box's seal key ---
+function Get-BoxSealKey {
+    $lines = @(Remote ("`$ErrorActionPreference = 'Stop'`r`n" + (Get-ThornswoodSealLockFunction) + "`r`n" + (Get-ThornswoodSealKeyBlock)) | ForEach-Object { "$_".Trim() })
+    return (@($lines | Where-Object { $_ -like 'SEAL KEY <RSAKeyValue>*' }) | Select-Object -Last 1), ($lines -join ' ')
+}
+if ($SealKey) {
+    $k, $said = Get-BoxSealKey
+    if (-not $k) { Die ('the box gave no seal key: ' + $said) }
+    # Public: only the box holds the private half.
+    Write-Host $k
+    exit 0
+}
+
 # ------------------------------------------------- the API token, sealed ---
-. (Join-Path $Here '..\ops\WorkflowRun.ps1')
-if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { Die 'there is no gh here to start the tunnel-token workflow with. Nothing was sent.' }
-Head 'The API token'
-Say '1. The box''s seal key'
-$keyLines = @(Remote ("`$ErrorActionPreference = 'Stop'`r`n" + (Get-ThornswoodSealLockFunction) + "`r`n" + (Get-ThornswoodSealKeyBlock)) | ForEach-Object { "$_".Trim() })
-$keyLine = @($keyLines | Where-Object { $_ -like 'SEAL KEY <RSAKeyValue>*' }) | Select-Object -Last 1
-if (-not $keyLine) { Die ('the box gave no seal key: ' + ($keyLines -join ' ') + '. Nothing was sent.') }
-$publicKey = $keyLine.Substring('SEAL KEY '.Length)
-Say '2. The workflow seals the token to it'
-try { $s = Start-ThornswoodWorkflow -Repo $GitHubRepo -Workflow 'tunnel-token.yml' -Inputs ([ordered]@{ seal_key = $publicKey }) }
-catch { Die ($_.Exception.Message + '. Nothing was sent to the box.') }
-if (-not $s.Run) { Die ('GitHub started the workflow but named no run, so its answer cannot be read here: ' + $s.Url + '. Nothing was sent to the box.') }
-Say ('  ' + $s.Url) 'DarkGray'
-$a = Read-ThornswoodRunAnswer -Repo $GitHubRepo -Workflow 'tunnel-token.yml' -Run $s.Run -Title 'Tunnel' -WaitMinutes 15 -Started -Say { param($m) Say $m 'DarkGray' }
-if ($a.State -ne 'answer') { Die ('the workflow gave no sealed token (' + $a.State + ': ' + $a.Text + '). Nothing was sent to the box.') }
-$sealed = $a.Text
-if ($sealed -notmatch '^[A-Za-z0-9+/]+={0,2}$') { Die 'the workflow''s answer is not a sealed value. Nothing was sent to the box.' }
+if ($Sealed) {
+    Head 'The API token'
+    Say '  sealed to the box''s key, as tunnel-token.yml left it'
+    $sealed = $Sealed
+} else {
+    . (Join-Path $Here '..\ops\WorkflowRun.ps1')
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { Die 'there is no gh here to start the tunnel-token workflow with. Nothing was sent.' }
+    Head 'The API token'
+    Say '1. The box''s seal key'
+    $keyLine, $said = Get-BoxSealKey
+    if (-not $keyLine) { Die ('the box gave no seal key: ' + $said + '. Nothing was sent.') }
+    $publicKey = $keyLine.Substring('SEAL KEY '.Length)
+    Say '2. The workflow seals the token to it'
+    try { $s = Start-ThornswoodWorkflow -Repo $GitHubRepo -Workflow 'tunnel-token.yml' -Inputs ([ordered]@{ seal_key = $publicKey }) }
+    catch { Die ($_.Exception.Message + '. Nothing was sent to the box.') }
+    if (-not $s.Run) { Die ('GitHub started the workflow but named no run, so its answer cannot be read here: ' + $s.Url + '. Nothing was sent to the box.') }
+    Say ('  ' + $s.Url) 'DarkGray'
+    $a = Read-ThornswoodRunAnswer -Repo $GitHubRepo -Workflow 'tunnel-token.yml' -Run $s.Run -Title 'Tunnel' -WaitMinutes 15 -Started -Say { param($m) Say $m 'DarkGray' }
+    if ($a.State -ne 'answer') { Die ('the workflow gave no sealed token (' + $a.State + ': ' + $a.Text + '). Nothing was sent to the box.') }
+    $sealed = $a.Text
+    if ($sealed -notmatch '^[A-Za-z0-9+/]+={0,2}$') { Die 'the workflow''s answer is not a sealed value. Nothing was sent to the box.' }
+}
 
 $opened = @"
 `$sealed = '$sealed'

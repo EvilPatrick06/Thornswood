@@ -8,7 +8,7 @@
   and back. Neither the API token nor the tunnel's token may ever be in
   anything a session, GitHub or a log holds.
 
-  HOW. NEVER CONNECTS. Five parts.
+  HOW. NEVER CONNECTS. Six parts.
     1. The record. The shipped one passes the script's own check, and a
        record that sends a route anywhere but Caddy on 127.0.0.1:443, names
        a cloudflared from anywhere but its own release, or lists other names
@@ -32,7 +32,13 @@
        put back when it does not; -Back makes them proxied A records at the
        box again; a name that is neither stops it with DNS unchanged; a
        restart while the names are on the tunnel is refused.
-    5. Afterwards every command line, script and input handed to gh, ssh and
+    5. The gate's halves (#2841): -SealKey prints only the public key,
+       -Sealed runs with what the workflow sealed and starts no workflow, and
+       -ThroughGate, against a stand-in Box-Run.ps1 that checks each line
+       with the gate's own GateRules.ps1 and verbs.json, hands the gate
+       'Install-Tunnel -SealKey', then the sealed token with the mode, under
+       600 characters; -Status is one line and -Remove is never sent.
+    6. Afterwards every command line, script and input handed to gh, ssh and
        scp, and everything printed, is searched for both tokens, plain and
        base64.
 
@@ -394,7 +400,54 @@ try {
     $all = Tunnel 'Status'
     Yes '-Status reads without asking for the API token, and says only whether the token is there' ($all -match 'token +(there \(never shown\)|NOT THERE)' -and $all -match 'ready +yes' -and @($handed | Where-Object { $_ -match 'dispatches' }).Count -eq $asks)
 
-    # ---- 5. no token anywhere -------------------------------------------------
+    # ---- 5. the gate's halves --------------------------------------------------
+    # What the gate runs on the box: -SealKey prints the public half only, and
+    # -Sealed opens what tunnel-token.yml sealed, so no gh is needed there.
+    $all = Tunnel 'SealKey'
+    Yes '-SealKey prints the box''s public seal key and nothing private' ($all -match 'SEAL KEY <RSAKeyValue><Modulus>' -and $all -notmatch '<P>|<D>|<InverseQ>')
+    $asks = @($handed | Where-Object { $_ -match 'dispatches' }).Count
+    $sealedHere = [regex]::Match((Run-Seal $apiToken $publicKey).Out, '::notice title=Tunnel::([A-Za-z0-9+/=]+)').Groups[1].Value
+    $said = @(& $Script -Sealed $sealedHere -NoPause -AsSystem -Wait 5 -RecordPath $recPath -Vps 'nowhere.invalid' -User 'nobody' *>&1 | ForEach-Object { [string]$_ })
+    $script:printed += $said
+    Yes '-Sealed runs with the token the workflow sealed and starts no workflow itself' ((($said -join ' ') -match 'TUNNEL OK') -and @($handed | Where-Object { $_ -match 'dispatches' }).Count -eq $asks)
+
+    # -ThroughGate hands the box only gate lines. A stand-in Box-Run.ps1 in a
+    # copy of the scripts records each line and answers as the gate would.
+    $tree = Join-Path $work 'tree'
+    foreach ($d in 'scripts/deploy', 'scripts/vps/gate', 'scripts/ops') { [void](New-Item -ItemType Directory -Force -Path (Join-Path $tree $d)) }
+    Copy-Item -LiteralPath $Script -Destination (Join-Path $tree 'scripts/deploy/Install-Tunnel.ps1')
+    foreach ($f in 'scripts/vps/Seal.ps1', 'scripts/ops/WorkflowRun.ps1', 'scripts/vps/gate/GateRules.ps1', 'scripts/vps/gate/verbs.json') { Copy-Item -LiteralPath (Join-Path $Root $f) -Destination (Join-Path $tree $f) }
+    $env:TW_GATE = Join-Path $work 'gate.txt'
+    $env:TW_PUB = $publicKey
+    [IO.File]::WriteAllText((Join-Path $tree 'scripts/vps/Box-Run.ps1'), @'
+param([string]$Line)
+. (Join-Path $PSScriptRoot 'gate/GateRules.ps1')
+[IO.File]::AppendAllText($env:TW_GATE, $Line + "`n")
+$r = Test-ThornswoodGateRequest -Line $Line -Verbs (Read-ThornswoodGateVerbs)
+if (-not $r.Ok) { 'REFUSED ' + $r.Why; exit 1 }
+if ($Line -eq 'Install-Tunnel -SealKey') { 'SEAL KEY ' + $env:TW_PUB; exit 0 }
+'the box ran it'; exit 0
+'@, $noMark)
+    $gated = Join-Path $tree 'scripts/deploy/Install-Tunnel.ps1'
+    function Gated([hashtable]$more) {
+        if (Test-Path -LiteralPath $env:TW_GATE) { Remove-Item -LiteralPath $env:TW_GATE -Force }
+        $said = @(& $gated @more -ThroughGate -NoPause -RecordPath $recPath *>&1 | ForEach-Object { [string]$_ })
+        $script:printed += $said
+        $lines = @(if (Test-Path -LiteralPath $env:TW_GATE) { [IO.File]::ReadAllLines($env:TW_GATE) })
+        return @{ Said = ($said -join ' | '); Lines = $lines }
+    }
+    $g = Gated @{ Switch = $true; Wait = 120 }
+    Yes '-ThroughGate asks the gate for the seal key, then hands it the sealed token with the mode' ($g.Lines.Count -eq 2 -and $g.Lines[0] -eq 'Install-Tunnel -SealKey' -and $g.Lines[1] -match '^Install-Tunnel -Sealed [A-Za-z0-9+/]{400,560}={0,2} -Switch -Wait 120$' -and $g.Said -notmatch 'REFUSED')
+    Yes '  and the gate''s own rules take both lines, the longer under 600 characters' ($g.Lines.Count -eq 2 -and $g.Lines[1].Length -le 600 -and $g.Said -match 'the box ran it')
+    Yes '  and the sealed form is the workflow''s, opened only on the box' ($g.Lines.Count -eq 2 -and $g.Lines[1].Contains($state.sealed) -and -not $g.Lines[1].Contains($apiToken))
+    $asks = @($handed | Where-Object { $_ -match 'dispatches' }).Count
+    $g = Gated @{ Status = $true }
+    Yes '-ThroughGate -Status hands the gate one line and starts no workflow' ($g.Lines.Count -eq 1 -and $g.Lines[0] -eq 'Install-Tunnel -Status' -and @($handed | Where-Object { $_ -match 'dispatches' }).Count -eq $asks)
+    $g = Gated @{ Remove = $true }
+    Yes '-ThroughGate -Remove is refused before the gate is asked anything' ($g.Lines.Count -eq 0 -and $g.Said -match 'not gate words')
+    Remove-Item Env:\TW_GATE, Env:\TW_PUB -ErrorAction SilentlyContinue
+
+    # ---- 6. no token anywhere -------------------------------------------------
     $handedAll = ($handed -join "`n") + "`n" + ($script:printed -join "`n")
     $found = @()
     foreach ($v in @($apiToken, $runToken)) {
