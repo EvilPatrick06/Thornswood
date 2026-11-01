@@ -150,6 +150,16 @@ try {
     Yes 'S the survey says the three counts in words' ((Get-Content -Raw -LiteralPath (Join-Path $Repo 'scripts/ops/Reset-Npcs.ps1')) -match "an item without it: \{1\}; nothing: \{2\}")
     Yes 'S one character holds kill history for one NPC being moved' ((Line $s 'KILLHISTORY') -eq 'KILLHISTORY|1|1')
     Yes 'S the creature staff kept is named with its record and place' ((Line $s 'STAFFKEPT') -eq 'STAFFKEPT|100|13bbf:Skyrim.esm|3c:Skyrim.esm|10,-21,30')
+    # The server build in the folder against main's record.
+    $wc = '6ebd3487d478bbe73f3d32a2956c55fe404b555b'; $ws = ('ab' * 32)
+    Yes 'S no server-build.json is an unknown build' ((Test-ThornswoodServerBuild $root $wc $ws) -eq "SERVERBUILD|unknown|none there||$wc|$ws")
+    Put (Join-Path $root 'server-build.json') ('{ "sha256": "' + $ws + '", "source": { "commit": "' + $wc + '" } }')
+    Yes 'S the build main''s record holds is the same' ((Test-ThornswoodServerBuild $root $wc $ws) -eq "SERVERBUILD|same|$wc|$ws|$wc|$ws")
+    Put (Join-Path $root 'server-build.json') ('{ "sha256": "' + ('cd' * 32) + '", "source": { "commit": "1111111111111111111111111111111111111111" } }')
+    Yes 'S another build differs' ((Test-ThornswoodServerBuild $root $wc $ws) -like 'SERVERBUILD|differs|1111111111111111111111111111111111111111|cdcd*')
+    Put (Join-Path $root 'server-build.json') '{ "sha256": "'
+    Yes 'S a record that will not read is unknown' ((Test-ThornswoodServerBuild $root $wc $ws) -like 'SERVERBUILD|unknown|it will not read|*')
+    Remove-Item -LiteralPath (Join-Path $root 'server-build.json')
     Yes 'S each file not read is named' (@(Line $s 'NOTREAD').Count -eq 2 -and @(Line $s 'NOTREAD' | Where-Object { $_ -like 'NOTREAD|30_Skyrim.esm.json|*' }).Count -eq 1)
     Yes 'S no STOP or FAILED' (-not @(Line $s 'STOP').Count -and -not @(Line $s 'FAILED').Count)
 
@@ -249,6 +259,9 @@ Yes 'B it holds the server before it stops it, so the watchdog leaves it alone w
 Yes 'B and takes the hold away on every way out after it' (@([regex]::Matches($rn, 'Clear-ThornswoodHold -Target \$Task')).Count -eq 3 -and
     $rn.LastIndexOf('Clear-ThornswoodHold -Target $Task') -lt $rn.IndexOf("if (`$up) { 'ANSWERED|'"))
 Yes 'B a server somebody else holds is left as it is, with nothing moved' ($rn.IndexOf('is held by another stop on purpose') -gt 0 -and $rn.IndexOf('is held by another stop on purpose') -lt $set)
+$gate = $rn.IndexOf("if (-not `$serverBuild.StartsWith('SERVERBUILD|same|'))")
+Yes 'B a reset moves nothing unless the server is the build main''s record holds, checked before the hold and the stop' ($gate -gt $rn.IndexOf('if ($Survey) {') -and $gate -lt $set -and $gate -lt $rn.IndexOf('Stop-ScheduledTask -TaskName $Task'))
+Yes 'B the box step is told main''s record' ($rn.Contains("Join-Path `$Here '..\..\records\server-build.json'") -and $rn.Contains('`$WantSha = $(Q ([string]$build.sha256))'))
 Yes 'B a survey sends no stop and no hold' ($rn.Contains("`$(if (`$Survey) { '' } else { (Get-ThornswoodHoldScript -Script 'Reset-Npcs.ps1') + `$stopAndMove"))
 Yes 'B a reset asks for RESET unless -Yes' ($rn.Contains("`$typed -cne 'RESET'"))
 # The box step as the script builds it, for a survey and for a reset.
@@ -264,6 +277,7 @@ foreach ($survey in $true, $false) {
     $what = if ($survey) { 'survey' } else { 'reset' }
     Yes "B the box step for a $what parses" (-not $err -or $err.Count -eq 0)
     Yes "B and names the dev folder, its task and its stamp" ($box.Contains("`$Root = 'C:\Thornswood-Server-Dev'") -and $box.Contains("`$Task = 'Thornswood Dev Server'") -and $box.Contains("`$Stamp = '20261031-120000'") -and $box.Contains("`$Survey = `$$survey"))
+    Yes "B and names main's server build record" ($box -match "\`$WantCommit = '[0-9a-f]{40}'" -and $box -match "\`$WantSha = '[0-9a-f]{64}'")
     Yes "B and carries the stop and the hold only for a reset" ($box.Contains('function Stop-ThornswoodProcessHeld') -ne $survey -and $box.Contains('function Set-ThornswoodHold') -ne $survey)
 }
 

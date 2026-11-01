@@ -86,6 +86,13 @@
     STAFFKEPT|<formDesc>|<baseDesc>|<world or cell>|<x,y,z>
     NOTREAD|<file>|<why>
     STOP|<why>                      nothing was moved
+
+  THE SERVER BUILD. Test-ThornswoodServerBuild reads the server-build.json
+  a deploy puts in the server's folder (Deploy-Server.ps1, Publish-Server)
+  and says whether it is the build records\server-build.json holds on main:
+    SERVERBUILD|<same, differs or unknown>|<the box's fork commit>|<its sha256>|<main's fork commit>|<main's sha256>
+  Reset-Npcs.ps1 moves nothing unless it says same, since an NPC made again
+  by a server without #98 is unmarked again.
 #>
 $ThornswoodNpcReset = @'
 # ---- the NPC reset (scripts\ops\NpcReset.ps1, #4595) ----
@@ -129,6 +136,20 @@ function Get-ThornswoodFormKind($o, [string]$File) {
   }
   $r.life = Get-ThornswoodField $df '_skympNpcLifeGeneration'
   return $r
+}
+# Whether the server in $Root is the build main's record names (#98 and
+# later): one SERVERBUILD line, said the same way whether it reads or not.
+function Test-ThornswoodServerBuild([string]$Root, [string]$WantCommit, [string]$WantSha) {
+  $path = Join-Path $Root 'server-build.json'
+  $rec = $null; $why = ''
+  if (-not (Test-Path -LiteralPath $path)) { $why = 'none there' }
+  else { try { $rec = Read-ThornswoodJson $path } catch { $why = 'it will not read' } }
+  $commit = [string](Get-ThornswoodField (Get-ThornswoodField $rec 'source') 'commit')
+  $sha = [string](Get-ThornswoodField $rec 'sha256')
+  if (-not $why -and (-not $commit -or -not $sha)) { $why = 'it names no commit or sha256' }
+  $state = if ($why) { 'unknown' } elseif ($sha -eq $WantSha -and $commit -eq $WantCommit) { 'same' } else { 'differs' }
+  if ($why) { $commit = $why; $sha = '' }
+  return ('SERVERBUILD|' + $state + '|' + $commit + '|' + $sha + '|' + $WantCommit + '|' + $WantSha)
 }
 function Read-ThornswoodJson([string]$Path) {
   return ([IO.File]::ReadAllText($Path) -replace '^\uFEFF', '' | ConvertFrom-Json)
