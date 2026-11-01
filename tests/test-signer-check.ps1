@@ -49,22 +49,20 @@
   files, because Ship and Publish-Installer must refuse whatever the launcher
   would.
 
-  Runs under Windows PowerShell 5.1, and restarts itself there from pwsh: the
-  launcher runs on the .NET Framework.
+  Builds Signature.cs with the .NET 10 SDK the way the launcher project
+  does (tests\Launcher-Csc.ps1) and runs it in this PowerShell, which is
+  .NET 10 as the launcher is. Windows PowerShell 5.1 compiles the same file
+  with Add-Type when Assert-PublishSigned.ps1 runs there (the box's check
+  from Sign-OnGitHub.ps1), so that compile is run too. Windows only: the check
+  is WinVerifyTrust, and the certificates are Windows' own store.
 #>
 [CmdletBinding()]
-param([string]$Signed = (Join-Path ([string](& (Join-Path $PSScriptRoot '..\scripts\release\Where.ps1') InstallDev)) 'Launcher\Thornswood.exe'))
+param([string]$Signed = '')
 
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
-
-. (Join-Path $PSScriptRoot 'Windows.ps1')
-if (-not $OnWindows) { Write-Host 'NOT RUN  this runs the launcher''s code on the .NET Framework the launcher runs on, which only Windows has'; exit 0 }
-if ($PSVersionTable.PSEdition -eq 'Core') {
-    $winps = Get-WindowsPowerShell
-    & $winps -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -Signed $Signed
-    exit $LASTEXITCODE
-}
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's SDK and settings, and $OnWindows
+if (-not $OnWindows) { Write-Host 'NOT RUN  Signature.Refusal asks WinVerifyTrust, and the certificates are made in Windows'' own store, which only Windows has'; exit 0 }
+if (-not $Signed) { $Signed = Join-Path ([string](& (Join-Path $PSScriptRoot '..\scripts\release\Where.ps1') InstallDev)) 'Launcher\Thornswood.exe' }
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
@@ -116,9 +114,9 @@ Yes 'nothing in the launcher decides a signer from CreateFromSignedFile any more
     -not (@(Get-ChildItem (Join-Path $App '*.cs') | Where-Object {
         [IO.File]::ReadAllText($_.FullName) -match 'CreateFromSignedFile\s*\(' }).Count))
 
-# ---- compile Signature.cs on its own ----------------------------------------
-Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
-if (-not (Test-Path -LiteralPath $LauncherCsc)) { Finish }
+# ---- build Signature.cs on its own -------------------------------------------
+Yes ('the .NET SDK the launcher builds with is on this machine (' + $LauncherDotnet + ')') (Test-Path -LiteralPath $LauncherDotnet)
+if (-not (Test-Path -LiteralPath $LauncherDotnet)) { Finish }
 # Programs Microsoft signed that every Windows has, for the refusals below;
 # nothing is compiled with them.
 $fw = Get-WindowsPath 'Microsoft.NET\Framework64\v4.0.30319'
@@ -126,15 +124,6 @@ $fw = Get-WindowsPath 'Microsoft.NET\Framework64\v4.0.30319'
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('tssigner-' + [Guid]::NewGuid().ToString('N'))
 $null = New-Item -ItemType Directory -Force -Path $tmp
 $made = @()
-
-function Compile([string[]]$cscArgs) {
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $said = & $LauncherCsc @cscArgs 2>&1
-    $rc = $LASTEXITCODE
-    $ErrorActionPreference = $old
-    if ($rc -ne 0) { foreach ($l in @($said | Select-Object -First 20)) { Write-Host "      $l" } }
-    return ($rc -eq 0)
-}
 
 function Drop-Cert([string]$thumb) {
     foreach ($store in 'My', 'CA', 'Root', 'TrustedPublisher', 'Disallowed') {
@@ -144,15 +133,27 @@ function Drop-Cert([string]$thumb) {
 }
 
 try {
-    $dll = Join-Path $tmp 'Signature.dll'
-    # At C# 5, not the project's version: Assert-PublishSigned.ps1 compiles
-    # this file with Add-Type, which in Windows PowerShell is the .NET
-    # Framework compiler and stops at C# 5 (Developer-Guide.md, Settled design).
-    $ok = Compile @('/noconfig', '/nologo', '/langversion:5', '/target:library', '/platform:anycpu',
-                    "/reference:$(Join-Path $LauncherRefDir 'System.dll')", "/out:$dll", $sigCs)
-    Yes 'Signature.cs compiles on its own at C# 5, for Add-Type in Assert-PublishSigned.ps1' $ok
-    if (-not $ok) { Finish }
-    $asm = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($dll))
+    # Windows PowerShell's Add-Type is the .NET Framework compiler and stops
+    # at C# 5. Assert-PublishSigned.ps1 compiles this file with it wherever
+    # it runs in Windows PowerShell (the box's catalog check), so it is asked
+    # there, the way that script asks it.
+    $winps = Get-WindowsPowerShell
+    $assert = Join-Path (Join-Path (Join-Path $Repo 'scripts') 'release') 'Assert-PublishSigned.ps1'
+    # Single quotes after the path: $t is the child's, not this harness's.
+    $probe = ". '" + $assert.Replace("'", "''") + "'; " + '$t = Get-LauncherSignatureType; if ($t) { ''COMPILED '' + $t.FullName } else { ''NO TYPE'' }'
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    $said = @(& $winps -NoProfile -ExecutionPolicy Bypass -Command $probe 2>&1 | ForEach-Object { "$_" })
+    $ErrorActionPreference = $old
+    $compiled = @($said | Where-Object { $_ -match '^COMPILED ThornswoodSign[0-9a-f]+\.Signature$' }).Count -eq 1
+    if (-not $compiled) { foreach ($l in @($said | Select-Object -First 20)) { Write-Host "      $l" } }
+    Yes 'Signature.cs compiles in Windows PowerShell''s Add-Type at C# 5, as Assert-PublishSigned.ps1 compiles it there' $compiled
+
+    # The launcher's own build of it, by the project's settings.
+    $asm = $null
+    try { $asm = Add-LauncherType -File $sigCs }
+    catch { foreach ($l in @(($_.Exception.Message -split "`r?`n") | Where-Object { $_ -match 'error' } | Select-Object -First 20)) { Write-Host "      $l" } }
+    Yes 'Signature.cs builds on its own the way the launcher project builds it' ($null -ne $asm)
+    if ($null -eq $asm) { Finish }
     $S = $asm.GetType('Thornswood.Signature')
     $flags = [Reflection.BindingFlags]'Static, Public'
     $three = $S.GetMethod('Refusal', $flags, $null,
@@ -227,12 +228,17 @@ try {
     }
 
     # ---- an unsigned exe is refused ----------------------------------------
-    $stubCs = Join-Path $tmp 'stub.cs'
-    [IO.File]::WriteAllText($stubCs, 'static class P { static void Main() { } }')
+    # A program built here, so signed by nobody: the SDK's build of a Main
+    # that does nothing, under the launcher's name.
     $stub = Join-Path $tmp 'unsigned\Thornswood.exe'
     $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $stub)
-    $ok = Compile @('/noconfig', '/nologo', '/target:exe', "/out:$stub", $stubCs)
-    Yes 'a stand-in exe compiles' $ok
+    $ok = $false
+    try {
+        $built = Build-LauncherCode -Source 'static class P { static void Main() { } }' -Exe
+        Copy-Item -LiteralPath $built -Destination $stub
+        $ok = Test-Path -LiteralPath $stub
+    } catch { foreach ($l in @(($_.Exception.Message -split "`r?`n") | Select-Object -First 20)) { Write-Host "      $l" } }
+    Yes 'a stand-in program builds' $ok
     if ($ok) {
         $r = Check $stub $Signer
         Yes ('an unsigned exe is refused: ' + $r.Why) ($r.Why -eq 'is not signed.')
