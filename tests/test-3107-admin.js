@@ -381,6 +381,10 @@ const gh = {
   envNames: { board: { secrets: ['BOARD_TOKEN'], variables: [] }, notices: { secrets: ['NOTICE_KEY_B64'], variables: [] } },
   forkToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
   forkInstalled: true,
+  // The Discord bot's issues token (#5184), and whether the installation
+  // holds Issues write yet.
+  botToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
+  botGranted: true,
   sets: { Thornswood: [], skymp: [] },
   pvr: { Thornswood: false, skymp: false },
   immutable: { Thornswood: false, skymp: false },
@@ -425,6 +429,7 @@ function standIn(req, res) {
       if (body && body.repositories === undefined) return perms === '{"metadata":"read"}' ? send(201, { token: gh.repoToken }) : send(422, { message: 'not a metadata token' });
       const repos = JSON.stringify((body && body.repositories) || []);
       if (repos === '["Thornswood-Ops"]') return perms === '{"administration":"write"}' ? send(201, { token: gh.instToken }) : send(422, { message: 'not a runner token' });
+      if (repos === '["Thornswood"]' && perms === '{"issues":"write"}') return gh.botGranted ? send(201, { token: gh.botToken, expires_at: '2026-11-01T05:00:00Z' }) : send(422, { message: 'The permissions requested are not granted to this installation.' });
       if (repos === '["Thornswood"]') return perms === '{"contents":"read"}' ? send(201, { token: gh.readToken }) : perms === '{"administration":"write","contents":"read"}' ? send(201, { token: gh.aboutToken }) :
         /^\{"administration":"read","contents":"read"/.test(perms) && Object.values(body.permissions).every(v => v === 'read') ? send(201, { token: gh.settingsToken }) : send(422, { message: 'no such permissions' });
       // repo-settings' fork token (#3683): administration write on skymp alone,
@@ -556,10 +561,10 @@ function ask(port, method, p, headers, body) {
   });
 }
 
-function start(stateDir, ghPort) {
+function start(stateDir, ghPort, more) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [ADMIN], {
-      env: Object.assign({}, process.env, {
+      env: Object.assign({}, process.env, more || {}, {
         THORNSWOOD_ADMIN_PORT: '0', THORNSWOOD_ADMIN_STATE: stateDir,
         THORNSWOOD_ADMIN_GITHUB_API: 'http://127.0.0.1:' + ghPort, THORNSWOOD_ADMIN_GITHUB_WEB: 'http://127.0.0.1:' + ghPort + '/web',
         THORNSWOOD_ADMIN_JWKS: 'http://127.0.0.1:' + ghPort + '/jwks',
@@ -984,8 +989,8 @@ function start(stateDir, ghPort) {
     const unesc = s => s.replace(/&quot;/g, '"').replace(/&#39;/g, '\'').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
     yes('the armed page, through Caddy, posts the manifest to GitHub with the state', r.status === 200 && form && unesc(form[1]) === 'http://127.0.0.1:' + ghPort + '/web/settings/apps/new?state=' + st);
     const mf = form ? JSON.parse(unesc(form[2])) : {};
-    yes('  the manifest: private, administration write, contents read, secrets and environments write for go-public (#4013), variables read, Actions write for the Ship verbs (#2841), no webhook, back to /github-app/setup/done',
-      mf.public === false && JSON.stringify(mf.default_permissions) === '{"administration":"write","contents":"read","secrets":"write","actions_variables":"read","environments":"write","actions":"write"}' && mf.hook_attributes.active === false &&
+    yes('  the manifest: private, administration write, contents read, secrets and environments write for go-public (#4013), variables read, Actions write for the Ship verbs (#2841), Issues write for the Discord bot (#5184), no webhook, back to /github-app/setup/done',
+      mf.public === false && JSON.stringify(mf.default_permissions) === '{"administration":"write","contents":"read","secrets":"write","actions_variables":"read","environments":"write","actions":"write","issues":"write"}' && mf.hook_attributes.active === false &&
       mf.redirect_url === 'https://thornswood.net/github-app/setup/done' && (mf.default_events || []).length === 0);
     yes('  and the page is neither kept nor passed on', /no-store/.test(r.headers['cache-control'] || '') && r.headers['referrer-policy'] === 'no-referrer');
 
@@ -1016,6 +1021,47 @@ function start(stateDir, ghPort) {
     fs.writeFileSync(path.join(state, 'setup.json'), JSON.stringify({ state: st, expires: now() - 1 }));
     r = await ask(P, 'GET', '/setup?state=' + st, fwd);
     yes('an expired setup: the plain 404', r.status === 404);
+
+    // #5184, Patrick's A of 1 Nov 2026: the Discord bot's GitHub token comes
+    // from the App, issues write on Thornswood alone, into the folder only the
+    // bot's account may read, and never into the log.
+    console.log('the bot\'s token');
+    const botRoot = path.join(tmp, 'bot-box');
+    const botState = path.join(botRoot, 'state');
+    const forBot = path.join(botRoot, 'for-bot');
+    fs.mkdirSync(botState, { recursive: true });
+    fs.writeFileSync(path.join(botState, 'key.pem'), appKeyPem);
+    fs.writeFileSync(path.join(botState, 'app.json'), JSON.stringify({ id: 123456, slug: 'thornswood-box-admin', owner: 'EvilPatrick06' }));
+    const waitFor = async (what, ms) => { const until = Date.now() + ms; while (Date.now() < until) { if (what()) return true; await new Promise(r => setTimeout(r, 100)); } return what(); };
+    let botSvc = await start(botState, ghPort, { THORNSWOOD_ADMIN_BOT_EVERY: '1' });
+    try {
+      yes('with no for-bot folder no token is asked for, and the log says why',
+        await waitFor(() => /bot token: no .*for-bot, which Install-AdminService\.ps1 makes/.test(botSvc.log()), 5000) &&
+        !gh.calls.some(c => /access_tokens$/.test(c.path) && JSON.stringify(c.body.permissions) === '{"issues":"write"}'));
+    } finally { botSvc.kill(); }
+    fs.mkdirSync(forBot);
+    gh.calls = [];
+    botSvc = await start(botState, ghPort, { THORNSWOOD_ADMIN_BOT_EVERY: '1' });
+    try {
+      const file = path.join(forBot, 'github-token.json');
+      yes('the token is made and written into for-bot', await waitFor(() => fs.existsSync(file), 5000));
+      const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
+      yes('  issues write on Thornswood alone, with when it ends', doc.token === gh.botToken && doc.expires_at === '2026-11-01T05:00:00Z' &&
+        doc.repository === 'ThornswoodRP/Thornswood' && JSON.stringify(doc.permissions) === '{"issues":"write"}');
+      const asked = gh.calls.filter(c => /access_tokens$/.test(c.path));
+      yes('  asked of GitHub with only that', asked.length > 0 && asked.every(c => JSON.stringify(c.body) === '{"repositories":["Thornswood"],"permissions":{"issues":"write"}}'));
+      yes('  and made again on the clock', await waitFor(() => gh.calls.filter(c => /access_tokens$/.test(c.path)).length >= 2, 5000));
+      yes('  no half-written file is left beside it', !fs.existsSync(file + '.part'));
+      yes('  the log says it once and never holds the token', (botSvc.log().match(/bot token: made for ThornswoodRP\/Thornswood issues/g) || []).length === 1 && !botSvc.log().includes(gh.botToken));
+      gh.botGranted = false;
+      fs.writeFileSync(file, JSON.stringify({ token: 'old', expires_at: '2026-11-01T04:00:00Z' }));
+      yes('an installation without Issues write: the log says where it is added, and the file is left as it was',
+        await waitFor(() => /bot token: GitHub gave the App no issues token .*settings\/apps\/thornswood-box-admin\/permissions/.test(botSvc.log()), 5000) &&
+        JSON.parse(fs.readFileSync(file, 'utf8')).token === 'old');
+    } finally {
+      botSvc.kill();
+      gh.botGranted = true;
+    }
   } catch (e) {
     yes('the run went through without throwing: ' + e.stack, false);
   } finally {

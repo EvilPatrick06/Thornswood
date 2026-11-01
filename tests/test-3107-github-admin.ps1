@@ -235,6 +235,7 @@ function Build($h) {
 }
 . (Join-Path $repo 'scripts/deploy/ServiceAccount.ps1')
 $Root = 'C:\Thornswood-Admin'; $Port = 7791; $TaskName = 'Thornswood Admin'; $Wait = 20; $AsSystem = $false
+$forBot = 'C:\Thornswood-Admin\for-bot'; $botSid = 'S-1-5-80-1-2-3-4-5'
 $log = 'C:\Thornswood-Admin\admin.log'; $state = 'C:\Thornswood-Admin\state'; $stage = '.stage-20261022-000000'; $prev = '.prev-20261022-000000'
 $want = "'admin.js' = 'AA'; 'server-log.js' = 'CC'"
 $pa = @($iast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Get-PlainAnswer' }, $true))
@@ -263,7 +264,7 @@ Yes '  and records what the box runs only once it answers' ($install.IndexOf('Se
 Yes 'the task is LOCAL SERVICE with its own SID, after the fail-safe' (
     $installCode -match 'New-ThornswoodServicePrincipal -AsSystem:\$system' -and $installCode -match 'Get-ThornswoodTaskSid' -and
     $installCode.IndexOf('Test-ThornswoodServiceCannotReach (') -ge 0 -and $installCode.IndexOf('Test-ThornswoodServiceCannotReach (') -lt $installCode.IndexOf('if (-not $stopOk)'))
-Yes '  granted its folder, its state folder to keep the App in, and its log' ($installCode.Contains("Grant-ThornswoodServiceFolder -Root 'C:\Thornswood-Admin' -Sid `$sid -Writable 'state' -Files 'admin.log', 'admin.log.*'"))
+Yes '  granted its folder, its state folder to keep the App in, and its log' ($installCode.Contains("Grant-ThornswoodServiceFolder -Root 'C:\Thornswood-Admin' -Sid `$sid -Writable 'state', 'for-bot' -Files 'admin.log', 'admin.log.*'"))
 Yes '  at priority 4, normal (#1968)' ($installCode -match 'New-ScheduledTaskSettingsSet [^\r\n]*-Priority 4\b')
 Yes '  running admin.js under server-log.js, kept 90 days with a time on each line, on 7791 with its state folder' (
     $installCode -match '--log "\{1\}" --days 90 --stamp admin\.js' -and $installCode.Contains('set THORNSWOOD_ADMIN_PORT=7791&& set THORNSWOOD_ADMIN_STATE=C:\Thornswood-Admin\state&&'))
@@ -288,7 +289,19 @@ Yes '  owned by Administrators, and so is all in it, which keeps only what state
 $check = $installCode.IndexOf('ANOTHER SERVICE COULD READ')
 Yes 'after the grant and before the start, the install refuses while another service could read the key' (
     $check -gt $installCode.IndexOf('Grant-ThornswoodServiceFolder -Root') -and $check -lt $installCode.IndexOf("Start-ScheduledTask -TaskName 'Thornswood Admin'") -and
-    $installCode -match "Test-ThornswoodServiceCannotReach -Paths \(@\('C:\\Thornswood-Admin\\state'\) \+ [^\r\n]*-Sids @\('S-1-3-0'\)")
+    $installCode -match "Test-ThornswoodServiceCannotReach -Paths \(@\('C:\\Thornswood-Admin\\state', 'C:\\Thornswood-Admin\\for-bot'\) \+ [^\r\n]*-Sids @\('S-1-3-0'\)")
+# #5184, Patrick's A of 1 Nov 2026: the Discord bot's token folder.
+$botAt = $stageCode.IndexOf("# The bot's token, locked apart")
+$botLock = if ($botAt -ge 0) { $stageCode.Substring($botAt, $stageCode.IndexOf("'COULD NOT LOCK FOR-BOT: '") - $botAt) } else { '' }
+Yes 'the bot''s token folder is made and locked apart before anything is stopped, and a lock that fails stops the install (#5184)' (
+    $botLock -and $stageCode.IndexOf("'COULD NOT LOCK FOR-BOT: '") -lt $stageCode.IndexOf("'READY'") -and
+    $botLock.Contains("New-Item -ItemType Directory -Path 'C:\Thornswood-Admin\for-bot'") -and $botLock -match '\$acl\.SetAccessRuleProtection\(\$true, \$false\)')
+Yes '  SYSTEM and Administrators Full, OWNER RIGHTS only Synchronize, the bot''s own account Read, the task''s SID Modify, and no broad group' (
+    $botLock -match "@\('S-1-5-18', 'FullControl'\), @\('S-1-5-32-544', 'FullControl'\), @\('S-1-3-4', 'Synchronize'\), @\('S-1-5-80-1-2-3-4-5', 'Read'\)" -and
+    $botLock -match "if \(\`$taskSid\) \{ \`$rules \+= ,@\(\`$taskSid, 'Modify'\) \}" -and $botLock -notmatch "'S-1-5-19'|'S-1-3-0'|'S-1-1-0'|'S-1-5-11'|'S-1-5-32-545'")
+Yes '  owned by Administrators, and so is all in it' ($botLock -match '\$acl\.SetOwner\(\$admins\)' -and $botLock -match '\$a\.SetOwner\(\$admins\)')
+. (Join-Path $repo 'scripts/vps/Bot-Service.ps1')
+Yes '  the bot''s account is NT SERVICE\ThornswoodBot, worked out from its name' ($install -match "Get-ThornswoodServiceSid \`$BotService" -and $install -match "\[string\]\`$BotService = 'ThornswoodBot'" -and (Get-ThornswoodServiceSid 'ThornswoodBot') -match '^S-1-5-80(-\d+){5}$')
 Yes '  or LOCAL SERVICE owns a file there with no OWNER RIGHTS rule, and leaves the service stopped and disabled' (
     $installCode -match "GetOwner\(\[Security\.Principal\.SecurityIdentifier\]\)\.Value -eq 'S-1-5-19' -and -not \`$capped" -and
     $installCode -match "Disable-ScheduledTask -TaskName 'Thornswood Admin'[^\r\n]*\r?\n\s*'ADMIN REFUSED'; exit 1")
