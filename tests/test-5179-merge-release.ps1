@@ -7,9 +7,11 @@
   that changes what Thornswood ships, every part on it, and a Deployment to
   Dev for it (.github\workflows\merge-release.yml). This holds the pieces it
   runs, with no network:
-    - MergeRelease.ps1: the tag and the Velopack version from one time and
-      run number; the print of each part, leaving out the gamemode's stamp,
-      the server zip and the game files' list, which differ on every merge;
+    - MergeRelease.ps1: the tag and the Velopack version from the day and
+      the names it already has; where the notes start when the Release
+      before is from a rewritten history; the print of each part, leaving
+      out the gamemode's stamp, the server zip and the game files' list,
+      which differ on every merge;
       the parts that changed since the Release before (all of them when there
       is none, never velopack); and the Release before read from a planted
       list: drafts and other tags skipped, a manifest that names another tag
@@ -57,14 +59,33 @@ try {
     . (Join-Path $Repo 'scripts/release/MergeRelease.ps1')
 
     # ---- the names ----------------------------------------------------------------
-    $n = New-MergeReleaseNames -Utc ([DateTime]::new(2026, 11, 1, 23, 30, 0, [DateTimeKind]::Utc)) -Run 7
-    Yes 'the tag is build-<yyyyMMdd>.<run> and the Velopack version <yyyy>.<M*100+d>.<run>' ($n.Tag -eq 'build-20261101.7' -and $n.Velopack -eq '2026.1101.7')
-    $j = New-MergeReleaseNames -Utc ([DateTime]::new(2027, 1, 2, 0, 0, 0, [DateTimeKind]::Utc)) -Run 8
-    Yes '  with no leading zero, so 2 Jan is 102' ($j.Velopack -eq '2027.102.8')
-    $later = New-MergeReleaseNames -Utc ([DateTime]::new(2026, 12, 31, 0, 0, 0, [DateTimeKind]::Utc)) -Run 9
-    Yes '  and a later release in the year is the higher version' ([version]$later.Velopack -gt [version]$n.Velopack)
-    $threw = $false; try { New-MergeReleaseNames -Utc (Get-Date) -Run 0 | Out-Null } catch { $threw = $true }
-    Yes '  a run number under 1 is refused' $threw
+    $n = New-MergeReleaseNames -Utc ([DateTime]::new(2026, 11, 1, 23, 30, 0, [DateTimeKind]::Utc)) -Taken @('build-20261101.1', 'build-20261101.6', 'build-20261031.9', 'v1.2.16', 'agent-v1.0.30')
+    Yes 'the tag is build-<yyyyMMdd>.<n>, n one past the day''s highest, and the Velopack version <yyyy>.<M*100+d>.<n>' ($n.Tag -eq 'build-20261101.7' -and $n.Velopack -eq '2026.1101.7')
+    $f = New-MergeReleaseNames -Utc ([DateTime]::new(2026, 11, 2, 0, 0, 0, [DateTimeKind]::Utc)) -Taken @('build-20261101.6')
+    Yes '  and a new day starts at 1' ($f.Tag -eq 'build-20261102.1')
+    $j = New-MergeReleaseNames -Utc ([DateTime]::new(2027, 1, 2, 0, 0, 0, [DateTimeKind]::Utc))
+    Yes '  with no leading zero, so 2 Jan is 102' ($j.Velopack -eq '2027.102.1')
+    $later = New-MergeReleaseNames -Utc ([DateTime]::new(2026, 12, 31, 0, 0, 0, [DateTimeKind]::Utc))
+    Yes '  and a later day is the higher version' ([version]$later.Velopack -gt [version]$n.Velopack)
+
+    # ---- where the notes start, across a rewritten history ------------------------
+    $g = Join-Path $tmp 'hist'
+    New-Item -ItemType Directory -Force -Path $g | Out-Null
+    function G { & git -C $g -c user.name=t -c user.email=t@t -c commit.gpgsign=false @args 2>&1 | Out-Null }
+    G init -q -b main
+    G commit -q --allow-empty -m 'first (#10)'
+    G commit -q --allow-empty -m 'the Release before (#11)'
+    $here = "$(git -C $g rev-parse HEAD)".Trim()
+    G commit -q --allow-empty -m 'after it (#12)'
+    $none = { param($c) throw 'not asked' }
+    Yes 'the notes start at the Release before''s commit when this history holds it' ((Resolve-MergeReleaseSince -Commit $here -Subject $none -RepoDir $g) -eq $here)
+    $gone = 'f' * 40
+    $got = Resolve-MergeReleaseSince -Commit $gone -Subject { param($c) 'the Release before (#11)' } -RepoDir $g
+    Yes '  and at the same merge, by its pull request number, when the history was rewritten' ($got -eq $here)
+    $threw = $false; try { Resolve-MergeReleaseSince -Commit $gone -Subject { param($c) 'no number here' } -RepoDir $g | Out-Null } catch { $threw = $true }
+    Yes '  a commit not here whose title names no pull request stops it' $threw
+    $threw = $false; try { Resolve-MergeReleaseSince -Commit $gone -Subject { param($c) 'gone (#99)' } -RepoDir $g | Out-Null } catch { $threw = $_.Exception.Message -match '0 commits here end in \(#99\)' }
+    Yes '  and so does one whose merge is not in this history' $threw
 
     # ---- the prints and what changed ------------------------------------------------
     function M($parts) { [pscustomobject]@{ tag = 'build-1'; parts = [pscustomobject]$parts } }

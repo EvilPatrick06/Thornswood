@@ -21,15 +21,16 @@ It does two jobs with the same code:
 
 ## What this first slice does, and what it does not
 
-It looks after the **dev server only** and applies **the gamemode and the
-server build** (the engine).
+It looks after the **dev server**, and **the live server** once main is
+turned on (#5181, "Main" below), and applies **the gamemode and the server
+build** (the engine).
 
 | Part | Today |
 | --- | --- |
 | Dev gamemode | Applied by the agent: a merge that changes `game/gamemode.js` makes a signed Release and a Deployment, and the agent reloads the dev server's gamemode with nobody dropped. The gate's `Deploy-Release` verb puts in any such Release by its tag. |
 | Dev engine (the server build) | Applied by the agent (#5219): every Release carries the server build its commit records, and when dev runs another one the agent stops dev, swaps in the build and the gamemode together and starts it under a hold. So a merged engine pin reaches dev with no Publish-Server and no Deploy-DevGamemode. See "A new server build" below. |
 | Dev plugins, settings | Not yet. Like the engine they need a stop and a swap under a hold, but nothing puts them on a Release yet. Deploy-DevGamemode and Ship still do them. |
-| Main | Not yet. Main waits on a Main environment that only Patrick can approve (#5181). The agent refuses any environment but dev. |
+| Main | Applied by the agent once `Install-DeployAgent -Main` has run (#5181): the same Release dev ran, after Patrick approves its promotion on GitHub. See "Main" below. |
 | Site, Discord bot | Applied by the agent (#5190, #5187): a merge that changes either makes a Deployment to **Site** or **Discord bot** with the Release's `site.zip` or `discord.zip`, and the agent swaps it in the way Deploy-Docs and Install-Bot -CodeOnly do. See "The site, the Discord bot and voice" below. |
 | Dev voice | Applied with dev's Deployment (#5187): voice has no Deployment of its own, because the gamemode pushes positions to it. |
 | Release news | After a Deployment goes in, the agent leaves its Release's notes for the bot, which posts them once (#5187). See "Release news" below. |
@@ -54,7 +55,7 @@ That is the gate verb for
 `thornswood-agent.exe deploy --environment dev --tag <tag>` on the box, which
 does steps 3 to 7 below with no Deployment to report on, and prints the
 address of the log. The tags are on the
-repository's Releases page as `build-<date>.<run>`. To roll dev back, deploy the tag before the one that
+repository's Releases page as `build-<date>.<n>`. To roll dev back, deploy the tag before the one that
 is on it now; the box's deploy record says which one that is
 (`http://play.thornswood.net:7788/thornswood-deploy.json`).
 
@@ -76,7 +77,7 @@ the App holds Deployments.
    ([New-SignedManifest.ps1](../scripts/release/New-SignedManifest.ps1)),
    makes a catalog over the manifest and signs it with ThornswoodRelease
    ([Sign-OnRunner.ps1](../scripts/release/Sign-OnRunner.ps1)), then
-   publishes the Release `build-<date>.<run>` from a draft (Releases here
+   publishes the Release `build-<date>.<n>` from a draft (Releases here
    are immutable once published) and makes a Deployment to the environment
    **Dev** naming it. A merge that changed none of the parts publishes
    nothing; the workflow's header says how a change is told.
@@ -283,6 +284,43 @@ whether it does. `Record-Deployment.ps1` went in the same pull request. The
 old records in **Dev** all carry a success, so the agent never applies them;
 the old **Dev server** Deployments are history. **Main** gets the same
 Release deployed after Patrick's Approve click (#5181).
+
+## Main
+
+The live server takes a Release dev ran, and only once Patrick approves it
+(#5181; Patrick chose A on 31 Oct: a Main environment with him as its only
+required reviewer). Nothing is built again: main gets the files dev ran,
+byte for byte, held to the same signature.
+
+1. Somebody starts the promotion on main with the Release's tag:
+   `gh workflow run promote-main.yml --ref main -f tag=build-<yyyyMMdd>.<run>`
+2. [promote-main.yml](../.github/workflows/promote-main.yml) holds the tag to
+   a published build Release with its signed manifest and a Deployment of it
+   to **Dev** that ended in success, then waits in the **Main** environment.
+3. Patrick approves it on the run ("Review deployments"). A rejection ends
+   it and nothing reaches main.
+4. The approved job makes a Deployment to **Main** naming the Release and
+   its run. The agent holds it to that run before anything is touched: the
+   Deployment was made by GitHub Actions; the run is `promote-main.yml` on
+   main, started by hand; its wait on Main was approved and not rejected; it
+   made no Main Deployment before (`state\main-runs.txt`); and dev applied
+   that Release. A Deployment made any other way says why it was not
+   applied.
+5. The agent then puts the Release on `C:\Thornswood-Server` the way it does
+   on dev: a reload when the live server runs the server build the Release
+   records, otherwise a stop, swap and start under a hold. It refuses a
+   folder whose settings do not name the live port, 7777. There is no bot
+   pass; the Release passed one on dev.
+
+Main goes back the same way: promote the Release main ran before. The gate's
+`Deploy-Release` verb puts a tag on dev only, and the agent refuses a tag
+for main.
+
+Reading who approved needs Actions: read, which the box admin App holds
+(Actions read and write since 30 Oct, #5006). The agent asks for it only
+while main is on. Main is turned on by
+`Box-Run.ps1 -Line 'Install-DeployAgent -Main'`, once the Main environment
+exists with Patrick as its reviewer, and `-NoMain` turns it off.
 
 ## What it holds and what it can do
 
