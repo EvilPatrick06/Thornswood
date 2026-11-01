@@ -1218,8 +1218,8 @@ function Start-ThornswoodOpenTrace([string]$Name) {
   $script:ThornswoodTraceWhy = ''
   if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { $script:ThornswoodTraceWhy = 'Windows has this trace and this is not Windows'; return $null }
   $logman = Join-Path $env:SystemRoot 'System32\logman.exe'
-  $etl = Join-Path $env:TEMP ($Name + '.etl')
-  $pf = Join-Path $env:TEMP ($Name + '.providers')
+  $etl = Join-Path ([IO.Path]::GetTempPath()) ($Name + '.etl')
+  $pf = Join-Path ([IO.Path]::GetTempPath()) ($Name + '.providers')
   Remove-Item -LiteralPath $etl, $pf -Force -EA SilentlyContinue
   # Opens (the create keyword, 0x80) and process starts and ends (0x10).
   [IO.File]::WriteAllLines($pf, [string[]]@('"Microsoft-Windows-Kernel-File" 0x80 0x5', '"Microsoft-Windows-Kernel-Process" 0x10 0x5'))
