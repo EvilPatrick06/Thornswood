@@ -53,8 +53,10 @@
        Velo.Restarted, the start right after an update went in) runs that Fix.
        By the source, in the wiring section.
 
-  HOW. Every file in launcher\app is compiled with a driver into one program,
-  with the compiler and C# version the build uses (Launcher-Csc.ps1). The
+  HOW. The whole launcher is built with a driver into one program, the way
+  the project builds (the .NET 10 SDK, Launcher-Csc.ps1), with a stand-in for
+  the list of Skyrim's own files. It builds everywhere and runs on Windows:
+  the scan and Fix read Windows paths and Windows' Skyrim folders. The
   server, and the site the release's files are on, are a plain HTTP listener
   on this machine's loopback address, in the driver; the release is read
   through Updater.ReleaseCopyAt, past the https check ReleaseCopy makes,
@@ -66,7 +68,7 @@
 param([string]$Repo, [string]$Scratch)
 
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # builds launcher code the way the project does (#498, #4823)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if (-not $Repo) { $Repo = Split-Path -Parent $Here }
@@ -160,20 +162,10 @@ Yes 'Diagnostics keeps the icon refresh, which Scan cannot see' ($xaml -match 'x
 Yes 'and has no Repair, Restore or Bring it up to date button, which Fix does now' (
     $xaml -notmatch 'x:Name="BtnRepair"' -and $xaml -notmatch 'x:Name="BtnRestore"' -and $xaml -notmatch 'x:Name="BtnOwnGameRefresh"')
 
-# 1 to 4 compile the launcher's files and a driver with the build's compiler and
-# run them; that compiler is the Build Tools' csc, which only Windows has.
-if (-not $OnWindows) {
-    Write-Host 'SKIP  1 to 4, the scan and fix compiled and run: the build''s compiler (the Build Tools'' csc, against .NET Framework 4.8.1) is only on Windows'
-    Done
-}
-Yes 'the compiler the launcher builds with is on this machine' (Test-Path -LiteralPath $LauncherCsc)
-if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
-
-$refs = @(); $missing = @()
-foreach ($n in @($LauncherNeeded)) { $p = Find-LauncherRef $n; if ($p) { $refs += $p } else { $missing += $n } }
-foreach ($n in @($LauncherLib)) { $p = $n; if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
-Yes ('every reference Thornswood.csproj names is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($refs.Count -gt 0 -and $missing.Count -eq 0)
-if ($missing.Count -or $refs.Count -eq 0) { Done }
+# 1 to 4 build the whole launcher and a driver the way the project builds, and
+# run them on Windows.
+Yes 'the .NET SDK the launcher builds with is on this machine' (Test-Path -LiteralPath $LauncherDotnet)
+if (-not (Test-Path -LiteralPath $LauncherDotnet)) { Done }
 
 $T = Join-Path $Scratch ('scan-fix-2627-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Force -Path $T
@@ -797,30 +789,21 @@ namespace Thornswood
 }
 '@
 
-$build = Join-Path $T 'build'
-$null = New-Item -ItemType Directory -Force -Path $build
-$driverCs = Join-Path $build 'ScanFixTest.cs'
-[IO.File]::WriteAllText($driverCs, $driver, (New-Object Text.UTF8Encoding($false)))
-$exe = Join-Path $build 'ScanFixTest.exe'
-$cs = @(Get-ChildItem (Join-Path $App '*.cs') -File | ForEach-Object { $_.FullName })
-$cscArgs = @('/noconfig', '/nologo', '/target:exe', '/platform:anycpu', "/langversion:$LauncherLangVersion", '/nowarn:0649,1701,0414,0169', "/out:$exe", '/main:Thornswood.ScanFixTest')
-foreach ($r in $refs) { $cscArgs += "/reference:$r" }
-$cscArgs += ('/resource:' + (Join-Path $Repo 'launcher\Thornswood.ini') + ',Thornswood.ini')
-$cscArgs += ('/resource:' + (Join-Path $Repo 'records\ui-gone.json') + ',ui-gone.json')
+# The list of Skyrim's own files, in place of the real one: one file, so
+# case 4's lost file is the only one it can name.
 $skyrimList = Join-Path $T 'skyrim-files.json'
 [IO.File]::WriteAllText($skyrimList, "{`n  ""build"": ""1.6.1170"",`n  ""files"": {`n    ""SkyrimSE.exe"": { ""bytes"": 1, ""sha1"": ""0"", ""depot"": ""1"" }`n  }`n}`n", (New-Object Text.UTF8Encoding($false)))
-$cscArgs += ('/resource:' + $skyrimList + ',skyrim-files.json')
-$cscArgs += $cs
-$cscArgs += $driverCs
-$old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-$said = & $LauncherCsc @cscArgs 2>&1
-$rc = $LASTEXITCODE
-$ErrorActionPreference = $old
-Yes ('the launcher''s {0} source files and the driver compile' -f $cs.Count) ($rc -eq 0 -and (Test-Path -LiteralPath $exe))
-if ($rc -ne 0) { $said | Where-Object { "$_" -match 'error' } | Select-Object -First 20 | ForEach-Object { Write-Host "      $_" }; Done }
+$dll = $null
+try { $dll = Build-LauncherCode -Launcher -Source $driver -Exe -Main 'Thornswood.ScanFixTest' -Resource @{ 'skyrim-files.json' = $skyrimList } }
+catch { ($_.Exception.Message -split "`n") | Where-Object { $_ -match 'error' } | Select-Object -First 20 | ForEach-Object { Write-Host "      $_" } }
+Yes 'the whole launcher and the driver build the way the project does' ($null -ne $dll)
+if ($null -eq $dll -or -not $OnWindows) {
+    if ($null -ne $dll) { Write-Host 'SKIP  1 to 4, the scan and Fix run on a scratch install: they read Windows paths, Windows'' Skyrim folders and its processes, which only Windows has' }
+    try { Remove-Item -LiteralPath $T -Recurse -Force } catch { Write-Host "      (scratch left at $T)" }
+    Done
+}
 
-foreach ($r in $refs) { if ($r -like '*webview2*') { Copy-Item -LiteralPath $r -Destination $build -Force } }
-$out = & $exe $T 2>&1 | ForEach-Object { "$_" }
+$out = Invoke-LauncherExe $dll $T 2>&1 | ForEach-Object { "$_" }
 foreach ($l in $out) {
     if ($l -match '^PASS  ') { $script:pass++; Write-Host $l }
     elseif ($l -match '^FAIL  ') { $script:fail++; Write-Host $l }
