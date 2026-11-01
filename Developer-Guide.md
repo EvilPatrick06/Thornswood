@@ -851,8 +851,8 @@ Ship, a Deploy-*, Publish-* or Install-* script, a step on the live or dev
 server, a Vortex step) is run by Bramble, from the note the change's pull
 request leaves in the private ops repo's `ops\claude-queue\` folder
 (`ops\README.md` there has the template), once that pull request is merged;
-a main or live run still waits for Patrick's word. Until the switch, the
-Claude Desk runs those notes. Bot branches carry the Bot's name
+a main or live run still waits for Patrick's word. Since 1 Nov the Claude
+Desk neither runs those notes nor merges. Bot branches carry the Bot's name
 (`wisp/3150-what-it-is`). On the shipping machine `C:\Thornswood-Repo` is
 shared and sits detached at `origin/main`: branch work goes in a worktree in
 its ignored `worktrees` folder, removed with its branch once the pull request
