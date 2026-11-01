@@ -149,7 +149,7 @@ try {
     Put $tmp 'launcher/app/Updater.cs' @('        public const string ExpectedSigner = "Ada Signer";')
     Put $tmp 'CONTRIBUTING.md' @('Never "player".', 'And a player here is not the rule.')
     # With a byte order mark, which the check has to read through.
-    Put $tmp 'launcher/ui.xaml' @('<TextBlock x:Name="PlayerList" Text="the multiplayer client"/>', ('<TextBlock Text="one' + $em + 'two"/>')) $utf8bom
+    Put $tmp 'launcher/app/MainWindow.axaml' @('<TextBlock x:Name="PlayerList" Text="the multiplayer client"/>', ('<TextBlock Text="one' + $em + 'two"/>')) $utf8bom
     Put $tmp 'bot/content.py' @('WELCOME = """', 'Nothing wrong here.', 'TODO say hello', '"""')
     Put $tmp 'site/data/site/a.md' @('Fine.', ('Not' + $em + 'fine.'))
     Put $tmp 'site/data/site/b.md' @('Fine, with a hyphen - and nothing else.', 'The todo list and the To Do board.')
@@ -179,7 +179,7 @@ try {
         'README.md:2:em-dash', 'README.md:3:banned-word', 'README.md:4:banned-word', 'README.md:7:old-owner', 'README.md:8:names-person',
         'SECURITY.md:2:em-dash', 'SECURITY.md:3:em-dash', 'SECURITY.md:4:em-dash', 'SECURITY.md:5:signer-name',
         'CONTRIBUTING.md:2:banned-word',
-        'launcher/ui.xaml:2:em-dash',
+        'launcher/app/MainWindow.axaml:2:em-dash',
         'bot/content.py:3:placeholder',
         'site/data/site/a.md:2:em-dash',
         'site/data/board.json:2:banned-word',
@@ -209,7 +209,7 @@ try {
         Yes ("rule $rule catches every break planted for it ($caught of $planted)") ($planted -gt 0 -and $caught -eq $planted)
     }
     Yes ('a hit exits 1 (exit ' + $s.Code + ')') ($s.Code -eq 1)
-    Yes 'a file with a byte order mark is read through it' ($s.Hits -contains 'launcher/ui.xaml:2:em-dash')
+    Yes 'a file with a byte order mark is read through it' ($s.Hits -contains 'launcher/app/MainWindow.axaml:2:em-dash')
     Yes 'any Markdown file is read, not only named ones (docs/NEW.md)' ($s.Hits -contains 'docs/NEW.md:1:placeholder')
     Yes 'a public page other than home is read (site index.html)' ($s.Hits -contains 'site/public/index.html:1:banned-word')
     Yes 'lore, the archive and code files are not read' (@($s.Hits | Where-Object { $_ -like 'lore/*' -or $_ -like 'docs/archive/*' -or $_ -like 'game/*' }).Count -eq 0)
@@ -243,7 +243,7 @@ try {
     Put $tmp 'README.md' @('# Seeded', 'A multiplayer engine, a playtest, getPlayer() and PlayerCharacter.', 'Clone https://github.com/ThornswoodRP/Thornswood to start.')
     Put $tmp 'SECURITY.md' @('Fine.', 'Signed as the name on the signing certificate; the oldest branches use the gavin/ prefix.', 'Patrick holds the key, and this page may say so.')
     Put $tmp 'CONTRIBUTING.md' @('Never "player".', 'And people here are customers.')
-    Put $tmp 'launcher/ui.xaml' @('<TextBlock x:Name="PlayerList" Text="the multiplayer client"/>') $utf8bom
+    Put $tmp 'launcher/app/MainWindow.axaml' @('<TextBlock x:Name="PlayerList" Text="the multiplayer client"/>') $utf8bom
     Put $tmp 'bot/content.py' @('WELCOME = """', 'Nothing wrong here.', '"""')
     Put $tmp 'site/data/site/a.md' @('Fine.')
     Put $tmp 'site/data/board.json' @('{ "active": { "intro": "Fine.",', '  "sections": [ { "note": "an ordinary Skyrim save" } ] } }')

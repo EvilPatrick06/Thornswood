@@ -13,7 +13,7 @@
 // copy. The setup block listed git, gh, node and Python and never mentioned the
 // dev build, although every change goes to the dev build first. And none of
 // these six folders had a word written about it outside the code:
-// launcher reads like the launcher's source and holds one HTML page, and
+// launcher reads like the launcher's source and its compiled window, and
 // installer holds what the install hands over, while the install itself is
 // in the launcher's first start (#4824).
 //
@@ -97,7 +97,7 @@ function tracked(rel) {
     return execSync('git ls-files -- "' + rel + '"', { cwd: ROOT }).toString().trim().length > 0;
   } catch (e) { return null; }
 }
-// What a button in ui.xaml says on it, whichever way it is written: the
+// What a button in the launcher's window (launcher\app\MainWindow.axaml) says on it, whichever way it is written: the
 // Content attribute for a plain label, or the first nested TextBlock's Text for
 // one built out of a dot, a label and a line of meta, which is how every entry
 // in the Play page's server dropdown is written. '' when there is no such
@@ -313,20 +313,30 @@ SIX.forEach(function (d) {
 {
   const t = readme.launcher || '';
   const bl = read('scripts/release/Build-Launcher.ps1') || '';
-  const voice = read('launcher/app/Voice.cs') || '';
+  const art = read('launcher/app/Art.cs') || '';
   const held = files('launcher');
-  // Since phase 7 (issue #440) this is the whole launcher, not only its voice
-  // page: the source, the window, the icon and art, the voice page, WebView2.
-  yes('launcher: holds the source folder, the window and the voice page (' + held.join(', ') + ')',
-      held.indexOf('ui.xaml') >= 0 && held.indexOf('voice-host.html') >= 0 && exists('launcher/app/Shell.cs'));
+  // Since phase 7 (issue #440) this is the whole launcher: the source, the
+  // window, the icon and the art. Since #4823 the window is compiled markup
+  // in launcher\app (MainWindow.axaml, with App.axaml), not a ui.xaml read at
+  // run time, and voice is the launcher's own code, so there is no voice page
+  // and no WebView2 or NLayer file under launcher\lib.
+  yes('launcher: holds the art and the key template, and no ui.xaml or voice page (' + held.join(', ') + ')',
+      held.indexOf('launcher-header.webp') >= 0 && held.indexOf('Thornswood.ini') >= 0 &&
+      held.indexOf('ui.xaml') < 0 && held.indexOf('voice-host.html') < 0 && !exists('launcher/lib'));
+  yes('launcher: the source folder holds the compiled window and the application',
+      exists('launcher/app/Shell.cs') && exists('launcher/app/MainWindow.axaml') &&
+      exists('launcher/app/MainWindow.axaml.cs') && exists('launcher/app/App.axaml'));
   // Since #498's switch the project file says what goes in, and Build-Launcher.ps1 builds it.
   const appProj = read('launcher/app/Thornswood.csproj') || '';
-  yes('launcher: Thornswood.csproj embeds the voice page by name, and Build-Launcher.ps1 builds that project',
-      /<EmbeddedResource Include="\.\.\\voice-host\.html"><LogicalName>voice-host\.html<\/LogicalName>/.test(appProj) &&
+  yes('launcher: Thornswood.csproj embeds the moving header strip by name, and Build-Launcher.ps1 builds that project',
+      /<EmbeddedResource Include="\.\.\\launcher-header\.webp"><LogicalName>launcher-header\.webp<\/LogicalName>/.test(appProj) &&
       bl.indexOf("Join-Path $Src 'Thornswood.csproj'") >= 0);
-  yes('launcher: Voice.cs loads it by that name', voice.indexOf('"voice-host.html"') >= 0);
+  yes('launcher: Art.cs loads it by that name', art.indexOf('"launcher-header.webp"') >= 0);
   yes('launcher: the README says where the source and the window are',
-      t.indexOf('`launcher' + BS + 'app`') >= 0 && t.indexOf('ui.xaml') >= 0 && t.indexOf('voice-host.html') >= 0);
+      t.indexOf('`launcher' + BS + 'app`') >= 0 && t.indexOf('MainWindow.axaml') >= 0 &&
+      t.indexOf('App.axaml') >= 0 && t.indexOf('launcher-header.webp') >= 0);
+  yes('launcher: the README says how it is built, with dotnet publish and Native AOT, not MSBuild',
+      /dotnet publish/.test(t) && /Native AOT/.test(t) && !/\bMSBuild\b/.test(t));
 }
 
 // ------------------------------------------------------------ installer --
@@ -445,7 +455,7 @@ SIX.forEach(function (d) {
     while (e < lines.length - 1 && lines[e + 1].trim() !== '') { e++; }
     para = lines.slice(s, e + 1).join('\n');
   }
-  const ui = read('launcher/ui.xaml') || '';
+  const ui = read('launcher/app/MainWindow.axaml') || '';
   const shell = read('launcher/app/Shell.cs') || '';
   const install = label(ui, 'BtnServerDev');
   const make = label(ui, 'BtnOwnGameMake');
@@ -455,11 +465,11 @@ SIX.forEach(function (d) {
   // Which entry that is, measured rather than taken from the paragraph. The
   // label above is only worth checking while this is the control that does it.
   yes('that entry is in the dropdown the paragraph sends a reader to, under the server button',
-      /<Popup x:Name="ServerPickPopup"[^>]*[\s\S]*?ElementName=BtnServerPick/.test(ui) &&
+      /<Popup x:Name="ServerPickPopup"[^>]*[\s\S]*?#BtnServerPick\b/.test(ui) &&
       ui.indexOf('x:Name="BtnServerPick"') < ui.indexOf('x:Name="BtnServerDev"') &&
       /Play page/.test(para) && /dropdown/.test(para));
   yes('and pressing it is what installs the dev build (Shell.cs, SwitchToDev)',
-      /btnServerDev\s*=\s*F<Button>\("BtnServerDev"\)/.test(shell) &&
+      /btnServerDev\s*=\s*win\.BtnServerDev\b/.test(shell) &&
       /btnServerDev\.Click\s*\+=[\s\S]{0,160}?SwitchToDev\(\)/.test(shell) &&
       /static void SwitchToDev\(\)[\s\S]*?DevBuild\.Install\(/.test(shell));
 

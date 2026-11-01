@@ -15,7 +15,7 @@ using Avalonia.Threading;
 namespace Thornswood
 {
     /// <summary>
-    /// Profile\accepted.json, the same file the setup program writes when the
+    /// Profile\accepted.json, the same file the install window writes when the
     /// terms, the privacy policy and the rules are ticked (issue #1009).
     ///
     /// An install made before that lock has no file, and nothing else in the
