@@ -1122,6 +1122,36 @@ public sealed class AgentTests : IDisposable
         Assert.False(File.Exists(Path.Combine(s.Root, "data", "thornswood-deploy.json")), "a record was written for a deploy that did not take");
     }
 
+    // The cause of AFailedHealthCheckPutsTheOldOneBack failing now and then on
+    // the Windows gate (1 Nov, "could not put the new gamemode.js in place"):
+    // the stand-in engine reads gamemode.js every 5 ms, sharing delete as the
+    // real one does, and the swap was MoveFileEx, which Windows refuses while
+    // any handle is open on the file it replaces (#2727).
+    [Fact]
+    public void AFileIsReplacedWhileAReaderSharingDeleteHoldsTheOldOne()
+    {
+        var d = Temp();
+        var to = Path.Combine(d, "gamemode.js");
+        var from = Path.Combine(d, "gamemode.js.new");
+        File.WriteAllText(to, "// old\n");
+        File.WriteAllText(from, "// new\n");
+        using (var reader = Thornswood.DeployAgent.Files.OpenShared(to))
+        {
+            if (OperatingSystem.IsWindows())
+                Assert.True(Record.Exception(() => File.Move(from, to, true)) is UnauthorizedAccessException or IOException, "MoveFileEx replaced a file a reader held open");
+            Thornswood.DeployAgent.Files.Into(from, to);
+            using var r = new StreamReader(reader);
+            Assert.Equal("// old\n", r.ReadToEnd());
+        }
+        Assert.Equal("// new\n", File.ReadAllText(to));
+        Assert.False(File.Exists(from));
+        // A handle that does not share delete still refuses it, and nothing moves.
+        File.WriteAllText(from, "// newer\n");
+        using (new FileStream(to, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            if (OperatingSystem.IsWindows()) Assert.Throws<IOException>(() => Thornswood.DeployAgent.Files.Into(from, to));
+        if (OperatingSystem.IsWindows()) Assert.Equal("// new\n", File.ReadAllText(to));
+    }
+
     [Fact]
     public async Task AFailedHealthCheckPutsTheOldOneBack()
     {
