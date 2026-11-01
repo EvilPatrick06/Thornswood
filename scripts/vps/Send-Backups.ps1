@@ -98,7 +98,10 @@ if ($Install) {
   foreach ($sid in 'S-1-5-18', 'S-1-5-32-544') {
     $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($sid)), 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow')))
   }
-  (Get-Item -LiteralPath $Box -Force).SetAccessControl($acl)
+  # pwsh's DirectoryInfo has no SetAccessControl; Windows PowerShell's does (#2862).
+  $item = Get-Item -LiteralPath $Box -Force
+  if ($PSVersionTable.PSEdition -eq 'Core') { [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]$item, [Security.AccessControl.DirectorySecurity]$acl) }
+  else { $item.SetAccessControl($acl) }
   Note "  $Box is SYSTEM's and the Administrators' only"
   if (-not (Test-Path -LiteralPath $Key)) {
     & $keygen -q -t ed25519 -N '""' -C 'thornswood-box-drops-backups' -f $Key
