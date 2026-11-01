@@ -16,8 +16,8 @@
   What it checks:
     - Checks.CollectionRevisionUrl makes .../collections/<slug>/revisions/<N>
       from the configured address and the feed's revision, and leaves the
-      address as it is with no revision or no collection in it (compiled and
-      run with the build's compiler on Windows; SKIP elsewhere);
+      address as it is with no revision or no collection in it (built the
+      way the project builds, with the .NET 10 SDK, and run, on any system);
     - no button, card or box in the launcher opens cfg.CollectionUrl as it
       stands: each goes through OpenCollection, whose page is CollectionLink;
     - the ahead state has its own Play label and tooltip, saying nothing
@@ -88,8 +88,8 @@ $bar = Method $shell 'static void ShowCollectionBar(int revision = -1)'
 Yes 'the ahead card says nothing needs installing' ($bar.Contains('nothing needs installing'))
 # Since #3201 the card's button above Play and Settings' are one handler with
 # one label and one visibility, in ShellUpdate.cs (InstallNowPressed, InstallShown).
-Yes 'the ahead card has no install button' ($bar.Contains('InstallShown(problem == "ahead" ? Visibility.Collapsed : Visibility.Visible);') -and
-    $update -match '(?s)static void InstallShown\(Visibility shown\)\s*\{\s*if \(btnInstallNow != null\) btnInstallNow\.Visibility = shown;\s*if \(btnUpdate != null\) btnUpdate\.Visibility = shown;')
+Yes 'the ahead card has no install button' ($bar.Contains('InstallShown(problem != "ahead");') -and
+    $update -match '(?s)static void InstallShown\(bool shown\)\s*\{\s*if \(btnInstallNow != null\) btnInstallNow\.IsVisible = shown;\s*if \(btnUpdate != null\) btnUpdate\.IsVisible = shown;')
 $click = Method $update 'static void InstallNowPressed()'
 Yes 'a press on the bar''s button while ahead opens nothing' ($click.Contains('if (collectionBarUp && CollectionProblem() == "ahead") return;'))
 $draw = Method $shell 'static bool DrawStatus()'
@@ -99,9 +99,9 @@ Yes 'Play has its own label for ahead, ahead of the install label' ($aheadAt -gt
 Yes 'its tooltip says nothing needs installing' ($draw.Substring([Math]::Max(0, $aheadAt), 700).Contains('Nothing needs installing.'))
 Yes 'a copy behind reads UPDATE THE MODS FIRST' ($draw.Contains('== "stale" ? "UPDATE THE MODS FIRST" : "INSTALL THE MODS FIRST"'))
 Yes 'Play is still enabled by the same test' ($draw.Contains('btnPlay.IsEnabled = all && !playing && !updatePending && !collectionBarUp && !ownGameBusy && !working && feedNotice.Hold == null;'))
-$status = Method $packs 'static UIElement CollectionStatusCard()'
+$status = Method $packs 'static Control CollectionStatusCard()'
 Yes 'the Diagnostics ahead card has no button' ($status.Contains('installing; Play opens once the server is rebuilt on your revision.", false);'))
-Yes 'CollectionCard leaves the button out when asked' ((Method $packs 'static UIElement CollectionCard(string title, string body, bool button = true)').Contains('if (button)'))
+Yes 'CollectionCard leaves the button out when asked' ((Method $packs 'static Control CollectionCard(string title, string body, bool button = true)').Contains('if (button)'))
 
 # ---- why updates wait -------------------------------------------------------
 $wait = Method $shell 'static string[] CollectionWait()'
@@ -149,9 +149,8 @@ Yes 'help.md says to install the revision the link opens' ($help.Contains('it op
 Yes 'help.md tells a copy ahead of the server nothing needs installing' ($help.Contains('## When your mods are ahead of the server') -and $help.Contains('nothing needs installing'))
 
 # ---- the real method, compiled ----------------------------------------------
-if (-not $OnWindows) {
-    Write-Host 'SKIP  Checks.CollectionRevisionUrl compiled and run: the build''s compiler (the Build Tools'' csc, against .NET Framework 4.8.1) is only on Windows; its source was read above'
-} else {
+Yes 'the .NET SDK the launcher builds with is on this machine' (Test-Path -LiteralPath $LauncherDotnet)
+if (Test-Path -LiteralPath $LauncherDotnet) {
     $slug = Method $checks 'public static string CollectionSlug(Config cfg)'
     $fixture = @'
 using System;
