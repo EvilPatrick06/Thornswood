@@ -47,7 +47,10 @@
 // every source and the bytes of every file read, so the same code is built
 // once; a build() folder and its assembly carry that hash in their name.
 // tests\Launcher-Csc.ps1 writes the same project the same way, and names a
-// buildProject() folder by the same hash, so the two share it.
+// buildProject() folder by the same hash, so the two share it. A build() is
+// for this machine's runtime identifier, so it carries this machine's native
+// libraries only, and package files are hard links to the NuGet cache where
+// the disk allows one: copied, one build of the whole launcher was 580 MB.
 //
 // Until #4823 this found the Roslyn csc in Visual Studio's Build Tools, which
 // only Windows has, and every compile here was SKIP off Windows (#3005).
@@ -103,6 +106,17 @@ function findDotnet() {
 }
 const dotnet = findDotnet();
 
+// The runtime identifier of this machine, as the SDK names it, asked once.
+let hostRid = null;
+function rid() {
+  if (hostRid) return hostRid;
+  const r = cp.spawnSync(dotnet, ['--info'], { encoding: 'utf8' });
+  const m = /^\s*RID:\s*(\S+)/m.exec(r.stdout || '');
+  if (!m) throw new Error('launcher-csc: dotnet --info names no RID, so a build cannot pick this machine\'s native libraries. It said:\n' + ((r.stdout || '') + (r.stderr || '')).trim());
+  hostRid = m[1];
+  return hostRid;
+}
+
 function build(opts) {
   const sources = (opts && opts.sources) || [];
   let files = ((opts && opts.files) || []).map((f) => {
@@ -143,6 +157,9 @@ function build(opts) {
     '    <EnableDefaultItems>false</EnableDefaultItems>',
     '    <UseAppHost>false</UseAppHost>',
     '    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>',
+    '    <CreateHardLinksForCopyLocalIfPossible>true</CreateHardLinksForCopyLocalIfPossible>',
+    '    <RuntimeIdentifier>' + rid() + '</RuntimeIdentifier>',
+    '    <SelfContained>false</SelfContained>',
     '    <GenerateDocumentationFile>false</GenerateDocumentationFile>',
     '    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>',
     ...(opts.main ? ['    <StartupObject>' + esc(opts.main) + '</StartupObject>'] : []),
@@ -233,6 +250,7 @@ function buildProject() {
     const r = cp.spawnSync(dotnet, ['build', projPath, '-c', 'Release', '-o', bin,
       '-p:BaseIntermediateOutputPath=' + path.join(work, 'obj') + path.sep,
       '-p:BaseOutputPath=' + path.join(work, 'out') + path.sep,
+      '-p:CreateHardLinksForCopyLocalIfPossible=true',
       '-nologo', '-v:q', '-clp:NoSummary;ErrorsOnly'], { encoding: 'utf8' });
     if (r.status !== 0 || !fs.existsSync(path.join(bin, 'Thornswood.dll'))) {
       throw new Error('launcher-csc buildProject: the .NET SDK refused launcher/app/Thornswood.csproj:\n' + ((r.stdout || '') + (r.stderr || '')).trim());
