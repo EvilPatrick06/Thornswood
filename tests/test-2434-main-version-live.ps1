@@ -235,7 +235,7 @@ function Run {
     Yes 'BuildNews keeps the header line, so an answer is put in without rebuilding the list' ($sn -match 'newsHead = ht;' -and $sn -match '(?s)static void MainVersionRead\(string got, string why\).*?if \(newsHead != null\) newsHead\.Text = DevHeadText\(\);')
     Yes 'the read is on a pool thread and the answer comes back on the window''s' ($sn -match '(?s)static void ReadMainVersion\(\).*?ThreadPool\.QueueUserWorkItem.*?Updater\.MainLauncherVersion\(cfg\).*?Dispatcher\.UIThread\.Post\(delegate \{ MainVersionRead\(got, why\); \}\);')
     Yes 'one read at a time' ($sn -match '(?s)static void ReadMainVersion\(\)\s*\{\s*if \(mainReading\) return;\s*mainReading = true;')
-    Yes 'the DEV marks still come from the dev feed''s notes' ($sn -match 'if \(items\[i\]\.IsDev\) ahead\+\+;')
+    Yes 'the DEV marks are the notes'' own (ReleaseNews.cs marks them from main''s Deployment)' ($sn -match 'if \(items\[i\]\.IsDev\) ahead\+\+;')
 }
 
 try {

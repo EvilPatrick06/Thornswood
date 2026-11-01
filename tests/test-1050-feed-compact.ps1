@@ -24,7 +24,8 @@
     - the launcher compiled from launcher\app (or -Src, any launcher source,
       such as the one at a channel's minLauncher) with the compiler the build
       runs (tests\Launcher-Csc.ps1), reads that file with VersionDoc.Parse:
-      every field it binds, the record pointer and its note, and the news file
+      every field it binds, and the record pointer and its note (the news
+      file is the site's: the launcher reads its News from the Releases, #5187)
 
   The launcher half runs under Windows PowerShell 5.1, because the launcher
   runs on the .NET Framework; this script starts itself there for it. Nothing
@@ -128,8 +129,6 @@ if ($ParseFeed) {
             $null -ne $v.record -and $v.record.id -eq '20261012-115531' -and $v.record.sha256 -eq $NoteSha -and
             $v.record.url -eq ('https://thornswood.net/feed/assets/' + $NoteSha))
         Yes '  and its note, line break, quotes, backslash and accents as written' ($null -ne $v.record -and $v.record.notes -ceq $Note)
-        Yes '  the news file, read apart (NewsRef.FromFeed)' (
-            $null -ne $v.newsRef -and $v.newsRef.sha256 -eq $NewsSha -and $v.newsRef.url -eq ('https://thornswood.net/feed/assets/' + $NewsSha))
     } finally {
         Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
     }
