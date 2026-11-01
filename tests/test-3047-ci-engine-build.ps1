@@ -192,7 +192,7 @@ try {
     }
     function Run-Of([long]$id, [string]$status = 'completed', [string]$conclusion = 'success') {
         return [pscustomobject]@{ id = $id; html_url = "https://github.com/$ForkRepo/actions/runs/$id"; status = $status; conclusion = $conclusion
-                                  head_sha = $commit; head_branch = 'thornswood/engine-changes'; event = 'push'; repository = [pscustomobject]@{ full_name = $ForkRepo } }
+                                  head_sha = $commit; head_branch = 'thornswood/engine-changes'; event = 'push'; repository = [pscustomobject]@{ id = 1375283516; full_name = $ForkRepo } }
     }
     function Art-Of([long]$id, [bool]$expired = $false) {
         return [pscustomobject]@{ id = $id; name = ('thornswood-engine-' + $commit); expired = $expired; digest = 'sha256:' + ('a' * 64); size_in_bytes = 34677624 }
