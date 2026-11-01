@@ -108,6 +108,10 @@ Yes 'Install-Bridge takes -Status, -Record and -Wait, never -Remove or a site' (
 Yes 'Setup-Domain takes -TaskOnly and -SkipDnsCheck, never a domain, an address or another Caddy' ((Words 'Setup-Domain -TaskOnly') -eq '-TaskOnly' -and
     (Words 'Setup-Domain -Domain x.net') -eq 'REFUSED' -and (Words 'Setup-Domain -Email a') -eq 'REFUSED' -and (Words 'Setup-Domain -CaddyVersion 1') -eq 'REFUSED' -and (Words 'Setup-Domain -AsSystem') -eq 'REFUSED')
 Yes 'Read-Availability reads the box''s own alerts.jsonl over -Days, never a path' ((Words 'Read-Availability -Days 28') -eq '-NoPause|-Days|28' -and (Words 'Read-Availability -Path x') -eq 'REFUSED')
+Yes 'Send-Backups installs with an IPv4 address only, reads its status, or sends; never another root, folder or user' ((Words 'Send-Backups -Install -VmHost 10.0.0.5') -eq '-NoPause|-Install|-VmHost|10.0.0.5' -and
+    (Words 'Send-Backups') -eq '-NoPause' -and (Words 'Send-Backups -Status') -eq '-NoPause|-Status' -and
+    (Words 'Send-Backups -Install -VmHost vm.example') -eq 'REFUSED' -and (Words 'Send-Backups -Root x') -eq 'REFUSED' -and
+    (Words 'Send-Backups -WatchRoot x') -eq 'REFUSED' -and (Words 'Send-Backups -Days 400') -eq 'REFUSED')
 Yes 'Check-Site takes nothing of the caller''s' ((Words 'Check-Site') -eq '-NoPause' -and (Words 'Check-Site -Who 1') -eq 'REFUSED' -and (Words 'Check-Site -Site x') -eq 'REFUSED')
 # Publish-Server through the gate is the dev server's, from the box's store,
 # and nothing else (#4987): main stays with a Main run Patrick approves.

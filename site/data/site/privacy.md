@@ -287,9 +287,10 @@ until 24 September 2026, and both are served from here now.
   dropped. The bot checks every hour.
 
 **Backups.** Encrypted recovery copies include site records and uploads. The
-server keeps seven daily and four weekly copies. Copies fetched to the
-operator's computer are kept for 30 days, with at least seven retained for
-recovery. A whole copy of the server taken by hand, before moving it to a
+server keeps seven daily and four weekly copies. Copies sent off the server,
+to the operator's own cloud server and from there to the operator's Google
+Drive, still encrypted, are kept for 30 days in each place, with at least
+seven retained for recovery. A whole copy of the server taken by hand, before moving it to a
 new machine, is encrypted the same way and kept on the operator's computer
 for 30 days. These are private recovery copies, not public downloads. Removing
 a live record does not rewrite older backups; they expire through that

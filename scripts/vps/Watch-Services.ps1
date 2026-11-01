@@ -105,10 +105,10 @@
     backup    the Thornswood Backup task's last result, and a backup file in
               C:\Thornswood-Backup less than 26 hours old
     offbox    the copy of the backups off this box is less than 26 hours
-              old: the newest copy Fetch-Backups.ps1 on One has checked, by
-              the name it writes into offbox.txt in this folder after each
-              run (#2755). Judged here, not on One, so a One that is off is
-              told about, since that is when the copy falls behind
+              old: the newest backup the Oracle VM took from
+              Send-Backups.ps1, by the name it writes into offbox.txt in
+              this folder after each one (#2755, #2862). Judged here, so a
+              copy that stopped going is told about
     runner    every build runner's Windows service is running: the first,
               thornswood-vps, and the numbered ones Install-Runner.ps1
               -Number puts beside it (4 October)
@@ -586,18 +586,19 @@ function BackupProblem($task, $folder, $hours) {
 }
 
 # '' when the newest copy off this box is younger than $hours, else why not
-# (#2755). Fetch-Backups.ps1 on One writes the name of the newest copy it has
-# checked into offbox.txt after each run, so this box knows how far behind the
-# copy off it is even while One is off, which is when it falls behind. The
+# (#2755). Send-Backups.ps1 writes the name of each backup the Oracle VM took
+# into offbox.txt (#2862; until 31 Oct Fetch-Backups.ps1 on One wrote the
+# newest it had checked), so this box knows how far behind the copy off it
+# is. The
 # age is read from the name, stamped by this box's clock when it took the
 # backup, so the two machines' clocks never meet.
 function OffBoxProblem($file, $hours) {
-  if (-not (Test-Path -LiteralPath $file)) { return ('One has not said it holds a copy: there is no ' + $file + ', which Fetch-Backups.ps1 writes after each copy it checks') }
+  if (-not (Test-Path -LiteralPath $file)) { return ('no copy has been sent off this box: there is no ' + $file + ', which Send-Backups.ps1 writes after each backup the VM took') }
   $name = ('' + (Get-Content -LiteralPath $file -TotalCount 1 -EA SilentlyContinue)).Trim()
   if ($name -notmatch '^thornswood-(\d{8}-\d{6})\.zip(\.enc)?$') { return ($file + ' does not name a backup') }
   $taken = [datetime]::ParseExact($Matches[1], 'yyyyMMdd-HHmmss', [Globalization.CultureInfo]::InvariantCulture)
   $age = ($now - $taken).TotalHours
-  if ($age -gt $hours) { return ('the newest copy One has checked is ' + $name + ', ' + [math]::Floor($age) + ' hours old, and the line is ' + $hours) }
+  if ($age -gt $hours) { return ('the newest copy sent off this box is ' + $name + ', ' + [math]::Floor($age) + ' hours old, and the line is ' + $hours) }
   return ''
 }
 
@@ -849,7 +850,7 @@ $checks = @(
 $tellOnly = @(
   @{ Name = 'backup'; Say = 'The nightly backup'; Fails = 'is failing'; Recovers = 'is working again'; Backup = 'Thornswood Backup'; Folder = 'C:\Thornswood-Backup'; Hours = 26 },
   @{ Name = 'offbox'; Say = 'The copy of the backups off the VPS'; Fails = 'is out of date'; Recovers = 'is up to date again'; OffBox = (Join-Path $root 'offbox.txt'); Hours = 26
-     Fix = 'Fetch-Backups.ps1 on One brings the nightly backup down at 04:15 while One is on and signed in. Run .\scripts\vps\Fetch-Backups.ps1 there, and -Schedule again if its task is gone. Until then a VPS lost is everything since that copy lost too.' },
+     Fix = 'The Thornswood Send Backups task sends each nightly to the Oracle VM when the backup task ends (#2862). Its record says why it did not: the gate verb Send-Backups -Status. Until then a VPS lost is everything since that copy lost too.' },
   @{ Name = 'runner'; Say = 'The build runner (Launcher builds on thornswood-vps and every numbered one)'; Service = 'actions.runner.*.thornswood-vps*' },
   # Caddy's own certificate (#2995), which only this box can reach now.
   @{ Name = 'cert'; Say = 'The certificate Caddy holds for thornswood.net'; Fails = 'needs a look'; Recovers = 'is fine again'; Cert = 'https://thornswood.net/'; Days = 14
