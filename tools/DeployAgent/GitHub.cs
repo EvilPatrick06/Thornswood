@@ -116,8 +116,18 @@ public sealed class GitHub(string api, string repo, ITokenSource tokens, HttpCli
     public Task<Release> ReleaseByTag(string tag, CancellationToken ct) =>
         Call<Release>(HttpMethod.Get, $"{RepoPath}/releases/tags/{Uri.EscapeDataString(tag)}", null, ct);
 
-    public Task<List<Release>> Releases(int n, CancellationToken ct) =>
-        Call<List<Release>>(HttpMethod.Get, $"{RepoPath}/releases?per_page={n}", null, ct);
+    /// <summary>The names of every tag that starts with prefix. GitHub's list
+    /// of Releases is a page of them in its own order (a Release's created_at
+    /// is its commit's date, so one made today can sit far down), so the
+    /// newest of a kind is found from the tags, all of them, and then fetched
+    /// by its tag.</summary>
+    public async Task<List<string>> TagNames(string prefix, CancellationToken ct)
+    {
+        var refs = await Call<List<Ref>>(HttpMethod.Get, $"{RepoPath}/git/matching-refs/tags/{Uri.EscapeDataString(prefix)}", null, ct);
+        return refs.Select(r => r.Name).Where(n => n.StartsWith("refs/tags/", StringComparison.Ordinal)).Select(n => n["refs/tags/".Length..]).ToList();
+    }
+
+    sealed class Ref { [JsonPropertyName("ref")] public string Name { get; set; } = ""; }
 
     /// <summary>Saves one asset to a file, refusing more bytes than the asset
     /// says it has. GitHub answers with a redirect to its file store, and

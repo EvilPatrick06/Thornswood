@@ -166,18 +166,27 @@ if (-not (Test-Path -LiteralPath `$root)) { New-Item -ItemType Directory -Path `
 if (`$LASTEXITCODE -ne 0) { Refuse ('icacls could not set the rules on ' + `$root) }
 New-Item -ItemType Directory -Force -Path (Join-Path `$stage 'files') | Out-Null
 
-# Which Release. Published Releases only: GitHub lists no draft to a caller
-# with no token.
-try { `$rels = @(Invoke-RestMethod -Uri 'https://api.github.com/repos/$Repo/releases?per_page=50' -Headers `$h) }
-catch { Refuse ('GitHub would not list the Releases: ' + `$_.Exception.Message) }
-`$best = `$null; `$bestV = `$null
-foreach (`$r in `$rels) {
-  if (`$r.draft -or `$r.tag_name -notmatch '^agent-v(\d+\.\d+\.\d+)$') { continue }
-  `$v = [version]`$Matches[1]
-  if (`$want -and `$r.tag_name -ne `$want) { continue }
-  if (-not `$bestV -or `$v -gt `$bestV) { `$best = `$r; `$bestV = `$v }
+# Which Release. The newest agent-v tag of all of them (GitHub's list of
+# Releases is one page in its own order, a Release's created_at being its
+# commit's date), then its Release by the tag, which answers with a published
+# Release only. Windows PowerShell 5.1 hands a JSON array back as one object
+# holding it, so the list is spread through ForEach-Object before it is read
+# (#3686); without that every tag name was tested at once and none matched.
+`$tag = `$want
+if (-not `$tag) {
+  try { `$refs = @(Invoke-RestMethod -Uri 'https://api.github.com/repos/$Repo/git/matching-refs/tags/agent-v' -Headers `$h | ForEach-Object { `$_ }) }
+  catch { Refuse ('GitHub would not list the agent-v tags: ' + `$_.Exception.Message) }
+  `$bestV = `$null
+  foreach (`$r in `$refs) {
+    if ([string]`$r.ref -cnotmatch '^refs/tags/(agent-v(\d+\.\d+\.\d+))`$') { continue }
+    `$v = [version]`$Matches[2]
+    if (-not `$bestV -or `$v -gt `$bestV) { `$tag = `$Matches[1]; `$bestV = `$v }
+  }
+  if (-not `$tag) { Refuse 'there is no agent-v tag yet: deploy-agent.yml makes one, with its Release, when its change reaches main' }
 }
-if (-not `$best) { if (`$want) { Refuse ('there is no published Release ' + `$want) } else { Refuse 'there is no published agent-v Release yet: deploy-agent.yml makes one when its change reaches main' } }
+try { `$best = Invoke-RestMethod -Uri ('https://api.github.com/repos/$Repo/releases/tags/' + `$tag) -Headers `$h }
+catch { Refuse ('there is no published Release ' + `$tag + ' (GitHub said: ' + `$_.Exception.Message + ')') }
+if ([string]`$best.tag_name -cne `$tag -or `$best.draft) { Refuse ('GitHub answered for ' + `$tag + ' with ' + `$best.tag_name) }
 'release ' + `$best.tag_name
 
 function Fetch([string]`$name, [string]`$to) {
