@@ -96,3 +96,99 @@ function Get-NoteProblems([string]$Notes) {
     }
     return $problems.ToArray()
 }
+
+<#
+  THE RELEASE NOTE IN A PULL REQUEST (#5179).
+
+  A release's note was written by whoever shipped it, from merged pull request
+  titles, after the fact. Since #5179 each pull request carries its own note,
+  written by the person who made the change, and the build check reads it
+  while the pull request is open (scripts\dev\Check-PrBody.ps1, run by
+  .github\workflows\pr-body.yml). Collect-ReleaseNotes.ps1 joins the notes of
+  every pull request merged since the last release into the release's note, so
+  nobody writes one at release time and nothing in it is new to the rules.
+
+  In the pull request body, outside any <!-- comment -->:
+
+      Release note: The forge shows the price before you pay
+      - The forge window lists each metal a piece takes and how much.
+
+  A headline of three words or more, then at least one "- " detail line
+  directly under it: the same shape a release's note has, so a release that
+  carries one change is that change's note as written. A change nobody would
+  notice in the game, the launcher, the site or Discord (scripts, tests, docs
+  for the team, the board) says:
+
+      Release note: none
+#>
+
+# The note a pull request body carries. Returns Found (a Release note line is
+# there), None (it says none), Headline, Details (the "- " lines under it) and
+# Text (headline and details as one note), and Count, the number of Release
+# note lines, so a body with two can be refused rather than half read.
+function Get-PrReleaseNote([string]$Body) {
+    $text = [regex]::Replace([string]$Body, '(?s)<!--.*?-->', '')
+    $lines = @($text -split "`r?`n")
+    $at = @()
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match '^\s*(\*\*)?Release note:(\*\*)?\s*(.*?)\s*$') { $at += $i }
+    }
+    $r = [ordered]@{ Found = $false; None = $false; Headline = ''; Details = @(); Text = ''; Count = $at.Count }
+    if ($at.Count -eq 0) { return [pscustomobject]$r }
+    $i = $at[0]
+    $null = $lines[$i] -match '^\s*(\*\*)?Release note:(\*\*)?\s*(.*?)\s*$'
+    $r.Found = $true
+    $r.Headline = $Matches[3].Trim()
+    if ($r.Headline -match '^(?i)none\.?$') { $r.None = $true; return [pscustomobject]$r }
+    $details = New-Object System.Collections.Generic.List[string]
+    for ($j = $i + 1; $j -lt $lines.Count; $j++) {
+        if ($lines[$j] -match '^\s*-\s+\S') { $details.Add($lines[$j].Trim()) } else { break }
+    }
+    $r.Details = $details.ToArray()
+    $r.Text = (@($r.Headline) + $r.Details) -join "`n"
+    return [pscustomobject]$r
+}
+
+# What is wrong with a pull request body's release note, one line each; none
+# when it is right. Author is the pull request's author: Dependabot writes its
+# own bodies and only moves the versions of what we build with, so its pull
+# requests say none by rule rather than by a line.
+function Get-PrReleaseNoteProblems([string]$Body, [string]$Author = '') {
+    if ($Author -eq 'dependabot[bot]') { return @() }
+    $n = Get-PrReleaseNote $Body
+    $problems = New-Object System.Collections.Generic.List[string]
+    if (-not $n.Found) {
+        $problems.Add('there is no "Release note:" line. Add one under "For the Thornswood team": "Release note: none" when nobody would notice the change, otherwise a headline people read and a "- " line under it.')
+        return $problems.ToArray()
+    }
+    if ($n.Count -gt 1) { $problems.Add("there are $($n.Count) Release note lines; keep one, so the release says one thing for this change.") }
+    if ($n.None) { return $problems.ToArray() }
+    if (-not $n.Headline) { $problems.Add('the Release note line is empty: write a headline, or "none".') }
+    foreach ($p in @(Get-NoteShapeProblems $n.Text)) { $problems.Add($p) }
+    foreach ($p in @(Get-NoteProblems $n.Text)) { $problems.Add($p) }
+    return $problems.ToArray()
+}
+
+# Joins the notes of the pull requests a release carries, in merge order, into
+# the release's note: the first one's headline is the title, its details
+# follow, and each later one gives its headline as a "- " line and then its own
+# details. A line already there is not written twice. Items are objects with
+# Number and Body; those whose note is none are left out. Returns '' when none
+# of them has a note.
+function Join-PrReleaseNotes($Items) {
+    $out = New-Object System.Collections.Generic.List[string]
+    $seen = @{}
+    function Add-Line([string]$line) {
+        $key = (($line -replace '^\s*-\s*', '').Trim()).ToLowerInvariant()
+        if ($seen.ContainsKey($key)) { return }
+        $seen[$key] = $true
+        $out.Add($line)
+    }
+    foreach ($it in @($Items)) {
+        $n = Get-PrReleaseNote ([string]$it.Body)
+        if (-not $n.Found -or $n.None -or -not $n.Headline) { continue }
+        if ($out.Count -eq 0) { Add-Line $n.Headline } else { Add-Line ('- ' + $n.Headline) }
+        foreach ($d in $n.Details) { Add-Line $d }
+    }
+    return ($out -join "`n")
+}
