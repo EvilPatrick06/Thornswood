@@ -264,7 +264,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Set-NexusKey.ps1](release/Set-NexusKey.ps1) | Puts Patrick's Nexus Mods API key on One, asked at a prompt and never shown, or says whether the key this machine has works (#2914). |
 | [release/Setup-ShipMachine.ps1](release/Setup-ShipMachine.ps1) | Checks and prepares a Windows machine to Ship dev, and says what is left for a person to do. |
 | [release/Ship-OnBox.ps1](release/Ship-OnBox.ps1) | The deploy gate's Ship verbs (#2841): a Ship from the feed run on the box itself, from main as the gate reads it, so a cloud session ships with no key to the box (Patrick, 30 Oct 2026: "we arent doing this on One"). |
-| [release/Ship-Rules.ps1](release/Ship-Rules.ps1) | The one list of what never leaves a machine inside a Thornswood pack or installer. |
+| [release/Ship-Rules.ps1](release/Ship-Rules.ps1) | The one list of what never leaves a machine inside a Thornswood pack. |
 | [release/Ship-Stack.ps1](release/Ship-Stack.ps1) | One Dev or Main command that runs the gamemode deploy and the host feed remirror. |
 | [release/Ship.ps1](release/Ship.ps1) | Builds the launcher and publishes everything that changed, launcher and mods both, in a single release, to the main build or the dev build. |
 | [release/ShippedBytes.ps1](release/ShippedBytes.ps1) | The bytes a file of this checkout goes out as, the same from every machine (#2903). |
