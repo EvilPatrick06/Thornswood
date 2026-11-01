@@ -8,10 +8,10 @@
       pwsh scripts/ops/List-Untouched.ps1 -Days 45 -OutFile temp/review/untouched.md
 
   WHY (#5185, the redesign's part 5). 909 issues were open when #5185 was
-  filed, and an issue nobody looks at keeps whatever priority it was given
-  the day it was filed. A month untouched is the cue to look again: give it
-  the priority it deserves now, merge it into the issue it repeats, or write
-  what it waits on. Never to close it for being old (Developer-Guide.md, the
+  filed, and an issue nobody looks at keeps whatever Order it was given the
+  day it was filed. A month untouched is the cue to look again: move it to
+  where it belongs now (an order: label), merge it into the issue it
+  repeats, or write what it waits on. Never to close it for being old (Developer-Guide.md, the
   board: an issue closes when it is done, a duplicate or replaced).
 
   WHAT "TOUCHED" MEANS. GitHub's own updated time for the issue: a comment, a
@@ -19,8 +19,9 @@
   It is read with GitHub's issue search, which a cloud thread may use, so no
   board read is needed.
 
-  It prints one line per issue: its number, title, priority label (or "no
-  priority") and the day it was last touched, and the count. -OutFile also
+  It prints one line per issue: its number, title and the day it was last
+  touched, and the count (its Order is on the board, which a search cannot
+  read; Read-Board.ps1 has it). -OutFile also
   writes them there as a Markdown list. It changes nothing anywhere.
 
   Exits 0 with the list (an empty one included), 1 when GitHub could not be
@@ -61,11 +62,8 @@ for ($page = 1; $page -le 10; $page++) {
 
 $lines = New-Object System.Collections.Generic.List[string]
 foreach ($i in $found) {
-    $names = @($i.labels | ForEach-Object { [string]$_.name })
-    $p = @('P0', 'P1', 'P2', 'P3' | Where-Object { $names -contains $_ })
-    $prio = $(if ($p.Count) { $p[0] } else { 'no priority' })
     $when = ([DateTime]$i.updated_at).ToUniversalTime().ToString('d MMM yyyy', [Globalization.CultureInfo]::InvariantCulture)
-    $lines.Add(('#{0} {1} ({2}, last touched {3})' -f $i.number, $i.title, $prio, $when))
+    $lines.Add(('#{0} {1} (last touched {2})' -f $i.number, $i.title, $when))
 }
 Write-Host ('{0} open issue(s) on {1} untouched since {2} ({3} days):' -f $lines.Count, $GitHubRepo, $before, $Days)
 foreach ($l in $lines) { Write-Host "  $l" }

@@ -1,4 +1,4 @@
-# Reads the whole board, every card's Status and Priority, into a file a cloud
+# Reads the whole board, every card's Status and Order, into a file a cloud
 # session can download (#3192).
 #
 # WHY. The board is a Projects board, read here through GraphQL. It was a
@@ -35,9 +35,8 @@
 # Status options in board order, its built-in workflows and whether each is
 # on, and one entry per card: the repository, number, kind (Issue,
 # PullRequest or DraftIssue), title, state (OPEN, CLOSED or MERGED), Status,
-# Priority and whether the card is archived. A card with no Status or
-# Priority has null there. The Order field went with #5185, when a priority
-# label (P0 to P3) took its place, and is not read.
+# Order and whether the card is archived. A card with no Status or Order has
+# null there.
 #
 # THE TOKEN. The board App's (board.yml's header says what it is), minted
 # for the job from its key in the "board" environment, which only main may
@@ -97,7 +96,7 @@ jobs:
           $after = $null
           do {
             $vars = $who.Clone(); $vars.c = $after
-            $page = (Board 'query($o:String!,$n:Int!,$c:String){organization(login:$o){projectV2(number:$n){items(first:100,after:$c){pageInfo{hasNextPage endCursor} nodes{isArchived status:fieldValueByName(name:"Status"){... on ProjectV2ItemFieldSingleSelectValue{name}} priority:fieldValueByName(name:"Priority"){... on ProjectV2ItemFieldSingleSelectValue{name}} content{__typename ... on Issue{number title state repository{nameWithOwner}} ... on PullRequest{number title state repository{nameWithOwner}} ... on DraftIssue{title}}}}}}}' $vars).organization.projectV2.items
+            $page = (Board 'query($o:String!,$n:Int!,$c:String){organization(login:$o){projectV2(number:$n){items(first:100,after:$c){pageInfo{hasNextPage endCursor} nodes{isArchived status:fieldValueByName(name:"Status"){... on ProjectV2ItemFieldSingleSelectValue{name}} order:fieldValueByName(name:"Order"){... on ProjectV2ItemFieldNumberValue{number}} content{__typename ... on Issue{number title state repository{nameWithOwner}} ... on PullRequest{number title state repository{nameWithOwner}} ... on DraftIssue{title}}}}}}}' $vars).organization.projectV2.items
             foreach ($n in @($page.nodes)) {
               $c = $n.content
               $items.Add([ordered]@{
@@ -107,7 +106,7 @@ jobs:
                 title    = $(if ((Has $c 'title')) { $c.title } else { $null })
                 state    = $(if ((Has $c 'state')) { $c.state } else { $null })
                 status   = $(if ((Has $n 'status') -and (Has $n.status 'name')) { $n.status.name } else { $null })
-                priority = $(if ((Has $n 'priority') -and (Has $n.priority 'name')) { [string]$n.priority.name } else { $null })
+                order    = $(if ((Has $n 'order') -and (Has $n.order 'number')) { [double]$n.order.number } else { $null })
                 archived = [bool]$n.isArchived
               })
             }
