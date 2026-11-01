@@ -12,7 +12,9 @@
   code under test itself does something only Windows has.
 
   It sets these variables, and the functions below them, and nothing else
-  (apart from $OnWindows, which it gets from tests\Windows.ps1):
+  (apart from $OnWindows, which it gets from tests\Windows.ps1, and its own
+  workings, whose names all start with launcher, so none can replace a
+  variable of the harness that dot-sources it):
 
     $LauncherDotnet       the dotnet that builds the launcher: the one on
                           PATH, else $env:DOTNET_ROOT's, else ~/.dotnet's.
@@ -113,34 +115,45 @@ if (-not $LauncherLangVersion) { throw 'launcher\app\Thornswood.csproj names no 
 $LauncherFramework = Get-LauncherProjectValue 'TargetFramework'
 if (-not $LauncherFramework) { throw 'launcher\app\Thornswood.csproj names no TargetFramework, so the harnesses cannot compile against what the build does.' }
 
+# A harness dot-sources this file, so whatever it sets at the top lands
+# among the harness's own variables, and a loop variable here once replaced a
+# harness's $root (test-963 then looked for its scripts under ~/.dotnet). So
+# every value below is worked out inside & { }, a scope of its own, and only
+# names that start with Launcher or launcher are set here.
+
 # The project's own settings that change what compiles, copied as they are.
-$launcherCopied = @('Nullable', 'ImplicitUsings', 'AllowUnsafeBlocks', 'EnableWindowsTargeting', 'AvaloniaUseCompiledBindingsByDefault') | ForEach-Object {
-    $v = Get-LauncherProjectValue $_
-    if ($null -ne $v) { '    <' + $_ + '>' + [Security.SecurityElement]::Escape($v) + '</' + $_ + '>' }
-}
-$launcherPackages = @($launcherProjXml.SelectNodes('//ItemGroup/PackageReference') | ForEach-Object {
-    '    <PackageReference Include="' + [Security.SecurityElement]::Escape($_.Include) + '" Version="' + [Security.SecurityElement]::Escape($_.Version) + '" />'
+$launcherCopied = @(& {
+    foreach ($name in @('Nullable', 'ImplicitUsings', 'AllowUnsafeBlocks', 'EnableWindowsTargeting', 'AvaloniaUseCompiledBindingsByDefault')) {
+        $value = Get-LauncherProjectValue $name
+        if ($null -ne $value) { '    <' + $name + '>' + [Security.SecurityElement]::Escape($value) + '</' + $name + '>' }
+    }
+})
+$launcherPackages = @(& {
+    foreach ($ref in $launcherProjXml.SelectNodes('//ItemGroup/PackageReference')) {
+        '    <PackageReference Include="' + [Security.SecurityElement]::Escape($ref.Include) + '" Version="' + [Security.SecurityElement]::Escape($ref.Version) + '" />'
+    }
 })
 # For -Launcher: the project's resources, each as a full path and the name
 # the code asks for, read from the project the way the packages are.
 $launcherAppDir = Split-Path -Parent $launcherProjPath
-$launcherResources = @($launcherProjXml.SelectNodes('//ItemGroup/EmbeddedResource') | ForEach-Object {
-    $rel = $_.Include.Replace('\', [string][IO.Path]::DirectorySeparatorChar)
-    [pscustomobject]@{ Path = [IO.Path]::GetFullPath((Join-Path $launcherAppDir $rel)); Name = $_.LogicalName }
+$launcherResources = @(& {
+    foreach ($res in $launcherProjXml.SelectNodes('//ItemGroup/EmbeddedResource')) {
+        $rel = $res.Include.Replace('\', [string][IO.Path]::DirectorySeparatorChar)
+        [pscustomobject]@{ Path = [IO.Path]::GetFullPath((Join-Path $launcherAppDir $rel)); Name = $res.LogicalName }
+    }
 })
 
-$LauncherDotnet = $null
-$launcherOnPath = Get-Command dotnet -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
-if ($launcherOnPath) { $LauncherDotnet = $launcherOnPath.Source }
-else {
-    $launcherExeName = if ($OnWindows) { 'dotnet.exe' } else { 'dotnet' }
-    foreach ($root in @($env:DOTNET_ROOT, (Join-Path ([Environment]::GetFolderPath('UserProfile')) '.dotnet'))) {
-        if (-not $root) { continue }
-        $p = Join-Path $root $launcherExeName
-        if (Test-Path -LiteralPath $p) { $LauncherDotnet = $p; break }
+$LauncherDotnet = & {
+    $onPath = Get-Command dotnet -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($onPath) { return $onPath.Source }
+    $exeName = if ($OnWindows) { 'dotnet.exe' } else { 'dotnet' }
+    foreach ($dotnetRoot in @($env:DOTNET_ROOT, (Join-Path ([Environment]::GetFolderPath('UserProfile')) '.dotnet'))) {
+        if (-not $dotnetRoot) { continue }
+        $candidate = Join-Path $dotnetRoot $exeName
+        if (Test-Path -LiteralPath $candidate) { return $candidate }
     }
+    Join-Path ([IO.Path]::GetTempPath()) (Join-Path 'no-dotnet-sdk' 'dotnet')
 }
-if (-not $LauncherDotnet) { $LauncherDotnet = Join-Path ([IO.Path]::GetTempPath()) (Join-Path 'no-dotnet-sdk' 'dotnet') }
 
 function Build-LauncherCode {
     param(
