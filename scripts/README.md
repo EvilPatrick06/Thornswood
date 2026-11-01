@@ -87,7 +87,9 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [dev/Check-Change.ps1](dev/Check-Change.ps1) | Runs, before a push, the gate harnesses this branch's change can reach, from main's nightly map, in a cloud container or on a PC (#5183). |
 | [dev/Check-Controls.ps1](dev/Check-Controls.ps1) | Every control in the launcher is found at runtime by name. |
 | [dev/Check-Outside.ps1](dev/Check-Outside.ps1) | Walks the path a first install takes through the things this project does not run itself, and says which of them is broken or has moved. |
+| [dev/Check-Parse.ps1](dev/Check-Parse.ps1) | Says whether every PowerShell script and every game script parses (#5291). |
 | [dev/Check-PrBody.ps1](dev/Check-PrBody.ps1) | The parts of a pull request's body that a release reads, checked while the pull request is open (#5179). .github\workflows\pr-body.yml runs it on every pull request when it is opened, pushed to or its body is edited, so fixing the body is enough to turn it green. |
+| [dev/Check-Push.ps1](dev/Check-Push.ps1) | The pre-push hook's checks (#5291): every script parses and the writing rules hold, in the commit being pushed, before it leaves the machine. |
 | [dev/Check-Secrets.ps1](dev/Check-Secrets.ps1) | Read only. Looks for anything that must never leave a machine: in the files this repository tracks, in a pack or installer zip, in the installer's staged folder, or in a built program. |
 | [dev/Check-Serena.ps1](dev/Check-Serena.ps1) | Read only. Says how Claude Code on this machine starts Serena, and times one start the way Claude Code makes it: from the repo folder, over stdin and stdout, until Serena answers initialize and lists its tools. |
 | [dev/Check-Swallow.ps1](dev/Check-Swallow.ps1) | Counts the silent catches in the launcher and in the PowerShell under scripts\ and installer\, file by file, and fails when any file has more than scripts\dev\swallow-baseline.txt allows, or fewer than it allows with its line not yet lowered. |
@@ -98,6 +100,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [dev/Gate-Map.ps1](dev/Gate-Map.ps1) | Fetches the newest map of which gate harnesses a change can reach: the gate-map artifact of main's nightly trace on GitHub's runner (#5183, #4009). |
 | [dev/Install-Serena.ps1](dev/Install-Serena.ps1) | Installs Serena once, at the version in scripts\dev\serena-version.txt, and points Claude Code on this machine at the installed program, so a session start runs Serena straight away instead of resolving it first. |
 | [dev/Install-Thornswood.ps1](dev/Install-Thornswood.ps1) | Everything the client needs, in one run, in the order it has to happen in. |
+| [dev/Launcher-Reach.ps1](dev/Launcher-Reach.ps1) | Says whether a pull request's change reaches the job "Launcher builds" (#5292): launcher=true or launcher=false, to the step's outputs. |
 | [dev/Lint.ps1](dev/Lint.ps1) | Reports ruff, eslint and PSScriptAnalyzer findings, warnings only, over the files it is given or the whole tree, with each pinned tool fetched once per machine. |
 | [dev/Measure-Reclaim.ps1](dev/Measure-Reclaim.ps1) | How much disk deleting a folder would ACTUALLY free. |
 | [dev/Merge-HarnessReports.ps1](dev/Merge-HarnessReports.ps1) | Merges the JUnit reports of a run's harness shares into one report, and writes the failing checks, by name, to the run's summary (#5295). |
