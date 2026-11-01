@@ -58,7 +58,7 @@ const HEX7 = /^[0-9a-f]{7,40}$/;
 
 // Every way the pin, the two records and .gitmodules disagree, as sentences.
 // Empty when they are one engine.
-//   pin        the 40 character commit in HEAD's tree at engine/skymp
+//   pin        the 40 character commit the index pins at engine/skymp
 //   client     records/client-build.json, parsed
 //   server     records/server-build.json, parsed
 //   submodule  { url, branch } from .gitmodules for engine/skymp
@@ -229,13 +229,20 @@ function readJson(rel) {
   try { return JSON.parse(fs.readFileSync(path.join(REPO, rel), 'utf8').split(CR).join('')); } catch (e) { return null; }
 }
 
+// The pin in the index, which is what a commit takes: HEAD's on a clean
+// checkout like the build check's, and the moved pin in
+// scripts/release/Update-EnginePin.ps1, which moves it with git update-index
+// and runs this before it commits. Read from HEAD, the engine pin robot's
+// first pin stopped here on 1 Nov 2026 with the records already at the new
+// commit (#5207), as Get-EngineRecords.ps1 reads the index for the same
+// reason.
 let pin = '';
 try {
-  // "160000 commit <sha>\tengine/skymp"
-  const m = /^160000 commit ([0-9a-f]{40})\tengine\/skymp$/.exec(git(['ls-tree', 'HEAD', 'engine/skymp']));
+  // "160000 <sha> 0\tengine/skymp"
+  const m = /^160000 ([0-9a-f]{40}) 0\tengine\/skymp$/.exec(git(['ls-files', '-s', 'engine/skymp']));
   pin = m ? m[1] : '';
 } catch (e) { pin = ''; }
-yes('HEAD pins engine/skymp to a commit' + (pin ? ' (' + pin.slice(0, 8) + ')' : ''), !!pin);
+yes('the index pins engine/skymp to a commit' + (pin ? ' (' + pin.slice(0, 8) + ')' : ''), !!pin);
 
 let submodule = null;
 try {
