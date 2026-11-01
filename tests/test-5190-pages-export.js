@@ -55,6 +55,7 @@ function run(live, out) {
     const r = await run(live, out);
     good.close();
     yes('it exports (exit ' + r.code + ')', r.code === 0 && /10 pages written/.test(r.out));
+    if (r.code !== 0) console.log('  it said: ' + r.out.trim().slice(-600));
     yes('it asked the live site for its wording and invite', asked.some((u) => u.startsWith('/api/public')));
     const html = (n) => { try { return fs.readFileSync(path.join(out, n), 'utf8'); } catch (e) { return ''; } };
     const src = fs.readFileSync(path.join(REPO, 'site', 'server.js'), 'utf8');

@@ -171,7 +171,15 @@ async function main() {
     console.log('Export-Pages: ' + pages.length + ' pages written to ' + outDir + ' (' +
                 (pub.body.open ? 'open' : 'alpha') + ' wording)');
   } finally {
-    if (child && !child.killed) { try { child.kill(); } catch (e) { /* gone already */ } }
+    // The site copy is stopped and its exit waited for before its folder
+    // goes: on Windows a running process holds the files it opened there,
+    // and the folder cannot be removed until it has exited (the gate's
+    // Windows run of this, 1 Nov: pages written, then exit 1 on the cleanup).
+    if (child && child.exitCode === null && child.signalCode === null) {
+      const gone = new Promise((r) => child.once('exit', r));
+      try { child.kill(); } catch (e) { /* gone already */ }
+      await gone;
+    }
     fs.rmSync(scratch, { recursive: true, force: true });
   }
 }
