@@ -10,11 +10,10 @@
 # efficient, faster, safer, more accurate, streamlined, and more dynamic"
 # way. Every step was already a script; this runs them in order.
 #
-# HOW, ONE LOOK AT A TIME. Nothing in the fork can start a run here without
-# holding a token of this repository, so until plan part 8 this looked every
-# ten minutes; now it is woken too (WOKEN, NOT ONLY TICKING, below). Each
-# look, the job "look" asks GitHub what the next step is (scripts\release\EnginePin.ps1, Get-EnginePinStep):
-#   pinned, building, no-build, recording: nothing to do this tick;
+# HOW, ONE LOOK AT A TIME. Until plan part 8 this looked every ten minutes,
+# because nothing in the fork could start a run here; now it looks only when
+# woken (WOKEN, NOT TICKING, below). Each look, the job "look" asks GitHub what the next step is (scripts\release\EnginePin.ps1, Get-EnginePinStep):
+#   pinned, building, no-build, recording: nothing to do this look;
 #   aside: another open pull request moves engine/skymp (a pin made by hand,
 #          or a change that needs the pin with it), so this waits for it;
 #   record: the fork built its head green and nothing recorded it, so this
@@ -25,20 +24,30 @@
 #   red:   engine.yml's run for the head ended red. That is a failure to fix
 #          at its cause, so this run goes red with its link and never starts
 #          engine.yml again for that commit (no re-runs, #5148's rules).
-# From a fork merge: the fork's push build (20 to 45 minutes), a tick, the
+# From a fork merge: the fork's push build (20 to 45 minutes), the
 # record (about 3), the pin (about 4) and the build check (about 5).
 #
-# WOKEN, NOT ONLY TICKING (plan part 8, Patrick's yes of 31 Oct 2026). Three
-# things start a look the moment they happen, so a step waits for no tick:
+# WOKEN, NOT TICKING (plan part 8, Patrick's yes of 31 Oct 2026). Four
+# things start a look the moment they happen, so a step waits for nothing:
 #   - engine.yml's "wake" job, when a record run on main ends, green or red;
 #   - a push to main that moves engine/skymp, so a look that stood aside for
 #     another pin pull request moves on once that one merges;
 #   - the fork, when its push build of thornswood/engine-changes ends green
 #     (the fork's thornswood-wake-pin.yml, with the one secret the fork
 #     holds: a fine-grained token that may start workflows here and do
-#     nothing else, THORNSWOOD_PIN_WAKE).
-# The ten-minute tick stays until the fork's wake has run once for real;
-# then it goes, in its own pull request.
+#     nothing else, THORNSWOOD_PIN_WAKE);
+#   - another pull request that moves engine/skymp closed without merging
+#     (engine-pin-aside.yml), so a look that stood aside for it moves on.
+# The ten-minute tick went once the fork's wake had run for real (1 Nov
+# 2026, 2:50 AM UTC: the fork's build ended green, this ran 5 seconds later,
+# started engine.yml, and engine.yml's wake started this again). Two things
+# start no look, on purpose:
+#   - engine-pin/next's own pull request closed without merging. A person
+#     who closes it means "not this pin"; the next fork build or pin merge
+#     looks again, and the next fork head gets a pin of its own.
+#   - a look that ends red. An engine.yml run that ended red is never
+#     started again (#5148's rules); the next fork build's wake looks at the
+#     new head, or a person starts engine.yml by hand once the cause is fixed.
 #
 # THREE JOBS, BECAUSE OF THE TOKEN. "make" runs the front's npm build
 # (Build-Front.ps1), which is code from the npm registry, so its token can
@@ -66,18 +75,16 @@
 # tests\test-5148-engine-pin.ps1 holds this file's shape.
 name: Engine pin
 on:
-  schedule:
-    - cron: '3-59/10 * * * *'
   workflow_dispatch:
   # A pin made by another pull request has merged: the look that stood aside
-  # for it moves on now, not at the next tick.
+  # for it moves on now.
   push:
     branches: [main]
     paths: [engine/skymp]
 permissions:
   contents: read
-# One tick at a time. A tick never cancels the one before it, which may be
-# pushing; a third waiting tick drops the second, which would only look again.
+# One look at a time. A look never cancels the one before it, which may be
+# pushing; a third waiting look drops the second, which would only look again.
 concurrency:
   group: engine-pin
   cancel-in-progress: false
@@ -133,7 +140,7 @@ jobs:
         run: |
           gh workflow run engine.yml --repo $env:GITHUB_REPOSITORY --ref main -f "commit=$env:HEAD_COMMIT"
           if ($LASTEXITCODE -ne 0) { Write-Host '::error::engine.yml could not be started'; exit 1 }
-          Write-Host "engine.yml started for $env:HEAD_COMMIT; the next tick moves the pin once it is green"
+          Write-Host "engine.yml started for $env:HEAD_COMMIT; engine.yml's wake starts the next look, which moves the pin once it is green"
 
       - name: Open the pull request the branch is ready for
         if: steps.look.outputs.open == 'yes'

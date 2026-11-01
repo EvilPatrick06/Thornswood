@@ -1,0 +1,44 @@
+# Wakes the engine pin when another pull request that moves engine/skymp is
+# closed without merging (plan part 8, #5219).
+#
+# WHY. engine-pin.yml stands aside while another open pull request moves
+# engine/skymp (a pin made by hand, or a change that needs the pin with it),
+# and since its ten-minute tick went it looks only when woken. A merge of
+# that pull request wakes it (a push to main that moves engine/skymp); a
+# close without a merge moved nothing on main, so without this the pin would
+# wait for the next fork build.
+#
+# NOT FOR engine-pin/next. Its own pull request closed unmerged means a
+# person said "not this pin"; looking again would open it once more.
+#
+# ON pull_request, NEVER pull_request_target, which no workflow here runs on
+# (tests\test-1306-pr-workflow.js). It checks out nothing: one gh line that
+# starts engine-pin.yml on main, whose jobs check out main, with a token
+# that may start a workflow and do nothing else. A pull request from another
+# repository gets a token that only reads, so its close is passed over here
+# and the next fork build or pin merge looks instead.
+# tests\test-5148-engine-pin.ps1 holds this file's shape.
+name: Engine pin, a pull request stood aside for closed
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+    paths: [engine/skymp]
+permissions: {}
+jobs:
+  wake:
+    name: Wake the engine pin
+    if: github.event.pull_request.merged == false && github.event.pull_request.head.ref != 'engine-pin/next' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Start engine-pin.yml
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run engine-pin.yml --repo $env:GITHUB_REPOSITORY --ref main
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::engine-pin.yml could not be started, so the pin waits for the next fork build or pin merge; gh says why above'; exit 1 }
+          Write-Host 'engine-pin.yml started: the look that stood aside for this pull request moves on'
