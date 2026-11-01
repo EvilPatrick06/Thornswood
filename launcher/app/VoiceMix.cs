@@ -1,28 +1,27 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Thornswood
 {
     /// <summary>
     /// Everybody this person can hear, mixed into one stereo stream for the
     /// speakers: what the voice page's Web Audio graph did, a PannerNode
-    /// and a GainNode per person into the AudioContext's destination.
+    /// and a GainNode per person into the AudioContext's destination, worked
+    /// out a render quantum of 128 frames at a time as Web Audio works it.
     ///
-    /// The numbers are the page's. The distance model is the PannerNode's
+    /// The numbers are the page's. The panner is 'HRTF' (Patrick, 28 Sep,
+    /// #963 point 4: every voice panner is HRTF, none cheaper), Chromium's own
+    /// HRTF panner and data set ported in VoiceHrtf.cs, so above, below and
+    /// behind sound as they did. The position goes to the panner as the
+    /// page's positionX.value did, from the next quantum, and the panner's
+    /// own crossfade carries a move. The distance model is the PannerNode's
     /// 'inverse' with refDistance 1 and rolloffFactor 0, which is 1 at every
     /// distance: the panner only places the voice, and how loud it is comes
-    /// from the speaker's mode (levelFor in VoiceSession.cs). The level moves
-    /// the way the page's setTargetAtTime(value, now, 0.05) moved it, an
-    /// exponential approach with a 50 ms time constant, so a position a fifth
-    /// of a second later does not click.
-    ///
-    /// One thing is not the page's. Its panner was 'HRTF', which filters each
-    /// voice through a set of measured head related impulse responses that
-    /// ship inside Chromium. This launcher has no such set and no right to
-    /// copy Chromium's, so the panner here is Web Audio's other model,
-    /// 'equalpower', exactly as the Web Audio specification gives it: left
-    /// and right gains from the voice's azimuth. Left and right are where
-    /// they were; above, below and behind are no longer heard as different.
+    /// from the speaker's mode (levelFor in VoiceSession.cs). The level after
+    /// the panner moves the way the page's setTargetAtTime(value, now, 0.05)
+    /// moved it, an exponential approach with a 50 ms time constant, so a
+    /// position a fifth of a second later does not click.
     ///
     /// Each person has a little buffer in front of the mix (jitter), because
     /// packets arrive in bursts and the speakers take samples evenly. It
@@ -46,6 +45,8 @@ namespace Thornswood
         const double RefDistance = 1;
         const double RolloffFactor = 0;
 
+        const int Quantum = HrtfPanner.Quantum;
+
         sealed class Source
         {
             public readonly float[] Ring = new float[Rate];
@@ -53,17 +54,36 @@ namespace Thornswood
             public bool Primed;
             public bool Audible = true;
             public float Gain = 1, GainTarget = 1;
-            public float Left = (float)Math.Cos(Math.PI / 4), Right = (float)Math.Sin(Math.PI / 4);
-            public float LeftTarget = (float)Math.Cos(Math.PI / 4), RightTarget = (float)Math.Sin(Math.PI / 4);
+            // Where the page's PannerNode starts: at the listener, which is
+            // straight ahead.
+            public double Azimuth, Elevation;
+            public float Distance = 1;
+            public readonly HrtfPanner Panner;
+            // This quantum, as taken under the lock: the voice, where it is
+            // and the level it is going to.
+            public readonly float[] In = new float[Quantum];
+            public double QAzimuth, QElevation;
+            public float QTarget, QDistance;
+            public Source(Task<HrtfDatabase> hrtf) { Panner = new HrtfPanner(hrtf, Rate); }
         }
 
         readonly object gate = new object();
         readonly Dictionary<int, Source> sources = new Dictionary<int, Source>();
+        // The HRTF data, built on the thread pool from the first mix on.
+        readonly Task<HrtfDatabase> hrtf = HrtfDatabase.Shared();
+        // One quantum of the mix, and how much of it the speakers have had.
+        readonly float[] mixL = new float[Quantum], mixR = new float[Quantum];
+        readonly float[] panL = new float[Quantum], panR = new float[Quantum];
+        readonly List<Source> work = new List<Source>();
+        int mixAt = Quantum;
+
+        /// <summary>The HRTF data's build, for the session to say when it fails.</summary>
+        public Task Hrtf { get { return hrtf; } }
 
         Source At(int id)
         {
             Source s;
-            if (!sources.TryGetValue(id, out s)) { s = new Source(); sources[id] = s; }
+            if (!sources.TryGetValue(id, out s)) { s = new Source(hrtf); sources[id] = s; }
             return s;
         }
 
@@ -143,15 +163,17 @@ namespace Thornswood
         /// </summary>
         public void SetPosition(int id, double x, double y, double z)
         {
-            double l, r;
-            EqualPower(x, y, z, out l, out r);
-            double d = DistanceGain(Math.Sqrt(x * x + y * y + z * z));
+            double azimuth, elevation;
+            // An AudioParam holds a float.
+            HrtfPanner.Azimuth((float)x, (float)y, (float)z, out azimuth, out elevation);
+            float d = (float)DistanceGain(Math.Sqrt(x * x + y * y + z * z));
             lock (gate)
             {
                 Source s;
                 if (!sources.TryGetValue(id, out s)) return;
-                s.LeftTarget = (float)(l * d);
-                s.RightTarget = (float)(r * d);
+                s.Azimuth = azimuth;
+                s.Elevation = elevation;
+                s.Distance = d;
             }
         }
 
@@ -167,73 +189,63 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Web Audio's equal-power panning of a mono input (the
-        /// specification's azimuth and elevation, then its equal-power
-        /// algorithm), for the default listener.
-        /// </summary>
-        public static void EqualPower(double x, double y, double z, out double left, out double right)
-        {
-            double azimuth = 0;
-            double len = Math.Sqrt(x * x + y * y + z * z);
-            if (len > 0)
-            {
-                // Listener: forward (0,0,-1), up (0,1,0), right = forward x up = (1,0,0).
-                double sx = x / len, sy = y / len, sz = z / len;
-                // Project onto the listener's horizontal plane.
-                double px = sx, pz = sz;
-                double plen = Math.Sqrt(px * px + pz * pz);
-                if (plen > 0)
-                {
-                    px /= plen; pz /= plen;
-                    azimuth = 180 * Math.Acos(Math.Max(-1, Math.Min(1, px))) / Math.PI;
-                    double frontBack = -pz;   // projected . forward
-                    if (frontBack < 0) azimuth = 360 - azimuth;
-                    if (azimuth >= 0 && azimuth <= 270) azimuth = 90 - azimuth;
-                    else azimuth = 450 - azimuth;
-                }
-            }
-            azimuth = Math.Max(-180, Math.Min(180, azimuth));
-            if (azimuth < -90) azimuth = -180 - azimuth;
-            else if (azimuth > 90) azimuth = 180 - azimuth;
-            double xn = (azimuth + 90) / 180;
-            left = Math.Cos(xn * Math.PI / 2);
-            right = Math.Sin(xn * Math.PI / 2);
-        }
-
-        /// <summary>
         /// The next frames for the speakers, interleaved left and right,
         /// everybody summed and held inside -1 to 1.
         /// </summary>
+        /// <remarks>Called by one thread only, the speakers'.</remarks>
         public void Render(Span<float> stereo, int frames)
         {
-            stereo.Slice(0, frames * 2).Clear();
+            for (int i = 0; i < frames; i++)
+            {
+                if (mixAt == Quantum) { RenderQuantum(); mixAt = 0; }
+                float l = mixL[mixAt], r = mixR[mixAt];
+                mixAt++;
+                stereo[2 * i] = l > 1 ? 1 : l < -1 ? -1 : l;
+                stereo[2 * i + 1] = r > 1 ? 1 : r < -1 ? -1 : r;
+            }
+        }
+
+        /// <summary>
+        /// One render quantum: each person's next 128 frames out of their
+        /// buffer (silence while it fills or when it has run dry), through
+        /// their panner, times their level, summed. Only taking the frames
+        /// is done under the lock, so a packet arriving never waits on the
+        /// filtering; the panners and levels are this thread's alone.
+        /// </summary>
+        void RenderQuantum()
+        {
+            work.Clear();
             lock (gate)
             {
                 foreach (Source s in sources.Values)
                 {
-                    if (!s.Primed)
+                    if (!s.Primed && s.Count >= Prime) s.Primed = true;
+                    for (int i = 0; i < Quantum; i++)
                     {
-                        if (s.Count < Prime) continue;
-                        s.Primed = true;
-                    }
-                    for (int i = 0; i < frames; i++)
-                    {
-                        s.Gain += (s.GainTarget - s.Gain) * Approach;
-                        s.Left += (s.LeftTarget - s.Left) * Approach;
-                        s.Right += (s.RightTarget - s.Right) * Approach;
-                        if (s.Count == 0) { s.Primed = false; continue; }
-                        float v = s.Ring[s.Read] * s.Gain;
+                        if (!s.Primed || s.Count == 0) { s.Primed = false; s.In[i] = 0; continue; }
+                        s.In[i] = s.Ring[s.Read];
                         s.Read = (s.Read + 1) % s.Ring.Length;
                         s.Count--;
-                        stereo[2 * i] += v * s.Left;
-                        stereo[2 * i + 1] += v * s.Right;
                     }
+                    s.QAzimuth = s.Azimuth;
+                    s.QElevation = s.Elevation;
+                    s.QTarget = s.GainTarget;
+                    s.QDistance = s.Distance;
+                    work.Add(s);
                 }
             }
-            for (int i = 0; i < frames * 2; i++)
+            Array.Clear(mixL);
+            Array.Clear(mixR);
+            foreach (Source s in work)
             {
-                float v = stereo[i];
-                stereo[i] = v > 1 ? 1 : v < -1 ? -1 : v;
+                s.Panner.Pan(s.QAzimuth, s.QElevation, s.In, panL, panR);
+                for (int i = 0; i < Quantum; i++)
+                {
+                    s.Gain += (s.QTarget - s.Gain) * Approach;
+                    float g = s.Gain * s.QDistance;
+                    mixL[i] += panL[i] * g;
+                    mixR[i] += panR[i] * g;
+                }
             }
         }
     }

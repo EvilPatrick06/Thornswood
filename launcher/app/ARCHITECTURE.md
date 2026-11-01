@@ -585,7 +585,7 @@ location, `gameData.profileId`, and `gameData.chooseAtMenu`. Roster asks the
 site for this account's character names and keeps them in memory.
 
 **Voice** (Voice.cs, VoiceSession.cs, VoiceAudio.cs, VoiceCom.cs,
-VoiceIce.cs, VoiceStun.cs, VoicePeer.cs, VoiceMix.cs). Proximity voice runs
+VoiceIce.cs, VoiceStun.cs, VoicePeer.cs, VoiceMix.cs, VoiceHrtf.cs). Proximity voice runs
 in the launcher, not in the game, and since #4823 in the launcher's own code,
 with no browser: until then it was `voice-host.html` in a hidden WebView2.
 `Voice.cs:134 Start()` makes the session at startup (row 23). VoiceSession.cs
@@ -595,8 +595,11 @@ same protocol. The microphone and speakers are WASAPI in shared mode
 (VoiceAudio.cs, through the generated COM interfaces in VoiceCom.cs), the
 connections are ICE with STUN and TURN (VoiceIce.cs, VoiceStun.cs) and
 DTLS-SRTP through SharpSRTP on BouncyCastle (VoicePeer.cs), the codec is Opus
-through Concentus (THIRD-PARTY.md), and the page's panner and gain are a mixer
-of our own with the page's numbers (VoiceMix.cs). Nothing is written beside
+through Concentus (THIRD-PARTY.md), the page's gain is a mixer of our own
+with the page's numbers (VoiceMix.cs), and its HRTF panner is Chromium's,
+ported to C# with Chromium's impulse responses (VoiceHrtf.cs and
+`launcher\hrtf-composite.wav`, embedded; #963 point 4), whose filters are
+built once on the thread pool. Nothing is written beside
 the exe and there is no browser data folder. Voice.cs is the launcher's side,
 as it always was. It talks to the game through small files in both
 `Game\Data\Platform` and Profile (`voice-status.txt`, and `voice-muted.txt`

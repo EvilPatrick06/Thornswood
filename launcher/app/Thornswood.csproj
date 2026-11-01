@@ -78,6 +78,7 @@
     <EmbeddedResource Include="..\app.ico"><LogicalName>app.ico</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\app-dev.ico"><LogicalName>app-dev.ico</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\Thornswood.ini"><LogicalName>Thornswood.ini</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\hrtf-composite.wav"><LogicalName>hrtf-composite.wav</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\..\records\client-build.json"><LogicalName>client-build.json</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\..\records\skyrim-files.json"><LogicalName>skyrim-files.json</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\..\records\ui-gone.json"><LogicalName>ui-gone.json</LogicalName></EmbeddedResource>

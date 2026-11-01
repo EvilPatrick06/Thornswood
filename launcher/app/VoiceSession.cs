@@ -107,6 +107,14 @@ namespace Thornswood
             pinger = world.Time.CreateTimer(delegate { Post(Ping); }, null,
                                             TimeSpan.FromMilliseconds(PING_EVERY), TimeSpan.FromMilliseconds(PING_EVERY));
             Post(delegate { Host("status", "waiting for config"); });
+            // The HRTF data is built on the thread pool (VoiceHrtf.cs). If it
+            // cannot be, every voice plays in both ears unplaced, so the log
+            // says why rather than nothing.
+            mix.Hrtf.ContinueWith(delegate (Task t)
+            {
+                if (t.IsFaulted)
+                    Post(delegate { Say("the voice's 3D placement did not load (" + t.Exception.GetBaseException().Message + "), so every voice plays in both ears, unplaced"); });
+            }, TaskScheduler.Default);
         }
 
         void Post(Action a)
