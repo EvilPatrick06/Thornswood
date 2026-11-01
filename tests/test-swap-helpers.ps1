@@ -15,9 +15,10 @@
                            relative path for a record outside it, including a
                            sibling folder whose name starts with the root's.
     Get-ThornswoodVpsLocalPath, Get-ThornswoodKnownHostsPath
-                           which file each one names.
+                           which file each one names; with an address, the
+                           known_hosts file ssh -G names (a stand-in ssh).
 
-  Offline: nothing runs ssh or scp, and no file is written outside a scratch
+  Offline: nothing runs ssh or scp but the stand-in, and no file is written outside a scratch
   folder that is removed at the end. Runs on Windows PowerShell 5.1 and 7.
 #>
 [CmdletBinding()]
@@ -89,6 +90,26 @@ try {
     $env:LOCALAPPDATA = ''
     Check 'Get-ThornswoodVpsLocalPath: no LOCALAPPDATA is no file, not a path at the drive root' ((Get-ThornswoodVpsLocalPath) -eq '')
     Check 'Get-ThornswoodKnownHostsPath: the user''s own .ssh\known_hosts' ((Get-ThornswoodKnownHostsPath) -eq (Join-Path (Join-Path $HOME '.ssh') 'known_hosts'))
+    # With an address, the file ssh itself reads for it (ssh -G), which on
+    # the box through the gate is the gate's box_known_hosts (#5211's run of
+    # Set-InboundRules -Check). A stand-in ssh says what ssh -G would.
+    $bin = Join-Path $scratch 'bin'
+    $null = New-Item -ItemType Directory -Path $bin -Force
+    $gateFile = [IO.Path]::GetFullPath((Join-Path $scratch 'gate/keys/box_known_hosts'))
+    function Set-StandInSsh([string]$line) {
+        if ($IsWindows -or $env:OS -eq 'Windows_NT') { [IO.File]::WriteAllText((Join-Path $bin 'ssh.cmd'), "@echo off`r`necho host x`r`necho $line`r`n") }
+        else { [IO.File]::WriteAllText((Join-Path $bin 'ssh'), "#!/bin/sh`necho 'host x'`necho '$line'`n"); & chmod +x (Join-Path $bin 'ssh') }
+    }
+    $savedPath = $env:PATH
+    try {
+        $env:PATH = $bin + [IO.Path]::PathSeparator + $env:PATH
+        Set-StandInSsh ('userknownhostsfile ' + $gateFile.Replace('\', '/'))
+        Check 'Get-ThornswoodKnownHostsPath -Address: the file ssh -G names for it, the gate''s own on the box' ((Get-ThornswoodKnownHostsPath -Address 'play.example') -eq $gateFile)
+        Set-StandInSsh 'userknownhostsfile ~/.ssh/known_hosts ~/.ssh/known_hosts2'
+        Check '  ssh''s default reads as the user''s own .ssh\known_hosts' ((Get-ThornswoodKnownHostsPath -Address 'play.example') -eq [IO.Path]::GetFullPath((Join-Path (Join-Path $HOME '.ssh') 'known_hosts')))
+        Set-StandInSsh 'hostname play.example'
+        Check '  an ssh that names none gives the user''s own' ((Get-ThornswoodKnownHostsPath -Address 'play.example') -eq (Join-Path (Join-Path $HOME '.ssh') 'known_hosts'))
+    } finally { $env:PATH = $savedPath }
 } finally {
     $env:THORNSWOOD_VPS_LOCAL = $savedLocal
     $env:LOCALAPPDATA = $savedApp
