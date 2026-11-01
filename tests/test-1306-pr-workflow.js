@@ -53,7 +53,7 @@ const result = /\n  result:\n([\s\S]*)$/.exec(code(pr));
 const rj = result ? result[1] : '';
 yes('a "Build check result" job needs the build and the gate\'s shares (#3683)', /^    name: Build check result\n    needs: \[launcher, gate\]\n/.test(rj));
 yes('  runs unless cancelled', /\n    if: \$\{\{ !cancelled\(\) \}\}\n/.test(rj));
-yes('  on GitHub\'s ubuntu-latest, never the box', /\n    runs-on: ubuntu-latest\n/.test(rj) && !/self-hosted|thornswood/.test(rj));
+yes('  on GitHub\'s arm64 Linux runner, ubuntu-24.04-arm, never the box', /\n    runs-on: ubuntu-24\.04-arm\n/.test(rj) && !/self-hosted|thornswood/.test(rj));
 yes('  with no checkout, action or secret: it reads only their results', !/uses:|secrets\.|checkout/.test(rj) &&
     /BUILD: \$\{\{ needs\.launcher\.result \}\}/.test(rj) && /GATE: \$\{\{ needs\.gate\.result \}\}/.test(rj));
 yes('  and passes only when both are success', /if \[ "\$BUILD" = success \] && \[ "\$GATE" = success \]; then exit 0; fi\n[\s\S]*exit 1/.test(rj));
@@ -70,7 +70,7 @@ for (const [what, t] of [['main\'s build', build], ['the pull request build', pr
   const p = t.indexOf('\n  pick:\n');
   const pick = p < 0 || p > at ? '' : t.slice(p, at);
   yes('  in shares, every one running to its end, as many as the pick says', /\n      fail-fast: false\n      matrix:\n        shard: \$\{\{ fromJSON\(needs\.pick\.outputs\.shares\) \}\}\n/.test(g) &&
-      /\n          SHARES: '([2-9]|\d\d)'\n/.test(pick) && /\n    runs-on: ubuntu-latest\n/.test(pick));
+      /\n          SHARES: '([2-9]|\d\d)'\n/.test(pick) && /\n    runs-on: ubuntu-24\.04-arm\n/.test(pick));
 }
 yes('  main\'s own build has no such job: only a pull request is held to it', !/\n  result:\n/.test(code(build)));
 let gen = null;

@@ -4523,13 +4523,11 @@ TASK_TAG = 'Main'
 TASK_FORM = 4
 KNOWN_FORM = 5
 DEV_FORM = 3
-# The board's column for a fix that is merged and waits on main
-# (done-on-merge.yml puts it on, with the test task). The label is an
-# instruction, not a record: board-status.yml moves the card and takes it off
-# again within a minute (#2863), so a pass rarely sees it. What stays is
-# done-on-merge.yml's comment, written by the workflow and starting
-# "Pull request #N merged (", which Close-ShippedIssues.ps1 reads as well.
-BOARD_DONE = 'board: Done'
+# A fix that is merged and waits on main: done-on-merge.yml's comment,
+# written by the workflow and starting "Pull request #N merged (", which
+# Close-ShippedIssues.ps1 reads as well. Until #5185 a board: Done label went
+# on beside it for a minute; the card follows the merge by itself now
+# (board.yml), and the comment is the one mark.
 DONE_ON_MERGE = re.compile(r'^Pull request #\d+ merged \(')
 DONE_ON_MERGE_BY = 'github-actions[bot]'
 
@@ -5478,9 +5476,8 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
     Dev Findings or Main Findings whose fix has not landed (Patrick, 22 Oct,
     and #3140). Its fix has landed when the issue gets a "Test task:"
     comment or is in Done: done-on-merge.yml's comment on it (merged_fix),
-    or the board: Done label for the minute it is on (BOARD_DONE). A card
-    moved to Done by hand, with no merge, is not seen: the bot cannot read
-    the board. A closed or unlabelled issue is not a finding at all. Then its post goes: the fix is a test task, not
+    A card is never moved to Done by hand (#5185): it follows that same
+    merged test task. A closed or unlabelled issue is not a finding at all. Then its post goes: the fix is a test task, not
     a known issue. A merged pull request alone does not take it down: until
     26 Oct any one that named the issue did, and a measuring step on the
     scripts finding, a partial fix, and a Refs written by mistake each kept
@@ -5529,10 +5526,6 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
         key = str(num)
         issue = issues[num]
         have = rec.get(key)
-        if BOARD_DONE.lower() in [str(l.get('name', '')).lower()
-                                  for l in issue.get('labels') or []]:
-            why[key] = 'it is on the board as Done: its fix is merged'
-            continue                # fixed, waiting on main: not a known issue
         if (have and have.get('updated') == issue.get('updated_at')
                 and have.get('form') == KNOWN_FORM):
             listed.add(num)
