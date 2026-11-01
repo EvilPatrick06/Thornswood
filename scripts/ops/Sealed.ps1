@@ -121,7 +121,7 @@ function Read-ThornswoodSealedLog([string]$Repo, [long]$Run) {
         if ($LASTEXITCODE -ne 0) { return @{ Bytes = $null; Why = ('the run''s jobs could not be read: ' + ($jobs -join ' ')) } }
         # The log keeps the runner's colours, which a newer gh hands over
         # only when told (Get-GhLogFlags, #5202).
-        $flags = Get-GhLogFlags
+        $flags = @(Get-GhLogFlags)
         foreach ($job in $jobs) {
             if ($job -notmatch '^[0-9]+$') { continue }
             $log = @(& gh api "repos/$Repo/actions/jobs/$job/logs" @flags 2>&1 | ForEach-Object { "$_" })
