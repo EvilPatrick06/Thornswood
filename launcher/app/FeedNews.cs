@@ -85,7 +85,7 @@ namespace Thornswood
             }
             if (raw == null)
             {
-                using (var wc = Client(cfg, true, r.url)) raw = wc.DownloadData(r.url);
+                raw = FeedGet(cfg, true, r.url);
                 if (ShaOf(raw) != r.sha256)
                     throw new Exception("The news file did not match its checksum, so it was not read.");
                 // One rename over the old copy (#2591), not a delete and then

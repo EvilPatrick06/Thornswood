@@ -102,27 +102,22 @@ namespace Thornswood
             return Velo.RepoUrl + "/releases/download/" + Uri.EscapeDataString(tag) + "/" + Uri.EscapeDataString(name);
         }
 
-        // One client for these small files. Its timeout is the whole request,
-        // which is right for files of a few kilobytes; the packages themselves
-        // go through Velopack's own downloader.
-        static readonly HttpClient http = MakeClient();
-
-        static HttpClient MakeClient()
-        {
-            var c = new HttpClient();
-            c.Timeout = TimeSpan.FromSeconds(30);
-            c.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "ThornswoodLauncher/" + Updater.Version);
-            return c;
-        }
-
+        // Through Http.cs, the launcher's one HttpClient, with the feed's ten
+        // seconds for the answer to start and Http's own wait for each read;
+        // these are files of a few kilobytes. The packages themselves go
+        // through Velopack's own downloader.
         static byte[] Fetch(string tag, string name)
         {
             string url = Download(tag, name);
-            using (HttpResponseMessage r = http.GetAsync(url).GetAwaiter().GetResult())
+            using (var req = new HttpRequestMessage(HttpMethod.Get, url))
             {
-                if (!r.IsSuccessStatusCode)
-                    throw new Exception("GitHub answered HTTP " + (int)r.StatusCode + " for " + name + " of " + tag + ".");
-                return r.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+                req.Headers.TryAddWithoutValidation("User-Agent", "ThornswoodLauncher/" + Updater.Version);
+                using (HttpResponseMessage r = Http.Send(req, 10000))
+                {
+                    if (!r.IsSuccessStatusCode)
+                        throw new Exception("GitHub answered HTTP " + (int)r.StatusCode + " for " + name + " of " + tag + ".");
+                    return Http.Body(r, Http.DefaultReadMs);
+                }
             }
         }
 

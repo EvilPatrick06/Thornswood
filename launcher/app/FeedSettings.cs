@@ -102,7 +102,7 @@ namespace Thornswood
             {
                 if (fetchWith == null) throw new Exception("The update feed's settings file is not on this machine.");
                 string url = assets + sha;
-                using (var wc = Client(fetchWith, true, url)) raw = wc.DownloadData(url);
+                raw = FeedGet(fetchWith, true, url);
                 if (ShaOf(raw) != sha)
                     throw new Exception("The update feed's settings file did not match its checksum, so it was not read.");
                 if (cache != null) OwnGame.WriteRecord(cache, raw);

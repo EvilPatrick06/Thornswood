@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
-using System.Net;
+using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -96,70 +96,85 @@ namespace Thornswood
         static bool cacheRead;
         const string CacheMagic = "Thornswood feed cache 1";
 
-        // WebClient has no timeout worth the name, and the default is long
-        // enough that a GitHub which accepts the connection and then says
-        // nothing looks like a hung launcher. The same helper Online and
-        // Roster use. Timeout is the wait for an answer, not for the body, so
-        // a large asset still downloads for as long as it needs.
-        class Quick : WebClient
+        // The feed's requests go through Http.cs, the launcher's one HttpClient
+        // (#4823, #4825), with ten seconds for the answer to start, so a GitHub
+        // or a site that accepts the connection and then says nothing does not
+        // look like a hung launcher. The wait is for the answer, not the body:
+        // a large asset still downloads for as long as its bytes keep coming
+        // (Http.cs, readMs). Until then they went through a WebClient of their
+        // own, Quick, with the same ten seconds.
+        const int AnswerMs = 10000;
+
+        /// <summary>
+        /// A GET with the launcher's headers. The token only ever goes to
+        /// GitHub's own API, never to whatever host an asset URL happens to
+        /// point at. gzip asks for the answer compressed, for the feed's JSON
+        /// only (#443): a compressed feed is a quarter of the size, and
+        /// FeedBody reads it either way.
+        /// </summary>
+        static HttpRequestMessage FeedAsk(Config cfg, bool octet, string url, bool gzip)
         {
-            public int Ms = 10000;
-            // For the feed only (#443): If-Modified-Since has to go through
-            // the request's own property, because WebClient refuses it as a
-            // plain header, and a compressed feed is a quarter of the size.
-            public DateTime Since = DateTime.MinValue;
-            public bool Gzip;
-            // The status of the last answer that WebClient returned from
-            // rather than threw on, which is every 2xx. 200 and 204 are both
-            // success to it and DownloadData gives back bytes either way (an
-            // empty array for 204), so a caller that has to tell them apart
-            // reads this (#2636). 0 until an answer arrives.
-            public int Status;
-            // The connection group the request goes in, or null for the
-            // shared one. Only the feed watch sets it (WatchGroup).
-            public string Group;
-            protected override WebResponse GetWebResponse(WebRequest request)
+            var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.TryAddWithoutValidation("User-Agent", "ThornswoodLauncher/" + Version);
+            bool github = false;
+            try { github = new Uri(url).Host.Equals("api.github.com", StringComparison.OrdinalIgnoreCase); }
+            catch (Exception ex) { Swallow.Note("Updater.FeedAsk, uri host", ex); }
+            if (github && !string.IsNullOrEmpty(cfg.UpdateToken))
+                req.Headers.TryAddWithoutValidation("Authorization", "Bearer " + cfg.UpdateToken);
+            // GitHub Contents API wants the raw media type; a direct https feed
+            // on thornswood.net is ordinary JSON (#649).
+            string accept;
+            if (github) accept = octet ? "application/octet-stream" : "application/vnd.github.raw";
+            else accept = octet ? "application/octet-stream" : "application/json";
+            req.Headers.TryAddWithoutValidation("Accept", accept);
+            if (gzip) req.Headers.TryAddWithoutValidation("Accept-Encoding", "gzip");
+            return req;
+        }
+
+        /// <summary>The answer's body, unpacked when the server sent it gzip.</summary>
+        static byte[] FeedBody(HttpResponseMessage res, int readMs)
+        {
+            byte[] raw = Http.Body(res, readMs);
+            foreach (string e in res.Content.Headers.ContentEncoding)
             {
-                var r = base.GetWebResponse(request);
-                var h = r as HttpWebResponse;
-                if (h != null) Status = (int)h.StatusCode;
-                return r;
-            }
-            protected override WebRequest GetWebRequest(Uri address)
-            {
-                var r = base.GetWebRequest(address);
-                if (r != null) { r.Timeout = Ms; }
-                var h = r as HttpWebRequest;
-                if (h != null)
+                if (!string.Equals(e, "gzip", StringComparison.OrdinalIgnoreCase)) continue;
+                using (var z = new GZipStream(new MemoryStream(raw), CompressionMode.Decompress))
+                using (var ms = new MemoryStream())
                 {
-                    if (Since != DateTime.MinValue) h.IfModifiedSince = Since;
-                    if (Gzip) h.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
-                    if (Group != null) h.ConnectionGroupName = Group;
+                    z.CopyTo(ms);
+                    return ms.ToArray();
                 }
-                return r;
+            }
+            return raw;
+        }
+
+        /// <summary>
+        /// The body of a 2xx answer, and an exception for any other answer,
+        /// worded as WebClient's DownloadData worded it, which is what the
+        /// callers had before.
+        /// </summary>
+        static byte[] FeedGet(Config cfg, bool octet, string url, bool gzip = false)
+        {
+            using (HttpRequestMessage req = FeedAsk(cfg, octet, url, gzip))
+            using (HttpResponseMessage res = Http.Send(req, AnswerMs))
+            {
+                if (!res.IsSuccessStatusCode) throw Refused(res);
+                return FeedBody(res, Http.DefaultReadMs);
             }
         }
 
-        static WebClient Client(Config cfg, bool octet, string url)
+        static HttpRequestException Refused(HttpResponseMessage res)
         {
-            var wc = new Quick();
-            wc.Headers["User-Agent"] = "ThornswoodLauncher/" + Version;
-            // The token only ever goes to GitHub's own API, never to whatever
-            // host an asset URL happens to point at.
-            bool github = false;
-            try { github = new Uri(url).Host.Equals("api.github.com", StringComparison.OrdinalIgnoreCase); }
-            catch (Exception ex) { Swallow.Note("Updater.Client, uri host", ex); }
-            if (github && !string.IsNullOrEmpty(cfg.UpdateToken))
-                wc.Headers["Authorization"] = "Bearer " + cfg.UpdateToken;
-            // GitHub Contents API wants the raw media type; a direct https feed
-            // on thornswood.net is ordinary JSON (#649).
-            if (github)
-                wc.Headers["Accept"] = octet ? "application/octet-stream" : "application/vnd.github.raw";
-            else if (octet)
-                wc.Headers["Accept"] = "application/octet-stream";
-            else
-                wc.Headers["Accept"] = "application/json";
-            return wc;
+            return new HttpRequestException("The remote server returned an error: (" + (int)res.StatusCode + ") " + res.ReasonPhrase + ".", null, res.StatusCode);
+        }
+
+        /// <summary>One header of the answer, from either of its two lists, or null.</summary>
+        static string HeaderOf(HttpResponseMessage res, string name)
+        {
+            IEnumerable<string> v;
+            if (res.Headers.TryGetValues(name, out v) || res.Content.Headers.TryGetValues(name, out v))
+                return string.Join(", ", v);
+            return null;
         }
 
         /// <summary>The feed this build reads when config.json names none of Thornswood's.</summary>
@@ -327,28 +342,21 @@ namespace Thornswood
 
             // The tip holds the socket for fifty seconds on the site and then
             // answers 204 (measured 18 Oct: 204 after 50.7 s). Sixty here, so
-            // the site's own answer always arrives first; Quick's default ten
-            // would cut every quiet wait off before the site could answer.
+            // the site's own answer always arrives first; the feed's usual ten
+            // (AnswerMs) would cut every quiet wait off before the site could
+            // answer.
             return Tip(cfg, tip, tag, 60000);
         }
 
-        /// <summary>
-        /// The connection group the feed watch holds its socket in, apart from
-        /// every other request to thornswood.net.
-        ///
-        /// The .NET Framework lets a program keep two connections to a host
-        /// at a time (ServicePointManager.DefaultConnectionLimit), and a
-        /// request waits for a free one inside its own timeout. Each
-        /// connection group counts its two apart. In the shared group the
-        /// watch held one of the two all the time from #2440 on, so the
-        /// Play page's gallery, its pictures, the voice token and the news
-        /// took turns on the one left: a picture of several megabytes held
-        /// the rest back, and a request whose timeout ran out while it
-        /// waited failed, which left the gallery blank. In a group of its
-        /// own the watch leaves both to them, as before it existed.
-        /// tests\test-2440-watch-connection.ps1 holds this.
-        /// </summary>
-        public const string WatchGroup = "feed-watch";
+        // THE WATCH'S OWN CONNECTION (#2440, WatchGroup until #4825). The .NET
+        // Framework let a program keep two connections to a host at a time,
+        // and the watch, holding one all the time, left the Play page's
+        // gallery, pictures, voice token and news to take turns on the other,
+        // so it was given a connection group of its own. On .NET 10 the
+        // shared HttpClient (Http.cs) has no such limit: SocketsHttpHandler's
+        // MaxConnectionsPerServer is unlimited unless set, and Http.cs does
+        // not set it, so the watch's open request holds no other back and
+        // needs no group.
 
         /// <summary>
         /// The long-poll request itself, apart from CheckUrl so a test can
@@ -356,8 +364,8 @@ namespace Thornswood
         /// the way Conditional is apart from FromSite.
         ///
         /// The site answers 200 when the feed moved and 204 when its wait ran
-        /// out unchanged. WebClient treats every 2xx as success: DownloadData
-        /// returns for a 204 with an empty array and never throws. Until #2636
+        /// out unchanged. WebClient treated every 2xx as success: DownloadData
+        /// returned for a 204 with an empty array and never threw. Until #2636
         /// this read any return from DownloadData as "moved" and looked for the
         /// 204 in the catch, where it never arrives, so every quiet fifty
         /// second wait ran a full update check, about seventy an hour for each
@@ -368,19 +376,23 @@ namespace Thornswood
         /// </summary>
         static bool Tip(Config cfg, string tip, string tag, int ms)
         {
-            using (var q = (Quick)Client(cfg, false, tip))
+            using (HttpRequestMessage req = FeedAsk(cfg, false, tip, true))
             {
-                q.Ms = ms;
-                q.Group = WatchGroup;
-                q.Gzip = true;
-                if (tag.Length > 0) q.Headers["If-None-Match"] = tag;
-                try { q.DownloadData(tip); }
-                catch (WebException wex) { throw WrapFeedFail(wex, true); }
-                // 200: the feed moved, or there was no tag to compare.
-                if (q.Status == 200) return true;
-                // 204: the wait ran out and the feed is as it was.
-                if (q.Status == 204) return false;
-                throw new Exception("The update feed tip answered HTTP " + q.Status + ", which says neither that the feed moved nor that it did not.");
+                if (tag.Length > 0) req.Headers.TryAddWithoutValidation("If-None-Match", tag);
+                HttpResponseMessage res;
+                try { res = Http.Send(req, ms); }
+                catch (Exception ex) when (ex is HttpRequestException || ex is TimeoutException) { throw WrapFeedFail(ex, true); }
+                using (res)
+                {
+                    // Anything but 2xx failed, as it did when WebClient threw.
+                    if (!res.IsSuccessStatusCode) throw WrapFeedFail(Refused(res), true);
+                    int status = (int)res.StatusCode;
+                    // 200: the feed moved, or there was no tag to compare.
+                    if (status == 200) return true;
+                    // 204: the wait ran out and the feed is as it was.
+                    if (status == 204) return false;
+                    throw new Exception("The update feed tip answered HTTP " + status + ", which says neither that the feed moved nor that it did not.");
+                }
             }
         }
         /// <summary>
@@ -426,51 +438,38 @@ namespace Thornswood
                          && have.Doc != null
                          && (!string.IsNullOrEmpty(have.Etag) || since != DateTime.MinValue)
                          && string.Equals(have.Url, feedUrl, StringComparison.Ordinal);
-            using (var wc = Client(cfg, false, feedUrl))
+            using (HttpRequestMessage req = FeedAsk(cfg, false, feedUrl, true))
             {
-                var q = wc as Quick;
-                if (q != null) q.Gzip = true;
-                if (asked && !string.IsNullOrEmpty(have.Etag)) wc.Headers["If-None-Match"] = have.Etag;
-                if (asked && q != null) q.Since = since;
-                byte[] body;
-                try { body = wc.DownloadData(feedUrl); }
-                catch (WebException wex)
+                if (asked && !string.IsNullOrEmpty(have.Etag)) req.Headers.TryAddWithoutValidation("If-None-Match", have.Etag);
+                if (asked && since != DateTime.MinValue) req.Headers.IfModifiedSince = new DateTimeOffset(since, TimeSpan.Zero);
+                using (HttpResponseMessage res = Http.Send(req, AnswerMs))
                 {
-                    // The .NET Framework hands a 304 back as a WebException
-                    // rather than as an answer, so the one reply this cache
-                    // exists to get arrives as a throw. Anything else really
-                    // is a failed check and goes on up.
-                    if (asked && NotChanged(wex))
+                    // The one reply this cache exists to get. HttpClient hands a
+                    // 304 back as an answer; the .NET Framework's WebClient threw
+                    // it as a WebException, and an empty 2xx was read as one too
+                    // in case some stack answered that way. Only a real 304 is
+                    // one now; anything else that is not 2xx is a failed check
+                    // and goes on up.
+                    if (asked && (int)res.StatusCode == 304)
                     {
                         LastNotModified = true;
                         return have.Doc;
                     }
-                    throw;
+                    if (!res.IsSuccessStatusCode) throw Refused(res);
+                    byte[] body = FeedBody(res, Http.DefaultReadMs);
+                    VersionDoc doc = ReadFeed(body, feedUrl, cfg);
+                    // Kept only once the document parsed, so a tag is never held
+                    // beside something the launcher could not read.
+                    string tag = HeaderOf(res, "ETag"), mod = HeaderOf(res, "Last-Modified");
+                    var fresh = new Cached();
+                    fresh.Url = feedUrl;
+                    fresh.Etag = tag == null ? "" : tag.Trim();
+                    fresh.LastModified = mod == null ? "" : mod.Trim();
+                    fresh.Doc = doc;
+                    cached = fresh;
+                    if (fresh.Etag.Length > 0 || fresh.LastModified.Length > 0) WriteCache(fresh, body);
+                    return doc;
                 }
-                // Belt as well as braces, for a stack that hands a 304 back as
-                // an answer with no body instead of throwing.
-                if (asked && (body == null || body.Length == 0))
-                {
-                    LastNotModified = true;
-                    return have.Doc;
-                }
-                VersionDoc doc = ReadFeed(body, feedUrl, cfg);
-                // Kept only once the document parsed, so a tag is never held
-                // beside something the launcher could not read.
-                string tag = null, mod = null;
-                if (wc.ResponseHeaders != null)
-                {
-                    tag = wc.ResponseHeaders["ETag"];
-                    mod = wc.ResponseHeaders["Last-Modified"];
-                }
-                var fresh = new Cached();
-                fresh.Url = feedUrl;
-                fresh.Etag = tag == null ? "" : tag.Trim();
-                fresh.LastModified = mod == null ? "" : mod.Trim();
-                fresh.Doc = doc;
-                cached = fresh;
-                if (fresh.Etag.Length > 0 || fresh.LastModified.Length > 0) WriteCache(fresh, body);
-                return doc;
             }
         }
 
@@ -559,17 +558,12 @@ namespace Thornswood
             }
         }
 
-        static bool NotChanged(WebException wex)
-        {
-            var r = wex.Response as HttpWebResponse;
-            return r != null && (int)r.StatusCode == 304;
-        }
-
         static Exception WrapFeedFail(Exception ex, bool fromHost)
         {
             string where = fromHost ? "the site update feed" : "GitHub";
-            var wex = ex as WebException;
-            if (wex != null && wex.Status == WebExceptionStatus.Timeout)
+            // Http.Send and its reads throw TimeoutException when the answer
+            // or the next bytes of it did not come in time.
+            if (ex is TimeoutException)
                 return new Exception(where + " did not answer in time. The check runs again by itself.");
             if (!string.IsNullOrEmpty(ex.Message)
                 && (ex.Message.StartsWith("the ", StringComparison.Ordinal)
@@ -794,22 +788,14 @@ namespace Thornswood
             // show the bytes as they come (#1145, PlayProgress.Part).
             try
             {
-                using (var wc = Client(cfg, true, url))
-                using (Stream s = wc.OpenRead(url))
-                using (var f = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
+                using (HttpRequestMessage req = FeedAsk(cfg, true, url, false))
+                using (HttpResponseMessage res = Http.Send(req, AnswerMs))
                 {
-                    long length;
-                    if (wc.ResponseHeaders == null || !long.TryParse(wc.ResponseHeaders["Content-Length"], out length)) length = -1;
-                    byte[] buf = new byte[81920];
-                    long had = 0;
-                    int n;
+                    if (!res.IsSuccessStatusCode) throw Refused(res);
+                    long length = res.Content.Headers.ContentLength ?? -1;
                     PlayProgress.Part(0, length);
-                    while ((n = s.Read(buf, 0, buf.Length)) > 0)
-                    {
-                        f.Write(buf, 0, n);
-                        had += n;
-                        PlayProgress.Part(had, length);
-                    }
+                    using (var f = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
+                        Http.CopyBody(res, f, Http.DefaultReadMs, had => PlayProgress.Part(had, length));
                 }
             }
             catch

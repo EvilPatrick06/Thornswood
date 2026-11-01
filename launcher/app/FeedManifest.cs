@@ -106,7 +106,7 @@ namespace Thornswood
             if (!u.EndsWith("/" + sha, StringComparison.OrdinalIgnoreCase))
                 throw new Exception("The update feed names a manifest file that is not stored under its own checksum.");
             byte[] raw;
-            using (var wc = Client(cfg, true, url)) raw = wc.DownloadData(url);
+            raw = FeedGet(cfg, true, url);
             string got;
             using (var h = SHA256.Create()) got = BitConverter.ToString(h.ComputeHash(raw)).Replace("-", "").ToLowerInvariant();
             if (got != sha) throw new Exception("A manifest file did not match its checksum.");
