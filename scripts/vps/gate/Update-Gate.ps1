@@ -19,8 +19,9 @@
 
   WHAT IT CHANGES, and nothing else: the three files, written into the files
   already there so each keeps its access list (Gate.ps1 stays readable by
-  thornswood-deploy), and gate.json's commit, which ping and Install-Gate
-  -Status show. The account, the keys, the ssh config, the pinned GitHub CLI
+  thornswood-deploy), gate.json's commit, which ping and Install-Gate
+  -Status show, and gate.json's remote when GitHub names the repository
+  differently now (THE REPOSITORY'S NAME, below). The account, the keys, the ssh config, the pinned GitHub CLI
   and the task stay as Install-Gate made them; a change to any of those is
   still Install-Gate's.
 
@@ -44,13 +45,27 @@
   Box-Run.ps1 -OnTheBox sends this verb by itself before any other when the
   gate's files are not main's (#5178).
 
-  -Root and -NoRestart are for the harness (tests\test-2841-deploy-gate.ps1);
+  THE REPOSITORY'S NAME (#5184). gate.json's remote is the address the
+  broker clones, fetches and pings, and the checkout's origin is set to it
+  before every fetch; Install-DeployAgent.ps1 and Ship.ps1 read the
+  repository's owner/name from that origin. Install-Gate wrote it once, so
+  when the repository moved to ThornswoodRP on 1 Nov 2026 the box kept the
+  old name: git followed GitHub's redirect, but the deploy agent's
+  GET /repos/EvilPatrick06/Thornswood/installation answered 404 and dev took
+  no Deployment. So each run asks GitHub, without a token (the repository is
+  public, and GitHub's answer follows a move), what the repository is called
+  now, and writes that name into the remote when it differs. A GitHub that
+  does not answer leaves the remote as it is, and the run says so.
+
+  -Root, -NoRestart and -FullName (GitHub's answer, so no network is asked)
+  are for the harness (tests\test-2841-deploy-gate.ps1);
   the gate passes neither.
 #>
 [CmdletBinding()]
 param(
     [string]$Root = 'C:\Thornswood-Gate',
-    [switch]$NoRestart
+    [switch]$NoRestart,
+    [string]$FullName = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -87,13 +102,31 @@ function Get-Sha([byte[]]$b) {
 }
 
 $cfg = [IO.File]::ReadAllText($cfgPath) | ConvertFrom-Json
+
+# ---- the repository's name as GitHub has it now (THE REPOSITORY'S NAME)
+$remoteWas = [string]$cfg.remote
+$remoteNow = $remoteWas
+if ($remoteWas -match '^ssh://git@ssh\.github\.com:443/([A-Za-z0-9-]+/[A-Za-z0-9._-]+?)(?:\.git)?$') {
+    $asked = $Matches[1]
+    $full = $FullName
+    if (-not $full) {
+        try {
+            [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+            $full = [string](Invoke-RestMethod -UseBasicParsing -TimeoutSec 30 -Uri ('https://api.github.com/repos/' + $asked) -Headers @{ 'User-Agent' = 'thornswood-gate'; Accept = 'application/vnd.github+json' }).full_name
+        } catch { Write-Host ("  GitHub did not say what $asked is called now (" + $_.Exception.Message + "), so the gate's remote stays as it is") }
+    }
+    if ($full -and $full -notmatch '^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$') { Write-Host "  GitHub named $asked '$full', which is not owner/name, so the gate's remote stays as it is"; $full = '' }
+    if ($full -and $full -cne $asked) { $remoteNow = 'ssh://git@ssh.github.com:443/' + $full + '.git' }
+    elseif ($full) { Write-Host "  the repository is $full, as GitHub names it" }
+} elseif ($remoteWas) { Write-Host "  gate.json's remote ($remoteWas) is not a GitHub address over ssh port 443, so it is left as it is" }
+
 $changed = @()
 foreach ($n in $Names) {
     $at = Join-Path $Root $n
     $old = if (Test-Path -LiteralPath $at) { [IO.File]::ReadAllBytes($at) } else { [byte[]]@() }
     if ((Get-Sha $old) -ne (Get-Sha $new[$n])) { $changed += $n }
 }
-if (-not $changed.Count -and [string]$cfg.commit -eq $commit) {
+if (-not $changed.Count -and [string]$cfg.commit -eq $commit -and $remoteNow -ceq $remoteWas) {
     Write-Host "  ALREADY the gate's three files are main's, installed from $commit"
     exit 0
 }
@@ -120,8 +153,10 @@ foreach ($n in $Names) {
 }
 $was = [string]$cfg.commit
 $cfg.commit = $commit
+if ($remoteNow -cne $remoteWas) { $cfg.remote = $remoteNow }
 [IO.File]::WriteAllText($cfgPath, ($cfg | ConvertTo-Json), $Utf8)
 Write-Host ("  CHANGED " + $(if ($changed.Count) { $changed -join ', ' } else { 'no file, only the record' }) + " from $commit (installed from $was before)")
+if ($remoteNow -cne $remoteWas) { Write-Host "  CHANGED the gate's remote from $remoteWas to $remoteNow, the name GitHub gives the repository now; the broker sets the checkout's origin to it before its next fetch" }
 
 if ($NoRestart) { Write-Host '  not restarted (-NoRestart)'; exit 0 }
 
