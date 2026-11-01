@@ -12,16 +12,17 @@ the icon (`app.ico`), the emblem (`logo.png`, `logo-192.png`), the dev build's
 icon and emblem (`app-dev.ico`, `logo-dev.png`, picked in `Icons.cs` and
 `Art.cs`), the strip of art behind the title (`launcher-header.jpg` and
 `.mp4`), the key template the launcher writes when a machine has none
-(`Thornswood.ini`), and the WebView2 libraries in `lib\webview2`. `art` holds the
-source pictures for the main menu backdrop and its spec (`BACKDROP-SPEC.md`,
+(`Thornswood.ini`), and NLayer, the menu theme's MP3 decoder, in
+`lib\nlayer`. `art` holds the source pictures for the main menu backdrop and its spec (`BACKDROP-SPEC.md`,
 `ART-PROMPT.md`), which `scripts\dev\Build-Backdrop.py` reads; the launcher
 does not ship them (#3680).
 
-`voice-host.html` is proximity voice as the launcher runs it. The launcher
-(`launcher\app\Voice.cs`) opens it in a hidden WebView2 window, where a real
-browser can hold the microphone, run WebRTC between people and play the
-audio, none of which the game's own browser ever managed. It talks to the
-voice service (`voice`) on the same protocol as the in-game page. Push to
+Proximity voice runs in the launcher's own code (`launcher\app\Voice.cs`
+and the `Voice*.cs` files beside it, #4823): it holds the microphone through
+Windows' audio API, makes the WebRTC connections between people, encodes and
+decodes with Opus and plays the mix, none of which the game's own browser ever
+managed. It needs no web view. It talks to the voice service (`voice`) on the
+same protocol as the in-game page. Push to
 talk reaches it through the launcher, which hears it from the game plugin over
 a local socket and a small file in `Data\Platform`.
 

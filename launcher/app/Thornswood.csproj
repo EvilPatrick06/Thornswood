@@ -56,6 +56,13 @@
     <!-- DPAPI for the keys the launcher keeps on this PC (Secrets.cs); on
          .NET Framework ProtectedData was part of the framework. -->
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.14" />
+    <!-- Voice without a browser (#4823, Voice*.cs). Opus in C# (Concentus,
+         BSD-3-Clause), and DTLS-SRTP (SharpSRTP, MIT) on BouncyCastle (MIT).
+         All three rooted whole in a Native AOT publish give no trim or AOT
+         warning (measured 1 Nov 2026). THIRD-PARTY.md has their notices. -->
+    <PackageReference Include="Concentus" Version="2.2.2" />
+    <PackageReference Include="SharpSRTP" Version="0.5.8" />
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.7.0" />
   </ItemGroup>
 
   <!-- Every resource under the name the code asks for. -->

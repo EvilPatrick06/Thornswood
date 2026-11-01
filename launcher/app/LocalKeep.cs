@@ -25,7 +25,7 @@ namespace Thornswood
     ///
     /// Uninstall's "Keep this build's saves and settings" kept the whole
     /// Profile folder, so the log, the Discord sign-in, name and picture, and
-    /// the WebView2 browser folders stayed on the PC under a box that named
+    /// the browser folders voice and the music ran in stayed on the PC under a box that named
     /// none of them. NotSaves lists what goes whatever the box says.
     /// </summary>
     static class LocalKeep
@@ -149,7 +149,7 @@ namespace Thornswood
         /// <summary>
         /// What is in Profile that is not a save or a setting: the launcher's
         /// log, the support zips, the Discord sign-in with the name and picture
-        /// kept beside it, and the voice browser's own folder. An
+        /// kept beside it. An
         /// uninstall removes these even when it keeps the saves and settings,
         /// and the farewell names any that could not be removed.
         /// </summary>
@@ -159,7 +159,6 @@ namespace Thornswood
             all.Add(Paths.LogFile);
             all.Add(Diag.ReportDir);
             all.AddRange(Discord.AccountFiles(Paths.ProfileDir));
-            all.Add(Voice.BrowserDir);
             // The menu music ran in a WebView2 of its own until #3207 moved it
             // to NLayer, and that browser's cache and storage were left in
             // Profile\MusicBrowser, which nothing reads now. It is the

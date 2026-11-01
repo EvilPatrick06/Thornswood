@@ -485,8 +485,8 @@ namespace Thornswood
             {
                 // The box keeps saves and settings, and Profile holds more
                 // than those: the log, the Discord sign-in with the name and
-                // picture beside it, the support zips and the WebView2
-                // browser folders. Keeping all of Profile kept them on the PC
+                // picture beside it, the support zips and the music's old
+                // browser folder. Keeping all of Profile kept them on the PC
                 // under a box that named none of them (#3679). They go here,
                 // and the farewell names any that are still there.
                 leave.AddRange(LocalKeep.NotSaves());
@@ -522,7 +522,10 @@ namespace Thornswood
             // Licence texts Package stages beside SOURCE CODE.txt (issue #421).
             leave.Add(Path.Combine(Paths.Root, "GPL-3.0.txt"));
             leave.Add(Path.Combine(Paths.Root, "AGPL-3.0.txt"));
-            leave.Add(Path.Combine(Paths.Root, "WebView2-LICENSE.txt"));
+            // The voice libraries' licences beside them (#4823).
+            leave.Add(Path.Combine(Paths.Root, "Concentus-LICENSE.txt"));
+            leave.Add(Path.Combine(Paths.Root, "SharpSRTP-LICENSE.txt"));
+            leave.Add(Path.Combine(Paths.Root, "BouncyCastle-LICENSE.txt"));
             // The libraries' licence texts SOURCE CODE.txt lists (issue #3099).
             leave.Add(Path.Combine(Paths.Root, "licences"));
 

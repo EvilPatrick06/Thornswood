@@ -128,9 +128,17 @@ shows every line of it.
 
 ## What else Thornswood hands you that somebody else wrote
 
-**The launcher** carries three files from Microsoft's WebView2 SDK, version
-1.0.2903.40. They give it the browser that voice runs in. Microsoft's licence
-for them is at the bottom of this page. It also carries NLayer 3.0.0, by Mark
+**The launcher** carries three libraries for proximity voice: Concentus
+2.2.2, by Logan Stromberg, the Opus codec written in C# from the Opus
+reference library by Xiph.Org and its contributors, under the Opus BSD
+licence; SharpSRTP 0.5.8, by Lukas Volf, which encrypts each call, under the
+MIT licence; and BouncyCastle 2.7.0, by the Legion of the Bouncy Castle, the
+cryptography SharpSRTP is built on, under the MIT licence. Their licences are
+at the bottom of this page, and their sources are on GitHub:
+[Concentus](https://github.com/lostromb/concentus) at commit `6c2328dc`,
+[SharpSRTP](https://github.com/jimm98y/SharpSRTP) at commit `ede1d045` and
+[BouncyCastle](https://github.com/bcgit/bc-csharp) at commit `4007498b`.
+It also carries NLayer 3.0.0, by Mark
 Heath, Andrew Ward and contributors, the MP3 decoder it plays its menu theme
 with, under the MIT licence, which is at the bottom of this page too. Its
 source is [on GitHub](https://github.com/naudio/NLayer), at commit
@@ -219,36 +227,92 @@ licence. All three are served from here, and so are their licences:
 [marked's](/marked-LICENSE.txt), [Cinzel's](/cinzel-OFL.txt) and
 [Spectral's](/spectral-OFL.txt).
 
-## Microsoft WebView2 SDK licence
+## Concentus licence
 
 ```
-Copyright (C) Microsoft Corporation. All rights reserved.
+Copyright (c) by various holding parties, including (but not limited to): 
+Skype Limited, Xiph.Org Foundation, CSIRO, Microsoft Corporation,
+Jean-Marc Valin, Gregory Maxwell, Mark Borgerding, Timothy B. Terriberry,
+Logan Stromberg. All rights are reserved by their respective holders.
 
 Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are
-met:
+modification, are permitted provided that the following conditions are met:
 
-   * Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-   * Redistributions in binary form must reproduce the above
-copyright notice, this list of conditions and the following disclaimer
-in the documentation and/or other materials provided with the
-distribution.
-   * The name of Microsoft Corporation, or the names of its contributors
-may not be used to endorse or promote products derived from this
-software without specific prior written permission.
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+* Neither the name of Internet Society, IETF or IETF Trust, nor the
+   names of specific contributors, may be used to endorse or promote
+   products derived from this software without specific prior written
+   permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+This repository and its redistributable packages contain independently compiled
+versions of the Opus C reference library, which is maintained by Xiph.org and the
+Opus open-source contributors. The source code for these libraries is freely available
+at https://gitlab.xiph.org/xiph/opus/-/tags/v1.5.2, and all binaries are being
+redistributed to you under the same terms of the general Opus license dictated above.
+```
+
+## SharpSRTP licence
+
+```
+MIT License
+
+Copyright (c) 2025 Lukas Volf
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## BouncyCastle licence
+
+```
+MIT License (https://opensource.org/licenses/MIT)
+
+Copyright (c) 2000-2026 The Legion of the Bouncy Castle Inc. (https://www.bouncycastle.org).
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction,
+including without limitation the rights to use, copy, modify, merge, publish, distribute,
+sub license, and/or sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions: The above copyright notice and this
+permission notice shall be included in all copies or substantial portions of the Software.
+
+**THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
+OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.**
 ```
 
 ## NLayer licence

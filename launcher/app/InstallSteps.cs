@@ -508,8 +508,9 @@ namespace Thornswood
             // removes, or the install folder would never come out empty.
             CopyIfThere(Path.Combine(choice.Package, "SOURCE CODE.txt"), Path.Combine(Root, "SOURCE CODE.txt"));
 
-            // Full GPL / AGPL / WebView2 texts beside SOURCE CODE.txt (#421).
-            foreach (string lic in new[] { "GPL-3.0.txt", "AGPL-3.0.txt", "WebView2-LICENSE.txt" })
+            // Full GPL / AGPL texts and the voice libraries' licences beside SOURCE
+            // CODE.txt (#421; installer\licences\README.txt lists them).
+            foreach (string lic in new[] { "GPL-3.0.txt", "AGPL-3.0.txt", "Concentus-LICENSE.txt", "SharpSRTP-LICENSE.txt", "BouncyCastle-LICENSE.txt" })
                 CopyIfThere(Path.Combine(choice.Package, lic), Path.Combine(Root, lic));
 
             // The licence texts of the libraries inside the SkyMP files, which
