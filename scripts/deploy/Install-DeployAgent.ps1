@@ -42,6 +42,18 @@
   failure: a program that will not start is three restarts and then stopped,
   for a day, and this script's -Status says so.
 
+  THE BOT PASS (#5196). It also sets up the task every dev Deployment's bot
+  pass runs as: "Thornswood Bot Pass", on demand only, node running
+  Bot-Pass.js in C:\Thornswood-BotPass\run, as LOCAL SERVICE, Limited, with
+  a SID of its own (NT TASK\Thornswood Bot Pass) and rights in that folder
+  only, below normal priority, the way the game servers run
+  (ServiceAccount.ps1, #2578, #4077). It never goes on SYSTEM: when the SID
+  or the rules cannot be set, or LOCAL SERVICE could read what no service
+  may, the bot pass is left off and this says why, and Deployments go in
+  without one. Once it is set up, agent.json names the folder and every dev
+  Deployment waits on a pass (tools\DeployAgent\BotPass.cs). -NoBotPass
+  takes it off again.
+
   WHAT IT CANNOT DO YET. Until the box admin App holds Deployments: Read and
   write (its permissions page, then Accept on its installation, an owner's
   step), the agent runs and every pass says GitHub gave it no token; -Status
@@ -63,6 +75,8 @@ param(
     [string]$Tag     = '',
     [switch]$Status,
     [switch]$Remove,
+    # Leave the bot pass off (#5196): no task, and agent.json names no folder.
+    [switch]$NoBotPass,
     [switch]$NoPause
 )
 
@@ -72,6 +86,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $RepoDir = (Resolve-Path (Join-Path $Here '..\..')).Path
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
+. (Join-Path $Here 'ServiceAccount.ps1')
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 
@@ -104,6 +119,8 @@ function Remote($script) { return Invoke-ThornswoodRemote -Target $target -SshAr
 
 $agentSvc = 'ThornswoodDeployAgent'
 $exe = $Root.TrimEnd('\') + '\thornswood-agent.exe'
+$passTask = 'Thornswood Bot Pass'
+$passRoot = 'C:\Thornswood-BotPass'
 
 # ------------------------------------------------------------------ status --
 if ($Status) {
@@ -114,6 +131,12 @@ if (-not `$s) { 'NOT INSTALLED: there is no service $agentSvc'; exit 0 }
 if (Test-Path -LiteralPath '$exe') { & '$exe' version 2>&1 | ForEach-Object { "`$_" } }
 '--- the agent''s own check ---'
 & '$exe' check 2>&1 | ForEach-Object { "`$_" }
+'--- the bot pass (#5196) ---'
+`$t = Get-ScheduledTask -TaskName '$passTask' -ErrorAction SilentlyContinue
+if (`$t) { `$i = `$t | Get-ScheduledTaskInfo; 'task $passTask is ' + `$t.State + ' as ' + `$t.Principal.UserId + ', last run ' + `$i.LastRunTime + ', last result ' + `$i.LastTaskResult }
+else { 'no task ${passTask}: dev Deployments go in without a bot pass' }
+`$res = '$passRoot\run\result.json'
+if (Test-Path -LiteralPath `$res) { try { `$r = [IO.File]::ReadAllText(`$res) | ConvertFrom-Json; 'last pass ' + `$r.ended + ': ' + `$(if (`$r.ok) { 'OK' } else { 'FAILED' }); foreach (`$l in @(`$r.lines)) { '  ' + `$(if (`$l.ok) { 'PASS' } else { 'FAIL' }) + '  ' + `$l.step + ': ' + `$l.detail } } catch { 'its result.json does not read: ' + `$_.Exception.Message } }
 '--- agent.log, last 30 ---'
 `$log = '$Root\logs\agent.log'
 if (Test-Path -LiteralPath `$log) { Get-Content -LiteralPath `$log -Tail 30 } else { 'no log yet' }
@@ -130,6 +153,7 @@ if (`$s) {
   if (`$s.Status -ne 'Stopped') { Stop-Service -Name '$agentSvc' -Force; `$s.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(60)) }
   & sc.exe delete '$agentSvc' | Out-Null
   'REMOVED the service $agentSvc; $Root is left with its logs'
+  if (Get-ScheduledTask -TaskName '$passTask' -ErrorAction SilentlyContinue) { Unregister-ScheduledTask -TaskName '$passTask' -Confirm:`$false; 'REMOVED the task $passTask; $passRoot is left with the last pass' }
 } else { 'NOT INSTALLED' }
 "@)
     foreach ($l in $out) { Say ("  $l") }
@@ -233,8 +257,64 @@ if (Test-Path -LiteralPath `$cfgPath) { try { `$cfg = [IO.File]::ReadAllText(`$c
 if (-not `$cfg.environments) { `$cfg | Add-Member -NotePropertyName environments -NotePropertyValue (New-Object PSObject) -Force }
 if (-not `$cfg.environments.dev) { `$cfg.environments | Add-Member -NotePropertyName dev -NotePropertyValue (New-Object PSObject) -Force }
 `$cfg.environments.dev | Add-Member -NotePropertyName logBase -NotePropertyValue '$logBase' -Force
-[IO.File]::WriteAllText(`$cfgPath, (`$cfg | ConvertTo-Json -Depth 10))
 'agent.json names $Repo'
+
+# The bot pass (#5196): its folder, its task, and agent.json naming the
+# folder only once the task runs as its own SID with rights there alone.
+`$passTask = '$passTask'
+`$passRoot = '$passRoot'
+`$noPass = [bool]$([int][bool]$NoBotPass)
+`$passWhy = ''
+`$cfg.environments.dev.PSObject.Properties.Remove('botPassRoot')
+if (`$noPass) {
+  if (Get-ScheduledTask -TaskName `$passTask -ErrorAction SilentlyContinue) { Unregister-ScheduledTask -TaskName `$passTask -Confirm:`$false }
+  'bot pass: off (-NoBotPass); dev Deployments go in without one'
+} else {
+$(Get-ThornswoodServiceAccountScript)
+  `$cannot = @(Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach -Own `$passRoot -Box 'C:\'))
+  if (`$cannot.Count) { `$passWhy = 'LOCAL SERVICE could read what no service may: ' + (`$cannot -join '; ') + ' (scripts\vps\Lock-VpsFolders.ps1 locks them)' }
+  `$node = Get-Command node -ErrorAction SilentlyContinue
+  `$nodeExe = if (`$node) { `$node.Source } elseif (Test-Path -LiteralPath 'C:\Program Files\nodejs\node.exe') { 'C:\Program Files\nodejs\node.exe' } else { '' }
+  if (-not `$passWhy -and -not `$nodeExe) { `$passWhy = 'node is not installed on this machine' }
+  # The bot connects through dev's own engine (createBotClient, skymp fork
+  # #137). With an engine older than that every pass would fail, so the pass
+  # waits for a dev release that carries it, and this says so.
+  `$devEngine = 'C:\Thornswood-Server-Dev\scam_native.node'
+  if (-not `$passWhy) {
+    try { `$hasBot = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes(`$devEngine)).Contains('createBotClient') } catch { `$hasBot = `$false; `$passWhy = 'dev''s engine could not be read: ' + `$_.Exception.Message }
+    if (-not `$passWhy -and -not `$hasBot) { `$passWhy = 'dev''s engine has no createBotClient (skymp fork #137); run this again once a dev release carries it' }
+  }
+  if (-not `$passWhy) {
+    try {
+      foreach (`$d in `$passRoot, (Join-Path `$passRoot 'run'), (Join-Path `$passRoot 'plugins')) { if (-not (Test-Path -LiteralPath `$d)) { New-Item -ItemType Directory -Path `$d | Out-Null } }
+      & icacls.exe `$passRoot /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
+      if (`$LASTEXITCODE -ne 0) { throw ('icacls could not set the rules on ' + `$passRoot) }
+      `$run = Join-Path `$passRoot 'run'
+      `$action = New-ScheduledTaskAction -Execute `$nodeExe -Argument ('"' + `$run + '\bot\Bot-Pass.js" --root "' + `$run + '\server" --out "' + `$run + '\result.json"') -WorkingDirectory `$run
+      # On demand only (the agent starts it), below normal priority (7), and
+      # a time limit past the agent's own 30 minutes.
+      `$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 40) -Priority 7
+      if (Get-ScheduledTask -TaskName `$passTask -ErrorAction SilentlyContinue) { Unregister-ScheduledTask -TaskName `$passTask -Confirm:`$false }
+      Register-ScheduledTask -TaskName `$passTask -Action `$action -Settings `$settings -Principal (New-ThornswoodServicePrincipal) | Out-Null
+      `$sid = Get-ThornswoodTaskSid `$passTask
+      if (-not `$sid) { throw ('the task SID NT TASK\' + `$passTask + ' could not be looked up') }
+      Grant-ThornswoodServiceFolder -Root `$passRoot -Sid `$sid -Writable 'run' | ForEach-Object { 'bot pass: ' + `$_ }
+      Set-ThornswoodTaskOwner -TaskName `$passTask -Sid `$sid -Action `$action -Roots `$passRoot | ForEach-Object { 'bot pass: ' + `$_ }
+      `$p = (Get-ScheduledTask -TaskName `$passTask).Principal
+      if (`$p.UserId -notmatch 'LOCAL SERVICE' -or [string]`$p.RunLevel -ne 'Limited') { throw ('the task reads back as ' + `$p.UserId + ', ' + `$p.RunLevel) }
+    } catch {
+      `$passWhy = `$_.Exception.Message
+      # Never left on SYSTEM or half set up: no task means no bot pass.
+      if (Get-ScheduledTask -TaskName `$passTask -ErrorAction SilentlyContinue) { Unregister-ScheduledTask -TaskName `$passTask -Confirm:`$false }
+    }
+  }
+  if (`$passWhy) { 'BOT PASS NOT SET UP: ' + `$passWhy + '. Dev Deployments go in without one until it is.' }
+  else {
+    `$cfg.environments.dev | Add-Member -NotePropertyName botPassRoot -NotePropertyValue `$passRoot -Force
+    'bot pass: the task ' + `$passTask + ' runs node ' + `$nodeExe + ' as LOCAL SERVICE, Limited, NT TASK\' + `$passTask + ', below normal priority; every dev Deployment waits on it'
+  }
+}
+[IO.File]::WriteAllText(`$cfgPath, (`$cfg | ConvertTo-Json -Depth 10))
 
 # In place, with the one it replaces kept beside it until the new one runs.
 `$svc = Get-Service -Name `$agentSvc -ErrorAction SilentlyContinue
