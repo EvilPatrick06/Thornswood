@@ -15,8 +15,9 @@
 //    the wire with 28 bytes of header a datagram, per person against step 0,
 //    and the summary table;
 //  - New-LoadServer.js: the start points of each shape, and its refusals of
-//    a build of another commit, a file that is not the record's, and a master
-//    that is not the one the fork's build holds it to.
+//    a server build whose record is not the checkout's, a file that is not
+//    the record's, and a master that is not the one the fork's build holds
+//    it to, or is not there.
 //
 // Read only, apart from a temp folder it deletes. The proxy test binds two
 // UDP sockets on 127.0.0.1; nothing else connects anywhere.
@@ -178,21 +179,19 @@ async function serverChecks() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'test-4623-'));
   try {
     const record = JSON.parse(fs.readFileSync(path.join(ROOT, 'records', 'server-build.json'), 'utf8'));
-    const engine = path.join(tmp, 'engine');
-    const dist = path.join(engine, 'build', 'dist', 'server');
+    const dist = path.join(tmp, 'build');
     fs.mkdirSync(dist, { recursive: true });
-    fs.writeFileSync(path.join(engine, 'fork-build.json'), JSON.stringify({ commit: 'f'.repeat(40) }));
+    fs.writeFileSync(path.join(dist, 'server-build.json'), JSON.stringify({ sha256: '0'.repeat(64) }));
     let err = '';
-    try { await server.build({ engine, masters: path.join(tmp, 'm'), out: path.join(tmp, 'out1') }); } catch (e) { err = e.message; }
-    yes('a build of another commit than the record pins is refused', /is of fork commit f{40}, and records\\server-build.json pins/.test(err));
-    fs.writeFileSync(path.join(engine, 'fork-build.json'), JSON.stringify({ commit: record.source.commit }));
+    try { await server.build({ build: dist, masters: path.join(tmp, 'm'), out: path.join(tmp, 'out1') }); } catch (e) { err = e.message; }
+    yes('a server build whose record is not the checkout\'s is refused', /records scam_native\.node as sha256 0{64}, and records\\server-build\.json holds/.test(err));
+    fs.writeFileSync(path.join(dist, 'server-build.json'), JSON.stringify(record));
     for (const rel of Object.keys(record.files)) {
       fs.mkdirSync(path.dirname(path.join(dist, rel)), { recursive: true });
       fs.writeFileSync(path.join(dist, rel), 'not the build');
     }
-    fs.writeFileSync(path.join(dist, 'server-settings.json'), '{}');
     err = '';
-    try { await server.build({ engine, masters: path.join(tmp, 'm'), out: path.join(tmp, 'out2') }); } catch (e) { err = e.message; }
+    try { await server.build({ build: dist, masters: path.join(tmp, 'm'), out: path.join(tmp, 'out2') }); } catch (e) { err = e.message; }
     yes('a file that is not the one the record holds is refused, by name', /in the build is sha256 [0-9a-f]{64}, not the [0-9a-f]{64} records\\server-build.json holds/.test(err));
     const fake = path.join(tmp, 'Skyrim.esm');
     fs.writeFileSync(fake, 'not Skyrim.esm');

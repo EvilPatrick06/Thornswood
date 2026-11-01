@@ -3,10 +3,16 @@
 //
 // #4623. Lays out the load test's server on GitHub's runner, from three
 // things and nothing else:
-//   the engine   the fork's own build of the commit records\server-build.json
-//                pins (thornswood-engine-<commit>, unpacked, as the workflow
-//                downloads it), every file the record names held to its
-//                sha256, so the server measured is the one Thornswood ships;
+//   the engine   the server build records\server-build.json names, as the
+//                signed build-<date>.<run> Release carries it for the deploy
+//                agent (the server-<commit>-<hash>.zip, unpacked, as the
+//                workflow downloads it), every file the record names held to
+//                its sha256, so the server measured is the one dev runs. The
+//                fork's own artifact of the commit is not used: after the
+//                history rewrite the fork built that commit again (run
+//                41340857541), and a rebuild is never the same bytes
+//                (engine\README.md), so its scam_native.node is not the one
+//                the record holds;
 //   the game     game\gamemode.js and game\content\Thornswood-Content.esp
 //                from this checkout;
 //   the masters  Skyrim.esm, Update.esm, Dawnguard.esm, HearthFires.esm and
@@ -30,7 +36,7 @@
 // is in the world, and the load copy has no hall to stand in, which is in
 // the collection.
 //
-//     node New-LoadServer.js --engine <unpacked build> --masters <folder>
+//     node New-LoadServer.js --build <unpacked server zip> --masters <folder>
 //         --out <server folder> [--shape crowd|spread] [--seats 100]
 //         [--download yes]
 'use strict';
@@ -118,10 +124,9 @@ async function build(o) {
   const seats = Number(o.seats) || 100;
   const record = readJson(path.join(REPO, 'records', 'server-build.json'));
   const commit = String(record.source && record.source.commit || '');
-  const engine = path.resolve(o.engine);
-  const fb = readJson(path.join(engine, 'fork-build.json'));
-  if (String(fb.commit) !== commit) { throw new Error('the build in ' + engine + ' is of fork commit ' + fb.commit + ', and records\\server-build.json pins ' + commit); }
-  const dist = path.join(engine, 'build', 'dist', 'server');
+  const dist = path.resolve(o.build);
+  const theirs = readJson(path.join(dist, 'server-build.json'));
+  if (String(theirs.sha256) !== String(record.sha256)) { throw new Error('the build in ' + dist + ' records scam_native.node as sha256 ' + theirs.sha256 + ', and records\\server-build.json holds ' + record.sha256); }
   const out = path.resolve(o.out);
   if (fs.existsSync(out)) { throw new Error(out + ' is there already'); }
   copyTree(dist, out);
@@ -151,8 +156,7 @@ async function build(o) {
   fs.copyFileSync(path.join(REPO, 'game', 'content', 'Thornswood-Content.esp'), content);
   order.push(content.replace(/\\/g, '/'));
 
-  const base = readJson(path.join(out, 'server-settings.json'));
-  const settings = Object.assign({}, base, {
+  const settings = {
     dataDir: 'data',
     loadOrder: order,
     master: '',
@@ -166,7 +170,7 @@ async function build(o) {
     thornswoodServer: 'dev',
     thornswoodRequirePass: false,
     thornswoodChargen: false
-  });
+  };
   fs.writeFileSync(path.join(out, 'server-settings.json'), JSON.stringify(settings, null, 2) + '\n');
   console.log('the load server is in ' + out + ': fork ' + commit + ', ' + shape + ', ' + seats + ' seats, ' + order.length + ' plugins');
   return { out, commit, settings };
@@ -176,8 +180,8 @@ async function main() {
   const o = {};
   const argv = process.argv.slice(2);
   for (let i = 0; i < argv.length; i += 2) { o[String(argv[i]).replace(/^--/, '')] = argv[i + 1]; }
-  if (!o.engine || !o.masters || !o.out) {
-    console.log('node New-LoadServer.js --engine <unpacked build> --masters <folder> --out <server folder> [--shape crowd|spread] [--seats 100] [--download yes]');
+  if (!o.build || !o.masters || !o.out) {
+    console.log('node New-LoadServer.js --build <unpacked server zip> --masters <folder> --out <server folder> [--shape crowd|spread] [--seats 100] [--download yes]');
     return 2;
   }
   await build(o);

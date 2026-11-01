@@ -3,9 +3,9 @@
 # game's port, log in and move like a person; the plan puts them on GitHub's
 # runner with the five masters.
 #
-# Each job lays out a server on a fresh windows-2022 runner from the engine
-# build records\server-build.json pins (the fork's own build of that commit,
-# every file held to the record), this checkout's gamemode.js and
+# Each job lays out a server on a fresh windows-2022 runner from the server
+# build records\server-build.json names (as the signed build Release carries
+# it for the deploy agent, every file held to the record), this checkout's gamemode.js and
 # Thornswood-Content.esp, and the five masters the fork's build downloads,
 # held to the same sha256 (scripts\bot\New-LoadServer.js; THIRD-PARTY.md says
 # where they come from, and they go with the runner). Then
@@ -20,8 +20,8 @@
 #
 # Why GitHub's runner: this repository is public, so its standard runners cost
 # nothing, and nothing here needs a secret, the box, or a real server. No job
-# here may name a self-hosted runner. Its token reads only: the fork's build is
-# a public repository's artifact, which GitHub serves to any token.
+# here may name a self-hosted runner. Its token reads only: the Releases of
+# this repository and nothing else.
 #
 # The runner is not the box: its cores are a cloud machine's, and the bots run
 # on it beside the server. Load-Test.js reads how busy the whole runner was at
@@ -62,10 +62,9 @@ jobs:
       matrix:
         shape: [crowd, spread]
     runs-on: windows-2022
-    # Measured on its first runs: the masters and the build download in about
-    # two minutes, the gamemode loads in about one, and each step takes its
-    # fill, 20 s of settling and its window. Six steps of 60 s are under 20
-    # minutes; twice that is the limit.
+    # Each step takes its fill, 20 s of settling and its window, so six
+    # steps of 60 s are about 15 minutes after the downloads and the
+    # gamemode's load; three times that is the limit.
     timeout-minutes: 45
     steps:
       # As the fork's build does: the gamemode's bytes as committed.
@@ -79,30 +78,41 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Get the engine build the checkout pins
+      # The server build dev runs: the signed build-<date>.<run> Release the
+      # deploy agent takes it from carries it as server-<commit>-<hash>.zip,
+      # with its server-build.json. The newest Release whose record holds the
+      # same scam_native.node as this checkout's is taken, and
+      # New-LoadServer.js then holds every file to this checkout's record.
+      - name: Get the server build the checkout records
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $commit = ((Get-Content -Raw records/server-build.json) | ConvertFrom-Json).source.commit
-          $name = "thornswood-engine-$commit"
-          $list = gh api -X GET repos/ThornswoodRP/skymp/actions/artifacts -f name=$name -f per_page=100 | ConvertFrom-Json
-          $art = @($list.artifacts | Where-Object { -not $_.expired -and $_.workflow_run.head_branch -eq 'thornswood/engine-changes' } | Sort-Object created_at -Descending) | Select-Object -First 1
-          if (-not $art) { Write-Host "::error::the fork keeps no $name from a push to thornswood/engine-changes, so the pinned engine cannot be measured"; exit 1 }
-          $zip = Join-Path $env:RUNNER_TEMP 'engine.zip'
-          # The API sends the zip on to GitHub's storage, and pwsh drops the
-          # token when a request moves to another host.
-          Invoke-WebRequest -Uri "https://api.github.com/repos/ThornswoodRP/skymp/actions/artifacts/$($art.id)/zip" -OutFile $zip `
-            -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
-          if ((Get-Item -LiteralPath $zip).Length -ne [long]$art.size_in_bytes) { Write-Host "::error::the download of $name is $((Get-Item -LiteralPath $zip).Length) bytes, and the fork says $($art.size_in_bytes)"; exit 1 }
-          Expand-Archive -LiteralPath $zip -DestinationPath (Join-Path $env:RUNNER_TEMP 'engine')
-          Write-Host "fork $commit, artifact $($art.id) of run $($art.workflow_run.id), $($art.size_in_bytes) bytes"
+          $want = ((Get-Content -Raw records/server-build.json) | ConvertFrom-Json).sha256
+          $h = @{ Authorization = "Bearer $env:GH_TOKEN"; 'X-GitHub-Api-Version' = '2022-11-28' }
+          $api = "https://api.github.com/repos/$env:GITHUB_REPOSITORY"
+          $rels = Invoke-RestMethod -Uri "$api/releases?per_page=100" -Headers $h
+          $found = $null
+          foreach ($r in @($rels | Where-Object { $_.tag_name -like 'build-*' } | Sort-Object created_at -Descending)) {
+            $rec = $r.assets | Where-Object { $_.name -eq 'server-build.json' }
+            $zip = $r.assets | Where-Object { $_.name -like 'server-*.zip' }
+            if (-not $rec -or -not $zip) { continue }
+            $f = Join-Path $env:RUNNER_TEMP "record-$($r.id).json"
+            Invoke-WebRequest -Uri $rec.url -Headers ($h + @{ Accept = 'application/octet-stream' }) -OutFile $f
+            if ((((Get-Content -Raw $f) | ConvertFrom-Json).sha256) -eq $want) { $found = @{ Release = $r; Zip = $zip }; break }
+          }
+          if (-not $found) { Write-Host "::error::no build Release carries the server build records/server-build.json holds (scam_native.node sha256 $want)"; exit 1 }
+          $z = Join-Path $env:RUNNER_TEMP 'server.zip'
+          Invoke-WebRequest -Uri $found.Zip.url -Headers ($h + @{ Accept = 'application/octet-stream' }) -OutFile $z
+          if ((Get-Item -LiteralPath $z).Length -ne [long]$found.Zip.size) { Write-Host "::error::the download of $($found.Zip.name) is $((Get-Item -LiteralPath $z).Length) bytes, and the Release says $($found.Zip.size)"; exit 1 }
+          Expand-Archive -LiteralPath $z -DestinationPath (Join-Path $env:RUNNER_TEMP 'build')
+          Write-Host "$($found.Zip.name) from $($found.Release.tag_name), $($found.Zip.size) bytes"
 
       - name: Lay out the load server
         shell: pwsh
         run: |
-          node scripts/bot/New-LoadServer.js --engine "$env:RUNNER_TEMP/engine" --masters "$env:RUNNER_TEMP/masters" --out "$env:RUNNER_TEMP/server" --shape ${{ matrix.shape }} --seats 200 --download yes
+          node scripts/bot/New-LoadServer.js --build "$env:RUNNER_TEMP/build" --masters "$env:RUNNER_TEMP/masters" --out "$env:RUNNER_TEMP/server" --shape ${{ matrix.shape }} --seats 200 --download yes
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Put the bots on it
