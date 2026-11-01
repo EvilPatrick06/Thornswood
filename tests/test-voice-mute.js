@@ -87,7 +87,7 @@ const BESIDE = { pos: [0, 0, 0], angleZ: 0, cell: 'c' };
   begins.
 */
 const SERA = 660;
-const HEARD = 0.1;    // a voice at full level in front reads about 0.21
+const HEARD = 0.1;    // a voice at full level in front reads about 0.25
 const SILENT = 0.02;
 const settle = () => new Promise((ok) => setTimeout(ok, 750));
 
