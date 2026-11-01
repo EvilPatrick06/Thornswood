@@ -152,7 +152,7 @@
   A file to which a line of JSON is added as each harness starts (its name,
   its process id and when Windows says it started, in UTC) and as it ends
   (its exit code, its seconds and whether it said SKIP or NOT RUN). A trace
-  of the gate (scripts\dev\Trace-Gate.ps1, #3114) reads it to know which
+  of the gate (gate-map.yml through scripts\dev\Trace-Gate-Here.ps1, #3114) reads it to know which
   process tree was which harness's.
 
 .PARAMETER BusyFrom
