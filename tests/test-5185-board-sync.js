@@ -1,5 +1,5 @@
 // #5185: the board follows what GitHub knows. scripts/ops/Sync-Board.js puts
-// each card's Status, Priority and the issue's type where the issue and the
+// each card's Status, Order and the issue's type where the issue and the
 // pull requests that name it say, and .github/workflows/board.yml is the one
 // workflow that runs it. Offline: the script against a stand-in GitHub, and
 // the workflows read from their files. Nothing reaches GitHub.
@@ -7,11 +7,13 @@
 // What is held here:
 //   1. the rules: which text names an issue, the Status order (closed or a
 //      merged test task is Done, an open pull request or a claim is In
-//      Progress, anything else Todo), the priority labels, the type an
+//      Progress, anything else Todo), the order: labels, the type an
 //      issue with none gets, and which timeline entries count;
 //   2. the script against a stand-in GitHub: one issue, a pull request's
 //      issues (with the issues it named before an edit, and itself read
-//      fresh), every open issue across pages, the Priority field made once,
+//      fresh), every open issue across pages, a new issue's Order and an
+//      order: label carried out, the Order field made once, the old board's
+//      Orders copied,
 //      a dry run that writes nothing, a type somebody set left alone, an
 //      issue that fails named and the run red, a board without its Status
 //      options refused, and nothing run without its settings;
@@ -68,9 +70,11 @@ yes('  but a merged fork pull request\'s test task is not this repository\'s Don
     st({}, [pr(3, { repo: FORK, state: 'closed', merged: true, body: 'Refs ThornswoodRP/Thornswood#10\nTest task for #10: x' })]) === 'Todo');
 yes('it says why', /pull request #1 names it and is open/.test(S.statusFor({ repo: HERE, number: 10, state: 'open', labels: [] }, [pr(1)]).why));
 
-yes('P0 to P3 are the priorities', S.priorityFor(['area: bot', 'P2']).priority === 'P2' && S.priorityFor([]).priority === null);
-yes('  two at once: the more urgent, and both are said', S.priorityFor(['P3', 'P1']).priority === 'P1' && same(S.priorityFor(['P3', 'P1']).all.map(x => Number(x[1])), [1, 3]));
-yes('  a label that only starts with one is not one', S.priorityFor(['P1x', 'priority']).priority === null);
+yes('an order: label asks for its number, a decimal too', S.orderFor(['area: bot', 'order: 52.5']).order === 52.5 && S.orderFor([]).order === null);
+yes('  two asking for different numbers ask for nothing, and say so', S.orderFor(['order: 3', 'order: 4']).order === null && S.orderFor(['order: 3', 'order: 4']).clash);
+yes('  two asking for the same number ask for it, and both come off', S.orderFor(['order: 3', 'Order:3']).order === 3 && S.orderFor(['order: 3', 'Order:3']).labels.length === 2);
+yes('  a label that is not a number asks for nothing', S.orderFor(['order: soon', 'reorder: 3']).order === null);
+yes('a card\'s number reads however the item answers it', S.numberOf(5) === 5 && S.numberOf('7.5') === 7.5 && S.numberOf({ number: 2 }) === 2 && S.numberOf(null) === null && S.numberOf('') === null);
 yes('a typeless issue labelled bug, Dev Findings or Main Findings is a Bug',
     S.typeFor(['bug']) === 'Bug' && S.typeFor(['Dev Findings']) === 'Bug' && S.typeFor(['Main Findings']) === 'Bug');
 yes('  one labelled Suggestion a Feature, anything else a Task', S.typeFor(['Suggestion']) === 'Feature' && S.typeFor(['area: site']) === 'Task');
@@ -95,7 +99,7 @@ function github(o) {
   const reads = [];
   const fields = () => [
     { id: 101, name: 'Status', data_type: 'single_select', options: (o.statuses || ['Todo', 'In Progress', 'Done']).map((n, i) => OPT('s' + i, n)) },
-  ].concat(o.priority === false ? [] : [{ id: 102, name: 'Priority', data_type: 'single_select', options: ['P0', 'P1', 'P2', 'P3'].map((n, i) => OPT('p' + i, n)) }]);
+  ].concat(o.order === false ? [] : [{ id: 102, name: 'Order', data_type: 'number' }]);
   async function f(url, init) {
     const method = (init && init.method) || 'GET';
     const p = url.replace('https://api.github.com/', '');
@@ -104,7 +108,16 @@ function github(o) {
     if (method !== 'GET') { writes.push({ method: method, path: p, body: body }); } else { reads.push(p); }
     let m;
     if ((m = /^orgs\/ThornswoodRP\/projectsV2\/7\/fields\?per_page=100$/.exec(p))) { return answer(200, fields()); }
-    if (method === 'POST' && p === 'orgs/ThornswoodRP/projectsV2/7/fields') { o.priority = true; return answer(201, { id: 102 }); }
+    if (method === 'POST' && p === 'orgs/ThornswoodRP/projectsV2/7/fields') { o.order = true; return answer(201, { id: 102 }); }
+    if ((m = /^orgs\/ThornswoodRP\/projectsV2\/7\/items\/(\d+)\?fields=102$/.exec(p))) {
+      const had = (o.cardOrder || {})[Number(m[1]) - 9000];
+      return answer(200, { id: Number(m[1]), fields: [{ id: 101, name: 'Status', value: null }, { id: 102, name: 'Order', data_type: 'number', value: had === undefined ? null : had }] });
+    }
+    if (method === 'DELETE' && (m = /^repos\/ThornswoodRP\/Thornswood\/issues\/(\d+)\/labels\/(.+)$/.exec(p))) { return answer(o.labelGone ? 404 : 200, []); }
+    if (/^users\/EvilPatrick06\/projectsV2\/1\/fields\?per_page=100$/.test(p)) {
+      return answer(200, [{ id: 201, name: 'Status', data_type: 'single_select', options: ['Todo', 'In Progress', 'Done'].map((n, i) => OPT('o' + i, n)) }].concat(o.oldOrder === false ? [] : [{ id: 202, name: 'Order', data_type: 'number' }]));
+    }
+    if (/^users\/EvilPatrick06\/projectsV2\/1\/items\?fields=202&per_page=100$/.test(p)) { return answer(200, o.oldItems || []); }
     if (method === 'POST' && p === 'orgs/ThornswoodRP/projectsV2/7/items') { return answer(201, { id: 9000 + body.number }); }
     if (method === 'PATCH' && (m = /^orgs\/ThornswoodRP\/projectsV2\/7\/items\/(\d+)$/.exec(p))) { return answer(200, { id: Number(m[1]) }); }
     if (method === 'PATCH' && (m = /^repos\/ThornswoodRP\/Thornswood\/issues\/(\d+)$/.exec(p))) { return answer(200, {}); }
@@ -138,19 +151,31 @@ async function go(argv, o, env) {
 const fieldWrite = (w, n) => w.find(x => x.method === 'PATCH' && x.path === 'orgs/ThornswoodRP/projectsV2/7/items/' + (9000 + n));
 
 (async () => {
-  let r = await go(['--issues', '10'], { issues: { 10: issue(10, { labels: [{ name: 'P1' }] }) }, timelines: { 10: [xref(55)] } });
+  let r = await go(['--issues', '10'], { issues: { 10: issue(10) }, timelines: { 10: [xref(55)] }, cardOrder: { 10: 52.5 } });
   let w = fieldWrite(r.writes, 10);
-  yes('one issue: its card is added and set to In Progress and P1: ' + r.lines[0], r.code === 0 &&
+  yes('one issue: its card is added and set to In Progress, and the Order it has is kept: ' + r.lines[0], r.code === 0 &&
       r.writes.some(x => x.method === 'POST' && x.path === 'orgs/ThornswoodRP/projectsV2/7/items' && x.body.type === 'Issue' && x.body.owner === 'ThornswoodRP' && x.body.repo === 'Thornswood' && x.body.number === 10) &&
-      w && JSON.stringify(w.body) === JSON.stringify({ fields: [{ id: 101, value: 's1' }, { id: 102, value: 'p1' }] }));
+      w && JSON.stringify(w.body) === JSON.stringify({ fields: [{ id: 101, value: 's1' }] }));
   yes('  a type somebody set is left as it is', !r.writes.some(x => x.path === 'repos/ThornswoodRP/Thornswood/issues/10'));
   r = await go(['--issues', '11'], { issues: { 11: issue(11, { type: null, labels: [{ name: 'Suggestion' }] }) } });
   w = fieldWrite(r.writes, 11);
-  yes('an issue with no type gets one, Todo and no priority cleared on the card: ' + r.lines[0], r.code === 0 &&
+  yes('an issue with no type gets one, Todo, and an open card with no Order gets 10000 plus its number: ' + r.lines[0], r.code === 0 &&
       r.writes.some(x => x.method === 'PATCH' && x.path === 'repos/ThornswoodRP/Thornswood/issues/11' && x.body.type === 'Feature') &&
-      w && JSON.stringify(w.body.fields) === JSON.stringify([{ id: 101, value: 's0' }, { id: 102, value: null }]));
+      w && JSON.stringify(w.body.fields) === JSON.stringify([{ id: 101, value: 's0' }, { id: 102, value: 10011 }]) && /Order 10011 \(it had none\)/.test(r.lines[0]));
   r = await go(['--issues', '12'], { issues: { 12: issue(12, { state: 'closed' }) } });
-  yes('a closed issue goes to Done', JSON.stringify(fieldWrite(r.writes, 12).body.fields[0]) === JSON.stringify({ id: 101, value: 's2' }));
+  yes('a closed issue goes to Done, and its Order is not read or given', JSON.stringify(fieldWrite(r.writes, 12).body.fields) === JSON.stringify([{ id: 101, value: 's2' }]) &&
+      !r.reads.some(p => /items\/9012\?/.test(p)));
+  r = await go(['--issues', '14'], { issues: { 14: issue(14, { labels: [{ name: 'order: 52.5' }, { name: 'bug' }] }) }, cardOrder: { 14: 10014 } });
+  w = fieldWrite(r.writes, 14);
+  yes('an order: label sets the card\'s Order, then comes off: ' + r.lines[0], r.code === 0 &&
+      w && JSON.stringify(w.body.fields) === JSON.stringify([{ id: 101, value: 's0' }, { id: 102, value: 52.5 }]) &&
+      r.writes.filter(x => x.method === 'DELETE').map(x => x.path).join() === 'repos/ThornswoodRP/Thornswood/issues/14/labels/order%3A%2052.5' &&
+      r.writes.indexOf(w) < r.writes.findIndex(x => x.method === 'DELETE'));
+  r = await go(['--issues', '14'], { issues: { 14: issue(14, { labels: [{ name: 'order: 3' }] }) }, labelGone: true });
+  yes('  a label somebody already took off is no failure', r.code === 0 && fieldWrite(r.writes, 14).body.fields[1].value === 3);
+  r = await go(['--issues', '14'], { issues: { 14: issue(14, { labels: [{ name: 'order: 3' }, { name: 'order: 4' }] }) }, cardOrder: { 14: 20 } });
+  yes('  two that disagree: the Order and the labels stay, and it says so: ' + r.lines[0], r.code === 0 &&
+      JSON.stringify(fieldWrite(r.writes, 14).body.fields) === JSON.stringify([{ id: 101, value: 's0' }]) && !r.writes.some(x => x.method === 'DELETE') && /disagree/.test(r.lines[0]));
 
   r = await go(['--pull', '55'], {
     pulls: { 55: { number: 55, state: 'open', merged_at: null, title: 'Faster (Refs #10)', body: 'Test task for #12: x\nServer: Main' } },
@@ -182,16 +207,32 @@ const fieldWrite = (w, n) => w.find(x => x.method === 'PATCH' && x.path === 'org
 
   r = await go(['--issues', '10'], { issues: { 10: issue(10) }, statuses: ['Todo', 'Doing', 'Done'] });
   yes('a board whose Status lacks an option is refused, and none is added: ' + r.out.split('\n').pop(), r.code === 1 && /has no In Progress/.test(r.out) && r.writes.length === 0);
-  r = await go(['--issues', '10'], { issues: { 10: issue(10) }, priority: false });
-  yes('with no Priority field yet: Status is still set, and it says so', r.code === 0 && /no Priority field yet/.test(r.out) &&
-      JSON.stringify(fieldWrite(r.writes, 10).body.fields) === JSON.stringify([{ id: 101, value: 's0' }]));
+  r = await go(['--issues', '10'], { issues: { 10: issue(10, { labels: [{ name: 'order: 5' }] }) }, order: false });
+  yes('with no Order field yet: Status is still set, the label stays, and it says so', r.code === 0 && /no Order field yet/.test(r.out) &&
+      JSON.stringify(fieldWrite(r.writes, 10).body.fields) === JSON.stringify([{ id: 101, value: 's0' }]) && !r.writes.some(x => x.method === 'DELETE'));
 
-  const o = { priority: false };
+  const o = { order: false };
   r = await go(['--setup'], o);
-  yes('setup makes the Priority field with P0 to P3', r.code === 0 && r.writes.length === 1 && r.writes[0].body.name === 'Priority' &&
-      r.writes[0].body.data_type === 'single_select' && same(r.writes[0].body.single_select_options.map(x => Number(x.name[1])), [0, 1, 2, 3]));
+  yes('setup makes the Order field, a number', r.code === 0 && r.writes.length === 1 && r.writes[0].body.name === 'Order' && r.writes[0].body.data_type === 'number');
   r = await go(['--setup'], {});
   yes('  and only when there is none', r.code === 0 && r.writes.length === 0 && /nothing to make/.test(r.out));
+
+  const oldItem = (n, order, repoUrl, type) => ({ id: 500 + n, content_type: type || 'Issue', content: { number: n, repository_url: repoUrl || 'https://api.github.com/repos/ThornswoodRP/Thornswood' }, fields: [{ id: 202, name: 'Order', value: order }] });
+  const oldItems = [oldItem(10, 52.5), oldItem(11, null), oldItem(12, 7, 'https://api.github.com/repos/ThornswoodRP/Thornswood-Ops'), oldItem(13, 8, null, 'PullRequest'), oldItem(14, 3)];
+  r = await go(['--copy-order', 'EvilPatrick06/1'], { oldItems: oldItems });
+  yes('copy-order: each issue of this repository with an Order on the old board gets it here: ' + r.lines[0], r.code === 0 &&
+      /5 cards on EvilPatrick06\/1, 2 issues/.test(r.lines[0]) &&
+      JSON.stringify(fieldWrite(r.writes, 10).body.fields) === JSON.stringify([{ id: 102, value: 52.5 }]) &&
+      JSON.stringify(fieldWrite(r.writes, 14).body.fields) === JSON.stringify([{ id: 102, value: 3 }]) &&
+      ![11, 12, 13].some(n => fieldWrite(r.writes, n)));
+  r = await go(['--copy-order', 'EvilPatrick06/1', '--dry-run'], { oldItems: oldItems });
+  yes('  a dry run says each and writes nothing', r.code === 0 && r.writes.length === 0 && /#10: Order 52\.5; nothing written/.test(r.out));
+  r = await go(['--copy-order', 'EvilPatrick06/1'], { oldItems: oldItems, order: false });
+  yes('  no Order field here yet: stopped, nothing written', r.code === 1 && r.writes.length === 0 && /no Order field yet/.test(r.out));
+  r = await go(['--copy-order', 'EvilPatrick06/1'], { oldItems: oldItems, oldOrder: false });
+  yes('  the old board with no Order field: stopped, nothing written', r.code === 1 && r.writes.length === 0);
+  r = await go(['--copy-order', 'nobody'], {});
+  yes('  a board that is not user/number: exit 2', r.code === 2 && r.writes.length === 0);
 
   for (const [what, env, argv] of [['no repository', { GITHUB_REPOSITORY: '' }, ['--all']], ['no board number', { BOARD_NUMBER: '' }, ['--all']],
     ['no token', { BOARD_TOKEN: '' }, ['--all']], ['nothing asked', {}, []], ['a bad issue list', {}, ['--issues', 'x']]]) {
@@ -207,7 +248,7 @@ const fieldWrite = (w, n) => w.find(x => x.method === 'PATCH' && x.path === 'org
   yes('board.yml runs on issues, on pr-events.yml completing, and by hand', JSON.stringify(on(board)) === '["issues","workflow_run","workflow_dispatch"]' &&
       /\n    types: \[opened, reopened, closed, labeled, unlabeled\]\n/.test(board) && /\n    workflows: \[Pull request changed\]\n    types: \[completed\]\n/.test(board));
   yes('  only on main, and only for the labels the board reads', /github\.ref == 'refs\/heads\/main'/.test(board) &&
-      /startsWith\(github\.event\.label\.name, 'claimed:'\)/.test(board) && /\["P0","P1","P2","P3"\]/.test(board));
+      /startsWith\(github\.event\.label\.name, 'claimed:'\)/.test(board) && /startsWith\(github\.event\.label\.name, 'order:'\)/.test(board) && !/P0/.test(board));
   yes('  in the board environment, with the board App\'s token and only these permissions', /\n    environment: board\n/.test(board) &&
       /client-id: \$\{\{ vars\.BOARD_APP_CLIENT_ID \}\}/.test(board) && /private-key: \$\{\{ secrets\.BOARD_APP_KEY \}\}/.test(board) &&
       /permission-organization-projects: write\n          permission-issues: write\n          permission-pull-requests: read\n/.test(board));

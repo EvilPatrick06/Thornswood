@@ -1,7 +1,7 @@
 <#
   test-3192-board-read.ps1
 
-  The board-read workflow reads every card's Status and Priority into board.json
+  The board-read workflow reads every card's Status and Order into board.json
   and hands it back in the run's log, changing nothing on the board, and
   scripts\ops\Read-Board.ps1 starts it and reads that file out of the log.
 
@@ -26,7 +26,7 @@
        PowerShell with a stand-in Invoke-RestMethod that answers as GitHub
        would: it reads every page of cards, not only the first; it writes one
        entry per card with its repository, number, kind, title, state, Status,
-       Priority and archived flag, and null for a missing Status, Priority or
+       Order and archived flag, and null for a missing Status, Order or
        number (a draft card); it writes the Status options and the board's
        workflows; it prints board.json in the log between the BOARD-JSON begin
        and end lines, and Read-BoardFromLog, lifted out of Read-Board.ps1,
@@ -138,15 +138,15 @@ function Invoke-RestMethod {
     $repo = [pscustomobject]@{ nameWithOwner = 'ThornswoodRP/Thornswood' }
     if (-not $b.variables.c) {
         $nodes = @(
-            [pscustomobject]@{ isArchived = $false; status = [pscustomobject]@{ name = 'In Progress' }; priority = [pscustomobject]@{ name = 'P1' }; content = [pscustomobject]@{ __typename = 'Issue'; number = 3192; title = 'Review the board'; state = 'OPEN'; repository = $repo } }
-            [pscustomobject]@{ isArchived = $false; status = $null; priority = $null; content = [pscustomobject]@{ __typename = 'PullRequest'; number = 3121; title = 'SYN gate'; state = 'MERGED'; repository = $repo } })
+            [pscustomobject]@{ isArchived = $false; status = [pscustomobject]@{ name = 'In Progress' }; order = [pscustomobject]@{ number = 52.5 }; content = [pscustomobject]@{ __typename = 'Issue'; number = 3192; title = 'Review the board'; state = 'OPEN'; repository = $repo } }
+            [pscustomobject]@{ isArchived = $false; status = $null; order = $null; content = [pscustomobject]@{ __typename = 'PullRequest'; number = 3121; title = 'SYN gate'; state = 'MERGED'; repository = $repo } })
         return [pscustomobject]@{ data = [pscustomobject]@{ organization = [pscustomobject]@{ projectV2 = [pscustomobject]@{ items = [pscustomobject]@{ pageInfo = [pscustomobject]@{ hasNextPage = $true; endCursor = 'cursor-1' }; nodes = $nodes } } } } }
     }
     if ($b.variables.c -ne 'cursor-1') { throw "stand-in: unexpected cursor $($b.variables.c)" }
     $nodes = @(
-        [pscustomobject]@{ isArchived = $true; status = [pscustomobject]@{ name = 'Done' }; priority = [pscustomobject]@{}; content = [pscustomobject]@{ __typename = 'Issue'; number = 2863; title = 'Board labels'; state = 'CLOSED'; repository = $repo } }
-        [pscustomobject]@{ isArchived = $false; status = [pscustomobject]@{ name = 'Todo' }; priority = $null; content = [pscustomobject]@{ __typename = 'DraftIssue'; title = 'A draft' } })
-    if ($env:TS_BIG) { foreach ($n in 1..400) { $nodes += [pscustomobject]@{ isArchived = $false; status = $null; priority = $null; content = [pscustomobject]@{ __typename = 'DraftIssue'; title = ([Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')) } } } }
+        [pscustomobject]@{ isArchived = $true; status = [pscustomobject]@{ name = 'Done' }; order = [pscustomobject]@{}; content = [pscustomobject]@{ __typename = 'Issue'; number = 2863; title = 'Board labels'; state = 'CLOSED'; repository = $repo } }
+        [pscustomobject]@{ isArchived = $false; status = [pscustomobject]@{ name = 'Todo' }; order = $null; content = [pscustomobject]@{ __typename = 'DraftIssue'; title = 'A draft' } })
+    if ($env:TS_BIG) { foreach ($n in 1..400) { $nodes += [pscustomobject]@{ isArchived = $false; status = $null; order = $null; content = [pscustomobject]@{ __typename = 'DraftIssue'; title = ([Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')) } } } }
     return [pscustomobject]@{ data = [pscustomobject]@{ organization = [pscustomobject]@{ projectV2 = [pscustomobject]@{ items = [pscustomobject]@{ pageInfo = [pscustomobject]@{ hasNextPage = $false; endCursor = 'cursor-2' }; nodes = $nodes } } } } }
 }
 
@@ -215,12 +215,12 @@ try {
         $items = @($b.items)
         Yes ("  one entry for every card on both pages ({0})" -f $items.Count) ($items.Count -eq 4)
         $i = @($items | Where-Object { $_.number -eq 3192 })
-        Yes '  an issue card has its repository, number, kind, title, state, Status and Priority' (
-            $i.Count -eq 1 -and $i[0].repo -eq 'ThornswoodRP/Thornswood' -and $i[0].kind -eq 'Issue' -and $i[0].title -eq 'Review the board' -and $i[0].state -eq 'OPEN' -and $i[0].status -eq 'In Progress' -and $i[0].priority -eq 'P1' -and $i[0].archived -eq $false -and -not $i[0].PSObject.Properties['order'])
+        Yes '  an issue card has its repository, number, kind, title, state, Status and Order' (
+            $i.Count -eq 1 -and $i[0].repo -eq 'ThornswoodRP/Thornswood' -and $i[0].kind -eq 'Issue' -and $i[0].title -eq 'Review the board' -and $i[0].state -eq 'OPEN' -and $i[0].status -eq 'In Progress' -and $i[0].order -eq 52.5 -and $i[0].archived -eq $false)
         $p = @($items | Where-Object { $_.number -eq 3121 })
-        Yes '  a pull request card with no Status or Priority has null for both' ($p.Count -eq 1 -and $p[0].kind -eq 'PullRequest' -and $p[0].state -eq 'MERGED' -and $null -eq $p[0].status -and $null -eq $p[0].priority)
+        Yes '  a pull request card with no Status or Order has null for both' ($p.Count -eq 1 -and $p[0].kind -eq 'PullRequest' -and $p[0].state -eq 'MERGED' -and $null -eq $p[0].status -and $null -eq $p[0].order)
         $a = @($items | Where-Object { $_.number -eq 2863 })
-        Yes '  an archived card says so, and an empty Priority is null' ($a.Count -eq 1 -and $a[0].archived -eq $true -and $a[0].status -eq 'Done' -and $null -eq $a[0].priority)
+        Yes '  an archived card says so, and an empty Order is null' ($a.Count -eq 1 -and $a[0].archived -eq $true -and $a[0].status -eq 'Done' -and $null -eq $a[0].order)
         $d = @($items | Where-Object { $_.kind -eq 'DraftIssue' })
         Yes '  a draft card has its title and null for repository and number' ($d.Count -eq 1 -and $d[0].title -eq 'A draft' -and $null -eq $d[0].repo -and $null -eq $d[0].number)
     }
