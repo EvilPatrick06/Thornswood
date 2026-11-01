@@ -544,31 +544,15 @@ namespace Thornswood
             ThreadPool.QueueUserWorkItem(delegate { CheckUpdatesBackground(false); });
             StartFeedWatch();
 
-            /*
-              Voice comes up with the launcher, not with the game.
+            // Voice comes up with the launcher, not with the game. It needs no
+            // window, and its lines come to the status line on the window's
+            // thread whichever thread says them (Voice.Say).
+            Voice.Start(delegate (string m) { Log(m); }, cfg);
 
-              Prepare installs the assembly resolver that hands WebView2 back
-              to the CLR out of this exe's own resources, and it has to happen
-              before any method touching a WebView2 type is compiled, which is
-              why it is here and not inside Start.
-
-              Start itself is queued on the dispatcher rather than called: it
-              creates a Window, and a Window needs a running message loop.
-              ApplicationIdle means it happens once the launcher is actually on
-              screen, so a slow WebView2 runtime cannot delay the window
-              appearing.
-            */
-            Voice.Prepare();
-            Dispatcher.UIThread.Post(
-                new Action(delegate
-                {
-                    // The theme starts in the same idle moment, once the
-                    // window is on screen. It plays from this process, not
-                    // from WebView2 (MenuMusic.cs, #3207).
-                    Voice.Start(delegate (string m) { Log(m); }, cfg);
-                    StartMenuMusic();
-                }),
-                DispatcherPriority.ApplicationIdle);
+            // The theme starts once the window is on screen: ApplicationIdle
+            // is after the first frame, so the track never holds the window
+            // back. It plays from this process (MenuMusic.cs, #3207).
+            Dispatcher.UIThread.Post(new Action(StartMenuMusic), DispatcherPriority.ApplicationIdle);
 
             // The self update's way back. A launcher that got as far as drawing
             // its window started cleanly, so the copy of the one before it can
@@ -2272,7 +2256,7 @@ namespace Thornswood
                 if (band != null && picture != null) { picture.Background = headerArt; band.IsVisible = true; }
                 StartHeaderVideo();
             }
-            // Menu music starts from the Voice ApplicationIdle callback above.
+            // Menu music starts from the ApplicationIdle callback in Run.
 
             // Dragging the title bar, a double click on it and snapping are
             // Windows' own: the bar is the window's caption (TitleBar's
@@ -4027,10 +4011,10 @@ namespace Thornswood
         /// Whether the voice service on the server answers, for its reading on
         /// Diagnostics.
         ///
-        /// The microphone and the audio run in this launcher, in the hidden
-        /// WebView2 page Voice.cs holds; this only asks whether the server's
-        /// half answers, which is worth showing because it is the one part
-        /// nothing on this PC can put right. It was a card on the Server page
+        /// The microphone and the audio run in this launcher, in Voice.cs;
+        /// this only asks whether the server's half answers, which is worth
+        /// showing because it is the one part nothing on this PC can put
+        /// right. It was a card on the Server page
         /// until that page was cut (#3146). The page had been off the rail
         /// since #599, so for weeks the answer went into a TextBlock nobody
         /// could see, under a comment that still said voice ran in the game.
