@@ -205,6 +205,16 @@ function Get-EnginePackageBuildIn([string]$Package, [string]$Commit, [string]$Re
     try {
         $tf = Join-Path $tmp 'token.json'
         $code = & $Http "$base/token?scope=repository:$($EngineArtifactPackage):pull&service=$hostName" @{} $tf
+        # ghcr.io refuses an anonymous pull token, 403 DENIED, for a package
+        # it has no public copy of: one that is not there and one that is not
+        # public alike (measured on 1 Nov 2026 for thornswoodrp's, before any
+        # build went there, and for a made-up name). So that owner has none to
+        # read, and the next is asked; until #5184 it stopped every gamemode
+        # release after the fork moved, though evilpatrick06 kept the pin's.
+        if ($code -eq 401 -or $code -eq 403) {
+            return [pscustomobject]@{ State = 'none'; Run = $null; Artifact = $null
+                Why = "the registry at $base has no package $EngineArtifactPackage that can be read without an account (HTTP ${code}: there is none, or it is not public)" }
+        }
         if ($code -ne 200) { throw "the registry at $base gave no pull token for $EngineArtifactPackage (HTTP $code)" }
         $token = [string](([IO.File]::ReadAllText($tf) | ConvertFrom-Json).token)
         $auth = @{ Authorization = "Bearer $token"; Accept = 'application/vnd.oci.image.manifest.v1+json' }
