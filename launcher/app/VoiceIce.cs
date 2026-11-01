@@ -100,6 +100,13 @@ namespace Thornswood
         readonly Socket sock;
         readonly int port;
         readonly object gate = new object();
+        /* Held around every send and around closing, so the socket is never
+           disposed while a send is on it: Dispose sets closed under it, and
+           a send that comes after finds closed and does not touch the
+           socket. The reading thread is the only other user, and it is
+           ended by the dispose on purpose (Read). Taken after gate when both
+           are held (Tick sends inside gate). */
+        readonly object sending = new object();
         readonly Timer timer;
         readonly Thread reader;
         volatile bool closed;
@@ -547,10 +554,12 @@ namespace Thornswood
 
         void SendRaw(byte[] data, IPEndPoint to)
         {
-            if (closed) return;
-            try { sock.SendTo(data, to); }
-            catch (ObjectDisposedException) { }
-            catch (SocketException ex) { Debug("ice: could not send to " + to + " (" + ex.SocketErrorCode + ")"); }
+            lock (sending)
+            {
+                if (closed) return;
+                try { sock.SendTo(data, to); }
+                catch (SocketException ex) { Debug("ice: could not send to " + to + " (" + ex.SocketErrorCode + ")"); }
+            }
         }
 
         void SendOn(Pair p, byte[] data)
@@ -884,8 +893,9 @@ namespace Thornswood
             // No state is reported for a close: the connection's owner closed
             // it and knows, as RTCPeerConnection.close() reported nothing.
             lock (gate) state = "closed";
-            closed = true;
+            lock (sending) closed = true;
             timer.Dispose();
+            // Ends the reading thread's ReceiveFrom, which is how it stops.
             sock.Dispose();
         }
     }
