@@ -133,7 +133,7 @@ Brought in by those:
 | HarfBuzzSharp | 8.3.1.3 | HarfBuzz for .NET | MIT | `ffe644863a4eb3c078b4c3f0def0f2b90a861991c9116bf2dd668a31a0f09ab5` |
 | HarfBuzzSharp.NativeAssets.Win32 | 8.3.1.3 | HarfBuzz itself, built for Windows (`libHarfBuzzSharp.dll`) | MIT, with HarfBuzz's "Old MIT" licence in its `THIRD-PARTY-NOTICES.txt` | `58d51098b595152c01293f71ed47614b3f53d8503bc226efc23b8f7b0ff7c943` |
 | MicroCom.Runtime | 0.11.6 | The COM calls Avalonia makes on Windows | MIT | `453af6d34477b19bb2c62d17436e68c76a75915b7947509b1ff601b36d7e78d8` |
-| Tmds.DBus.Protocol | 0.94.1 | D-Bus, for Avalonia on Linux; the launcher never calls it | MIT, as its nuspec names it | `4f71d06ac40e725ffbcf1b79853dd93218695a84f23d36fafc85f477a4c9580f` |
+| Tmds.DBus.Protocol | 0.94.1 | D-Bus, for Avalonia on Linux; the launcher never calls it | MIT, its repository's `COPYING` | `4f71d06ac40e725ffbcf1b79853dd93218695a84f23d36fafc85f477a4c9580f` |
 
 Avalonia.BuildServices 11.3.2 and Microsoft.NET.ILLink.Tasks 10.0.14 run
 during the build only; nothing of either goes into the exe.
@@ -158,7 +158,17 @@ build does not compile: `Update.exe` and the small `Thornswood.exe` that
 starts the launcher from `current\`, which `vpk` 1.2.161 packs
 (`.github\workflows\merge-release.yml`, `VPK_VERSION`), and `Setup.exe`, the
 download that installs it. They are Velopack's own, written in Rust, under
-the same MIT licence as the package.
+the same MIT licence as the package, and built with Rust crates of others
+(221, counting the ones used only while building). Velopack's repository carries no notices file for those, so
+`installer\licences\Velopack-Rust-crates.txt` was made from its `Cargo.lock`
+at the commit below (cargo tree for `velopack_bins` with its windows feature,
+target `x86_64-pc-windows-msvc`): each crate, its version and licence, and
+every licence text, which goes with the install. The licences are MIT,
+Apache-2.0, BSD, ISC, Zlib, Unicode-3.0, CDLA-Permissive-2.0 and the
+Unlicense, each alone or as a choice; `self_cell` offers Apache-2.0 or
+GPL-2.0 and is used under Apache-2.0. `fs_at` 0.2.1 and `intl_pluralrules`
+7.0.2 publish no licence file anywhere; their Cargo.toml says Apache-2.0,
+whose text the file carries.
 
 Downloaded from nuget.org and read on 1 November 2026. Their sources, as each
 nuspec names them:
@@ -184,6 +194,10 @@ nuspec names them:
   at commit `76785efc` (in full, `76785efcafd91b5902fd19dd11145f6dd655b7b4`).
 - Tmds.DBus.Protocol, by Tom Deseyn: https://github.com/tmds/Tmds.DBus at
   commit `b4a7fed0` (in full, `b4a7fed0b878f74cb54f7cca84d2889af4e596ba`).
+  Avalonia.FreeDesktop brings it in, and the win-x64 restore lists its
+  `lib\net9.0` file. Whether the native build keeps any of it in
+  `Thornswood.exe` was not measured (the build runs on Windows only), so its
+  text goes with the install either way.
 
 Licences: MIT asks for its notice in all copies, and the BSD licences of
 Skia and ANGLE ask for theirs with every binary copy, so the licences of
@@ -195,8 +209,16 @@ theirs. The .NET runtime packages and the two SkiaSharp native packages also
 carry a `THIRD-PARTY-NOTICES` file for the code inside them that others wrote
 (the .NET one is 1418 lines, sha256 `6d15e10a101c6bfff2ab4429ed061bf76c456fc4b23ad6b03e0d0f8377148a21`;
 SkiaSharp's and HarfBuzzSharp's are the same 2716 lines, sha256
-`21504c46c4c58aa64c1055bd2dcbc5f9a136b4b8c412ed3cc6740e22c5b127f5`); "What
-is still missing" says where those stand.
+`21504c46c4c58aa64c1055bd2dcbc5f9a136b4b8c412ed3cc6740e22c5b127f5`).
+Tmds.DBus.Protocol's package carries no licence file; its text is `COPYING`
+at its commit (MIT).
+
+Every one of these texts, the two `THIRD-PARTY-NOTICES` files and the Rust
+crates' notices also goes with the install as a file of its own beside
+`SOURCE CODE.txt`: they are in `installer\licences`, whose `README.txt` says
+where each is from, the Velopack package carries them (Build-SetupFiles.ps1),
+the install copies them (`InstallSteps.LicenceFiles`) and Uninstall removes
+them.
 
 ## Concentus, SharpSRTP and BouncyCastle, inside the launcher
 
@@ -276,7 +298,8 @@ contributors.
 Licence: MIT, which the package's nuspec names
 (`<license type="expression">MIT</license>`). The MIT licence asks for its
 notice to go with every copy, so the repository's `LICENSE` at that commit is
-reproduced in full at the end of this file and on the public credits page.
+reproduced in full at the end of this file and on the public credits page,
+and goes with the install as `NLayer-LICENSE.txt`.
 
 ## zlib 1.3, translated into C# inside the launcher
 
@@ -1516,12 +1539,13 @@ fork.
 
 The GPL and AGPL texts go with the files they cover. The installer hands
 `GPL-3.0.txt` and `AGPL-3.0.txt` into the install folder beside
-`SOURCE CODE.txt`, and with them `Concentus-LICENSE.txt`,
-`SharpSRTP-LICENSE.txt` and `BouncyCastle-LICENSE.txt`, the notices of the
-three voice libraries compiled into the launcher (the Velopack package
-carries them from `installer\licences`, Build-SetupFiles.ps1; the install in
-the launcher's first start copies them, InstallSteps.cs; Uninstall removes
-them). The update
+`SOURCE CODE.txt`, and with them the licence texts of every library inside
+the launcher or shipped with it: the three voice libraries, NLayer, .NET,
+Avalonia, SkiaSharp and HarfBuzzSharp with Skia's and HarfBuzz's notices,
+ANGLE, MicroCom, Tmds.DBus and Velopack with its Rust crates (the Velopack
+package carries them from `installer\licences`, Build-SetupFiles.ps1; the
+install in the launcher's first start copies them,
+`InstallSteps.LicenceFiles`; Uninstall removes them). The update
 feed's client runtime zip and every pack that carries a SkyMP file hand the
 GPL and AGPL texts with a note naming the recorded commit (Source-Notice.ps1).
 Updates stopped going to GitHub release pages on 28 September (#907); the
@@ -1532,22 +1556,6 @@ also installs
 beside its `___systemPolyfill.js`.
 
 ## What is still missing
-
-- The launcher's newer libraries (".NET, Avalonia, SkiaSharp and Velopack,
-  inside the launcher") have their licences on this page and the credits
-  page, but not as files beside the launcher yet: `installer\licences` holds
-  only the voice libraries' texts, and the long `THIRD-PARTY-NOTICES` files of
-  the .NET runtime and of SkiaSharp and HarfBuzzSharp, which list the code
-  others wrote inside them (libpng, libjpeg-turbo, libwebp, FreeType, expat,
-  zlib and more for Skia), go with no install. Each MIT and BSD licence asks
-  for its notice with the copy, so those texts belong in `installer\licences`
-  and the install's list of them (InstallSteps.cs, Build-SetupFiles.ps1).
-- Velopack's `Update.exe`, its starter and `Setup.exe` are built in Rust
-  with crates of other people's; their notices were not read here, and none
-  goes with the install.
-- Tmds.DBus.Protocol's licence text was not read: the package carries none,
-  and its repository has no licence file at the commit its nuspec names that
-  could be fetched on 1 November 2026. The nuspec names MIT.
 
 - The packs and the installer published up to 27 October 2026 carry the 39
   behavior files and the four women's body meshes, which nothing lets
