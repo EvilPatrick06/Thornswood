@@ -26,7 +26,7 @@ namespace Thornswood
     /// dev releases.
     ///
     /// Kept apart, with nothing in it but the framework and Signature, so that
-    /// tests\test-2163-manifest-check.ps1 can compile the two on their own and
+    /// launcher\tests\test-2163-manifest-check.ps1 can compile the two on their own and
     /// point them at a catalog ThornswoodRelease really signed.
     /// </summary>
     public static class ReleaseManifest

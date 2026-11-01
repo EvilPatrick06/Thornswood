@@ -751,6 +751,8 @@ function Get-LauncherInputHash([string]$repoDir) {
         foreach ($f in @(Get-ChildItem -LiteralPath $launcherDir -Recurse -File -Force -EA SilentlyContinue |
                          Where-Object { $_.Extension -ne '.md' })) {
             $rel = 'launcher/' + $f.FullName.Substring($launcherDir.Length).TrimStart('\', '/').Replace('\', '/')
+            # Its harnesses are no part of it, as LauncherVersion.ps1 leaves them out.
+            if ($rel.StartsWith('launcher/tests/')) { continue }
             # As a Windows checkout holds it, so the fingerprint is the same from
             # any machine (ShippedBytes.ps1, #2903).
             $lines.Add($rel + "`t" + (Get-ThornswoodShippedSha256 $f.FullName))

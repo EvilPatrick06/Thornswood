@@ -33,7 +33,7 @@ read it (issue #440, phase 8):
   there. No script writes this one: it is changed by hand, in the same pull
   request as the script extender, the collection revision, the launcher's
   compiled fallback (Downgrade.cs, Config.cs) and Setup-Thornswood.ps1,
-  because a pin move is one release. `tests\test-skyrim-pin.ps1` fails while
+  because a pin move is one release. `launcher\tests\test-skyrim-pin.ps1` fails while
   they disagree.
 - `ui-gone.json`: the 37 Daedric Online menu files (name and sha256) and the
   41 unused skymp5-front svgs, bg.png, and the four Futura PT and DIN Pro
@@ -62,7 +62,7 @@ read it (issue #440, phase 8):
   own folder takes a file from the Steam copy as Skyrim's own only when it is
   on this list, so a mod put into the Steam copy by hand never gets in. Run
   the script again in the same pull request as a pin move;
-  `tests\test-skyrim-pin.ps1` fails while the two disagree.
+  `launcher\tests\test-skyrim-pin.ps1` fails while the two disagree.
 - `recipe-owners.json`: the recipes whose owner or rank is a decision rather
   than a reading, each with the measured reason it cannot be derived:
   `"owner"` is RECIPE_OWNER and `"rank"` is RECIPE_RANK in

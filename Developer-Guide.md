@@ -1304,7 +1304,7 @@ from the board, none of these three puts an issue aside:
   taken from Vortex's own mods folder, and nothing else of that folder is
   read. Scan names the folder, Fix and Settings point the launcher at it,
   and with no Steam copy on the machine it refuses (OwnGame.DeploysInto,
-  Gather, tests\test-vortex-folder.ps1). Djinn to agree it in #staff-updates.
+  Gather, launcher\tests\test-vortex-folder.ps1). Djinn to agree it in #staff-updates.
   Decided by Patrick on 29 Sep (#1218, #1226): the Steam copy is the
   person's, to play vanilla at any build with their own mods, and Thornswood
   runs entirely from its own folder. With the own folder chosen in the setup
@@ -1315,7 +1315,7 @@ from the board, none of these three puts an issue aside:
   on and made the next start takes Thornswood's files back out of the Steam
   copy, once (OwnGame.CleanSteamCopy); an existing own folder gets the same
   from its next update. Steam's "Wait until I launch the game" is set only
-  until the folder exists (tests\test-own-folder-first.ps1).
+  until the folder exists (launcher\tests\test-own-folder-first.ps1).
   Decided by Patrick on 29 Sep (#1232): `Thornswood\Game` takes only
   Skyrim's own files (from the Steam copy when it is on the pinned build, or
   the Downgrade's download; for a ship root, also from a folder that holds
@@ -1325,7 +1325,7 @@ from the board, none of these three puts an issue aside:
   `records\skyrim-files.json`, read out of the depot manifests the Downgrade
   uses, never a guess by folder. A mod put into the Steam copy by hand stays
   there, and a folder made before this loses such files at its next refresh,
-  logged (OwnGameKinds.cs, tests\test-own-folder-alone.ps1).
+  logged (OwnGameKinds.cs, launcher\tests\test-own-folder-alone.ps1).
   Decided by Patrick on 29 Sep (#1247) and changed on 27 Oct (#3715): the
   behavior files and the BodySlide bodies are made in Thornswood's own
   folder, never in the Steam copy, and since #3715 by every launcher on its
@@ -1615,7 +1615,7 @@ The short form of the rules. The same decisions, with the dates they were made, 
   #1343) and the count of silent catches (#5292). The job "Launcher builds",
   on a Windows runner, checks the launcher window and its UI thread, builds
   the launcher with MSBuild from its project files, held to its sources
-  (`tests\test-498-msbuild.ps1`, issue #498). A pull request that changes only files under
+  (`launcher\tests\test-498-msbuild.ps1`, issue #498). A pull request that changes only files under
   `docs`, `site` or `bot` skips it, because nothing it checks reads those
   folders (`scripts\dev\Launcher-Reach.ps1`, #5292). Beside them, the job
   "gate" runs
@@ -2171,7 +2171,7 @@ the game itself comes from the Steam copy (`OwnGame.Source`, the one Downgrade
 keeps on the server's build), and the mods are exactly the files Vortex's
 records in that folder list, linked or copied from Vortex's staging folder.
 With no Steam copy on the machine the folder is not made.
-`tests\test-vortex-folder.ps1` proves it.
+`launcher\tests\test-vortex-folder.ps1` proves it.
 
 **The client.** The SkyMP client runtime is built from the fork, the
 `engine\skymp` submodule on `thornswood/engine-changes`: `npx webpack` in

@@ -61,7 +61,7 @@ Yes ('the Windows job "Launcher builds" has exactly the steps that need Windows,
 Yes '  and runs only when the pick does not say the change cannot reach it' ($launcher -match "(?m)^    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && needs\.pick\.outputs\.launcher != 'false' \}\}$")
 # What those steps build and read. Each named here is what one of them runs
 # or compiles; none may name a folder the path rule skips.
-$reads = @('scripts/dev/Check-Controls.ps1', 'scripts/release/ShipRoot/ShipRoot.csproj', 'tests/test-498-msbuild.ps1', 'tests/test-app-manifest.ps1',
+$reads = @('scripts/dev/Check-Controls.ps1', 'scripts/release/ShipRoot/ShipRoot.csproj', 'launcher/tests/test-498-msbuild.ps1', 'launcher/tests/test-app-manifest.ps1',
     'scripts/release/Build-Launcher.ps1', 'scripts/release/LauncherVersion.ps1', 'scripts/release/Find-MSBuild.ps1',
     'launcher/app/Thornswood.csproj', 'installer/setup/Setup.csproj')
 foreach ($f in $reads) {

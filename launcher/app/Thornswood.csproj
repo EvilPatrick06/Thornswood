@@ -9,7 +9,7 @@
   .NET Framework csc with its hand-resolved references is gone. Before the
   switch both builds were compared and made the same exe: the same sources,
   references, resources under the same names, win32 icon, stamped manifest
-  and file details (the figures are on #498). tests\test-498-msbuild.ps1
+  and file details (the figures are on #498). launcher\tests\test-498-msbuild.ps1
   holds this build to that list now.
 
   Build it (from the repository folder, in PowerShell 7):
@@ -125,7 +125,7 @@
   </ItemGroup>
 
   <!-- Every resource under the name the code asks for.
-       tests\test-498-msbuild.ps1 checks the built exe carries each of them,
+       launcher\tests\test-498-msbuild.ps1 checks the built exe carries each of them,
        by name and by bytes. -->
   <ItemGroup>
     <EmbeddedResource Include="..\ui.xaml"><LogicalName>ui.xaml</LogicalName></EmbeddedResource>

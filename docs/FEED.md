@@ -620,8 +620,8 @@ for byte, as before.
   `Copy-ReleaseAssets-ToSite.ps1`. The rest read the launcher fields alone.
 
 Projected from the 19 Oct main feed with the note's title, version.json is
-about 650 bytes. `tests\test-1050-feed-split.js` holds the site to this, and
-`tests\test-1050-feed-split.ps1` the launcher, `Join-FeedSettings`, and (with
+about 650 bytes. `launcher\tests\test-1050-feed-split.js` holds the site to this, and
+`launcher\tests\test-1050-feed-split.ps1` the launcher, `Join-FeedSettings`, and (with
 `-OldSrc`) every older launcher reading the split version.json as a feed that
 is behind and offers only the launcher update.
 

@@ -733,11 +733,11 @@ jobs:
           # file details and the manifest, the icon, nothing beside the exe.
           # GitHub's image has Visual Studio.
           # It builds both exes with Build-Launcher.ps1, then runs
-          # tests\test-app-manifest.ps1 (#463) and Check-Secrets.ps1 -Binary on
+          # launcher\tests\test-app-manifest.ps1 (#463) and Check-Secrets.ps1 -Binary on
           # the pair, so this build has no build, manifest or secrets step of
           # its own for them: until 22 Oct 2026 it did each twice (#3114).
-          & pwsh -NoProfile -File tests\test-498-msbuild.ps1 -RequireMSBuild -Scratch (Join-Path $env:RUNNER_TEMP 'msbuild-498')
-          if ($LASTEXITCODE -ne 0) { Write-Host '::error file=tests/test-498-msbuild.ps1::the MSBuild launcher does not match its sources, see the lines above'; exit 1 }
+          & pwsh -NoProfile -File launcher\tests\test-498-msbuild.ps1 -RequireMSBuild -Scratch (Join-Path $env:RUNNER_TEMP 'msbuild-498')
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error file=launcher/tests/test-498-msbuild.ps1::the MSBuild launcher does not match its sources, see the lines above'; exit 1 }
 
       # The note main's build looks for (#3182, the job "tested" at the top
       # of build.yml): the tree every step before this one passed on, one

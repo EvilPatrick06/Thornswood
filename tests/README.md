@@ -39,17 +39,29 @@ A product's harnesses go in a `tests` folder of its own, one folder below the
 top: `launcher\tests\`, `site\tests\`. This folder keeps the checks that are
 about the whole repository (the gate, the words, the secrets, the scripts'
 paths), the shared helpers (`Windows.ps1`, `Launcher-Csc.ps1`,
-`launcher-csc.js`, `fork-git.js` and the rest), and every harness whose
-product has not moved yet.
+`launcher-csc.js`, `fork-git.js` and the rest) and `fixtures\`, and every
+harness whose product has not moved yet. The launcher's moved on 1 Nov 2026:
+`launcher\tests\`. Its harnesses are no part of the launcher:
+`LauncherVersion.ps1` and Ship's launcher fingerprint leave that folder out,
+so a change to one gives no launcher a new number.
 
 The gate and the nightly find both kinds through one list,
 `scripts\dev\Harness-Files.ps1`. A harness here goes by its file name, as
 before; one beside its product goes by its path from the repository with
 forward slashes, `launcher/tests/test-498-msbuild.ps1`, in the gate's report,
 in a pull request's pick, in `gate-excluded.txt` and in
-`Nightly-Harnesses.ps1 -Only`. A shared helper stays here and is reached from
-the repository folder, never by `..` from the harness's own folder, so a
-harness reads the same wherever it sits.
+`Nightly-Harnesses.ps1 -Only`. A shared helper stays here. A `.ps1` harness
+beside its product reaches it from the repository folder, the shape
+`test-2957-windows-one-way.ps1` looks for, and a `.js` one two folders up:
+
+```
+. (Join-Path (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'tests') 'Launcher-Csc.ps1')
+const lc = require('../../tests/launcher-csc');
+```
+
+A check that reads a whole product folder for something its code must never
+do leaves that folder's `tests` out, since a harness names the very thing it
+looks for (`test-browser-args.ps1`, `test-3003-one-install-rule.ps1`).
 
 Moving a product's harnesses is one pull request for that product, and only
 while no open pull request changes any of them: a moved file and an edit to

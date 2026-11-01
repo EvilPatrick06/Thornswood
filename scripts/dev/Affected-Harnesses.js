@@ -68,7 +68,7 @@ const FORCE = [
   // helper reached in a way no trace sees, such as one only Windows loads.
   [/^tests\/(?!test-)[^/]+\.(ps1|psm1|js|cjs|mjs|py|c)$/, 'a shared test helper in tests'],
   // And one beside a product's harnesses, in its own tests folder (plan
-  // line 42), such as launcher/tests/Launcher-Csc.ps1.
+  // line 42), should a product's harnesses ever share one of their own.
   [/^[^/]+\/tests\/(?!test-)[^/]+\.(ps1|psm1|js|cjs|mjs|py|c)$/, 'a test helper in a product\'s tests folder'],
   [/^records\/build-runners\.json$/, 'the gate step reads it for its share of the cores'],
   [/^\.gitattributes$/, 'line endings of every file a Windows checkout writes'],

@@ -9,11 +9,11 @@ every monitor (per-monitor DPI), never asking for administrator (asInvoker),
 and named `Thornswood.Installer.Setup` at the launcher's version, which
 `Build-Launcher.ps1` writes into the copy it embeds. The window also keeps
 inside the screen at any scale with the launcher's `WindowFit.cs`, which the
-build compiles in beside it. `tests\test-app-manifest.ps1` reads the manifest
+build compiles in beside it. `launcher\tests\test-app-manifest.ps1` reads the manifest
 back out of the built exe. Its colours are the launcher's too (#2851): the build
 compiles `launcher\app\Themes.cs` in as well, the window is drawn in Forge
 from it, and Bootstrap.cs holds no colour of its own, so the first window a
-new tester sees has the launcher's 4.5 to 1 text. `tests\test-2771-text-contrast.js`
+new tester sees has the launcher's 4.5 to 1 text. `launcher\tests\test-2771-text-contrast.js`
 holds it to that. It is not the launcher's source;
 that is `launcher\app`. It is a WPF window in C# 13, like the launcher, built
 with MSBuild from `Setup.csproj` beside it (#498). It asks
@@ -214,4 +214,4 @@ else in the install records the three. The launcher reads the same file
 (`launcher\app\Acceptance.cs`). When the file is missing, or a page's hash is
 not the one recorded, it shows the same three boxes and the same three links
 and writes the same record. Declining closes the launcher and writes nothing.
-`tests\test-prior-acceptance.ps1` holds that.
+`launcher\tests\test-prior-acceptance.ps1` holds that.
