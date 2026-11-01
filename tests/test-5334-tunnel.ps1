@@ -67,6 +67,10 @@ function Done {
 }
 
 . (Join-Path $Root 'scripts\vps\Seal.ps1')
+. (Join-Path $Root 'scripts\vps\Vps.ps1')
+# vps.json's name, whose DNS-only A record is the box's address. It is not
+# written here either (test-vps-defaults).
+$boxName = [string](Get-ThornswoodVpsAddress)
 . (Join-Path $PSScriptRoot 'Windows.ps1')
 $thisShell = (Get-Process -Id $PID).Path
 if ($OnWindows) { $boxShell = Get-WindowsPowerShell } else { $boxShell = $thisShell }
@@ -194,6 +198,7 @@ try {
     Yes '  and is the account and zone Set-Turnstile.ps1 and the connector use' ($rec.account -eq 'c7738b46d6dea435f5228b00b6198706' -and $rec.zone -eq 'd2b885b1adae2d20ec1a00300e06d827')
     $recText = [IO.File]::ReadAllText($Shipped)
     Yes '  and holds no token' ($recText -notmatch 'eyJ[A-Za-z0-9_-]{10}' -and $recText -notmatch '(?i)"(token|secret)"\s*:')
+    Yes '  and no address of the box''s, nor its name: both come from vps.json and Cloudflare' (($recText -replace '127\.0\.0\.1', '') -notmatch '\b\d{1,3}(\.\d{1,3}){3}\b' -and -not $rec.PSObject.Properties['box'] -and -not $recText.Contains($boxName))
     function Bad([string]$name, [scriptblock]$change) {
         $r = [IO.File]::ReadAllText($Shipped) | ConvertFrom-Json
         & $change $r
@@ -269,9 +274,9 @@ try {
     $env:TW_CARRY = '1'
     [IO.File]::WriteAllText($env:TW_COUNT, '0')
     $cf0 = [pscustomobject]@{ made = 0; puts = 0; tunnels = @(); config = $null; dns = @(
-        [pscustomobject]@{ id = 'rec-apex'; name = 'thornswood.net'; type = 'A'; content = '192.135.112.23'; proxied = $true },
-        [pscustomobject]@{ id = 'rec-www'; name = 'www.thornswood.net'; type = 'A'; content = '192.135.112.23'; proxied = $true },
-        [pscustomobject]@{ id = 'rec-play'; name = 'play.thornswood.net'; type = 'A'; content = '192.135.112.23'; proxied = $false }) }
+        [pscustomobject]@{ id = 'rec-apex'; name = 'thornswood.net'; type = 'A'; content = '203.0.113.23'; proxied = $true },
+        [pscustomobject]@{ id = 'rec-www'; name = 'www.thornswood.net'; type = 'A'; content = '203.0.113.23'; proxied = $true },
+        [pscustomobject]@{ id = 'rec-play'; name = $boxName; type = 'A'; content = '203.0.113.23'; proxied = $false }) }
     [IO.File]::WriteAllText($env:TW_CF, (ConvertTo-Json -InputObject $cf0 -Depth 12))
 
     $handed = New-Object System.Collections.ArrayList
@@ -367,7 +372,7 @@ try {
     $env:TW_CARRY = '0'
     $all = Tunnel 'Switch'
     $cf = Cf
-    Yes '-Switch puts both A records back when cloudflared carries nothing to them' ($all -match 'DNS NOT CHANGED' -and @($cf.dns | Where-Object { $_.name -ne 'play.thornswood.net' -and $_.type -eq 'A' -and $_.proxied -and $_.content -eq '192.135.112.23' }).Count -eq 2 -and $all -match 'put back as it was')
+    Yes '-Switch puts both A records back when cloudflared carries nothing to them' ($all -match 'DNS NOT CHANGED' -and @($cf.dns | Where-Object { $_.name -ne $boxName -and $_.type -eq 'A' -and $_.proxied -and $_.content -eq '203.0.113.23' }).Count -eq 2 -and $all -match 'put back as it was')
     $env:TW_CARRY = '1'
     $env:TW_PATCH_FAILS = 'rec-www'
     $all = Tunnel 'Switch'
@@ -377,7 +382,7 @@ try {
     $cf = Cf
     $cname = $cf.tunnels[0].id + '.cfargotunnel.com'
     Yes '-Switch makes both names proxied CNAMEs at the tunnel once cloudflared carries them' ($all -match 'DNS SWITCHED' -and @($cf.dns | Where-Object { $_.type -eq 'CNAME' -and $_.content -eq $cname -and $_.proxied }).Count -eq 2)
-    Yes '  and leaves play.thornswood.net alone' (@($cf.dns | Where-Object { $_.name -eq 'play.thornswood.net' -and $_.type -eq 'A' -and -not $_.proxied }).Count -eq 1)
+    Yes '  and leaves the box''s own DNS-only name alone' (@($cf.dns | Where-Object { $_.name -eq $boxName -and $_.type -eq 'A' -and -not $_.proxied }).Count -eq 1)
     $all = Tunnel 'Switch'
     Yes '  and a second -Switch says it is already done' ($all -match 'is already on the tunnel' -and $all -match 'DNS ALREADY')
 
@@ -389,12 +394,22 @@ try {
 
     $all = Tunnel 'Back'
     $cf = Cf
-    Yes '-Back makes both names proxied A records at the box again' ($all -match 'DNS BACK' -and @($cf.dns | Where-Object { $_.name -ne 'play.thornswood.net' -and $_.type -eq 'A' -and $_.content -eq '192.135.112.23' -and $_.proxied }).Count -eq 2)
+    Yes '-Back makes both names proxied A records at the box again' ($all -match 'DNS BACK' -and @($cf.dns | Where-Object { $_.name -ne $boxName -and $_.type -eq 'A' -and $_.content -eq '203.0.113.23' -and $_.proxied }).Count -eq 2)
 
     $cf.dns[1].proxied = $false
     [IO.File]::WriteAllText($env:TW_CF, (ConvertTo-Json -InputObject $cf -Depth 12))
     $all = Tunnel 'Switch'
     Yes 'a name that is neither the box''s proxied A record nor the tunnel''s stops -Switch with DNS unchanged' ($all -match 'which is neither' -and $all -match 'DNS NOT CHANGED' -and @((Cf).dns | Where-Object { $_.type -eq 'CNAME' }).Count -eq 0)
+
+    $cf = Cf
+    $cf.dns[1].proxied = $true
+    $cf.dns[2].proxied = $true
+    [IO.File]::WriteAllText($env:TW_CF, (ConvertTo-Json -InputObject $cf -Depth 12))
+    $all = Tunnel 'Switch'
+    Yes 'a box name that is not one DNS-only A record stops -Switch, since the box''s address is not known' ($all -match 'is not one DNS-only A record' -and @((Cf).dns | Where-Object { $_.type -eq 'CNAME' }).Count -eq 0)
+    $cf = Cf
+    $cf.dns[2].proxied = $false
+    [IO.File]::WriteAllText($env:TW_CF, (ConvertTo-Json -InputObject $cf -Depth 12))
 
     $asks = @($handed | Where-Object { $_ -match 'dispatches' }).Count
     $all = Tunnel 'Status'
@@ -416,7 +431,7 @@ try {
     $tree = Join-Path $work 'tree'
     foreach ($d in 'scripts/deploy', 'scripts/vps/gate', 'scripts/ops') { [void](New-Item -ItemType Directory -Force -Path (Join-Path $tree $d)) }
     Copy-Item -LiteralPath $Script -Destination (Join-Path $tree 'scripts/deploy/Install-Tunnel.ps1')
-    foreach ($f in 'scripts/vps/Seal.ps1', 'scripts/ops/WorkflowRun.ps1', 'scripts/vps/gate/GateRules.ps1', 'scripts/vps/gate/verbs.json') { Copy-Item -LiteralPath (Join-Path $Root $f) -Destination (Join-Path $tree $f) }
+    foreach ($f in 'scripts/vps/Seal.ps1', 'scripts/vps/Vps.ps1', 'scripts/vps/vps.json', 'scripts/ops/WorkflowRun.ps1', 'scripts/vps/gate/GateRules.ps1', 'scripts/vps/gate/verbs.json') { Copy-Item -LiteralPath (Join-Path $Root $f) -Destination (Join-Path $tree $f) }
     $env:TW_GATE = Join-Path $work 'gate.txt'
     $env:TW_PUB = $publicKey
     [IO.File]::WriteAllText((Join-Path $tree 'scripts/vps/Box-Run.ps1'), @'

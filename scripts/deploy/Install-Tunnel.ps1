@@ -28,8 +28,9 @@
   Run it from anywhere with gh and the box's ssh: a cloud thread, the Desk, a
   developer's PC. Everything it does is written down in
   records\cloudflare-tunnel.json: the account, the zone, the tunnel's name,
-  the cloudflared release by SHA-256, its routes and the two DNS names with
-  the box's address.
+  the cloudflared release by SHA-256, its routes and the two DNS names. The
+  box's address is written nowhere (#3690): -Back reads it at Cloudflare
+  from the DNS-only A record of vps.json's name.
 
   FREE. Every Cloudflare account includes 1,000 tunnels at no cost, Tunnel is
   on every plan, and publishing a hostname needs only a domain on Cloudflare,
@@ -184,11 +185,17 @@ function Read-ThornswoodTunnelRecord([string]$Path) {
     $names = @($r.dns | ForEach-Object { [string]$_.name })
     $routed = @($ing | Where-Object { $_.PSObject.Properties['hostname'] } | ForEach-Object { [string]$_.hostname })
     if (($names -join ',') -ne ($routed -join ',')) { throw 'the DNS names and the routed names are not the same list' }
-    foreach ($d in @($r.dns)) { if ([string]$d.box -notmatch '^\d{1,3}(\.\d{1,3}){3}$') { throw ('no box address for ' + $d.name) } }
+    if ($r.PSObject.Properties['box']) { throw 'the record names the box; its name is vps.json''s alone (test-vps-defaults)' }
     return $r
 }
 if (-not $RecordPath) { $RecordPath = Join-Path $Here '..\..\records\cloudflare-tunnel.json' }
 try { $rec = Read-ThornswoodTunnelRecord $RecordPath } catch { Die ($_.Exception.Message + '. Nothing was sent.') }
+# The box's address is written nowhere in this repository (#3690): it is what
+# the DNS-only record of vps.json's name holds, read at Cloudflare on the box.
+. (Join-Path $Here '..\vps\Vps.ps1')
+$boxName = [string](Get-ThornswoodVpsAddress)
+if ($boxName -notmatch '^([a-z0-9-]+\.)*thornswood\.net$' -or @($rec.dns | ForEach-Object { [string]$_.name }) -contains $boxName) { Die ('vps.json''s address, ' + $boxName + ', is not a thornswood.net name apart from the two the tunnel takes, so the box''s address cannot be read from it. Nothing was sent.') }
+$rec | Add-Member -NotePropertyName box -NotePropertyValue $boxName
 $recB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(($rec | ConvertTo-Json -Depth 10 -Compress)))
 
 # ---------------------------------------------------- through the gate ---
@@ -232,7 +239,6 @@ if ($ThroughGate) {
 }
 
 $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
-. (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here 'ServiceAccount.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
@@ -327,11 +333,16 @@ function Find-Tunnel {
 }
 # Each of the record's names as Cloudflare holds it: @{ Name; Id; Type; Content; Proxied; Count }.
 function Get-Names {
+    # The box's address: the one A record of the record's box name, which
+    # Cloudflare only answers for (DNS only), so it is the box itself.
+    $b = @(@(Cf 'GET' ('zones/' + $rec.zone + '/dns_records?name=' + [uri]::EscapeDataString($rec.box))) | Where-Object { $_ -and @('A', 'AAAA', 'CNAME') -contains [string]$_.type })
+    if ($b.Count -ne 1 -or [string]$b[0].type -ne 'A' -or [bool]$b[0].proxied -or [string]$b[0].content -notmatch '^\d{1,3}(\.\d{1,3}){3}$') { throw ($rec.box + ' is not one DNS-only A record, so the box''s address is not known; nothing was changed') }
+    $boxAddress = [string]$b[0].content
     foreach ($d in @($rec.dns)) {
         $all = @(Cf 'GET' ('zones/' + $rec.zone + '/dns_records?name=' + [uri]::EscapeDataString($d.name)))
         $all = @($all | Where-Object { $_ -and @('A', 'AAAA', 'CNAME') -contains [string]$_.type })
         $one = $all | Select-Object -First 1
-        [pscustomobject]@{ Name = [string]$d.name; Box = [string]$d.box; Count = $all.Count; Id = [string]$one.id; Type = [string]$one.type; Content = [string]$one.content; Proxied = [bool]$one.proxied }
+        [pscustomobject]@{ Name = [string]$d.name; Box = $boxAddress; Count = $all.Count; Id = [string]$one.id; Type = [string]$one.type; Content = [string]$one.content; Proxied = [bool]$one.proxied }
     }
 }
 '@
