@@ -16,12 +16,15 @@
 //              git blob it names is this file's), and takes a connection;
 //   login      a bot logs in as a profile nobody has, the way the game does,
 //              and is sent its character (createActor with isMe);
-//   new        that character is new: the race menu is open, and the
-//              gamemode starts creation, which the bot sees as the plain
-//              clothes arriving (gamemode.js beginAppearance and giveShift);
-//   face       only then the bot sends a face (UpdateAppearance), and the
-//              gamemode moves it on: the race menu closes (gamemode.js
-//              onUpdateAppearanceAttempt, beginChoosing, closeRaceMenu);
+//   new        that character is new: it is sent with the race menu open
+//              and with creation already open (the thornswoodChargen
+//              property at stage appearance), because gamemode.js opens
+//              creation and dresses a new character before the engine hands
+//              it over (__thornswoodChargen.created, spawn.ts);
+//   face       the bot sends a face (UpdateAppearance) and the gamemode
+//              moves the character on to choosing a home, which the bot is
+//              told as thornswoodChargen at stage choosing (gamemode.js
+//              onUpdateAppearanceAttempt, beginChoosing);
 //   saved      the world on disk holds the character with that name;
 //   restart    the server is stopped and started again and loads again;
 //   loads back a second bot logs in as the same profile and is sent the same
@@ -48,9 +51,24 @@ const CHARGEN_STEPS = ['new', 'face', 'saved'];
 // A Nord, the race the game's own race menu opens on (NordRace,
 // 0x13746:Skyrim.esm), with the shape unit/TestUtils.hpp sends.
 const NORD = 0x13746;
-// Gold (0xf:Skyrim.esm). The gamemode counts what a character carries apart
-// from gold to tell a new character (nothing) from a returning one.
-const GOLD = 0xf;
+// The gamemode's creation record, which its owner is sent (gamemode.js
+// CHARGEN_PROPERTY, visible by the owner): in createActor among the
+// properties, and after that as an UpdateProperty of its own.
+const CHARGEN_PROPERTY = 'thornswoodChargen';
+
+function stageFrom(dump) {
+  try { const v = JSON.parse(dump); return v && typeof v.stage === 'string' ? v.stage : ''; } catch (e) { return ''; }
+}
+// The creation stage a createActor carries, or ''.
+function stageIn(actor) {
+  const props = Array.isArray(actor && actor.customPropsJsonDumps) ? actor.customPropsJsonDumps : [];
+  const p = props.find((x) => x && x.propName === CHARGEN_PROPERTY);
+  return p ? stageFrom(p.propValueJsonDump) : '';
+}
+// The creation stage an UpdateProperty for this character carries, or ''.
+function stageOf(m, idx) {
+  return m.t === MSG.UpdateProperty && m.idx === idx && m.propName === CHARGEN_PROPERTY ? stageFrom(m.dataDump) : '';
+}
 
 function readJson(file) {
   return JSON.parse(String(fs.readFileSync(file, 'utf8')).replace(/^﻿/, ''));
@@ -224,41 +242,33 @@ async function pass(opts) {
       say('new', false, 'the character was sent with the race menu ' + (props.isRaceMenuOpen === undefined ? 'not named' : 'closed') + ', so it was not made new');
       return result();
     }
-    // The face waits for creation to start. The engine takes one face per
-    // race menu (ActionListener::OnUpdateAppearance closes it on the first),
-    // and the gamemode starts creation only once a new arrival has settled
-    // (SETTLE_MS): it records the face the character stands in as the one
-    // to tell the made face from, and moves the character on when a face
-    // arrives while creation is open. A face sent before that is recorded
-    // as the starting face, and the race menu never closes: the first real
-    // pass, Deployment 7475814060, failed at face that way. What says
-    // creation has started is the plain clothes (giveShift runs once the
-    // stage is saved), the first thing but gold in the character's pack.
-    const clothed = (m) => m.t === MSG.SetInventory && m.inventory && Array.isArray(m.inventory.entries) &&
-      m.inventory.entries.some((e) => e && Number(e.baseId) !== GOLD);
-    const closed = (m) => m.t === MSG.SetRaceMenuOpen && m.open === false;
-    let started = null;
-    try {
-      started = await first.until(() => {
-        for (const x of first.inbox) {
-          if (!x.message) { continue; }
-          if (clothed(x.message)) { return 'clothes'; }
-          if (closed(x.message)) { return 'closed'; }
-        }
-        return null;
-      }, stepMs, 'creation starting (the plain clothes) for the new character');
-    } catch (e) { say('new', false, e.message); return result(); }
-    if (!say('new', started === 'clothes', started === 'clothes'
-      ? 'a new character: the race menu is open and creation started with the plain clothes'
-      : 'the race menu closed before creation started, so the gamemode took the character for a returning one')) {
+    // Creation is open from the first packet: the gamemode opens it before
+    // the engine hands the character over, so the stage comes in createActor
+    // among the properties its owner may see. Its plain clothes are already
+    // in the pack there too, so no later inventory message says creation
+    // began; waiting for one is how the second real pass (Deployment
+    // 7476990469) failed at new.
+    const stage = stageIn(me);
+    if (!say('new', stage === 'appearance', stage === 'appearance'
+      ? 'a new character: the race menu is open and creation is open at the face'
+      : (stage ? 'the character came with creation at stage ' + stage + ', not appearance, so the gamemode did not make it new'
+        : 'the character came with no creation stage, so the gamemode did not open creation for it'))) {
       return result();
     }
 
+    // What moves creation on is the gamemode setting the stage to choosing
+    // when the face lands. The race menu's close is not sent: the engine
+    // closes it as it takes the face (ActionListener::OnUpdateAppearance),
+    // the game closed its own menu before it sent one, and the gamemode's
+    // closeRaceMenu then finds it closed and sends nothing
+    // (PartOne::SetRaceMenuOpen). Waiting for that close is how the first
+    // real pass (Deployment 7475814060) failed at face.
     const sentAt = first.inbox.length;
     first.send({ t: 4, idx: me.idx, data: face(name) }, true);
     try {
-      await first.until(() => first.inbox.slice(sentAt).some((x) => x.message && closed(x.message)), stepMs, 'the race menu closing after the face was sent');
-      say('face', true, 'the face was taken and the race menu closed');
+      await first.until(() => first.inbox.slice(sentAt).some((x) => x.message && stageOf(x.message, me.idx) === 'choosing'),
+        stepMs, 'creation moving on to choosing after the face was sent');
+      say('face', true, 'the face was taken and creation moved on to choosing a home');
     } catch (e) { say('face', false, e.message); return result(); }
 
     let form = null;
@@ -339,4 +349,4 @@ if (require.main === module) {
   main().then((code) => process.exit(code), (e) => { console.log('BOT PASS FAILED: ' + (e && e.stack || e)); process.exit(1); });
 }
 
-module.exports = { pass, gitBlob, face, formOf, nameIn, ServerRun };
+module.exports = { stageIn, stageOf, pass, gitBlob, face, formOf, nameIn, ServerRun };
