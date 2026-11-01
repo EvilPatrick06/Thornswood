@@ -62,6 +62,7 @@ try {
     function Problems([string]$body, [string]$author = '') { return @(Get-PrReleaseNoteProblems $body $author) }
     Yes 'a good note passes' ((Problems $good).Count -eq 0)
     Yes 'none passes' ((Problems $none).Count -eq 0)
+    Yes 'a body with CRLF line ends, as GitHub''s editor sends it, passes the same' ((Problems ($good -replace "`r?`n", "`r`n")).Count -eq 0)
     Yes 'no line is refused' ((Problems "## What changed`n`nStuff.").Count -gt 0)
     Yes 'the template as it comes is refused (the line is empty)' ((Problems $template).Count -gt 0)
     Yes 'a headline with no detail line is refused' ((Problems "Release note: The forge shows the price").Count -gt 0)
@@ -120,7 +121,9 @@ try {
     Yes 'Collect ends 3 when every change says none' ($r.Code -eq 3 -and $r.Out -match 'NONE')
 
     # ---- the template, the workflow and the guide say the same line -------------
-    Yes 'the template has an empty Release note line to fill in' ($template -match '(?m)^Release note: ?$')
+    # A Windows checkout holds the template with CRLF, and .NET's $ stops only
+    # before a LF, so the line may end in a CR here.
+    Yes 'the template has an empty Release note line to fill in' ($template -match '(?m)^Release note: ?\r?$')
     $wf = [IO.File]::ReadAllText((Join-Path $Repo '.github/workflows/pr-body.yml'))
     Yes 'the workflow runs on an edited body' ($wf -match 'types: \[[^\]]*\bedited\b')
     Yes 'the workflow passes the body through the environment, not into the script' ($wf -match 'PR_BODY: \$\{\{ github\.event\.pull_request\.body \}\}' -and $wf -notmatch 'run:[^\n]*github\.event\.pull_request\.body')
