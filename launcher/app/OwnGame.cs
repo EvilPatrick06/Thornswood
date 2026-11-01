@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Runtime.Serialization;
-using System.Runtime.Serialization.Json;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.Win32.SafeHandles;
 
@@ -3285,23 +3285,32 @@ namespace Thornswood
             return l;
         }
 
-        [DataContract]
         class VortexRecord
         {
-            [DataMember] public string stagingPath;
-            [DataMember] public VortexFile[] files;
+            [JsonInclude] public string stagingPath;
+            [JsonInclude] public VortexFile[] files;
         }
 
-        [DataContract]
         class VortexFile
         {
-            [DataMember] public string relPath;
-            [DataMember] public string source;
+            [JsonInclude] public string relPath;
+            [JsonInclude] public string source;
             // The file's time as Vortex deployed it, in milliseconds (#2210).
             // Read as whatever the record holds, so a record whose time is not
             // a plain number is not refused whole for it.
-            [DataMember(IsRequired = false)] public object time;
+            [JsonInclude] public object time;
         }
+
+        /// <summary>
+        /// Vortex's deployment records for System.Text.Json, with the code
+        /// made at build time (#4823). time comes back as a JsonElement, whose
+        /// text is the number or string as the record has it, which is what
+        /// the old serializer's boxed value printed as. Strings read loosely
+        /// (LooseString).
+        /// </summary>
+        [JsonSourceGenerationOptions(Converters = new[] { typeof(LooseString) })]
+        [JsonSerializable(typeof(VortexRecord))]
+        partial class VortexJson : JsonSerializerContext { }
 
         /// <summary>What Vortex's records in a folder list, and where Vortex keeps each file.</summary>
         class Record
@@ -3345,7 +3354,7 @@ namespace Thornswood
                     try
                     {
                         using (var fs = File.OpenRead(f))
-                            doc = (VortexRecord)new DataContractJsonSerializer(typeof(VortexRecord)).ReadObject(fs);
+                            doc = JsonSerializer.Deserialize(fs, VortexJson.Default.VortexRecord);
                     }
                     catch { /* doc stays null, and the record is refused just below with a line saying so */ }
                     if (doc == null || doc.files == null || string.IsNullOrEmpty(doc.stagingPath))

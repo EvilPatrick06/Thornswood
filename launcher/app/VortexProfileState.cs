@@ -369,9 +369,11 @@ namespace Thornswood
             if (json.Length > 4096 || !System.Text.RegularExpressions.Regex.IsMatch(json,
                 "\\A\"(?:[^\"\\\\\\x00-\\x1f]|\\\\(?:[\"\\\\/bfnrt]|u[0-9a-fA-F]{4}))*\"\\z"))
                 throw new InvalidDataException("Profile metadata is not one JSON string");
-            using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(json))) {
-                return (string)new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof(string)).ReadObject(stream);
-            }
+            // The pattern above has made sure it is one string token and
+            // nothing else, so the reader's first token is the whole of it.
+            var reader = new System.Text.Json.Utf8JsonReader(Encoding.UTF8.GetBytes(json));
+            reader.Read();
+            return reader.GetString();
         }
     }
 }

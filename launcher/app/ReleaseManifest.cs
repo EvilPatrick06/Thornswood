@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
-using System.Runtime.Serialization;
-using System.Runtime.Serialization.Json;
 using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Thornswood
 {
@@ -29,24 +29,30 @@ namespace Thornswood
     /// tests\test-2163-manifest-check.ps1 can compile the two on their own and
     /// point them at a catalog ThornswoodRelease really signed.
     /// </summary>
-    public static class ReleaseManifest
+    public static partial class ReleaseManifest
     {
-        [DataContract]
         public class Doc
         {
-            [DataMember] public int schema;
-            [DataMember] public string release = "";
-            [DataMember] public string channel = "";
-            [DataMember] public string commit = "";
-            [DataMember] public Asset[] assets = null;
+            [JsonInclude] public int schema;
+            [JsonInclude] public string release = "";
+            [JsonInclude] public string channel = "";
+            [JsonInclude] public string commit = "";
+            [JsonInclude] public Asset[] assets = null;
         }
 
-        [DataContract]
         public class Asset
         {
-            [DataMember] public string what = "";
-            [DataMember] public string sha256 = "";
+            [JsonInclude] public string what = "";
+            [JsonInclude] public string sha256 = "";
         }
+
+        /// <summary>
+        /// release.json for System.Text.Json, with the code made at build time
+        /// (#4823). Strings read loosely (LooseString).
+        /// </summary>
+        [JsonSourceGenerationOptions(Converters = new[] { typeof(LooseString) })]
+        [JsonSerializable(typeof(Doc))]
+        partial class DocJson : JsonSerializerContext { }
 
         /// <summary>
         /// Empty when the catalog at catalogPath is signed by Thornswood
@@ -73,7 +79,7 @@ namespace Thornswood
 
                 Doc doc;
                 using (var fs = File.OpenRead(jsonPath))
-                    doc = (Doc)new DataContractJsonSerializer(typeof(Doc)).ReadObject(fs);
+                    doc = JsonSerializer.Deserialize(fs, DocJson.Default.Doc);
                 if (doc == null || doc.assets == null) return "release.json lists no assets.";
 
                 var listed = new HashSet<string>(StringComparer.Ordinal);
