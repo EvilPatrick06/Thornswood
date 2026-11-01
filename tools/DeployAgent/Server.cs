@@ -92,12 +92,15 @@ public sealed class Server(EnvConfig env, HttpClient http)
     /// holds the server to loading it, the way Reload.ps1 does:
     ///  - the server folders' turn first (#3247), held to the end;
     ///  - what it replaces is copied into &lt;root&gt;\.prev-&lt;stamp&gt; (gamemode.js,
-    ///    thornswood-build.json, server-settings.json and the deploy record),
-    ///    the set a swap keeps, so Deploy-DevGamemode.ps1 -PutBack puts it back;
+    ///    thornswood-build.json, server-settings.json, the deploy record and the
+    ///    gamemode-tables folder), the set a swap keeps, so
+    ///    Deploy-DevGamemode.ps1 -PutBack puts it back;
     ///  - each new file is staged in &lt;root&gt;\.agent-stage-&lt;stamp&gt; and moved
-    ///    over the old one in one rename, stamp first;
-    ///  - server.log has to say the new blob loaded, then the health address
-    ///    has to answer;
+    ///    over the old one in one rename: the tables folder first (#5191), then
+    ///    the stamp, then gamemode.js, whose arrival is what the server reloads
+    ///    on, so the reload reads the new tables;
+    ///  - server.log has to say the new blob and the new tables tree loaded,
+    ///    then the health address has to answer;
     ///  - when either does not happen the old files go back the same way and
     ///    the old blob has to load again. Only if that fails too is the server
     ///    left for a restart, which this slice does not make, and it says so.</summary>
@@ -120,6 +123,7 @@ public sealed class Server(EnvConfig env, HttpClient http)
         // the root's permissions, which the server's account reads.
         var stage = Path.Combine(Root, ".agent-stage-" + stamp);
         var gm = Path.Combine(Root, "gamemode.js");
+        var tablesAt = Path.Combine(Root, Tables.Dir);
 
         try
         {
@@ -131,17 +135,20 @@ public sealed class Server(EnvConfig env, HttpClient http)
             var rec = Path.Combine(DataDir(), "thornswood-deploy.json");
             var relRec = Path.GetRelativePath(Root, rec);
             if (!relRec.StartsWith("..") && File.Exists(rec)) Files.Copy(rec, Path.Combine(prev, relRec));
+            if (Directory.Exists(tablesAt)) Tables.CopyDir(tablesAt, Path.Combine(prev, Tables.Dir));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             TryDelete(prev);
             return new Outcome("failure", $"not applied: the running files could not be kept in {prevName}: {e.Message}");
         }
+        var withTables = files.ContainsKey(Tables.Zip);
         try
         {
             foreach (var rel in ReloadFiles) Files.Copy(files[rel], Path.Combine(stage, rel));
+            if (withTables) Tables.Expand(files[Tables.Zip], Path.Combine(stage, Tables.Dir));
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
         {
             TryDelete(stage);
             return new Outcome("failure", "not applied: the new files could not be staged: " + e.Message, Prev: prevName);
@@ -149,24 +156,35 @@ public sealed class Server(EnvConfig env, HttpClient http)
 
         var oldBlob = Files.GamemodeBlob(gm);
         var newBlob = Files.GamemodeBlob(Path.Combine(stage, "gamemode.js"));
-        var changes = oldBlob != newBlob;
-        log($"the running gamemode is git blob {oldBlob}; it and its stamp are kept in {prevName}");
+        var oldTree = Tables.Tree(tablesAt);
+        // A Release from before #5191 carries no tables and leaves the folder as it is.
+        var newTree = withTables ? Tables.Tree(Path.Combine(stage, Tables.Dir)) : oldTree;
+        var changes = oldBlob != newBlob || oldTree != newTree;
+        log($"the running gamemode is git blob {oldBlob}" + (oldTree != "" ? $" with tables tree {oldTree}" : "") + $"; it, its stamp and its tables are kept in {prevName}");
 
         var sl = new ServerLog(Root);
         sl.Mark();
         var placed = new List<string>();
         why = "";
-        foreach (var rel in ReloadFiles)
+        // The tables first: the running gamemode read its own once, as it
+        // loaded, so the folder can change under it, and the reload that
+        // gamemode.js's arrival starts reads the new one.
+        if (withTables)
+        {
+            why = SwapTables(Path.Combine(stage, Tables.Dir), tablesAt, Path.Combine(stage, Tables.Dir + ".old"));
+            if (why == "") placed.Add(Tables.Dir);
+        }
+        foreach (var rel in why == "" ? ReloadFiles : [])
         {
             try { File.Move(Path.Combine(stage, rel), Path.Combine(Root, rel), true); placed.Add(rel); }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { why = $"could not put the new {rel} in place: {e.Message}"; break; }
         }
         var wait = TimeSpan.FromSeconds(env.LoadSeconds);
-        if (why == "" && !changes) log($"the server already runs git blob {newBlob}, so it has nothing to load; the stamp is the new one");
+        if (why == "" && !changes) log($"the server already runs git blob {newBlob}" + (newTree != "" ? $" with tables tree {newTree}" : "") + ", so it has nothing to load; the stamp is the new one");
         if (why == "" && changes)
         {
-            log($"put in git blob {newBlob}, waiting up to {env.LoadSeconds} seconds for server.log to say it loaded");
-            var (got, said) = sl.AwaitLoad(newBlob, wait, Tick);
+            log($"put in git blob {newBlob}" + (newTree != "" ? $" and tables tree {newTree} ({Tables.Count(tablesAt)} tables)" : "") + $", waiting up to {env.LoadSeconds} seconds for server.log to say they loaded");
+            var (got, said) = sl.AwaitLoad(newBlob, newTree, wait, Tick);
             foreach (var l in Redact(said)) log("  " + l);
             if (got != "") why = "the new gamemode did not take: " + got;
         }
@@ -180,7 +198,7 @@ public sealed class Server(EnvConfig env, HttpClient http)
         {
             TryDelete(stage);
             PruneOld(log);
-            return new Outcome("success", $"dev runs gamemode blob {newBlob[..12]}, reloaded with nobody dropped", newBlob, prevName);
+            return new Outcome("success", $"dev runs gamemode blob {newBlob[..12]}" + (newTree != "" ? $" with tables tree {newTree[..12]}" : "") + ", reloaded with nobody dropped", newBlob, prevName);
         }
 
         // The way back: the old files from their copies in .prev, through the
@@ -198,6 +216,17 @@ public sealed class Server(EnvConfig env, HttpClient http)
         {
             var rel = placed[i];
             var kept = Path.Combine(prev, rel);
+            if (rel == Tables.Dir)
+            {
+                // The old folder back through the stage, or none when there was none.
+                var back = Path.Combine(stage, Tables.Dir + ".back");
+                var off = Path.Combine(stage, Tables.Dir + ".undone");
+                try { if (Directory.Exists(kept)) Tables.CopyDir(kept, back); }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException) { log($"COULD NOT PUT THE OLD {rel} BACK: {e.Message}"); clean = false; continue; }
+                var swapWhy = Directory.Exists(back) ? SwapTables(back, tablesAt, off) : MoveAside(tablesAt, off);
+                if (swapWhy != "") { log($"COULD NOT PUT THE OLD {rel} BACK: {swapWhy}"); clean = false; }
+                continue;
+            }
             if (!File.Exists(kept)) continue;
             try
             {
@@ -214,11 +243,13 @@ public sealed class Server(EnvConfig env, HttpClient http)
         if (clean)
         {
             var now = Files.GamemodeBlob(gm);
+            var nowTree = Tables.Tree(tablesAt);
             if (now != oldBlob) { log($"gamemode.js is git blob {now} after the put-back, not the old {oldBlob}"); clean = false; }
+            else if (nowTree != oldTree) { log($"the tables are git tree {nowTree} after the put-back, not the old {oldTree}"); clean = false; }
             else if (changes && placed.Contains("gamemode.js"))
             {
                 log($"the old gamemode is back on disk, waiting up to {env.LoadSeconds} seconds for the server to load it");
-                var (got, said) = sl.AwaitLoad(oldBlob, wait, Tick);
+                var (got, said) = sl.AwaitLoad(oldBlob, oldTree, wait, Tick);
                 foreach (var l in Redact(said)) log("  " + l);
                 if (got != "") { log("the old gamemode did not take either: " + got); clean = false; }
             }
@@ -259,7 +290,8 @@ public sealed class Server(EnvConfig env, HttpClient http)
     ///    loaded, and the health address;
     ///  - when any of that does not happen, the stop again, the old files
     ///    back the same way, and the old server started and asked again.
-    /// files are the Release's gamemode part (gamemode.js and its stamp).</summary>
+    /// files are the Release's gamemode part (gamemode.js, its stamp and, from
+    /// #5191, gamemode-tables.zip, whose folder is swapped with the files).</summary>
     public async Task<Outcome> ApplyServerBuild(string zip, byte[] record, IReadOnlyDictionary<string, string> files, string who, Action<string> log, CancellationToken ct)
     {
         foreach (var n in ReloadFiles)
@@ -291,6 +323,7 @@ public sealed class Server(EnvConfig env, HttpClient http)
                 throw new InvalidDataException("the zip's server-build.json is not the one the signed manifest names");
             Files.WriteWhole(Path.Combine(stage, "server-build.json"), record);
             foreach (var rel in ReloadFiles) Files.Copy(files[rel], Path.Combine(stage, rel));
+            if (files.ContainsKey(Tables.Zip)) Tables.Expand(files[Tables.Zip], Path.Combine(stage, Tables.Dir));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
         {
@@ -312,7 +345,12 @@ public sealed class Server(EnvConfig env, HttpClient http)
         }
         var want = sums.Keys.Append("server-build.json").Concat(ReloadFiles).ToList();
         var newBlob = Files.GamemodeBlob(Path.Combine(stage, "gamemode.js"));
-        log($"the stage checks out: server build {rec.Short}, {sums.Count} file(s) held to its record, and gamemode git blob {newBlob}");
+        var tablesAt = Path.Combine(Root, Tables.Dir);
+        var withTables = files.ContainsKey(Tables.Zip);
+        // A Release from before #5191 carries no tables and leaves the folder as it is.
+        var newTree = withTables ? Tables.Tree(Path.Combine(stage, Tables.Dir)) : Tables.Tree(tablesAt);
+        log($"the stage checks out: server build {rec.Short}, {sums.Count} file(s) held to its record, and gamemode git blob {newBlob}" +
+            (newTree != "" ? $" with tables tree {newTree}" : ""));
 
         Turn turn;
         try { turn = Turn.Take(env.Turn, who, TimeSpan.FromSeconds(env.TurnSeconds), log); }
@@ -334,7 +372,21 @@ public sealed class Server(EnvConfig env, HttpClient http)
             var placed = new List<string>();
             var aside = new List<string>();
             var why = "";
-            foreach (var rel in want.Concat(stale))
+            // The tables folder goes aside into .prev whole and the new one in,
+            // two renames, while the server is stopped.
+            var tablesAside = false;
+            var tablesPlaced = false;
+            if (withTables)
+            {
+                try
+                {
+                    if (Directory.Exists(tablesAt)) { Directory.CreateDirectory(prev); Directory.Move(tablesAt, Path.Combine(prev, Tables.Dir)); tablesAside = true; }
+                    Directory.Move(Path.Combine(stage, Tables.Dir), tablesAt);
+                    tablesPlaced = true;
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException) { why = $"could not swap {Tables.Dir}: {e.Message}"; }
+            }
+            foreach (var rel in why == "" ? want.Concat(stale) : [])
             {
                 var at = Path.Combine(Root, rel);
                 try
@@ -355,13 +407,13 @@ public sealed class Server(EnvConfig env, HttpClient http)
             if (why == "")
             {
                 log($"swapped in {placed.Count} file(s); the ones they replaced are in {prevName}");
-                why = await StartAndCheck(port, resPort, newBlob, log, ct);
+                why = await StartAndCheck(port, resPort, newBlob, newTree, log, ct);
             }
             if (why == "")
             {
                 TryDelete(stage);
                 PruneOld(log);
-                return new Outcome("success", $"dev runs server build {rec.Short} and gamemode blob {newBlob[..12]}, restarted", newBlob, prevName);
+                return new Outcome("success", $"dev runs server build {rec.Short} and gamemode blob {newBlob[..12]}" + (newTree != "" ? $" with tables tree {newTree[..12]}" : "") + ", restarted", newBlob, prevName);
             }
 
             // The way back: stop what was started, the new files out, the old ones in, and the old server started.
@@ -387,9 +439,15 @@ public sealed class Server(EnvConfig env, HttpClient http)
                 }
                 catch (Exception e) when (e is IOException or UnauthorizedAccessException) { log($"COULD NOT PUT THE OLD {rel} BACK: {e.Message}"); clean = false; }
             }
+            try
+            {
+                if (tablesPlaced && Directory.Exists(tablesAt)) Directory.Move(tablesAt, Path.Combine(stage, Tables.Dir));
+                if (tablesAside) Directory.Move(Path.Combine(prev, Tables.Dir), tablesAt);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { log($"COULD NOT PUT THE OLD {Tables.Dir} BACK: {e.Message}"); clean = false; }
             if (clean)
             {
-                var back = await StartAndCheck(port, resPort, Files.GamemodeBlob(Path.Combine(Root, "gamemode.js")), log, ct);
+                var back = await StartAndCheck(port, resPort, Files.GamemodeBlob(Path.Combine(Root, "gamemode.js")), Tables.Tree(tablesAt), log, ct);
                 if (back != "") { log("the previous server build is back and does not answer either: " + back); clean = false; }
                 else log("the previous server build is back and answering");
             }
@@ -430,8 +488,9 @@ public sealed class Server(EnvConfig env, HttpClient http)
 
     /// <summary>Starts the task, then waits for both ports (UDP held, the
     /// resources port taking a connection), server.log saying the gamemode
-    /// blob loaded, and the health address. "" when all of them did.</summary>
-    async Task<string> StartAndCheck(int port, int resPort, string blob, Action<string> log, CancellationToken ct)
+    /// blob and its tables tree loaded, and the health address. "" when all
+    /// of them did.</summary>
+    async Task<string> StartAndCheck(int port, int resPort, string blob, string tree, Action<string> log, CancellationToken ct)
     {
         var sl = new ServerLog(Root);
         sl.Mark();
@@ -453,8 +512,9 @@ public sealed class Server(EnvConfig env, HttpClient http)
             }
             await Task.Delay(Tick, ct);
         }
-        log($"answering on UDP {port} and {resPort}; waiting up to {env.LoadSeconds} seconds for server.log to say gamemode git blob {blob} loaded");
-        var (got, said) = sl.AwaitLoad(blob, TimeSpan.FromSeconds(env.LoadSeconds), Tick);
+        log($"answering on UDP {port} and {resPort}; waiting up to {env.LoadSeconds} seconds for server.log to say gamemode git blob {blob}" +
+            (tree != "" ? $" and tables tree {tree}" : "") + " loaded");
+        var (got, said) = sl.AwaitLoad(blob, tree, TimeSpan.FromSeconds(env.LoadSeconds), Tick);
         foreach (var l in Redact(said)) log("  " + l);
         if (got != "") return "the gamemode did not take on the new start: " + got;
         var sick = await Unhealthy(ct);
@@ -464,6 +524,29 @@ public sealed class Server(EnvConfig env, HttpClient http)
     }
 
     static string Trim(string s) => s.Length > 90 ? s[..87] + "..." : s;
+
+    /// <summary>Puts the tables folder from into place at to, the one at to
+    /// moved to aside first: two renames on the one volume. "" when it did;
+    /// when the second rename fails the first is undone.</summary>
+    static string SwapTables(string from, string to, string aside)
+    {
+        var had = Directory.Exists(to);
+        try { if (had) Directory.Move(to, aside); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return $"could not move the running {Tables.Dir} aside: {e.Message}"; }
+        try { Directory.Move(from, to); return ""; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            try { if (had) Directory.Move(aside, to); }
+            catch (Exception e2) when (e2 is IOException or UnauthorizedAccessException) { return $"could not put the new {Tables.Dir} in place ({e.Message}), nor the running one back ({e2.Message})"; }
+            return $"could not put the new {Tables.Dir} in place: {e.Message}";
+        }
+    }
+
+    static string MoveAside(string dir, string aside)
+    {
+        try { if (Directory.Exists(dir)) Directory.Move(dir, aside); return ""; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return $"could not take {Tables.Dir} out: {e.Message}"; }
+    }
 
     static void TryDelete(string dir)
     {

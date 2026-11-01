@@ -95,7 +95,7 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
                 Commit = m.Commit,
                 Sha256 = ReleaseFetch.FileSha256(gm),
                 Size = new FileInfo(gm).Length,
-                Files = Server.ReloadFiles.Length,
+                Files = Server.ReloadFiles.Length + (f.Files.ContainsKey(Tables.Zip) ? Tables.Count(Path.Combine(srv.Env.Root, Tables.Dir)) : 0),
                 DeployedUtc = Records.UtcNow(),
                 From = $"deploy agent {version} on {Host}",
             }, logf);
