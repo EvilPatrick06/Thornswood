@@ -404,6 +404,28 @@ if ($m.Success) {
     Yes 'a runtime of another commit is published again' (-not [bool](& $expr))
 }
 
+# ---- the Velopack package (#4825) ----------------------------------------------
+# On dev the game files come from the launcher's Velopack package, which
+# carries the six beside the launcher, so it carries the note and the texts
+# too (Build-SetupFiles.ps1), and the install copies them into its folder.
+$st = @(Get-SourceNoticeEntries $record $six 'setup' $licences)
+$setupNote = Text $st 'SOURCE CODE.txt'
+$wantSetup = @('SOURCE CODE.txt', 'GPL-3.0.txt', 'AGPL-3.0.txt') + @($ports | ForEach-Object { 'licences/' + $_ + '.txt' })
+Yes ('the Velopack package''s game files get SOURCE CODE.txt, both texts and the library texts: ' + ((Names $st) -join ', ')) `
+    (((Names $st) -join '|') -eq ($wantSetup -join '|'))
+Yes '  naming the recorded commit and every one of the six, and saying setup put them there' (
+    $setupNote.Contains($fork + '/tree/' + $commit) -and @($six | Where-Object { -not $setupNote.Contains((Leaf $_)) }).Count -eq 0 -and $setupNote -match 'setup put SkyMP files into your Skyrim folder')
+Yes '  in plain ASCII, with no em dash and never player' (-not ($setupNote -match '[^\x09\x0A\x0D\x20-\x7E]') -and -not ($setupNote -match '(?i)\bplayers?\b'))
+$bsf = Get-Content -LiteralPath (Join-Path $Repo 'scripts\release\Build-SetupFiles.ps1') -Raw
+Yes 'Build-SetupFiles.ps1 writes it from the game files it carries, and refuses a package that carries none of the six' (
+    $bsf.Contains(". (Join-Path `$Here 'Source-Notice.ps1')") -and
+    $bsf.Contains("Get-SourceNoticeEntries (Join-Path `$RepoDir 'records\client-build.json') `$carried 'setup' (Join-Path `$RepoDir 'installer\licences')") -and
+    $bsf.Contains('Write-SourceNoticeToFolder $files $entries') -and $bsf.Contains("if (`$entries.Count -eq 0) { throw"))
+$steps = Get-Content -LiteralPath (Join-Path $Repo 'launcher\app\InstallSteps.cs') -Raw
+Yes 'the install copies SOURCE CODE.txt, the two texts and licences\ out of the package into its folder' (
+    $steps.Contains('CopyIfThere(Path.Combine(choice.Package, "SOURCE CODE.txt"), Path.Combine(Root, "SOURCE CODE.txt"));') -and
+    $steps.Contains('"GPL-3.0.txt", "AGPL-3.0.txt"') -and $steps.Contains('Path.Combine(choice.Package, "licences")'))
+
 # ---- the launcher ignores what this adds -------------------------------------
 $cr = Get-Content -LiteralPath (Join-Path $Repo 'launcher\app\ClientRuntime.cs') -Raw
 Yes 'ClientRuntime.cs takes out only the recorded paths it wants (Find by name)' `
