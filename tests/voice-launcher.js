@@ -320,7 +320,7 @@ async function room(list) {
     m.l.listeners.push((e) => {
       if (e.ev === 'dial') {
         m.n = e.n;
-        m.l.send({ do: 'admit', n: e.n }).then(() => m.l.send({ do: 'say', n: e.n, msg: { t: 'welcome', peer: m.peer, profileId: m.opts.profileId } }));
+        m.welcomed = m.l.send({ do: 'admit', n: e.n }).then(() => m.l.send({ do: 'say', n: e.n, msg: { t: 'welcome', peer: m.peer, profileId: m.opts.profileId } }));
       } else if (e.ev === 'host' && e.kind === 'token' && e.text === 'need') {
         m.l.send({ do: 'token', token: 'room-' + m.peer });
       } else if (e.ev === 'sent' && e.msg && (e.msg.t === 'sdp' || e.msg.t === 'ice')) {
@@ -334,6 +334,10 @@ async function room(list) {
     await m.l.send({ do: 'configure', profileId: m.opts.profileId, name: m.opts.name || '', token: 'room-' + m.peer, base: 'https://room.invalid/voice' });
   }
   await Promise.all(members.map((m) => m.l.until(() => m.l.sent(m.n).some((x) => x.t === 'join'), 15000, 'join')));
+  // The service writes the welcome before anything else on a socket, so
+  // nothing the harness says goes to one before its welcome has: a roster
+  // ahead of it would find the session with no peer id of its own.
+  await Promise.all(members.map((m) => m.welcomed));
   return {
     at: function (i) { return members[i].l; },
     peer: function (i) { return members[i].peer; },
