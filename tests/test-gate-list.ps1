@@ -129,7 +129,8 @@ Yes 'and so is this harness' ($r.Out -contains 'test-gate-list.ps1')
 function Get-GateScript([string]$yaml) {
     $lines = $yaml -split "`r?`n"
     $at = -1
-    for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match '^\s*[^#\s].*Run-Gate\.ps1') { $at = $i; break } }
+    # The share's step; the pick's (Run-Gate.ps1 -Pick, #5183) is held below.
+    for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match '^\s*[^#\s].*Run-Gate\.ps1 -Shard') { $at = $i; break } }
     if ($at -lt 0) { return $null }
     $run = -1
     for ($i = $at; $i -ge 0; $i--) { if ($lines[$i] -match '^\s*run:\s*\|') { $run = $i; break } }
@@ -165,6 +166,7 @@ if ($null -eq $gate) { Done }
 $g = Get-Named $gate
 Yes 'the gate step parses' ($g.Errors -eq 0)
 Yes 'it runs its share through Run-Gate.ps1 with a throttle and a budget and fails when that does' ($gate -match "(?m)^\.\\scripts\\dev\\Run-Gate\.ps1 -Shard \`$env:SHARD -Of \`$env:OF -Throttle [1-9]\d* -BudgetSeconds \d+\s*\r?\nexit \`$LASTEXITCODE\s*$")
+Yes 'the pick runs Run-Gate.ps1 -Pick before it and fails when that does (#5183)' ([IO.File]::ReadAllText($Workflow) -match "(?m)^          \./scripts/dev/Run-Gate\.ps1 -Pick \(\[int\]\`$env:SHARES\)\r?\n          exit \`$LASTEXITCODE\r?\n")
 Yes ('the step names no harness itself' + $(if ($g.Named.Count) { ' (' + ($g.Named -join ', ') + ')' } else { '' })) ($g.Named.Count -eq 0)
 
 $runGate = Join-Path (Join-Path (Join-Path $Repo 'scripts') 'dev') 'Run-Gate.ps1'
