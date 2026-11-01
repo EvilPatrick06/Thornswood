@@ -235,6 +235,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/New-SkyrimFilesRecord.ps1](release/New-SkyrimFilesRecord.ps1) | Records every file of the pinned Skyrim build, from the depot manifests the Downgrade asks Steam for, into records\skyrim-files.json. |
 | [release/Nexus-Run.ps1](release/Nexus-Run.ps1) | Runs one of the Nexus scripts with Patrick's Nexus API key from a session that does not hold the key, a cloud thread included (#2841). |
 | [release/Nexus.ps1](release/Nexus.ps1) | The one place the release scripts talk to Nexus Mods from, with Patrick's personal API key (#2914). |
+| [release/NexusModPlan.ps1](release/NexusModPlan.ps1) | What Vortex would install from one mod archive, worked out the way Install-NexusRevision.ps1 lays a whole revision out (NexusLayout.cs), for a mod the collection does not carry yet (#5189). |
 | [release/NexusPublished.ps1](release/NexusPublished.ps1) | The newest published revision of a Nexus collection, as Nexus says it now (#4068). |
 | [release/Note-Repeats.ps1](release/Note-Repeats.ps1) | Whether a note tells a channel something it has already been told (#3320). |
 | [release/Note-Rules.ps1](release/Note-Rules.ps1) | What release notes may say. Ship.ps1 dot-sources this and refuses notes that break it, before anything is built. tests\test-note-rules.ps1 drives the same function, so the rule and its test cannot disagree. |
@@ -255,6 +256,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Publish-Update.ps1](release/Publish-Update.ps1) | Diffs the current build against the last published state, packs only what changed, sends it to the site (thornswood.net/feed[-dev]/assets/<sha256>, #897), and updates version.json so everyone's launcher picks it up. |
 | [release/Publish-VirusTotal.ps1](release/Publish-VirusTotal.ps1) | Optional manual tool: sends a file to VirusTotal, or says plainly that it is not sending and carries on. Not called from publish. |
 | [release/Read-JsonFile.ps1](release/Read-JsonFile.ps1) | ConvertFrom-ThornswoodJson: JSON text read from a file, parsed, or a stop that names the file. |
+| [release/Read-NexusFile.ps1](release/Read-NexusFile.ps1) | Reads one file of a Nexus mod with Patrick's Nexus API key and says what a change to records\collection.json needs from it (#5189). |
 | [release/RecordShape.ps1](release/RecordShape.ps1) | The shape and version each high-risk JSON record must have, checked fail closed (#2180, first slice). docs\JSON-STATE-INVENTORY.md lists every critical JSON file, who writes it and who reads it. |
 | [release/Refresh-DevNews.ps1](release/Refresh-DevNews.ps1) | Marks the dev feed's notes DEV again against what main has published, and sets its mainVersion, with no release. |
 | [release/Release-Baseline.ps1](release/Release-Baseline.ps1) | What a release is diffed against, and the record each release publishes of what it left installed (#441). |
