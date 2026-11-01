@@ -15,6 +15,11 @@ namespace Thornswood
     ///     game-files.json with the same size and sha256, and every file that
     ///     list names must be in the package. A file that does not match is
     ///     refused, as the feed's record sync refuses one (Sync.cs).
+    ///   - a file beside Game that the install reads on the first start
+    ///     (config.json, profile\, applied.txt, the source note and the
+    ///     licence texts, scripts/release/Build-SetupFiles.ps1) must be in the
+    ///     signed release's setup-files.json the same way, and every file it
+    ///     names must be there.
     ///   - every program (.exe, .dll) anywhere else, the launcher itself,
     ///     the native libraries beside it and Velopack's own Update.exe and
     ///     starter, must pass Signature.Refusal for ExpectedSigner: Windows
@@ -41,20 +46,24 @@ namespace Thornswood
         /// the line for launcher.log when it passed. Reports how far it has
         /// got to <paramref name="files"/> (done, total).
         /// </summary>
-        public static string Refusal(string nupkg, VeloRecord.GameList list, string expectedSigner,
+        public static string Refusal(string nupkg, VeloRecord.GameList list, VeloRecord.GameList setup, string expectedSigner,
                                      Action<long, long> files, out string said)
         {
             said = "";
             var want = new Dictionary<string, VeloRecord.GameFile>(StringComparer.OrdinalIgnoreCase);
-            foreach (VeloRecord.GameFile f in list.Files)
+            string bad = Wanted(list, "game-files.json", want);
+            if (bad.Length > 0) return bad;
+            var wantSetup = new Dictionary<string, VeloRecord.GameFile>(StringComparer.OrdinalIgnoreCase);
+            bad = Wanted(setup, "setup-files.json", wantSetup);
+            if (bad.Length > 0) return bad;
+            foreach (string p in wantSetup.Keys)
             {
-                if (f == null || string.IsNullOrEmpty(f.Path) || string.IsNullOrEmpty(f.Sha256)) return "names a game file the list gives no path or checksum for.";
-                string p = f.Path.Replace('\\', '/');
-                if (want.ContainsKey(p)) return "lists the game file " + p + " twice.";
-                want[p] = f;
+                if (p.StartsWith("Game/", StringComparison.OrdinalIgnoreCase) || p.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || p.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                    return "has a setup-files.json that names " + p + ", which is a game file or a program, and those are held to their own checks.";
             }
 
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var seenSetup = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             int programs = 0;
             string signerSaid = "";
             using (ZipArchive zip = ZipFile.OpenRead(nupkg))
@@ -77,14 +86,23 @@ namespace Thornswood
                         VeloRecord.GameFile f;
                         if (!want.TryGetValue(rel, out f))
                             return "carries the game file " + rel + ", which the signed release's game-files.json does not list.";
-                        if (e.Length != f.Size)
-                            return "carries " + rel + " at " + e.Length + " bytes, and the signed list says " + f.Size + ".";
-                        string sha;
-                        using (Stream s = e.Open()) sha = VeloRecord.Sha256(s);
-                        if (!string.Equals(sha, f.Sha256, StringComparison.OrdinalIgnoreCase))
-                            return "carries " + rel + " with the checksum " + sha + ", and the signed list says " + f.Sha256 + ".";
+                        string why = Differs(e, rel, f);
+                        if (why.Length > 0) return why;
                         seen.Add(rel);
                         continue;
+                    }
+
+                    if (name.StartsWith(App, StringComparison.OrdinalIgnoreCase))
+                    {
+                        VeloRecord.GameFile f;
+                        string rel = name.Substring(App.Length);
+                        if (wantSetup.TryGetValue(rel, out f))
+                        {
+                            string why = Differs(e, rel, f);
+                            if (why.Length > 0) return why;
+                            seenSetup.Add(rel);
+                            continue;
+                        }
                     }
 
                     bool program = name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ||
@@ -110,7 +128,7 @@ namespace Thornswood
                     // which Velopack reads and never puts on disk.
                     if (!name.StartsWith(App, StringComparison.OrdinalIgnoreCase)) continue;
                     if (string.Equals(name, App + "sq.version", StringComparison.OrdinalIgnoreCase)) continue;
-                    return "carries " + name + ", which is neither a signed program nor a game file the signed release lists.";
+                    return "carries " + name + ", which is neither a signed program nor a file the signed release lists.";
                 }
             }
 
@@ -118,10 +136,41 @@ namespace Thornswood
             foreach (string p in want.Keys) if (!seen.Contains(p)) missing.Add(p);
             if (missing.Count > 0)
                 return "lacks " + missing.Count + " of the game files the signed release lists, " + missing[0] + (missing.Count > 1 ? " among them." : ".");
+            foreach (string p in wantSetup.Keys) if (!seenSetup.Contains(p)) missing.Add(p);
+            if (missing.Count > 0)
+                return "lacks " + missing.Count + " of the files beside the game files the signed release lists, " + missing[0] + (missing.Count > 1 ? " among them." : ".");
             if (programs == 0) return "carries no program at all, so there is no launcher in it.";
 
-            said = "Every file in the update package checked: " + seen.Count + " game files match the signed release's list, and " +
+            said = "Every file in the update package checked: " + seen.Count + " game files and " + seenSetup.Count +
+                   " files beside them match the signed release's lists, and " +
                    programs + (programs == 1 ? " program is" : " programs are") + " signed by Thornswood. " + signerSaid;
+            return "";
+        }
+
+        /// <summary>The list as a map by path, or why it cannot be one.</summary>
+        static string Wanted(VeloRecord.GameList list, string named, Dictionary<string, VeloRecord.GameFile> want)
+        {
+            foreach (VeloRecord.GameFile f in list.Files)
+            {
+                if (f == null || string.IsNullOrEmpty(f.Path) || string.IsNullOrEmpty(f.Sha256)) return "has a " + named + " naming a file it gives no path or checksum for.";
+                string p = f.Path.Replace('\\', '/');
+                if (p.StartsWith("/", StringComparison.Ordinal) || p.Contains("../", StringComparison.Ordinal) || p.Contains("/..", StringComparison.Ordinal))
+                    return "has a " + named + " naming " + p + ", a path that climbs out of its folder.";
+                if (want.ContainsKey(p)) return "has a " + named + " that lists " + p + " twice.";
+                want[p] = f;
+            }
+            return "";
+        }
+
+        /// <summary>Empty when the entry is the listed file, by size and sha256; otherwise why not.</summary>
+        static string Differs(ZipArchiveEntry e, string rel, VeloRecord.GameFile f)
+        {
+            if (e.Length != f.Size)
+                return "carries " + rel + " at " + e.Length + " bytes, and the signed list says " + f.Size + ".";
+            string sha;
+            using (Stream s = e.Open()) sha = VeloRecord.Sha256(s);
+            if (!string.Equals(sha, f.Sha256, StringComparison.OrdinalIgnoreCase))
+                return "carries " + rel + " with the checksum " + sha + ", and the signed list says " + f.Sha256 + ".";
             return "";
         }
     }

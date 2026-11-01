@@ -29,11 +29,14 @@
 #   velopack  when the launcher's sources or the game files changed: the
 #             Velopack package of both on the one channel "dev" (Patrick's B
 #             on #3209: one channel for the launcher and the game payload),
-#             with its feed files and a delta from the Velopack release
-#             before. The launcher reads it from here (launcher/app/Velo*.cs),
-#             each package held to this manifest and its signed catalog. No
-#             installer and no portable copy go out yet: Setup.exe waits on
-#             the compiled installer (#4824), so --noInst stays until then
+#             with its feed files, a delta from the Velopack release before,
+#             setup-files.json (the files beside Game the install reads on
+#             the first start, Build-SetupFiles.ps1) and Thornswood-Setup.exe,
+#             Velopack's installer, which puts the launcher on a PC and starts
+#             it; the launcher's first start is the install (#4824). The
+#             launcher reads its updates from here (launcher/app/Velo*.cs),
+#             each package held to this manifest and its signed catalog. The
+#             portable copy vpk also makes does not go out
 # The agent applies gamemode, bot, server, site, discord and voice and names
 # the other parts in its log.
 #
@@ -112,6 +115,8 @@ on:
       - 'scripts/release/Build-GameFiles.ps1'
       - 'scripts/release/Build-Front.ps1'
       - 'scripts/release/Build-Launcher.ps1'
+      - 'scripts/release/Build-SetupFiles.ps1'
+      - 'scripts/release/Source-Notice.ps1'
       - 'scripts/release/Go.ps1'
       - 'scripts/release/MergeRelease.ps1'
       - 'scripts/release/New-SignedManifest.ps1'
@@ -367,12 +372,25 @@ jobs:
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("gamemode=" + $gm)
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("stamp=" + $stamp)
 
+      # What the install reads beside the game files on the first start
+      # (Build-SetupFiles.ps1), from the record the game files were built over.
+      - name: Build the files the install reads beside the game files
+        id: setup
+        if: ${{ steps.changed.outputs.velopack == 'yes' }}
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'setup'
+          ./scripts/release/Build-SetupFiles.ps1 -Out $out -GameRoot (Join-Path $env:RUNNER_TEMP 'game-root') -Channel dev -Commit $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::Build-SetupFiles.ps1 failed; the lines above say why'; exit 1 }
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("dir=" + (Join-Path $out 'files'))
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("list=" + (Join-Path $out 'setup-files.json'))
+
       # The launcher's programs come signed from the launcher step; Velopack's
-      # own (Update.exe and the stub) are signed through Sign-OnRunner.ps1 one
-      # at a time; the game files are never signed (their bytes are the ones
-      # the records name). Setup.exe is not made (--noInst) until the compiled
-      # installer (#4824) takes Velopack's Setup, and the portable copy vpk
-      # must make instead is not published.
+      # own (Update.exe, the stub and Setup.exe) are signed through
+      # Sign-OnRunner.ps1 one at a time; the game files and the setup files
+      # are never signed (their bytes are the ones the signed lists name).
+      # Setup.exe goes out as Thornswood-Setup.exe, the download; the portable
+      # copy vpk also makes is not published.
       - name: Pack the launcher and the game files with Velopack
         id: velopack
         if: ${{ steps.changed.outputs.velopack == 'yes' }}
@@ -384,6 +402,8 @@ jobs:
           VERSION: ${{ steps.names.outputs.velopack }}
           LAUNCHER_DIR: ${{ steps.launcher.outputs.dir }}
           GAME_ZIP: ${{ steps.game.outputs.zip }}
+          SETUP_DIR: ${{ steps.setup.outputs.dir }}
+          SETUP_LIST: ${{ steps.setup.outputs.list }}
           NOTES: ${{ steps.notes.outputs.file }}
         run: |
           $tools = Join-Path $env:RUNNER_TEMP 'vpk'
@@ -397,6 +417,10 @@ jobs:
           # VERSION is the one Build-Launcher took as -Version).
           Get-ChildItem -LiteralPath $env:LAUNCHER_DIR -File | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $pack $_.Name) }
           Expand-Archive -LiteralPath $env:GAME_ZIP -DestinationPath (Join-Path $pack 'Game')
+          # Beside Game, what the install reads on the first start
+          # (InstallSteps.cs): config.json, profile\, applied.txt, the source
+          # note and the licence texts.
+          Copy-Item -Path (Join-Path $env:SETUP_DIR '*') -Destination $pack -Recurse
           # A delta from the Velopack release before, when there is one: vpk
           # takes its full package and feed into the output folder first.
           $raw = gh api "repos/$($env:GITHUB_REPOSITORY)/releases?per_page=50"
@@ -410,8 +434,11 @@ jobs:
             Write-Host "a delta from $($before[0].tag_name)"
           } else { Write-Host 'the first Velopack release: a full package and no delta' }
           $sign = 'pwsh -NoProfile -File "' + (Resolve-Path 'scripts\release\Sign-OnRunner.ps1').Path + '" -Path {{file}}'
+          # packTitle is the name Windows shows in Apps and on the shortcuts,
+          # packAuthors the publisher beside it, and the icon is Setup.exe's
+          # and the installed app's.
           & $vpk pack --packId Thornswood --packVersion $env:VERSION --packDir $pack --mainExe Thornswood.exe --packTitle Thornswood --packAuthors Thornswood `
-            --channel dev --outputDir $out --noInst --skipVeloAppCheck --delta $delta --releaseNotes $env:NOTES `
+            --icon (Resolve-Path 'launcher\app.ico').Path --channel dev --outputDir $out --skipVeloAppCheck --delta $delta --releaseNotes $env:NOTES `
             --signTemplate $sign --signExclude '[\\/]Game[\\/]' --signParallel 1
           if ($LASTEXITCODE -ne 0) { Write-Host '::error::vpk pack failed; the lines above say why'; exit 1 }
           # This version's packages and the channel's feed files; a full
@@ -420,6 +447,14 @@ jobs:
           $files = @(Get-ChildItem -LiteralPath $out -File | Where-Object {
             $_.Name -in 'releases.dev.json', 'assets.dev.json', 'RELEASES-dev' -or $_.Name -like "Thornswood-$($env:VERSION)-dev-*.nupkg" })
           if (@($files | Where-Object Name -like '*-full.nupkg').Count -ne 1) { Write-Host "::error::vpk made no full package for $($env:VERSION)"; exit 1 }
+          # Setup.exe, under the name the download has had since the first
+          # installer, signed by vpk through Sign-OnRunner.ps1 like the rest.
+          $setupExe = @(Get-ChildItem -LiteralPath $out -File -Filter '*-Setup.exe')
+          if ($setupExe.Count -ne 1) { Write-Host "::error::vpk made $($setupExe.Count) Setup.exe files for $($env:VERSION), and one is the download"; exit 1 }
+          $download = Join-Path $out 'Thornswood-Setup.exe'
+          Move-Item -LiteralPath $setupExe[0].FullName -Destination $download -Force
+          $files += Get-Item -LiteralPath $download
+          $files += Get-Item -LiteralPath $env:SETUP_LIST
           Set-Content -LiteralPath (Join-Path $env:RUNNER_TEMP 'velopack.txt') -Value ($files | ForEach-Object { 'velopack=' + $_.FullName })
           Write-Host ('velopack: ' + (($files | ForEach-Object { $_.Name }) -join ', '))
 

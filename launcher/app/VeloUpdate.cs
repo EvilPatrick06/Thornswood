@@ -27,8 +27,9 @@ namespace Thornswood
     ///      keeps it or takes its Update.exe out of it.
     ///   3. Every file in the package, however it was put together (whole, or
     ///      rebuilt from the version before and its deltas): each game file by
-    ///      size and sha256 against the signed game-files.json, each program
-    ///      by Signature.Refusal (VeloPackage.cs).
+    ///      size and sha256 against the signed game-files.json, each file
+    ///      beside them against the signed setup-files.json, each program by
+    ///      Signature.Refusal (VeloPackage.cs).
     ///   4. The Update.exe Velopack took out of the package, by Signature.Refusal,
     ///      since it is what applies the update.
     /// A refusal deletes the package and says which check it failed; the
@@ -119,8 +120,9 @@ namespace Thornswood
                 VeloRecord.Manifest m = VeloRecord.Get(u.Info.TargetFullRelease.Version, out recordSaid);
                 if (recordSaid.Length > 0) log(recordSaid);
                 VeloRecord.GameList list = VeloRecord.Game(m);
+                VeloRecord.GameList setup = VeloRecord.Setup(m);
                 string said;
-                string why = VeloPackage.Refusal(pkg, list, ExpectedSigner,
+                string why = VeloPackage.Refusal(pkg, list, setup, ExpectedSigner,
                     delegate (long done, long total) { PlayProgress.Files("Checking the update", done, total); }, out said);
                 if (why.Length > 0) throw new Exception("The update package " + why);
                 log(said);

@@ -13,14 +13,15 @@ namespace Thornswood
     /// that changes the launcher or the game files publishes one Velopack
     /// package of both (.github/workflows/merge-release.yml, #5305).
     ///
-    /// THE LAYOUT. Velopack keeps an app in one folder of its own: Update.exe,
-    /// a small Thornswood.exe that starts the real one, current\ with the
-    /// package's files, and packages\ with the package it came from. The
-    /// install puts that folder at Root\Launcher (Setup.exe --installto), so
-    /// Root\Launcher\Thornswood.exe is still what every shortcut starts, and
-    /// the launcher itself runs from Root\Launcher\current. InstallRoot is
-    /// Root worked out from Velopack's own answer, not from where this exe
-    /// sits, which is one folder deeper than it used to be.
+    /// THE LAYOUT. Velopack keeps an app in one folder of its own, under the
+    /// person's profile (%LocalAppData%\Thornswood): Update.exe, a small
+    /// Thornswood.exe that starts the real one, current\ with the package's
+    /// files (the launcher, Game and the files the install reads beside it),
+    /// and packages\ with the package it came from. Root, the folder Profile,
+    /// Game and config.json go under, is apart from it, on Skyrim's drive,
+    /// chosen in the install window on the first start and recorded beside
+    /// Velopack's folder (InstallPlace.cs, #4824), because a hard link cannot
+    /// cross a drive. InstallRoot reads that record.
     ///
     /// The update itself, with every check made before it is applied, is
     /// VeloUpdate.cs; the signed release record it is held to, VeloRecord.cs;
@@ -87,19 +88,16 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Root, the folder that holds Launcher, Profile and Game, when
-        /// Velopack installed this launcher into Root\Launcher; null when it
-        /// did not. Paths.Init and the single-instance lock read it before
-        /// they fall back on the folder above the exe's.
+        /// Root, the folder that holds Profile, Game and config.json, when
+        /// Velopack installed this launcher and the install window recorded
+        /// one (InstallPlace.Recorded); null when not, and then the first
+        /// start is the install. Paths.Init and the single-instance lock read
+        /// it before they fall back on the folder above the exe's, which is
+        /// Root only for a launcher built into a test root.
         /// </summary>
         public static string InstallRoot
         {
-            get
-            {
-                if (!Installed) return null;
-                string app = Locator.RootAppDir.TrimEnd('\\', '/');
-                return Path.GetDirectoryName(app);
-            }
+            get { return Installed ? InstallPlace.Recorded() : null; }
         }
 
         /// <summary>

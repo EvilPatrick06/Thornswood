@@ -267,7 +267,10 @@ function Get-ClientLicenceLines($Licences) {
 
   $Kind 'runtime' is the client runtime zip: its note is README.txt and says
   what the download is. 'pack' is an update pack: its note is SOURCE CODE.txt,
-  the name the installer gives the same note.
+  the name the installer gives the same note. 'setup' is the launcher's
+  Velopack package (#4825, Build-SetupFiles.ps1): its note is SOURCE CODE.txt,
+  which the install copies into the install folder (InstallSteps.cs), so it
+  says what the install put into the Skyrim folder.
 
   Throws when a recorded file has no known source folder, so a new file in
   client-build.json stops the release until somebody says where it is from.
@@ -279,7 +282,7 @@ function Get-ClientLicenceLines($Licences) {
   SkyMP's own, with no commit, as before #2931.
 #>
 function Get-SourceNoticeEntries([string]$ClientRecord, [string[]]$Carried, [string]$Kind, [string]$LicenceDir, [string]$FrontRecord) {
-    if ($Kind -ne 'runtime' -and $Kind -ne 'pack') { throw "Kind is runtime or pack, not $Kind" }
+    if ($Kind -notin 'runtime', 'pack', 'setup') { throw "Kind is runtime, pack or setup, not $Kind" }
     $any = $false
     foreach ($x in @($Carried)) { if ($x -and $SourceNoticeFiles.Contains($x)) { $any = $true; break } }
     if (-not $any) { return @() }
@@ -335,6 +338,16 @@ function Get-SourceNoticeEntries([string]$ClientRecord, [string[]]$Carried, [str
             'download. Nothing here needs copying by hand.',
             '',
             'WHERE THE SOURCE CODE IS',
+            ''
+        )
+    } elseif ($Kind -eq 'setup') {
+        $note = 'SOURCE CODE.txt'
+        $lines = @(
+            'THORNSWOOD: WHERE THE SOURCE CODE IS',
+            '====================================',
+            '',
+            'Thornswood''s setup put SkyMP files into your Skyrim folder, listed below,',
+            'and the launcher''s updates can bring newer builds of them.',
             ''
         )
     } else {

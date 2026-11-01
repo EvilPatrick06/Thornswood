@@ -71,7 +71,11 @@ namespace Thornswood
             [JsonPropertyName("sha256")] public string Sha256 { get; set; }
         }
 
-        /// <summary>game-files.json as Build-GameFiles.ps1 writes it: every game file in the package.</summary>
+        /// <summary>
+        /// game-files.json as Build-GameFiles.ps1 writes it: every game file in
+        /// the package. setup-files.json (Build-SetupFiles.ps1) is the same
+        /// shape, for the files beside Game the install reads.
+        /// </summary>
         public sealed class GameList
         {
             [JsonPropertyName("schema")] public int Schema { get; set; }
@@ -227,12 +231,33 @@ namespace Thornswood
                 throw new Exception("game-files.json of " + m.Tag + " was built from " + list.Commit + ", and the release from " + m.Commit + ".");
             return list;
         }
+
+        /// <summary>
+        /// setup-files.json of the Release <paramref name="m"/> records, among
+        /// its Velopack files, held to the sha256 the record gives it: the
+        /// files beside Game the install reads on the first start
+        /// (Build-SetupFiles.ps1). Throws with the reason.
+        /// </summary>
+        public static GameList Setup(Manifest m)
+        {
+            PartFile f = m.File("velopack", "setup-files.json");
+            if (f == null) throw new Exception("The release record of " + m.Tag + " lists no setup-files.json, so the files beside the game files in the package cannot be held to a list.");
+            byte[] raw = Fetch(m.Tag, "setup-files.json");
+            if (!string.Equals(Sha256(raw), f.Sha256, StringComparison.OrdinalIgnoreCase))
+                throw new Exception("setup-files.json of " + m.Tag + " is not the one its signed release record lists.");
+            GameList list = JsonSerializer.Deserialize(raw, VeloJson.Default.GameList);
+            if (list == null || list.Schema != 1 || list.Files == null)
+                throw new Exception("setup-files.json of " + m.Tag + " is not a list this launcher reads.");
+            if (!string.Equals(list.Commit, m.Commit, StringComparison.OrdinalIgnoreCase))
+                throw new Exception("setup-files.json of " + m.Tag + " was built from " + list.Commit + ", and the release from " + m.Commit + ".");
+            return list;
+        }
     }
 
     /// <summary>
     /// The JSON the Velopack update reads, compiled when the launcher builds
     /// (no reflection, so it works in the native build): the release record,
-    /// the game list, and GitHub's list of Releases (VeloUpdate.cs).
+    /// the game and setup lists, and GitHub's list of Releases (VeloUpdate.cs).
     /// </summary>
     [JsonSerializable(typeof(VeloRecord.Manifest))]
     [JsonSerializable(typeof(VeloRecord.GameList))]
