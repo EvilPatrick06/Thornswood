@@ -278,7 +278,14 @@ public sealed class AgentTests : IDisposable
     public void Dispose()
     {
         foreach (var o in owned) o.Dispose();
-        foreach (var d in temp) try { Directory.Delete(d, true); } catch (IOException) { }
+        foreach (var d in temp)
+        {
+            // git writes its object files read only, and Windows will not
+            // delete a read-only file (TablesTreeIsGitsTreeId makes a repository).
+            foreach (var f in Directory.EnumerateFiles(d, "*", SearchOption.AllDirectories))
+                File.SetAttributes(f, File.GetAttributes(f) & ~FileAttributes.ReadOnly);
+            try { Directory.Delete(d, true); } catch (IOException) { }
+        }
     }
 
     static string Sha(byte[] b) => Convert.ToHexStringLower(SHA256.HashData(b));
