@@ -348,7 +348,7 @@ namespace Thornswood
             return Tip(cfg, tip, tag, 60000);
         }
 
-        // THE WATCH'S OWN CONNECTION (#2440, WatchGroup until #4825). The .NET
+        // THE WATCH'S OWN CONNECTION (#2440, WatchGroup until #4823). The .NET
         // Framework let a program keep two connections to a host at a time,
         // and the watch, holding one all the time, left the Play page's
         // gallery, pictures, voice token and news to take turns on the other,
