@@ -376,7 +376,10 @@ choice:
   looks every ten minutes until the fork's wake has run for real. Each look
   asks GitHub what the pin needs
   (`scripts\release\EnginePin.ps1`, `Get-EnginePinStep`): nothing, when main
-  pins the fork's head or the fork is still building it; wait, when another
+  pins the fork's head, or when the fork is still building it and no earlier
+  head since the pin is built; while the head builds, the newest earlier
+  head the fork built green goes first, so a fork merge during a build never
+  holds the pin back, and the head follows when its build ends; wait, when another
   open pull request moves `engine/skymp` (a pin made by hand goes first);
   start `engine.yml` for the head, when the fork built it green and nothing
   recorded it; move the pin, when `engine.yml` recorded it green.

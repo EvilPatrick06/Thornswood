@@ -187,7 +187,8 @@ function Get-EnginePinValue($Object, [string]$Name) {
 #   aside      another open pull request moves engine/skymp: it goes first
 #   ready      engine-pin/next already pins the head (Pr says whether a pull
 #              request is open from it)
-#   building   the fork is still building the head
+#   building   the fork is still building the head, and no earlier head
+#              since the pin is built either
 #   no-build   the fork has no build of the head to record, or it ended red
 #   record     the head is built and nothing recorded it: start engine.yml
 #   recording  engine.yml is recording the head
@@ -195,13 +196,49 @@ function Get-EnginePinValue($Object, [string]$Name) {
 #   red        engine.yml's newest run for the head ended red
 # Why says it in a sentence. A red is never started again by this: that run
 # is a failure to fix at its cause, and the next fork head starts afresh.
+#
+# Head is the commit the step is about, and ForkHead the fork's head. They
+# differ only while the head is still building. The fork's push build takes
+# 20 to 45 minutes, so a fork merge inside that time would leave the pin
+# waiting until merges stopped. On 1 Nov 2026 d566413 was built at 1:59 AM
+# UTC and was the head until 561ca60 merged at 2:18 AM: no tick looked in
+# between, and the pin waited again. So while the head builds, the newest
+# earlier head since the pin that the fork built green
+# (Find-EnginePinBuiltBefore) is recorded and pinned, and the head follows
+# when its build ends.
+function Find-EnginePinBuiltBefore([string]$Pin, [string]$ForkHead, [scriptblock]$Get) {
+    $list = & $Get ("repos/{0}/actions/workflows/{1}/runs?event=push&branch={2}&status=success&per_page=10" -f $ForkEngineRepo, $ForkEngineWorkflow, [Uri]::EscapeDataString($ForkEngineBranch))
+    $seen = @{}
+    foreach ($run in @(@(Get-EnginePinValue $list 'workflow_runs') | Where-Object {
+                $_ -and [string]$_.event -eq 'push' -and [string]$_.head_branch -eq $ForkEngineBranch -and [string]$_.conclusion -eq 'success' -and
+                [string](Get-EnginePinValue (Get-EnginePinValue $_ 'repository') 'full_name') -eq $ForkEngineRepo
+            } | Sort-Object { [long]$_.id } -Descending)) {
+        $sha = ([string]$run.head_sha).ToLowerInvariant()
+        if ($sha -notmatch '^[0-9a-f]{40}$' -or $sha -eq $ForkHead -or $sha -eq $Pin -or $seen[$sha]) { continue }
+        $seen[$sha] = $true
+        # On the branch's line from the pin to the head: the head is ahead
+        # of it, and it is ahead of the pin. An older build, or one of a
+        # commit the branch lost to a force push, is never the target.
+        $toHead = & $Get ("repos/{0}/compare/{1}...{2}" -f $ForkEngineRepo, $sha, $ForkHead)
+        if ([string](Get-EnginePinValue $toHead 'status') -ne 'ahead') { continue }
+        $fromPin = & $Get ("repos/{0}/compare/{1}...{2}" -f $ForkEngineRepo, $Pin, $sha)
+        # Not ahead of the pin, on the head's line: it and every older build
+        # are the pin or behind it.
+        if ([string](Get-EnginePinValue $fromPin 'status') -ne 'ahead') { break }
+        $b = Find-ForkEngineBuild $sha $Get
+        if ($b.State -eq 'found') { return [pscustomobject]@{ Commit = $sha; Build = $b } }
+    }
+    return $null
+}
+
 function Get-EnginePinStep([string]$Pin, [scriptblock]$Get) {
     $fork = $ForkEngineRepo
     $branch = & $Get ("repos/{0}/branches/{1}" -f $fork, [uri]::EscapeDataString($ForkEngineBranch))
     $head = ([string](Get-EnginePinValue (Get-EnginePinValue $branch 'commit') 'sha')).ToLowerInvariant()
     if ($head -notmatch '^[0-9a-f]{40}$') { throw "GitHub gave no head for $fork $ForkEngineBranch" }
-    $r = [ordered]@{ Step = ''; Head = $head; Pin = $Pin; Run = $null; Pr = $null; Why = '' }
-    function Done($step, $why) { $r.Step = $step; $r.Why = $why; return [pscustomobject]$r }
+    $r = [ordered]@{ Step = ''; Head = $head; ForkHead = $head; Pin = $Pin; Run = $null; Pr = $null; Why = '' }
+    $also = ''
+    function Done($step, $why) { $r.Step = $step; $r.Why = $(if ($also) { $why.TrimEnd('.') + '.' + $also } else { $why }); return [pscustomobject]$r }
     if ($head -eq $Pin) { return (Done 'pinned' "main pins the fork's head $($head.Substring(0, 12)) already") }
 
     $ours = $null
@@ -225,7 +262,14 @@ function Get-EnginePinStep([string]$Pin, [scriptblock]$Get) {
     $b = Find-ForkEngineBuild $head $Get
     if ($b.State -ne 'found') {
         $going = $b.Run -and [string]$b.Run.status -ne 'completed'
-        return (Done $(if ($going) { 'building' } else { 'no-build' }) $b.Why)
+        if (-not $going) { return (Done 'no-build' $b.Why) }
+        $before = Find-EnginePinBuiltBefore $Pin $head $Get
+        if (-not $before) { return (Done 'building' $b.Why) }
+        $also = (" The fork's head {0} is still building and follows once it is built: {1}" -f $head.Substring(0, 12), $b.Run.html_url)
+        $head = $before.Commit; $b = $before.Build; $r.Head = $head
+        if ($at -and ([string](Get-EnginePinValue $at 'sha')).ToLowerInvariant() -eq $head) {
+            return (Done 'ready' ("$EnginePinBranch already pins $($head.Substring(0, 12)), the newest head the fork built" + $(if ($ours) { ", in pull request #$($ours.number)" } else { ', and no pull request is open from it' }) + '.'))
+        }
     }
     $title = "Engine build of $head"
     $runs = @(@(Get-EnginePinValue (& $Get ("repos/{0}/actions/workflows/engine.yml/runs?branch=main&per_page=50" -f $EnginePinThornswood)) 'workflow_runs') |
