@@ -1742,6 +1742,10 @@ try:
     yes('  and its comments and new issues go to the name it has now',
         wrote == [bot.GITHUB_API + '/repos/ThornswoodRP/Thornswood/issues/2216/comments',
                   bot.GITHUB_API + '/repos/ThornswoodRP/Thornswood/issues'])
+    yes('  and the bot can say which kind of token it has, never the token',
+        [bot.github_token_kind(t) for t in
+         ('github_pat_x', 'ghp_x', 'ghs_x', 'gho_x', '', 'zzz')] ==
+        ['fine-grained', 'classic', 'app installation', 'oauth', 'no', 'unknown'])
     REPO_NOW[0] = 'EvilPatrick06/Thornswood'
     bot._KNOWN_REPO_NOW['name'] = ''
 

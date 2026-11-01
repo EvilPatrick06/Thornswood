@@ -4658,6 +4658,20 @@ def is_known_repo(name, get=None):
     return name == known_repo_now(get, again=True).lower()
 
 
+def github_token_kind(token=None):
+    """What kind of token GITHUB_TOKEN is, by its prefix, never the token.
+       A fine-grained token is bound to one owner and reaches nothing of the
+       repository once it moves to another (#5184), so the bot says the kind
+       at start, where Get-Logs reads it."""
+    token = os.environ.get('GITHUB_TOKEN', '') if token is None else token
+    token = str(token).strip()
+    for prefix, kind in (('github_pat_', 'fine-grained'), ('ghp_', 'classic'),
+                         ('ghs_', 'app installation'), ('gho_', 'oauth')):
+        if token.startswith(prefix):
+            return kind
+    return 'no' if not token else 'unknown'
+
+
 def github_issue(number, get=None):
     get = get or _github_get
     return get('%s/repos/%s/issues/%d' % (GITHUB_API, KNOWN_REPO, int(number)))
@@ -7794,6 +7808,7 @@ async def on_ready():
         asyncio.create_task(watch_lines())
 
     log('up as %s' % client.user)
+    log('github: the issues of %s, with a %s token' % (KNOWN_REPO, github_token_kind()))
 
     await register_commands()
 
