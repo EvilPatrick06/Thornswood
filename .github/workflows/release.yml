@@ -73,13 +73,15 @@
 # commit>), so pushing a tag still starts a signed release, through main.
 #
 # DEV NUMBERS (#3312). A dev Ship's launcher carries a fourth number
-# (1.2.6.7) that only ever lives in the dev feed: Ship works it out from what
-# main and dev have published and writes it into Updater.cs before it builds.
-# A Ship that cannot build here (the cloud) asks for the tag v<that number>
-# on main's commit (release-tag.yml makes it, since a cloud session cannot
-# push one), and the step "Put the tag's number in Updater.cs" writes it in
-# the same way Ship does. A three part tag is a main release and must be the
-# number Updater.cs already says (Bump-Version.ps1 moved it).
+# (2026.1101.1745.7) that only ever lives in the dev feed: Ship works it out
+# from what main and dev have published. A Ship that cannot build here (the
+# cloud) asks for the tag v<that number> on main's commit (release-tag.yml
+# makes it, since a cloud session cannot push one). Since #5179 main's number
+# is not committed either: it is the time the launcher's sources last changed
+# at the tag's commit (scripts\release\LauncherVersion.ps1), which needs the
+# history this checkout fetches. A three part tag is a main release and must
+# be that number; a four part one starts with it. Build-Launcher.ps1 -Version
+# writes it in for the compile, the same way Ship does.
 #
 # CHECKED ON A SECOND MACHINE (#2163, "a clean machine verifies"). When the
 # build drafted a signed launcher, the "verify" job downloads the draft's
@@ -235,37 +237,34 @@ jobs:
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("tag=" + $tag)
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("commit=" + $commit)
 
-      # DEV NUMBERS (header). Ship.ps1's own replace, so the exe built here
-      # carries its number exactly as one built by a dev Ship on One would.
-      - name: Put the tag's number in Updater.cs
+      # DEV NUMBERS (header). The tag's number against the launcher's own at
+      # this commit (scripts\release\LauncherVersion.ps1, #5179), which is
+      # what Ship.ps1 asked the tag for: a main tag is that number, a dev tag
+      # that number with a fourth part. Build-Launcher.ps1 writes it in for
+      # the compile and puts git's 0.0.0 back.
+      - name: Hold the tag's number to the launcher's
+        id: number
         shell: pwsh
         env:
           RELEASE_TAG: ${{ steps.tag.outputs.tag }}
         run: |
           $want = $env:RELEASE_TAG.Substring(1)
           if ($want -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') { Write-Host "::error::tag $($env:RELEASE_TAG) is not v<a.b.c> (main) or v<a.b.c.d> (dev)"; exit 1 }
-          $cs = 'launcher\app\Updater.cs'
-          $src = [IO.File]::ReadAllText($cs)
-          $m = [regex]::Match($src, 'Version\s*=\s*"([^"]+)"')
-          if (-not $m.Success) { Write-Host '::error::could not read the version out of launcher\app\Updater.cs'; exit 1 }
-          $have = $m.Groups[1].Value
+          . .\scripts\release\LauncherVersion.ps1
+          try { $main = Get-LauncherVersion -RepoDir . }
+          catch { Write-Host ('::error::' + $_.Exception.Message); exit 1 }
           $parts = $want.Split('.')
-          if ($parts.Count -eq 3) {
-            if ($have -ne $want) { Write-Host "::error::$($env:RELEASE_TAG) is a main release, and Updater.cs at its commit says $have. Move it with Bump-Version.ps1 and its pull request, then tag that."; exit 1 }
-            Write-Host "Updater.cs says $want, the tag's number"
-            exit 0
-          }
-          # A dev number climbs from the higher of the commit's number and
-          # main's published one (Ship.ps1), so it is never below the commit's.
-          if ([version](($parts[0..2]) -join '.') -lt [version]$have) { Write-Host "::error::dev number $want is below the $have Updater.cs says at this commit"; exit 1 }
-          $src = $src -replace 'Version\s*=\s*"[^"]+"', ('Version = "' + $want + '"')
-          [IO.File]::WriteAllText((Resolve-Path $cs).Path, $src, (New-Object Text.UTF8Encoding $false))
-          Write-Host "Updater.cs: $have -> $want (a dev number, as a dev Ship writes it)"
+          $base = ($parts[0..2]) -join '.'
+          if ($parts.Count -eq 3 -and $want -ne $main) { Write-Host "::error::$($env:RELEASE_TAG) is a main release, and the launcher's number at this commit is $main (LauncherVersion.ps1). A main tag is that number and no other."; exit 1 }
+          if ($parts.Count -eq 4 -and $base -ne $main) { Write-Host "::error::dev number $want does not start with $main, the launcher's number at this commit (LauncherVersion.ps1)"; exit 1 }
+          Write-Host "the launcher's number at this commit is $main; this builds $want"
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ('version=' + $want)
 
       - name: Build the launcher into RUNNER_TEMP
         shell: pwsh
         env:
           RUNNER_KIND: ${{ runner.environment }}
+          LAUNCHER_VERSION: ${{ steps.number.outputs.version }}
         run: |
           # RUNNER_TEMP, not a real install root, so Install-Launcher is never
           # run and no Desktop shortcut, icon cache or Stop-Game is touched.
@@ -275,7 +274,7 @@ jobs:
           Write-Host ("building with MSBuild on a {0} runner" -f $env:RUNNER_KIND)
           $root = Join-Path $env:RUNNER_TEMP 'Thornswood'
           New-Item -ItemType Directory -Force -Path (Join-Path $root 'Launcher') | Out-Null
-          .\scripts\release\Build-Launcher.ps1 -Root $root -NoSign -NoPause
+          .\scripts\release\Build-Launcher.ps1 -Root $root -NoSign -NoPause -Version $env:LAUNCHER_VERSION
           if ($LASTEXITCODE -ne 0) { Write-Host "::error::Build-Launcher.ps1 failed"; exit 1 }
           $exe = Join-Path $root 'Launcher\Thornswood.exe'
           if (-not (Test-Path $exe)) { Write-Host '::error::no Thornswood.exe came out of the build'; exit 1 }

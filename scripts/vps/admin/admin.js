@@ -18,7 +18,7 @@
                     runners }: the runners it lists (thornswood-vps is 1,
                     thornswood-vps-<n> is n) carry the label and no other
                     runner does. The runners are registered to the private
-                    ops repository, EvilPatrick06/Thornswood-Ops, since
+                    ops repository, ThornswoodRP/Thornswood-Ops, since
                     this one went public (#4013, Patrick's A on #3685).
                     records/build-runners.json is the build cap
                     (#2994). A record may also list off-box runners by
@@ -63,7 +63,7 @@
                     secret_scanning, secret_scanning_push_protection,
                     allow_auto_merge, collaborators: [login] }] },
                     for Thornswood and
-                    the engine fork, EvilPatrick06/skymp, and no other
+                    the engine fork, ThornswoodRP/skymp, and no other
                     repository: each ruleset an entry names is on GitHub
                     with exactly its target, enforcement, conditions, rules
                     and bypass list, made or put back by name, and private
@@ -180,15 +180,26 @@ const PLAIN = 'box admin: not here';
 
 // Where the records are, and where the runners and the workflow that asks
 // are (#4013).
-const REPO = 'EvilPatrick06/Thornswood';
-const RUNNERS_REPO = 'EvilPatrick06/Thornswood-Ops';
-const OWNER = 'EvilPatrick06';
+const REPO = 'ThornswoodRP/Thornswood';
+const RUNNERS_REPO = 'ThornswoodRP/Thornswood-Ops';
+// The owner of the repositories (#5184).
+const OWNER = 'ThornswoodRP';
+// Patrick's own login, which owns the App and holds the organization. He is
+// never a collaborator a record lists and never one this takes off: after
+// the move into the organization GitHub may list him beside the others.
+const HOLDER = 'EvilPatrick06';
+// A run is known by its repository's id, which GitHub never changes, not by
+// its owner/name, which a move into the ThornswoodRP organization changes
+// (#5184): matched by name, the box refused every admin run the moment the
+// ops repository moved, until this file was changed and the service put back
+// by hand. The workflow must be that same repository's own github-admin.yml
+// on main, so it is checked against the name the token itself carries.
 const RULES = {
   iss: 'https://token.actions.githubusercontent.com',
   aud: 'thornswood-admin',
-  repository: RUNNERS_REPO,
+  repositoryId: '1435123931', // ThornswoodRP/Thornswood-Ops (repos API, 1 Nov 2026)
   ref: 'refs/heads/main',
-  workflow: RUNNERS_REPO + '/.github/workflows/github-admin.yml@refs/heads/main',
+  workflow: '/.github/workflows/github-admin.yml@refs/heads/main',
   events: ['workflow_dispatch'],
 };
 // The labels every VPS runner carries, or GitHub gives itself; a record may
@@ -282,9 +293,9 @@ function verifyOidc(token, jwks, now, rules) {
   if (aud.indexOf(rules.aud) < 0) throw new Error('for the audience ' + aud.join(', '));
   if (!(Number(claims.exp) > now)) throw new Error('expired');
   if (claims.nbf !== undefined && Number(claims.nbf) > now + 60) throw new Error('not valid yet');
-  if (claims.repository !== rules.repository) throw new Error('from ' + claims.repository);
+  if (String(claims.repository_id) !== rules.repositoryId || !claims.repository) throw new Error('from ' + claims.repository + ' (repository id ' + claims.repository_id + ')');
   if (claims.ref !== rules.ref) throw new Error('from ' + claims.ref + ', not ' + rules.ref);
-  if (claims.job_workflow_ref !== rules.workflow) throw new Error('from the workflow ' + claims.job_workflow_ref);
+  if (claims.job_workflow_ref !== claims.repository + rules.workflow) throw new Error('from the workflow ' + claims.job_workflow_ref);
   if (rules.events.indexOf(claims.event_name) < 0) throw new Error('started by ' + claims.event_name);
   return claims;
 }
@@ -422,7 +433,7 @@ function checkCollaborators(repo, list) {
   for (const x of list) {
     if (typeof x !== 'string' || !LOGIN.test(x)) throw new Error(at + ': ' + JSON.stringify(x) + ' is not a GitHub login');
     const k = x.toLowerCase();
-    if (k === OWNER.toLowerCase()) throw new Error(at + ': the owner, ' + OWNER + ', is not a collaborator and is never listed');
+    if (k === OWNER.toLowerCase() || k === HOLDER.toLowerCase()) throw new Error(at + ': ' + x + ' owns these repositories, is not a collaborator and is never listed');
     if (seen[k]) throw new Error(at + ' names the collaborator ' + x + ' twice');
     seen[k] = true;
   }
@@ -438,7 +449,7 @@ function checkCollaborators(repo, list) {
 // GitHub's do. The owner is never dropped.
 function planCollaborators(list, have, invites) {
   const named = k => list.some(x => x.toLowerCase() === k.toLowerCase());
-  const logins = have.map(c => String(c.login)).filter(l => l.toLowerCase() !== OWNER.toLowerCase());
+  const logins = have.map(c => String(c.login)).filter(l => l.toLowerCase() !== OWNER.toLowerCase() && l.toLowerCase() !== HOLDER.toLowerCase());
   const asked = invites.map(i => ({ id: i.id, login: String((i.invitee && i.invitee.login) || '') }));
   const right = list.filter(x => logins.some(l => l.toLowerCase() === x.toLowerCase()));
   const missing = list.filter(x => !right.includes(x) && !asked.some(i => i.login.toLowerCase() === x.toLowerCase()));
@@ -523,7 +534,25 @@ function planAbout(rec, repo, topics) {
 // ------------------------------------------------------------------ GitHub --
 // One HTTPS call. Resolves { status, body } with the body parsed when it is
 // JSON; never rejects for a status, only when nothing answered.
-function call(method, url, headers, body) {
+// GitHub answers a request to a repository that moved (a rename, or the move
+// into the Thornswood organization, #5184) with a redirect to where it is
+// now, and its REST guide says a client follows it: 301, 302 and 303 for a
+// read, 307 and 308 for anything, with the same method and body. Only one on
+// the same host as the request is followed, so the App's or a run's token
+// never goes anywhere else, and at most five, so a loop ends.
+const REDIRECTS = 5;
+function call(method, url, headers, body, hops) {
+  return send(method, url, headers, body).then(a => {
+    const to = a.location ? new URL(a.location, url) : null;
+    const read = method === 'GET' || method === 'HEAD';
+    const follows = to && ([307, 308].includes(a.status) || (read && [301, 302, 303].includes(a.status)));
+    if (!follows) return { status: a.status, body: a.body };
+    if (to.host !== new URL(url).host) return { status: a.status, body: { message: 'redirected to another host, ' + to.host + ', which is not followed' } };
+    if ((hops || 0) >= REDIRECTS) return { status: a.status, body: { message: 'redirected more than ' + REDIRECTS + ' times' } };
+    return call(method, to.toString(), headers, body, (hops || 0) + 1);
+  });
+}
+function send(method, url, headers, body) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
     const data = body === undefined ? null : Buffer.from(JSON.stringify(body));
@@ -536,7 +565,7 @@ function call(method, url, headers, body) {
         const text = Buffer.concat(chunks).toString('utf8');
         let parsed = text;
         if (text.trim()) { try { parsed = JSON.parse(text); } catch (e) { parsed = text; } } else parsed = null;
-        resolve({ status: res.statusCode, body: parsed });
+        resolve({ status: res.statusCode, body: parsed, location: res.headers.location });
       });
     });
     req.on('timeout', () => req.destroy(new Error(method + ' ' + u.pathname + ' had no answer in 30 seconds')));
@@ -1163,9 +1192,9 @@ async function setupDone(res, q, now) {
     return;
   }
   const owner = a.body.owner && a.body.owner.login;
-  if (owner !== OWNER) {
+  if (owner !== HOLDER) {
     log('setup: refused an App made by ' + owner);
-    page(res, 403, 'Not this App', '<p>That App belongs to ' + esc(owner) + ', not ' + OWNER + ', so nothing was kept.</p>');
+    page(res, 403, 'Not this App', '<p>That App belongs to ' + esc(owner) + ', not ' + HOLDER + ', so nothing was kept.</p>');
     return;
   }
   fs.writeFileSync(path.join(STATE, 'key.pem'), a.body.pem, { mode: 0o600 });
@@ -1288,5 +1317,5 @@ function serve() {
   return server;
 }
 
-module.exports = { verifyOidc, appJwt, planCollaborators, planPublic, publicStops, PUBLIC_DROPS, OPS_COPIES, PUBLIC_KEEPS, planLabels, planLeftovers, checkRecords, checkAbout, planAbout, runnerNumber, checkRulesets, checkSettings, planRulesets, rulesetBody, says, manifest, RULES, ASKS, REPO, RUNNERS_REPO, SETTINGS_REPOS, SCANNING_KEYS, MERGE_KEYS, SETTINGS_PERMISSIONS, SETTINGS_EXTRA, serve };
+module.exports = { verifyOidc, appJwt, call, planCollaborators, planPublic, publicStops, PUBLIC_DROPS, OPS_COPIES, PUBLIC_KEEPS, planLabels, planLeftovers, checkRecords, checkAbout, planAbout, runnerNumber, checkRulesets, checkSettings, planRulesets, rulesetBody, says, manifest, RULES, ASKS, REPO, RUNNERS_REPO, SETTINGS_REPOS, SCANNING_KEYS, MERGE_KEYS, SETTINGS_PERMISSIONS, SETTINGS_EXTRA, serve };
 if (require.main === module) serve();

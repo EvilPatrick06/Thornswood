@@ -33,7 +33,7 @@ param(
   # Another repository whose release assets to look at. Thornswood-Releases
   # was the default until #907 deleted it.
   [string]$Repo = '',
-  [string]$SourceRepo = 'EvilPatrick06/Thornswood',
+  [string]$SourceRepo = 'ThornswoodRP/Thornswood',
   [string]$BackupDir,
   # Where releases stage, one <install root's name>\_dist each: Where.ps1 Dist.
   [string]$DistRoot,

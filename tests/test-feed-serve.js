@@ -211,7 +211,7 @@ async function main() {
   // Once the feed's release has a public GitHub Release holding the asset at
   // this size, the route answers 302 to it, and sends no bytes (#3686).
   const TAG = 'release/main/20261026-170000';
-  const COPY = 'https://github.com/EvilPatrick06/Thornswood/releases/download/' + TAG + '/' + SHA;
+  const COPY = 'https://github.com/ThornswoodRP/Thornswood/releases/download/' + TAG + '/' + SHA;
   fs.writeFileSync(path.join(ROOT, 'feed', 'version', '00000003.json'),
     JSON.stringify({ launcherUrl: 'https://thornswood.net/feed/assets/' + SHA, release: { id: '20261026-170000', tag: TAG } }));
   const before = await ask('GET', '/feed/assets/' + SHA);

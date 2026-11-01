@@ -67,9 +67,14 @@ jobs:
     # downloads every mod of the collection), and the steps around it.
     timeout-minutes: 170
     steps:
+      # The history without the files' old contents, so Nexus.ps1 can work out
+      # the launcher's number it sends as Application-Version
+      # (LauncherVersion.ps1, #5179).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          fetch-depth: 0
+          filter: blob:none
 
       - name: Run the script
         shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"

@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The box deploy agent (#5180), in C# on .NET 10 (Patrick, 31 Oct 2026,
+    7:18 PM: the release and box tools share code with the new launcher).
+    docs/DEPLOY-AGENT.md says what it does. It carries the launcher's own
+    signature check, launcher/app/Signature.cs, compiled in from where it
+    lives, so the box holds a Release to exactly what every launcher holds an
+    update to.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <!-- Off for the linked Signature.cs; every file of the agent turns it on itself. -->
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>thornswood-agent</AssemblyName>
+    <RootNamespace>Thornswood.DeployAgent</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Signature.cs is .NET Framework code: platform and obsolete-API warnings are its own. -->
+    <NoWarn>$(NoWarn);CA1416;SYSLIB0057</NoWarn>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- The box is Windows x64; naming it here keeps it in packages.lock.json. -->
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <!-- It ships as one file (dotnet publish -p:PublishSingleFile=true). The
+         single-file analyzer is off: it brings in Microsoft.NET.ILLink.Tasks at
+         the installed SDK's own version, so packages.lock.json would hold
+         only on a machine with that exact SDK (the gate's Windows runner had
+         10.0.13 where the lock said 10.0.14). The agent finds its folder by
+         AppContext.BaseDirectory and Environment.ProcessPath, which hold in
+         one file. -->
+    <EnableSingleFileAnalyzer>false</EnableSingleFileAnalyzer>
+    <!-- Set by the workflow: -p:Version=1.0.<run> -p:ExpectedSigner=<name>. -->
+    <Version Condition="'$(Version)' == ''">0.0.0</Version>
+    <ExpectedSigner Condition="'$(ExpectedSigner)' == ''"></ExpectedSigner>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\launcher\app\Signature.cs" Link="Signature.cs" />
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>ExpectedSigner</_Parameter1>
+      <_Parameter2>$(ExpectedSigner)</_Parameter2>
+    </AssemblyAttribute>
+    <InternalsVisibleTo Include="DeployAgent.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.14" />
+  </ItemGroup>
+</Project>

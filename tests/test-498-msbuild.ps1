@@ -23,8 +23,10 @@
        menu theme's decoder, #3207), and nothing restored;
     5. the PE kind (AnyCPU, not 32 bit preferred, GUI subsystem 4.00, high
        entropy ASLR off), no TargetFrameworkAttribute, the entry point;
-    6. the file details Windows shows carry Updater.cs's version, and the
-       application manifest's identity carries it too;
+    6. the file details Windows shows carry the number the build was given
+       (-Version, written into Updater.cs for the compile, #5179), the
+       application manifest's identity carries it too, and Updater.cs is
+       byte for byte what git holds again afterwards;
     7. a win32 icon, nothing beside the launcher but its pdb, and
        tests\test-app-manifest.ps1 and scripts\dev\Check-Secrets.ps1 -Binary
        pass on the pair.
@@ -153,11 +155,20 @@ $root = Join-Path $Scratch 'build'
 $stub = Join-Path $root 'setup-stub.exe'
 $exe = Join-Path $root 'Launcher\Thornswood.exe'
 if (Test-Path -LiteralPath $root) { Remove-Item -LiteralPath $root -Recurse -Force }
-$said = & $pwsh -NoProfile -File $blPath -Root $root -StubOut $stub -NoSign -NoPause 2>&1 | Out-String
+# A number given, not worked out from git: the build check's checkout has no
+# history (tests\test-launcher-version.ps1 holds the rule that works it out).
+$updaterPath = Join-Path $repo 'launcher\app\Updater.cs'
+$updaterBefore = [IO.File]::ReadAllBytes($updaterPath)
+$ver = '2026.1101.1745'
+$said = & $pwsh -NoProfile -File $blPath -Root $root -StubOut $stub -NoSign -NoPause -Version $ver 2>&1 | Out-String
 $rc = $LASTEXITCODE
 Yes "Build-Launcher.ps1 built both exes (exit $rc)" ($rc -eq 0 -and (Test-Path -LiteralPath $exe) -and (Test-Path -LiteralPath $stub))
 if ($rc -ne 0) { Write-Host $said }
 Yes 'it signed nothing (-NoSign)' ($said -match 'not signing: -NoSign')
+$updaterAfter = [IO.File]::ReadAllBytes($updaterPath)
+Yes 'Updater.cs is byte for byte what it was before the build, git''s 0.0.0' (
+    [Convert]::ToBase64String($updaterAfter) -eq [Convert]::ToBase64String($updaterBefore) -and
+    [Text.Encoding]::UTF8.GetString($updaterAfter) -match 'Version\s*=\s*"0\.0\.0"')
 if (-not (Test-Path -LiteralPath $exe) -or -not (Test-Path -LiteralPath $stub)) { Done }
 
 # ---- reading an exe -------------------------------------------------------
@@ -416,8 +427,6 @@ function Manifest-Xml([string]$path) {
 }
 function Sha([string]$path) { (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() }
 
-$updater = [IO.File]::ReadAllText((Join-Path $repo 'launcher\app\Updater.cs'))
-$ver = [regex]::Match($updater, 'Version\s*=\s*"([0-9.]+)"').Groups[1].Value
 $verFour = $ver
 while (($verFour -split '\.').Count -lt 4) { $verFour = "$verFour.0" }
 
@@ -442,8 +451,8 @@ foreach ($kind in @(@{ Path = $exe; Name = 'the launcher'; Res = $appResources; 
     $ic = [Thornswood498.Describe]::Icons($p)
     Yes "$($kind.Name): the exe carries an icon group and its images" (@($ic | Where-Object { $_ -like 'group *' }).Count -eq 1 -and @($ic | Where-Object { $_ -like 'icon *' }).Count -ge 1)
     $vi = (Get-Item -LiteralPath $p).VersionInfo
-    Yes ("$($kind.Name): FileVersion is Updater.cs's, {0}" -f $vi.FileVersion) ($vi.FileVersion -eq $verFour)
-    Yes ("$($kind.Name): ProductVersion is Updater.cs's, {0}" -f $vi.ProductVersion) ($vi.ProductVersion -eq $ver)
+    Yes ("$($kind.Name): FileVersion is the number it was built with, {0}" -f $vi.FileVersion) ($vi.FileVersion -eq $verFour)
+    Yes ("$($kind.Name): ProductVersion is the number it was built with, {0}" -f $vi.ProductVersion) ($vi.ProductVersion -eq $ver)
     Yes ("$($kind.Name): OriginalFilename is the name it ships under, {0}" -f $vi.OriginalFilename) ($vi.OriginalFilename -eq $kind.File)
     $m = Manifest-Xml $p
     $ident = if ($m) { $m.DocumentElement.SelectSingleNode("*[local-name()='assemblyIdentity']") } else { $null }
@@ -454,7 +463,7 @@ Write-Host ''
 $left = @(Get-ChildItem -LiteralPath (Split-Path -Parent $exe) -File | ForEach-Object { $_.Name } | Sort-Object)
 Yes ('nothing beside the launcher but its pdb: ' + ($left -join ', ')) ((Same $left @('Thornswood.exe', 'Thornswood.pdb')))
 
-$said = & $pwsh -NoProfile -File (Join-Path $repo 'tests\test-app-manifest.ps1') -Exe $exe -Stub $stub -Scratch (Join-Path $Scratch 'manifest') 2>&1 | Out-String
+$said = & $pwsh -NoProfile -File (Join-Path $repo 'tests\test-app-manifest.ps1') -Exe $exe -Stub $stub -Version $ver -Scratch (Join-Path $Scratch 'manifest') 2>&1 | Out-String
 Yes 'tests\test-app-manifest.ps1 passes on the pair' ($LASTEXITCODE -eq 0)
 if ($LASTEXITCODE -ne 0) { Write-Host $said }
 $said = & (Join-Path $repo 'scripts\dev\Check-Secrets.ps1') -Binary @($exe, $stub) 2>&1 | Out-String

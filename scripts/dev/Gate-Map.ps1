@@ -39,7 +39,7 @@
   The folder to write the newest map into. Whatever is there goes.
 
 .PARAMETER Repository
-  owner/name, GITHUB_REPOSITORY by default, else EvilPatrick06/Thornswood.
+  owner/name, GITHUB_REPOSITORY by default, else ThornswoodRP/Thornswood.
 
 .PARAMETER Api
   GitHub's API, https://api.github.com by default (the harness stands in).
@@ -63,7 +63,7 @@ function Say([string]$m) { Write-Host $m }
 $Token = [string]$env:GATE_MAP_TOKEN
 Remove-Item -LiteralPath Env:GATE_MAP_TOKEN -ErrorAction SilentlyContinue
 
-if (-not $Repository) { $Repository = 'EvilPatrick06/Thornswood' }
+if (-not $Repository) { $Repository = 'ThornswoodRP/Thornswood' }
 if (-not $Token) { Say 'No token to read main''s gate map on GitHub with.'; exit 1 }
 if ($Repository -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') { Say ('No repository to look in (' + $Repository + ').'); exit 1 }
 $headers = @{ Authorization = ('Bearer ' + $Token); Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }

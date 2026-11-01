@@ -129,7 +129,7 @@ function Invoke-RestMethod {
         $flows = [pscustomobject]@{ nodes = @([pscustomobject]@{ name = 'Item closed'; enabled = $true }, [pscustomobject]@{ name = 'Auto-close issue'; enabled = $false }) }
         return [pscustomobject]@{ data = [pscustomobject]@{ user = [pscustomobject]@{ projectV2 = [pscustomobject]@{ title = 'Thornswood To Do'; url = 'https://github.com/users/EvilPatrick06/projects/1'; status = $status; workflows = $flows } } } }
     }
-    $repo = [pscustomobject]@{ nameWithOwner = 'EvilPatrick06/Thornswood' }
+    $repo = [pscustomobject]@{ nameWithOwner = 'ThornswoodRP/Thornswood' }
     if (-not $b.variables.c) {
         $nodes = @(
             [pscustomobject]@{ isArchived = $false; status = [pscustomobject]@{ name = 'In Progress' }; order = [pscustomobject]@{ number = 52.5 }; content = [pscustomobject]@{ __typename = 'Issue'; number = 3192; title = 'Review the board'; state = 'OPEN'; repository = $repo } }
@@ -210,7 +210,7 @@ try {
         Yes ("  one entry for every card on both pages ({0})" -f $items.Count) ($items.Count -eq 4)
         $i = @($items | Where-Object { $_.number -eq 3192 })
         Yes '  an issue card has its repository, number, kind, title, state, Status and Order' (
-            $i.Count -eq 1 -and $i[0].repo -eq 'EvilPatrick06/Thornswood' -and $i[0].kind -eq 'Issue' -and $i[0].title -eq 'Review the board' -and $i[0].state -eq 'OPEN' -and $i[0].status -eq 'In Progress' -and $i[0].order -eq 52.5 -and $i[0].archived -eq $false)
+            $i.Count -eq 1 -and $i[0].repo -eq 'ThornswoodRP/Thornswood' -and $i[0].kind -eq 'Issue' -and $i[0].title -eq 'Review the board' -and $i[0].state -eq 'OPEN' -and $i[0].status -eq 'In Progress' -and $i[0].order -eq 52.5 -and $i[0].archived -eq $false)
         $p = @($items | Where-Object { $_.number -eq 3121 })
         Yes '  a pull request card with no Status or Order has null for both' ($p.Count -eq 1 -and $p[0].kind -eq 'PullRequest' -and $p[0].state -eq 'MERGED' -and $null -eq $p[0].status -and $null -eq $p[0].order)
         $a = @($items | Where-Object { $_.number -eq 2863 })

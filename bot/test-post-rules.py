@@ -133,7 +133,7 @@ yes('no tags read: unknown', bot.fix_in_main(prs, [], lambda u: (_ for _ in ()).
 
 # A dev pass refuses: nothing posted, one comment, and none on the next pass
 ISSUE = {'number': 41, 'title': 'Log', 'state': 'open', 'updated_at': '2026-10-22T10:00:00Z',
-         'html_url': 'https://github.com/EvilPatrick06/Thornswood/issues/41', 'labels': []}
+         'html_url': 'https://github.com/ThornswoodRP/Thornswood/issues/41', 'labels': []}
 COMM = [{'body': 'Test task: Count the log\nServer: Dev\n1. Claude reads the log.',
          'created_at': '2026-10-22T09:00:00Z', 'html_url': 'c1'}]
 

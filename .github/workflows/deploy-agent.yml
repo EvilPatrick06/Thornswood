@@ -1,0 +1,160 @@
+# The box deploy agent (#5180): tests it on every pull request that touches
+# it, and on main builds, signs and publishes it as a Release the agent on the
+# box updates itself from. tools/DeployAgent holds the code (C# on .NET 10,
+# Patrick, 31 Oct 2026), tools/DeployAgent.Tests its tests, and
+# docs/DEPLOY-AGENT.md says how it works.
+#
+# PULL REQUESTS. dotnet test on Linux and on a Windows runner, which is where
+# it runs (sharing modes on files, the server folders' turn), from the locked
+# packages only. A change to launcher/app/Signature.cs runs this too, because
+# the agent compiles that file in as its signature check.
+#
+# MAIN. The same tests, then, in the "release" environment (its subject is
+# what the Azure federated credential trusts, and only main may use it,
+# #3930), a self-contained Windows build with the version 1.0.<run number>
+# and the expected signer read from launcher/app/Updater.cs built in, the
+# program signed with ThornswoodRelease (Sign-OnRunner.ps1), a manifest and
+# its catalog (New-SignedManifest.ps1), the catalog signed, and a Release
+# agent-v<version> with the program, manifest.json and manifest.cat. The
+# Release is never the repository's "latest". The agent on the box sees it
+# within UpdateMinutes, holds it to the signature and the manifest, and puts
+# it in place of itself; Install-DeployAgent installs it the first time.
+name: Deploy agent
+
+on:
+  pull_request:
+    paths:
+      - 'tools/DeployAgent/**'
+      - 'tools/DeployAgent.Tests/**'
+      - 'launcher/app/Signature.cs'
+      - '.github/workflows/deploy-agent.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/DeployAgent/**'
+      - 'tools/DeployAgent.Tests/**'
+      - 'launcher/app/Signature.cs'
+      - 'scripts/release/Sign-OnRunner.ps1'
+      - 'scripts/release/New-SignedManifest.ps1'
+      - '.github/workflows/deploy-agent.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-agent-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: Deploy agent tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      - name: test
+        env:
+          DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+          DOTNET_NOLOGO: '1'
+        run: |
+          dotnet restore tools/DeployAgent.Tests --locked-mode
+          dotnet test tools/DeployAgent.Tests --no-restore
+
+  # The agent's Windows half (sharing modes on files, the server folders'
+  # turn) runs for real only here.
+  test-windows:
+    name: Deploy agent tests (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      - name: test
+        env:
+          DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+          DOTNET_NOLOGO: '1'
+        run: |
+          dotnet restore tools/DeployAgent.Tests --locked-mode
+          dotnet test tools/DeployAgent.Tests --no-restore
+
+  release:
+    name: Sign and publish the deploy agent
+    needs: [test, test-windows]
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+    runs-on: windows-latest
+    environment: release
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build the agent with its version and the signer it trusts
+        id: build
+        shell: pwsh
+        run: |
+          $m = [regex]::Match([IO.File]::ReadAllText('launcher\app\Updater.cs'), 'ExpectedSigner\s*=\s*"([^"]+)"')
+          if (-not $m.Success) { Write-Host '::error::ExpectedSigner is not in launcher\app\Updater.cs'; exit 1 }
+          $version = '1.0.' + $env:GITHUB_RUN_NUMBER
+          $out = Join-Path $env:RUNNER_TEMP 'agent'
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $exe = Join-Path $out 'thornswood-agent.exe'
+          $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'; $env:DOTNET_NOLOGO = '1'
+          dotnet restore tools/DeployAgent -r win-x64 --locked-mode
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::dotnet restore failed'; exit 1 }
+          dotnet publish tools/DeployAgent -c Release -r win-x64 --self-contained --no-restore -o $out `
+            -p:PublishSingleFile=true -p:DebugType=none -p:Version=$version ("-p:ExpectedSigner=" + $m.Groups[1].Value)
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::dotnet publish failed'; exit 1 }
+          $said = & $exe version
+          if ($said -ne $version) { Write-Host "::error::the built agent says version $said, not $version"; exit 1 }
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("version=" + $version)
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("exe=" + $exe)
+      - name: Sign the agent
+        shell: pwsh
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_SIGNING_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_SIGNING_TENANT_ID }}
+          EXE: ${{ steps.build.outputs.exe }}
+        run: ./scripts/release/Sign-OnRunner.ps1 -Path $env:EXE
+      - name: Write the manifest and sign its catalog
+        shell: pwsh
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_SIGNING_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_SIGNING_TENANT_ID }}
+          EXE: ${{ steps.build.outputs.exe }}
+          VERSION: ${{ steps.build.outputs.version }}
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'agent-release'
+          ./scripts/release/New-SignedManifest.ps1 -Out $out -Tag ('agent-v' + $env:VERSION) -Commit $env:GITHUB_SHA -Part agent -Files $env:EXE -Version $env:VERSION
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          ./scripts/release/Sign-OnRunner.ps1 -Path (Join-Path $out 'manifest.cat')
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $st = [string](Test-FileCatalog -CatalogFilePath (Join-Path $out 'manifest.cat') -Path (Join-Path $out 'files'))
+          if ($st -ne 'Valid') { Write-Host "::error::the signed catalog does not hold manifest.json (Test-FileCatalog said $st)"; exit 1 }
+          Copy-Item -LiteralPath (Join-Path $out 'manifest.cat') -Destination (Join-Path $out 'assets\manifest.cat')
+      - name: Publish the Release agent-v${{ steps.build.outputs.version }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.build.outputs.version }}
+        run: |
+          $tag = 'agent-v' + $env:VERSION
+          $assets = Get-ChildItem -LiteralPath (Join-Path $env:RUNNER_TEMP 'agent-release\assets') -File | ForEach-Object { $_.FullName }
+          $notes = "The box deploy agent $($env:VERSION), built from $($env:GITHUB_SHA) and signed with ThornswoodRelease. The agent on the box updates itself from this Release. docs/DEPLOY-AGENT.md says how."
+          # A draft first, the files into it, then published: releases here are
+          # immutable once published (records/github-repo-settings.json, #3287).
+          gh release create $tag --draft --target $env:GITHUB_SHA --title "Deploy agent $($env:VERSION)" --notes $notes --latest=false
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::the draft $tag could not be made"; exit 1 }
+          gh release upload $tag @assets
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::the files could not go on the draft $tag"; exit 1 }
+          gh release edit $tag --draft=false --latest=false
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::the draft $tag could not be published"; exit 1 }

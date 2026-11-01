@@ -4,7 +4,7 @@ This is the one guide for working on Thornswood. A first day starts at section 1
 
 The outline nests, and the table of contents follows it. A part is a numbered section. A group inside it is a subsection. A step inside that is a sub-subsection.
 
-- Repository: https://github.com/EvilPatrick06/Thornswood
+- Repository: https://github.com/ThornswoodRP/Thornswood
 - Board: https://github.com/users/EvilPatrick06/projects/1
 - Site: https://thornswood.net
 - Staff pages: https://thornswood.net/hub
@@ -277,7 +277,7 @@ Choose GitHub.com, then HTTPS, then login with a browser, as the GitHub user tha
 ```powershell
 New-Item -ItemType Directory -Force -Path C:\Dev | Out-Null
 cd C:\Dev
-git clone https://github.com/EvilPatrick06/Thornswood.git
+git clone https://github.com/ThornswoodRP/Thornswood.git
 cd C:\Dev\Thornswood
 git status
 ```
@@ -320,7 +320,7 @@ baseline are on the VPS (#907).
 
 ```
 cd C:\Users\<you>\Downloads
-git clone https://github.com/EvilPatrick06/Thornswood.git Thornswood-Repo
+git clone https://github.com/ThornswoodRP/Thornswood.git Thornswood-Repo
 gh auth login
 gh auth status
 ```
@@ -448,14 +448,14 @@ by hand, and no secret is written into the repository.
 
 | What a Ship needs | On One | A second machine |
 | --- | --- | --- |
-| The source | the shared clone | `git clone https://github.com/EvilPatrick06/Thornswood.git` and `gh auth login` as a collaborator |
+| The source | the shared clone | `git clone https://github.com/ThornswoodRP/Thornswood.git` and `gh auth login` as a collaborator |
 | The feed, its baseline, the launcher list and history | the VPS store, with a working copy in `%LOCALAPPDATA%\Thornswood\feed\<channel>` | Nothing to copy: every Ship receives them from the VPS first (`scripts\release\Feed-Store.ps1`, #907). The working copy is made on the first Ship |
 | The release webhooks, dev and #news | the VPS, `C:\Thornswood-Bot\webhooks`; One has no local copy | Nothing to copy: Ship reads them over ssh (`scripts\ops\Discord-Hook.ps1`) |
 | VPS access | One's own key, `.ssh\thornswood_ed25519`, and its own bridge token, `.ssh\thornswood-box-token` | Its own key and token: `.\scripts\vps\Setup-SshKey.ps1`, and somebody the VPS already knows runs `.\scripts\vps\Grant-BoxAccess.ps1 -Name <machine> -FromClipboard` with the line it prints (`docs\BOX-ACCESS.md` in the private ops repo). With no such machine left, the BisectHosting panel is the way in (`docs\IT-IS-DOWN.md` in the private ops repo) |
 | Signing: `records\signing\signing.json` | written from the template like any other machine's since 5 Oct, when `C:\tools` (an older copy of `metadata.json`) was removed. Never copy one machine's to another | `.\scripts\release\Setup-ShipMachine.ps1` writes one from `records\signing\signing.template.json` (paths and "enabled": true, no key or password) |
 | Signing: Microsoft's signing client | `records\signing\client`, ignored by git | The same script fetches `Microsoft.ArtifactSigning.Client` 1.0.128 from nuget.org and refuses it unless its sha256 is the pinned one, which is the package One has |
 | Signing: the Azure sign in | `az login` on One, as Patrick | `az login` on the new machine, as the person who ships from it, with an account of their own in the signing tenant that holds the Certificate Profile Signer role on the ThornswoodSigning account's profile ThornswoodRelease (Patrick, 4 Oct; #1740). Patrick makes the account and gives the role once: [Your own signing sign in](#your-own-signing-sign-in). The script asks the signing service with that sign in and checks the profile answers with the identity the launcher pins |
-| The client runtime `records\client-build.json` names | only in the dev game folder, `C:\Thornswood-DevBuild\Game`. The build copies in `Downloads\Thornswood-ClientBuild-<commit>` are older builds, and the shared clone's `engine\skymp\build` does not match the record | Setup-ShipMachine records CI's build of the pin as the machine's engine build (`-EngineBuild ci`, which it does by itself on a machine with no engine build), and `Get-EngineArtifact.ps1` fetches the public fork's build of the pin, `thornswood-engine-<fork commit>` from EvilPatrick06/skymp (#3540), and holds every file to both records. A build made on the machine is not the recorded bytes (engine\README.md, "A Ship machine takes CI's build") |
+| The client runtime `records\client-build.json` names | only in the dev game folder, `C:\Thornswood-DevBuild\Game`. The build copies in `Downloads\Thornswood-ClientBuild-<commit>` are older builds, and the shared clone's `engine\skymp\build` does not match the record | Setup-ShipMachine records CI's build of the pin as the machine's engine build (`-EngineBuild ci`, which it does by itself on a machine with no engine build), and `Get-EngineArtifact.ps1` fetches the public fork's build of the pin, `thornswood-engine-<fork commit>` from ThornswoodRP/skymp (#3540), and holds every file to both records. A build made on the machine is not the recorded bytes (engine\README.md, "A Ship machine takes CI's build") |
 | The game folder the Ship packs, `<root>-DevBuild\Game` | built by the dev launcher from what Vortex deployed | Skyrim Special Edition on Steam, Vortex with a profile named Thornswood and the Thornswood collection installed and deployed, the launcher from thornswood.net, then the dev build and its own game folder (Setting up a machine, above). A person does this; it needs a Nexus account, not Patrick's |
 | The collection itself | Nexus collection `7essxf`, curated from Patrick's Nexus account in his Vortex | Any machine installs it. Only publishing a new revision needs his account (`docs\OWNERSHIP.md` in the private ops repo) |
 | Backups | the originals on the VPS, `C:\Thornswood-Backup`, and copies fetched to `local\backups` in One's repository folder (`.\scripts\release\Where.ps1 Backups`); the passphrase on the VPS and in One's Documents | Not needed to Ship. `.\scripts\vps\Fetch-Backups.ps1` brings them down to any machine the VPS knows |
@@ -1038,7 +1038,7 @@ How to use it:
   the card's Order the same way, and the label is deleted afterwards. A cloud
   Claude thread is refused GraphQL, which the board needs, so these labels
   are how it moves a card:
-  `gh api -X POST repos/EvilPatrick06/Thornswood/issues/<N>/labels -f "labels[]=board: In Progress"`.
+  `gh api -X POST repos/ThornswoodRP/Thornswood/issues/<N>/labels -f "labels[]=board: In Progress"`.
   To see the cards, `pwsh scripts/ops/Read-Board.ps1` starts
   `.github\workflows\board-read.yml`, which reads every card's Status and
   Order on a VPS runner and changes nothing, and writes them to board.json
@@ -1373,17 +1373,18 @@ The short form of the rules. The same decisions, with the dates they were made, 
   a main release that is not on main, is behind or ahead of origin, has
   anything uncommitted, has a file under `scripts` or another folder a release is built from that git does not know, or
   asks for a new number with `-Version`. A main Ship writes nothing to the
-  repository: the version moves first through `Bump-Version.ps1` and its own
-  pull request, and Ship builds only what is already on GitHub, so every other
-  machine can `git pull` exactly what shipped. Corrected 24 Sep: this bullet
+  repository: the launcher's number comes from the build, the time its
+  sources last changed on main (`scripts\release\LauncherVersion.ps1`, #5179),
+  and Ship builds only what is already on GitHub, so every other machine can
+  `git pull` exactly what shipped. Corrected 24 Sep: this bullet
   used to say a main Ship committed and pushed the source after the release,
   which stopped being true on 22 Sep (f917dd8).
 - The one live release that does not come off main is a hotfix, decided by
   Patrick on 24 Sep for a tester who could not get in while a day of dev work
   sat on main: "the only thing that should be going to main now is the fix
   for him". A branch named `hotfix/...` starts from the commit the live
-  release was built from, carries only the fix and its `Bump-Version.ps1`
-  commit, is pushed, and Ship runs from a checkout of it; every other gate
+  release was built from, carries only the fix, is pushed, and Ship runs from
+  a checkout of it; every other gate
   above still applies, and Ship refuses a hotfix branch that is not on
   GitHub. A hotfix leaves the dev feed alone. The fix also goes to main
   through its own pull request, or the next main release loses it. 1.1.93 was
@@ -1429,12 +1430,12 @@ The short form of the rules. The same decisions, with the dates they were made, 
   The code owner review on `.github/CODEOWNERS` is off. And `enforce_admins`,
   which had to stay off while `Ship.ps1` pushed its own version commit
   straight to main, was turned on that day, since Ship writes nothing to the
-  repository now: `Bump-Version.ps1` moves the number first, as an ordinary
-  commit on a branch, and Ship reads it. It was off again by 25 Sep and is
+  repository now: the launcher's number is worked out from git, never
+  committed (#5179). It was off again by 25 Sep and is
   off today, which is why the admin account is not held to main's rules.
   Check which it is rather than assuming, because this paragraph was wrong
   for a day before anybody looked:
-  `gh api repos/EvilPatrick06/Thornswood/branches/main/protection`
+  `gh api repos/ThornswoodRP/Thornswood/branches/main/protection`
 ##### Branch names
 
 - Everybody's work goes on a branch named for whoever did it:
@@ -1546,7 +1547,7 @@ The short form of the rules. The same decisions, with the dates they were made, 
   - Before a session ends, the same look in both repositories, locally
     too: `git worktree list`, `git branch`, `gh pr list` and
     `git ls-remote --heads origin`, here and in `engine\skymp` (and
-    `gh pr list -R EvilPatrick06/skymp`). Each of yours still there is open
+    `gh pr list -R ThornswoodRP/skymp`). Each of yours still there is open
     work with the reason it is open written on its issue, or it goes.
 ##### Signing, the build check, and the six shared files
 
@@ -1652,7 +1653,7 @@ this is the long form.
   a pull request touches one of the shared files, and blocks nothing while
   the code owner review is off. The settings change without a commit, so
   read them rather than this paragraph:
-  `gh api repos/EvilPatrick06/Thornswood/branches/main/protection`
+  `gh api repos/ThornswoodRP/Thornswood/branches/main/protection`
 - **One fix per pull request.** A branch that changes eight things is eight
   reviews at once; split it.
 - **`git pull` before anything.** A conflicting pull is resolved on your
@@ -1791,7 +1792,7 @@ The machine that runs `Ship.ps1` still has to sign the build. `records\signing\s
 | Job | Command | Where it shows up |
 | --- | --- | --- |
 | Dev release | `.\scripts\release\Ship.ps1 -Channel dev` plus the note | Dev feed, dev launcher News tab, dev updates channel in Discord |
-| Main release | `.\scripts\release\Bump-Version.ps1`, then after that pull request is merged, `.\scripts\release\Ship.ps1` plus the note | Live feed, launcher News tab, the site news page, Discord #news |
+| Main release | `.\scripts\release\Ship.ps1` plus the note | Live feed, launcher News tab, the site news page, Discord #news |
 | Discord news | Ship posts it. To post the current feed again: `.\scripts\ops\Publish-Discord.ps1` or `.\scripts\ops\Publish-Discord.ps1 -Dev` | #news for main, the dev updates channel for dev |
 | Game news | The same note. The launcher News tab reads the feed. The site news page is `.\scripts\ops\Publish-News.ps1`, which a main Ship already runs | Launcher News tab, and https://thornswood.net for main |
 | Docs site | `.\scripts\deploy\Deploy-Docs.ps1` for the app. `.\scripts\deploy\Deploy-Docs.ps1 -Site` for the public pages | https://thornswood.net |
@@ -1820,15 +1821,11 @@ To post the current feed again:
 
 A main release is for a security fix, for something that leaves the game untestable, or for work the team has agreed goes live. It goes out only on Patrick's word for that exact build, and whoever he names runs it from a machine that can sign (Patrick, 30 Oct). Nobody asks him whether main is ready. A release gets no #staff-updates line; the update channel, the app and site News tabs and GitHub say it. A main release runs from `main` after `git pull`, with a clean tree that matches GitHub.
 
-### Move the version first
+### The version comes from the build
 
-`Bump-Version.ps1` changes the version in `launcher\app\Updater.cs`, commits that one file, and prints the commands that put that commit on a branch and open the pull request. It pushes nothing itself. Merge that pull request, then come back to `main`.
+Nothing moves the version before a release (#5179). `launcher\app\Updater.cs` holds `0.0.0` in git, and every build works out the launcher's number from git: the time, in UTC, of the newest commit on main that changed anything the launcher is built from, written year.monthday.hourminute, so `2026.1101.1745` for 5:45 PM UTC on 1 Nov 2026. `scripts\release\LauncherVersion.ps1` has the rule. The same sources always give the same number, and a later change always a higher one. A dev build adds a fourth part. Until 1 Nov 2026 the number was a line in `Updater.cs` that `Bump-Version.ps1` moved in a pull request of its own before every main release with a launcher change; that script is gone.
 
-```powershell
-git switch main
-git pull
-.\scripts\release\Bump-Version.ps1
-```
+The number needs the history, so a shallow checkout cannot build the launcher without `-Version`: fetch it with `git fetch --unshallow`, or give `actions/checkout` `fetch-depth: 0`.
 
 ### The content plugin goes to the live server first
 
@@ -1869,7 +1866,7 @@ The gamemode command, then the server command, is the live pair. `-GamemodeOnly`
 
 ### A hotfix
 
-A hotfix is the one live release that does not come off `main`. The branch starts from the tag of the release that is live, carries only the fix and its `Bump-Version.ps1` commit, and is pushed. Ship runs from a checkout of that branch. When the installer has to be rebuilt for it, `Package-Thornswood.ps1 -OneFile` runs from the same checkout: it and `Publish-Installer.ps1` accept a clean `hotfix/` branch that matches GitHub by the same rule Ship uses (#2436), with no `-AllowStaleCheckout`. The dev feed stays as it is. The fix also goes to `main` through its own pull request, or the next main release loses it. The long form is in [How a release goes out](#how-a-release-goes-out).
+A hotfix is the one live release that does not come off `main`. The branch starts from the tag of the release that is live, carries only the fix, and is pushed. Ship runs from a checkout of that branch. When the installer has to be rebuilt for it, `Package-Thornswood.ps1 -OneFile` runs from the same checkout: it and `Publish-Installer.ps1` accept a clean `hotfix/` branch that matches GitHub by the same rule Ship uses (#2436), with no `-AllowStaleCheckout`. The dev feed stays as it is. The fix also goes to `main` through its own pull request, or the next main release loses it. The long form is in [How a release goes out](#how-a-release-goes-out).
 
 ### How a release goes out
 
@@ -1882,7 +1879,7 @@ is confident may run it.
 .\scripts\release\Ship.ps1 -Channel dev "what changed, in plain words"
 ```
 
-That is the dev release: version 1.1.36.1, .2, .3, pack ids ending `-dev`, the
+That is the dev release: version 2026.1101.1745.1, .2, .3, pack ids ending `-dev`, the
 dev feed and the dev baseline (`feed-dev` in the VPS store), the dev ports,
 and the dev server told. It runs from
 any branch on any developer's machine. There is no installer for it, and it
@@ -1900,26 +1897,17 @@ A main release, from your clone, on a machine that can sign:
 cd C:\Users\<you>\Downloads\Thornswood-Repo
 git checkout main
 git pull
-.\scripts\release\Bump-Version.ps1
-```
-
-The version moves first and on its own. `Bump-Version.ps1` changes `Version`
-in `launcher\app\Updater.cs` (1.1.35 to 1.1.36), commits that one file, and
-prints the rest. Every change reaches main through a pull request, the
-admin's included, so it prints the commands that move that commit onto a branch, `patrick/launcher-1.1.36`,
-push it and open the pull request, which is then merged (see How work
-moves, the long form). Then, back on main:
-
-```
-git checkout main
-git pull
 .\scripts\release\Ship.ps1 "what changed, in plain words"
 ```
+
+Nothing moves the version first: Ship works the launcher's number out from
+git, the time its sources last changed on main (The version comes from the
+build, above, #5179).
 
 Ship writes nothing to this repository. It refuses a main release with
 anything uncommitted, with a file under `scripts` or another folder a release
 is built from that git does not know, with
-a `-Version` other than the number already on main, or with main here behind
+a `-Version` other than main's number for these sources, or with main here behind
 or ahead of `origin/main`, so what ships is what is on GitHub. It builds the
 launcher, checks that the game folder holds the recorded client build
 (`Sync-Client.ps1 -Check`) and that the collection there can build the
@@ -1984,8 +1972,8 @@ on the server is out. Both halves ask before they act, so
 
 **A hotfix** is the one live release that does not come off main (decided by
 Patrick on 24 Sep). A branch named `hotfix/...` starts from the commit the live
-release was built from, carries only the fix and its `Bump-Version.ps1`
-commit, is pushed, and Ship runs from a checkout of it. Every other check
+release was built from, carries only the fix, is pushed, and Ship runs from a
+checkout of it. Every other check
 above still applies, Ship refuses a hotfix branch that is not on GitHub, and
 the dev feed is left alone. The fix also goes to main through its own pull
 request, or the next main release loses it. Once live, the hotfix's commit
@@ -2051,7 +2039,7 @@ release, launcher, game files and server together, are in How work moves.
 
 | Piece | Where | What it is |
 | --- | --- | --- |
-| Source repo | github.com/EvilPatrick06/Thornswood (private), clone at `C:\Users\<you>\Downloads\Thornswood-Repo` | Launcher source, plugins, site, bot, every script |
+| Source repo | github.com/ThornswoodRP/Thornswood (private), clone at `C:\Users\<you>\Downloads\Thornswood-Repo` | Launcher source, plugins, site, bot, every script |
 | Feed store | On the VPS beside the feed the site serves: `C:\Thornswood-Docs\feed\{version.json, published.json, launchers.txt, history\}` and the same under `feed-dev`. Each machine's working copy is `%LOCALAPPDATA%\Thornswood\feed\main` and `\dev` | `version.json` (the feed, served at `/feed[-dev]/version.json`), `published.json` (the pack baseline), every launcher version the channel published, and each replaced file, none of those three served. Ship receives and sends them through `scripts\release\Feed-Store.ps1` (#907). Until then they were the `Thornswood-Releases` GitHub repository and its two clones |
 | Downloads | On the VPS, `C:\Thornswood-Docs\feed\assets` and `feed-dev\assets`, served at `https://thornswood.net/feed[-dev]/assets/<sha256>` | Every pack, launcher exe and client runtime a feed names, one file per sha256, one folder per channel (`docs\FEED.md` "Downloads come from the site") |
 | Launcher | `launcher\app\*.cs` + `launcher\ui.xaml`, built by `scripts\release\Build-Launcher.ps1` with MSBuild from `launcher\app\Thornswood.csproj`, C# 13 (#498) | WPF app at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on most machines); profile, config and packs under that folder. The scripts find the install on whichever fixed drive holds it; `-Root` overrides |
@@ -2065,7 +2053,7 @@ release, launcher, game files and server together, are in How work moves.
 | Bot | `bot`, on the VPS at `C:\Thornswood-Bot`, the Windows service `ThornswoodBot` under its own account, `NT SERVICE\ThornswoodBot` | discord.py: tickets, join cards, staff tools |
 | Watchdog | `C:\Thornswood-Watch\watch.ps1`, every five minutes | Restarts any service that stops answering, three tries an hour, and tells #staff-updates (the id in `bot\staff-channel.txt`) once when anything dies and once when it is back: the servers, voice, the site, the bot, the nightly backup, the build runner and the disk. Through the bot, or its own webhook when the bot is down. A server stopped on purpose is held (`C:\Thornswood-Watch\holds`, #5155): left alone until its hold runs out, 30 minutes unless the stop says, 2 hours at most, then told once and started. Every script that stops a server writes and removes its own hold; a stop by hand in a run note is held with `.\scripts\vps\Hold-Server.ps1 -Service <name> -Why "<why>"` first and `-Clear` after, or from a cloud thread `pwsh scripts/vps/Box-Run.ps1 -Line 'Hold-Server -Service <name> -Why "<why>"'`. Its install is the gate verb `Watch-Services -Install` |
 
-The server's SkyMP fork is on GitHub (github.com/EvilPatrick06/skymp, branch
+The server's SkyMP fork is on GitHub (github.com/ThornswoodRP/skymp, branch
 `thornswood/engine-changes`), so its source survives any one machine, and since
 25 September it is the `engine\skymp` submodule of this repository, pinned to
 the commit the build records name: `git submodule update --init engine/skymp`
@@ -2351,7 +2339,7 @@ Each letter stands on its own: what the thing is, then the commands. The numbere
 
 ### A. GitHub
 
-GitHub is the website copy of the repository, at https://github.com/EvilPatrick06/Thornswood. Your PC and GitHub each hold the history. `origin` is the name Git uses for the GitHub copy.
+GitHub is the website copy of the repository, at https://github.com/ThornswoodRP/Thornswood. Your PC and GitHub each hold the history. `origin` is the name Git uses for the GitHub copy.
 
 #### Sign in and look
 
@@ -2374,7 +2362,7 @@ The Pull requests tab lists open pull requests. `gh pr create` adds yours. The s
 - [Hello World on GitHub](https://docs.github.com/en/get-started/quickstart/hello-world), the first-time walkthrough
 - [About pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests)
 - [GitHub flow](https://docs.github.com/en/get-started/using-github/github-flow), the short version of branch, pull request, merge
-- This repository: https://github.com/EvilPatrick06/Thornswood
+- This repository: https://github.com/ThornswoodRP/Thornswood
 - The board: https://github.com/users/EvilPatrick06/projects/1
 
 ### B. Git
@@ -2814,7 +2802,7 @@ Click a name to open the file. The line under it says what the file is for.
 | [bot/README.md](bot/README.md) | How the Discord bot is laid out and how to change it |
 | [voice/voice-server.js](voice/voice-server.js) | The proximity voice service |
 | [scripts/release/Ship.ps1](scripts/release/Ship.ps1) | Publishes a dev release or a main release |
-| [scripts/release/Bump-Version.ps1](scripts/release/Bump-Version.ps1) | Moves the version number before a main release |
+| [scripts/release/LauncherVersion.ps1](scripts/release/LauncherVersion.ps1) | Works out the launcher's number from git, so it is never committed |
 | [scripts/deploy/Deploy-DevGamemode.ps1](scripts/deploy/Deploy-DevGamemode.ps1) | Puts the gamemode on the dev server |
 | [scripts/deploy/Deploy-Gamemode.ps1](scripts/deploy/Deploy-Gamemode.ps1) | Puts the gamemode on the live server. The server deploy is the next script in that folder |
 | [docs/GLOSSARY.md](docs/GLOSSARY.md) | The long list of Thornswood words |
@@ -2834,10 +2822,10 @@ An edit to one of them that blocks others' work gets a line in #dev-coordination
 
 #### Learn more about the repository
 
-- The repository on GitHub: https://github.com/EvilPatrick06/Thornswood
-- The launcher folder: https://github.com/EvilPatrick06/Thornswood/tree/main/launcher
-- The game folder: https://github.com/EvilPatrick06/Thornswood/tree/main/game
-- The scripts folder: https://github.com/EvilPatrick06/Thornswood/tree/main/scripts
+- The repository on GitHub: https://github.com/ThornswoodRP/Thornswood
+- The launcher folder: https://github.com/ThornswoodRP/Thornswood/tree/main/launcher
+- The game folder: https://github.com/ThornswoodRP/Thornswood/tree/main/game
+- The scripts folder: https://github.com/ThornswoodRP/Thornswood/tree/main/scripts
 - How the launcher is built: [launcher/app/ARCHITECTURE.md](launcher/app/ARCHITECTURE.md)
 
 ### O. Others
@@ -2854,7 +2842,7 @@ Launcher code is C# 13, built with MSBuild from `launcher\app\Thornswood.csproj`
 
 #### SkyMP
 
-The game server is SkyMP. The fork's source is on GitHub at github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`, and it is the `engine\skymp` submodule of this repository. `git submodule update --init engine/skymp` fetches it. It is large. A machine that only copies server binaries can leave it unfetched. Building it needs Visual Studio, and [Setting up a machine](#setting-up-a-machine) gives that command.
+The game server is SkyMP. The fork's source is on GitHub at github.com/ThornswoodRP/skymp, branch `thornswood/engine-changes`, and it is the `engine\skymp` submodule of this repository. `git submodule update --init engine/skymp` fetches it. It is large. A machine that only copies server binaries can leave it unfetched. Building it needs Visual Studio, and [Setting up a machine](#setting-up-a-machine) gives that command.
 
 #### HTML
 
@@ -2927,13 +2915,13 @@ An overlay change uses the same `Go.ps1 -SkipServer` as the HTML section, with t
 - CSS, the web.dev course: https://web.dev/learn/css
 - JavaScript, the web.dev course: https://web.dev/learn/javascript
 - JavaScript, the long written guide: https://javascript.info/
-- The public pages in this repository: https://github.com/EvilPatrick06/Thornswood/tree/main/site/public
-- The in-game page in this repository: https://github.com/EvilPatrick06/Thornswood/tree/main/game/ui
+- The public pages in this repository: https://github.com/ThornswoodRP/Thornswood/tree/main/site/public
+- The in-game page in this repository: https://github.com/ThornswoodRP/Thornswood/tree/main/game/ui
 - Python's tutorial: https://docs.python.org/3/tutorial/
 - Python downloads: https://www.python.org/downloads/
 - C# on Microsoft Learn: https://learn.microsoft.com/en-us/dotnet/csharp/
 - The .NET Framework: https://learn.microsoft.com/en-us/dotnet/framework/
-- The SkyMP fork this server builds from: https://github.com/EvilPatrick06/skymp
+- The SkyMP fork this server builds from: https://github.com/ThornswoodRP/skymp
 
 ### P. Secrets, by name and place, never by value
 

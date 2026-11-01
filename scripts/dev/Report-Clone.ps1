@@ -67,7 +67,7 @@ param(
     [Parameter(ParameterSetName = 'Send')][string]$Clone,
     # Define the functions and stop, which is how the harness loads them.
     [Parameter(ParameterSetName = 'Load', Mandatory = $true)][switch]$Load,
-    [string]$GitHubRepo = 'EvilPatrick06/Thornswood'
+    [string]$GitHubRepo = 'ThornswoodRP/Thornswood'
 )
 
 Set-StrictMode -Version Latest
@@ -291,7 +291,7 @@ if ($Read) {
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     # The log keeps the runner's colours, which a newer gh hands over only
     # when told (Get-GhLogFlags, #5202).
-    $flags = Get-GhLogFlags
+    $flags = @(Get-GhLogFlags)
     $log = @(& gh api "repos/$GitHubRepo/actions/jobs/$($j[0].id)/logs" @flags 2>&1 | ForEach-Object { "$_" })
     $c = $LASTEXITCODE
     $ErrorActionPreference = $old

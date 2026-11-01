@@ -7,17 +7,15 @@
   One command. Builds the launcher and publishes everything that changed,
   launcher and mods both, in a single release.
 
-  THE VERSION IS BUMPED BEFOREHAND, not here, by Bump-Version.ps1, and the bump
-  reaches main through a pull request like any other change, the owner's
-  included. GitHub refuses a push to main from write access; the admin account
-  is held to it by the team rule, since enforce_admins is off. Ship only reads
-  this repository and writes nothing back to it. A main release is refused if anything is
-  uncommitted or unpushed, or if a file in a folder a release is built from is
-  one git does not know, so what ships and what is written down are the same
-  thing.
+  THE VERSION COMES FROM THE BUILD (#5179). The launcher's number is the
+  time its sources last changed on main (scripts\release\LauncherVersion.ps1),
+  worked out here from git, so no pull request moves it; git holds 0.0.0 in
+  Updater.cs. Ship only reads this repository and writes nothing back to it. A
+  main release is refused if anything is uncommitted or unpushed, or if a
+  file in a folder a release is built from is one git does not know, so what
+  ships and what is written down are the same thing.
 
-      .\scripts\release\Bump-Version.ps1        then the branch and pull request it prints
-      git checkout main; git pull     once that pull request is merged
+      git checkout main; git pull
       .\scripts\release\Ship.ps1 "..."
 
   THE NOTE IS WHAT CUSTOMERS READ, in the launcher's News tab, on the site and
@@ -107,15 +105,14 @@
   more and at least one "- " detail line.
 
 .PARAMETER Version
-  A dev build's number, for example 1.2.0.1, in place of the one Ship would
-  work out from the dev feed. It is written into app\Updater.cs for the build
-  and put back afterwards, so it only ever lives in the dev feed.
+  A dev build's number, for example 2026.1101.1745.1, in place of the one
+  Ship would work out from the dev feed. It is written into app\Updater.cs for
+  the build and put back afterwards, so it only ever lives in the dev feed.
 
-  A main release refuses it. Main ships the number already on main, and
-  .\scripts\release\Bump-Version.ps1 -To 1.2.0 moves that number first, through its own
-  pull request, before Ship runs without -Version. The same number main
-  already has is let through, because it changes nothing. -ModsOnly keeps the
-  number where it is whatever this says.
+  A main release refuses it. Main ships main's number for its sources, the
+  time they last changed (LauncherVersion.ps1); that same number is let
+  through, because it changes nothing. -ModsOnly keeps the number where it is
+  whatever this says.
 
 .PARAMETER NoBump
   Kept for anything that passes it. Every main release now keeps the version
@@ -218,8 +215,8 @@
   uncommitted, that has a file in a folder a release is built from that git
   does not know about (the build and Go.ps1 would take it anyway), or that
   asks for a new number with
-  -Version. A hotfix/ branch is the live build plus one fix and its version
-  bump, cut from the commit the live release was built from. Ship refuses
+  -Version. A hotfix/ branch is the live build plus one fix, cut from the
+  commit the live release was built from. Ship refuses
   one that is not on GitHub, and it is Patrick's call like any live release.
 
   dev builds and publishes the second launcher: the dev branch of the
@@ -269,8 +266,8 @@
 .EXAMPLE
   .\scripts\release\Ship.ps1 "The map marker points at the right door now"
 
-  A main release, from main, pulled, with the version number already moved by
-  Bump-Version.ps1 and merged. Only when Patrick has said it goes live.
+  A main release, from main, pulled; its launcher number comes from git
+  (LauncherVersion.ps1). Only when Patrick has said it goes live.
 
 .NOTES
   The installer package is the one thing publishing does not touch, and that is
@@ -377,14 +374,14 @@ function Get-SourceRepo([string]$repoDir) {
         try { $remote = (@(& git -C $repoDir remote get-url origin 2>$null) | Select-Object -First 1) }
         finally { $ErrorActionPreference = $old }
     } else {
-        Write-Host '  git is not on the path, so the launcher''s draft is looked for on EvilPatrick06/Thornswood' -ForegroundColor Yellow
+        Write-Host '  git is not on the path, so the launcher''s draft is looked for on ThornswoodRP/Thornswood' -ForegroundColor Yellow
     }
     # A URL's port is not part of owner/name: the deploy gate's checkout reads
     # ssh://git@ssh.github.com:443/<owner>/<name>.git (Install-Gate.ps1), and
-    # on 31 Oct its main Ship asked gh for 443/EvilPatrick06/Thornswood, a
+    # on 31 Oct its main Ship asked gh for 443/ThornswoodRP/Thornswood, a
     # repository on a host named 443 ("error connecting to 443").
     if ($remote -and $remote -match 'github\.com(?::\d+(?=/))?[:/](.+?)(?:\.git)?\s*$') { return $Matches[1] }
-    return 'EvilPatrick06/Thornswood'
+    return 'ThornswoodRP/Thornswood'
 }
 
 # FOUND THROUGH REST, NOT GRAPHQL, issue #2432. The drafts release.yml makes
@@ -759,7 +756,8 @@ function Get-LauncherInputHash([string]$repoDir) {
             $lines.Add($rel + "`t" + (Get-ThornswoodShippedSha256 $f.FullName))
         }
     }
-    foreach ($rel in 'records/client-build.json', 'records/ui-gone.json', 'records/generated.json', 'scripts/release/Build-Launcher.ps1') {
+    # The same files LauncherVersion.ps1 dates the launcher's number by.
+    foreach ($rel in $script:LauncherInputFiles) {
         $p = Join-Path $repoDir $rel
         $h = 'missing'
         if (Test-Path -LiteralPath $p) { $h = Get-ThornswoodShippedSha256 $p }
@@ -827,8 +825,8 @@ function Test-LauncherUnchanged($published, [string]$inputs) {
 #   - main published $current from these same sources: dev carries $current;
 #   - main published $current from other sources: a dev number;
 #   - main published past $current: a dev number, from main's;
-#   - main has not published $current yet (Bump-Version moved it and the main
-#     Ship has not run): this is the source main will ship it from, so dev
+#   - main has not published $current yet (the launcher changed on main and
+#     the main Ship has not run): this is the source main will ship it from, so dev
 #     carries $current, unless dev already carries $current from other
 #     sources, when it takes a dev number instead;
 #   - main's feed cannot be read at all: it cannot tell, so it refuses, before
@@ -1054,7 +1052,7 @@ function Assert-DevVersionSelection([string]$selected, [string]$current, [bool]$
         if ($null -eq $l -or -not $l.Version) { continue }
         if ((Normalized ([string]$l.Version)) -ne $candidate) { continue }
         if ($l.Inputs -and $inputs -and ([string]$l.Inputs -eq $inputs)) { continue }
-        $way = if ($aligned) { 'This is main''s own launcher, which carries main''s number only, so move main past it first with .\scripts\release\Bump-Version.ps1.' }
+        $way = if ($aligned) { 'This is main''s own launcher, which carries main''s number only, the time its sources last changed (LauncherVersion.ps1); two launchers under it means the history was rewritten, so say so on the board rather than ship it.' }
                else { 'Ship without -Version so it takes the next dev number.' }
         Die ("$selected is already out as a launcher built from other sources than these, and a launcher updates by its number alone, " +
              "so nobody on $selected would ever be offered this one. Nothing was built. $way")
@@ -1096,6 +1094,8 @@ $RepoDir = Split-Path -Parent (Split-Path -Parent $Here)
 . (Join-Path $Here 'Ship-Rules.ps1')
 # What a file of the repo ships as, and fingerprints as, from any machine (#2903).
 . (Join-Path $Here 'ShippedBytes.ps1')
+# Get-LauncherVersion: the launcher's number from git, never committed (#5179).
+. (Join-Path $Here 'LauncherVersion.ps1')
 # A release from the feed signs its manifest on GitHub, in the engine fork (#2903).
 if ($FromFeed) { . (Join-Path $Here 'Sign-OnGitHub.ps1') }
 # The publish sign helpers, loaded here rather than at the publish gate because
@@ -1443,7 +1443,7 @@ $updaterCs = Join-Path $Here '..\..\launcher\app\Updater.cs'
 if (-not (Test-Path $updaterCs)) { Die "Could not find $updaterCs" }
 
 # Every write of Updater.cs goes through here, with no byte order mark, the
-# way Bump-Version.ps1 writes it and the way it is committed. Set-Content
+# way it is committed. Set-Content
 # -Encoding UTF8 adds a mark in Windows PowerShell 5.1 and none in
 # PowerShell 7, so a Ship run from 5.1 left Updater.cs changed in git with
 # nothing changed but those three bytes (#2035).
@@ -1454,7 +1454,19 @@ function Write-UpdaterCs([string]$text) {
 $src = Get-Content $updaterCs -Raw
 $m = [regex]::Match($src, 'Version\s*=\s*"([^"]+)"')
 if (-not $m.Success) { Die 'Could not read the version out of app\Updater.cs' }
-$current = $m.Groups[1].Value
+# THE VERSION COMES FROM THE BUILD (#5179). $committed is what git holds in
+# Updater.cs, 0.0.0, and never a number; $current is main's number for these
+# sources, the time the launcher last changed (LauncherVersion.ps1). Until
+# 1 Nov 2026 $current was the committed line, so every launcher change needed
+# a pull request moving it before main could ship it (#5192 among four in a
+# hundred merges). Below, "main's number" means $current.
+$committed = $m.Groups[1].Value
+if (-not (Test-LauncherVersionPlaceholder $src)) {
+    Die ("Updater.cs says $committed, and git holds $script:LauncherVersionPlaceholder there: a build that stopped left its number in, " +
+         'or something wrote one. git checkout -- launcher/app/Updater.cs puts it back. Nothing was built.')
+}
+try { $current = Get-LauncherVersion -RepoDir $RepoDir }
+catch { Die ($_.Exception.Message + ' Nothing was built.') }
 $MainSourceAligned = $false
 if (Test-Path -LiteralPath (Join-Path $RepoDir '.git')) {
     $releaseSource = Get-ReleaseSource $RepoDir
@@ -1555,8 +1567,8 @@ elseif ($Version) {
     # entry 205 on 24 Sep. A dev build still takes it: its source is put back
     # after the build and the number only ever lives in the dev feed.
     if (-not $Dev -and $Version -ne $current) {
-        Die ("A main release ships the version already on main, $current. Move it first with " +
-             ".\scripts\release\Bump-Version.ps1 -To $Version and its pull request, then Ship without -Version.")
+        Die ("A main release ships main's number for these sources, $current (LauncherVersion.ps1), and no other. " +
+             'Ship without -Version.')
     }
     $target = $Version
 }
@@ -1722,10 +1734,10 @@ else {
     # something different from what shipped. The worst half-state there is, on
     # every release.
     #
-    # The bump is its own commit now, made by Bump-Version.ps1 before any of
-    # this runs, and it goes through whatever the branch rules are like any
-    # other change. Ship only READS the repository, so nothing it does needs
-    # write access to main.
+    # Since #5179 nothing commits the number at all: main's is the time the
+    # launcher's sources last changed (LauncherVersion.ps1), read from git
+    # above. Ship only READS the repository, so nothing it does needs write
+    # access to main.
     #
     # -NoBump is kept and means the same as it always did, so anything that
     # passed it keeps working; it is simply what every main release does now.
@@ -1754,18 +1766,14 @@ if (-not $Dev -and -not $ModsOnly) {
     if ($mainNow -and $mainNow.Version) { Assert-DevVersionSelection $target $current $true @() @($mainNow) $LauncherInputs }
 }
 
-if ($target -ne $current) {
-    Head 'Version'
-    Say "  $current  ->  $target" 'Green'
-    if ($devLine -and $devLine.Why -and -not $ModsOnly) { Say "  $($devLine.Why)" 'DarkGray' }
-    $src = $src -replace 'Version\s*=\s*"[^"]+"', ('Version = "' + $target + '"')
-    Write-UpdaterCs $src
-}
-else {
-    Head 'Version'
-    Say "  staying on $current" 'DarkGray'
-    if ($devLine -and $devLine.Why -and -not $ModsOnly) { Say "  $($devLine.Why)" 'DarkGray' }
-}
+# Written in for the build whatever the number, since git's is 0.0.0, and put
+# back to that by Unbump on a stop or after the build.
+Head 'Version'
+if ($target -ne $current) { Say "  main's number for these sources is $current; this goes out as $target" 'Green' }
+else { Say "  $target, main's number for these sources" 'Green' }
+if ($devLine -and $devLine.Why -and -not $ModsOnly) { Say "  $($devLine.Why)" 'DarkGray' }
+$src = $src -replace 'Version\s*=\s*"[^"]+"', ('Version = "' + $target + '"')
+Write-UpdaterCs $src
 
 # A main release ships the exe CI built for v$target, so the launcher on main
 # has to be the launcher at that tag (Get-LauncherDrift above, issue #883).
@@ -1777,8 +1785,9 @@ if (-not $Dev -and (Test-Path -LiteralPath (Join-Path $RepoDir '.git'))) {
     if ($drift.Count) {
         foreach ($d in $drift | Select-Object -First 10) { Say "    $d" 'Yellow' }
         $why = ("$($drift.Count) launcher file(s) changed on this branch after v$target was tagged, and the exe CI built for v$target has none of it. " +
-                "Every launcher already on $target would keep the old one anyway. Move the version first: " +
-                ".\scripts\release\Bump-Version.ps1, its pull request, the new tag, then Ship again.")
+                "Every launcher already on $target would keep the old one anyway. That number is the time the " +
+                "launcher last changed (LauncherVersion.ps1), so a tag of it on another commit means the history " +
+                'of the launcher was rewritten; say so on the board rather than ship it.')
         if ($DryRun) { Say "  $why" 'Yellow' } else { Die $why }
     }
 }
@@ -1788,12 +1797,12 @@ if (-not $Dev -and (Test-Path -LiteralPath (Join-Path $RepoDir '.git'))) {
 # put it back, or a failed run burns a number and the launcher people are
 # running claims a version that was never published.
 function Unbump([string]$why) {
-    if ($target -eq $current) { return }
+    if ($target -eq $committed) { return }
     $back = Get-Content $updaterCs -Raw
-    $back = $back -replace 'Version\s*=\s*"[^"]+"', ('Version = "' + $current + '"')
+    $back = $back -replace 'Version\s*=\s*"[^"]+"', ('Version = "' + $committed + '"')
     Write-UpdaterCs $back
     Head 'Version'
-    Say "  put back to $current, $why" 'Yellow'
+    Say "  put back to $committed, $why" 'Yellow'
 }
 
 # ------------------------------------------------------------ setup program
@@ -2050,13 +2059,16 @@ if (-not $ModsOnly) {
     if ($kept.Count -gt 0) {
         Say ("  symbols kept under {0} ({1} file(s))" -f (Get-ShipSymbolDir $target), $kept.Count) 'DarkGray'
     }
-    if ($Dev -and $target -ne $current) {
-        $back = Get-Content $updaterCs -Raw
-        $back = $back -replace 'Version\s*=\s*"[^"]+"', ('Version = "' + $current + '"')
-        Write-UpdaterCs $back
-        Say "  source put back to $current, the exe carries $target" 'DarkGray'
-        $current = $target   # so nothing below tries to unbump a version the source no longer has
-    }
+}
+
+# The exe is built or taken by now, so Updater.cs goes back to git's 0.0.0 for
+# either channel (#5179); the number lives in the exe and the feed.
+if ($target -ne $committed) {
+    $back = Get-Content $updaterCs -Raw
+    $back = $back -replace 'Version\s*=\s*"[^"]+"', ('Version = "' + $committed + '"')
+    Write-UpdaterCs $back
+    Say "  source put back to $committed, the exe carries $target" 'DarkGray'
+    $committed = $target   # so nothing below tries to unbump a version the source no longer has
 }
 
 # ------------------------------------------------------------ the feed's launcher
@@ -2494,7 +2506,10 @@ $pubArgs = @{ Notes = $Notes; Root = $Root; RepoDir = $RepoDir; ReleaseDir = $Re
 if ($MoveServer) { $pubArgs['MoveServer'] = $true }
 if ($AcceptSize) { $pubArgs['AcceptSize'] = $true }
 if (-not $ModsOnly) { $pubArgs['Launcher'] = $true; $pubArgs['LauncherInputs'] = $LauncherInputs }
-if ($Dev) { $pubArgs['Channel'] = 'dev'; $pubArgs['VersionOverride'] = $target }
+# The number the exe carries, for both channels: Updater.cs is git's 0.0.0
+# again by the time Publish-Update reads it (#5179).
+$pubArgs['VersionOverride'] = $target
+if ($Dev) { $pubArgs['Channel'] = 'dev' }
 # -AllowStaleCheckout was Ship's alone, so Publish-Update refused what Ship had
 # already been told to let through (#2235).
 if ($AllowStaleCheckout) { $pubArgs['AllowStaleCheckout'] = $true }
@@ -2633,7 +2648,7 @@ if (-not $DryRun -and $published -eq 0) {
         Say 'Read the publisher output above for the reason. The Discord has not' 'Red'
         Say 'been told, the server has not been touched, and nobody has been sent' 'Red'
         Say 'an update that does not exist.' 'Red'
-        if ($target -ne $current) { Unbump 'the publish failed' }
+        if ($target -ne $committed) { Unbump 'the publish failed' }
         Write-Host ''
         if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
         exit 1
@@ -2689,7 +2704,7 @@ if ($published -ne 0 -and $published -ne 2) {
     Write-Host ''
     Say "The publisher stopped with exit code $published, so NOTHING was published." 'Red'
     Say 'The error is above, in the Publishing section.' 'Red'
-    if ($target -ne $current) { Unbump 'the publish failed' }
+    if ($target -ne $committed) { Unbump 'the publish failed' }
     Say 'Nobody has been told and nobody has been moved. Fix it and run this again.' 'Yellow'
     Write-Host ''
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
@@ -2707,7 +2722,7 @@ if ($published -ne 0 -and $published -ne 2) {
 # still brings the dev feed's DEV marks up to date with main (Dev-News.ps1);
 # it says how that went in $global:ThornswoodDevMarks, read back here.
 if ($published -eq 2) {
-    if ($target -ne $current) {
+    if ($target -ne $committed) {
         Unbump 'nothing was published'
         Say '  Rebuild the launcher next time you do ship, so the exe matches.' 'DarkGray'
     }
@@ -3022,7 +3037,7 @@ if (-not $DryRun -and -not $NoAnnounce) {
 # rules applying to the owner too, that push is refused, the release still
 # reaches every launcher, and the source never lands.
 #
-# Now the version is bumped and committed by Bump-Version.ps1 beforehand, the
+# Now the version is worked out from git (LauncherVersion.ps1, #5179), the
 # Git gate above refuses a release with anything uncommitted or unpushed, and
 # by the time anything is published the repository already says exactly what
 # shipped. There is nothing left to do here, which is the point.

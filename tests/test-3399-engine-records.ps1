@@ -92,7 +92,7 @@ try {
     # ================================================= 2. EngineRecords.ps1 ==
     Write-Host ''; Write-Host '2. EngineRecords.ps1'
     $commit = 'c19d6d4675ccd2af07901f78f02a223cae3de846'
-    function Server-Record([string]$c) { return ('{"binary":"scam_native.node","source":{"repo":"https://github.com/EvilPatrick06/skymp.git","commit":"' + $c + '"}}') }
+    function Server-Record([string]$c) { return ('{"binary":"scam_native.node","source":{"repo":"https://github.com/ThornswoodRP/skymp.git","commit":"' + $c + '"}}') }
     function Client-Record([string]$c) { return ('{"forkCommit":"' + $c.Substring(0, 8) + '","files":{}}') }
     $made = Join-Path $T 'made'
     Put (Join-Path $made 'records/server-build.json') (Server-Record $commit)
@@ -140,8 +140,8 @@ try {
     $null = & git -C $repo update-index --add --cacheinfo "160000,$oldPin,engine/skymp" 2>&1
     $gh = Join-Path $T 'gh'
     $null = New-Item -ItemType Directory -Force -Path $gh
-    [IO.File]::WriteAllText((Join-Path $gh 'run.json'), '{"id":40400000000,"path":".github/workflows/engine.yml","status":"completed","conclusion":"success","html_url":"https://github.com/EvilPatrick06/Thornswood/actions/runs/40400000000"}', $utf8)
-    [IO.File]::WriteAllText((Join-Path $gh 'jobs.json'), '{"jobs":[{"id":111,"name":"Engine build","conclusion":"failure"},{"id":222,"name":"Engine build (VPS fallback)","conclusion":"success"}]}', $utf8)
+    [IO.File]::WriteAllText((Join-Path $gh 'run.json'), '{"id":40400000000,"path":".github/workflows/engine.yml","status":"completed","conclusion":"success","html_url":"https://github.com/ThornswoodRP/Thornswood/actions/runs/40400000000"}', $utf8)
+    [IO.File]::WriteAllText((Join-Path $gh 'jobs.json'), '{"jobs":[{"id":111,"name":"Engine build","conclusion":"failure"},{"id":222,"name":"Engine build (VPS fallback)","conclusion":"success"},{"id":333,"name":"Wake the engine pin","conclusion":"success"}]}', $utf8)
     $logLines = @('2026-10-26T17:00:00.0000000Z Run .\scripts\release\EngineRecords.ps1') + @(Get-LogHandBackLines ('ENGINE' + '-RECORDS') $bundle | ForEach-Object { '2026-10-26T17:00:01.0000000Z ' + $_ })
     [IO.File]::WriteAllLines((Join-Path $gh 'log-222.txt'), [string[]]$logLines)
     [IO.File]::WriteAllText((Join-Path $gh 'log-111.txt'), 'the hosted job, refused for billing', $utf8)
@@ -153,9 +153,9 @@ $state = $env:TS_GH_STATE
 # its help and refuses a log (whose colours are escape sequences) without it.
 if ($args[0] -eq 'api' -and $args[1] -eq '--help') { if ($env:TS_GH_NEW) { 'FLAGS'; '  --allow-escape-sequences   Allow terminal escape sequences in the output' }; exit 0 }
 if ($env:TS_GH_NEW -and $args[0] -eq 'api' -and $args[1] -match '/logs$' -and $args -notcontains '--allow-escape-sequences') { [Console]::Error.WriteLine('the response contains terminal escape sequences; pass --allow-escape-sequences to output it anyway'); exit 1 }
-if ($args[0] -eq 'api' -and $args[1] -eq 'repos/EvilPatrick06/Thornswood/actions/runs/40400000000') { [IO.File]::ReadAllText((Join-Path $state 'run.json')); exit 0 }
-if ($args[0] -eq 'api' -and $args[1] -eq 'repos/EvilPatrick06/Thornswood/actions/runs/40400000000/jobs') { [IO.File]::ReadAllText((Join-Path $state 'jobs.json')); exit 0 }
-if ($args[0] -eq 'api' -and $args[1] -match '^repos/EvilPatrick06/Thornswood/actions/jobs/(\d+)/logs$') { [IO.File]::ReadAllLines((Join-Path $state ('log-' + $Matches[1] + '.txt'))); exit 0 }
+if ($args[0] -eq 'api' -and $args[1] -eq 'repos/ThornswoodRP/Thornswood/actions/runs/40400000000') { [IO.File]::ReadAllText((Join-Path $state 'run.json')); exit 0 }
+if ($args[0] -eq 'api' -and $args[1] -eq 'repos/ThornswoodRP/Thornswood/actions/runs/40400000000/jobs') { [IO.File]::ReadAllText((Join-Path $state 'jobs.json')); exit 0 }
+if ($args[0] -eq 'api' -and $args[1] -match '^repos/ThornswoodRP/Thornswood/actions/jobs/(\d+)/logs$') { [IO.File]::ReadAllLines((Join-Path $state ('log-' + $Matches[1] + '.txt'))); exit 0 }
 [Console]::Error.WriteLine('stand-in gh was asked ' + ($args -join ' ')); exit 1
 '@, $utf8)
     $env:TS_GH_STATE = $gh
@@ -189,7 +189,8 @@ if ($args[0] -eq 'api' -and $args[1] -match '^repos/EvilPatrick06/Thornswood/act
     Yes ("3. with the pin moved, the records are written (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Out -match 'records of fork commit c19d6d4675cc are written' -and
         [IO.File]::ReadAllText((Join-Path $repo 'records/server-build.json')) -eq (Server-Record $commit) -and (Test-Path -LiteralPath (Join-Path $repo 'records/client-build.json')))
     Yes '3.   and the old licence text is gone' (-not (Test-Path -LiteralPath (Join-Path $repo 'records/client-licences/old-port.txt')) -and (Test-Path -LiteralPath (Join-Path $repo 'records/client-licences/zlib.txt')))
-    Yes '3.   read from the log of the job that succeeded' ([IO.File]::ReadAllText((Join-Path $gh 'calls.txt')) -match 'actions/jobs/222/logs' -and -not ([IO.File]::ReadAllText((Join-Path $gh 'calls.txt')) -match 'actions/jobs/111/logs'))
+    Yes '3.   read from the log of the Engine build job that succeeded' ([IO.File]::ReadAllText((Join-Path $gh 'calls.txt')) -match 'actions/jobs/222/logs' -and -not ([IO.File]::ReadAllText((Join-Path $gh 'calls.txt')) -match 'actions/jobs/111/logs'))
+    Yes '3.   not the wake job that succeeded beside it (#5219)' (-not ([IO.File]::ReadAllText((Join-Path $gh 'calls.txt')) -match 'actions/jobs/333/logs'))
     Yes '3.   an older gh, with no such flag, is not given --allow-escape-sequences' ([IO.File]::ReadAllText((Join-Path $gh 'calls.txt')) -notmatch 'allow-escape-sequences')
     # #5202: engine-pin.yml stopped here on 31 Oct 2026, its runner's gh
     # refusing the log for its colours.

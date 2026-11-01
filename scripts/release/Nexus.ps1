@@ -41,7 +41,7 @@
   value the harness sets, and an address that is not loopback is refused.
 
   EVERY REQUEST to Nexus carries Application-Name Thornswood and
-  Application-Version, the launcher's version from launcher\app\Updater.cs, as
+  Application-Version, main's launcher number (LauncherVersion.ps1), as
   the acceptable use policy asks
   (https://help.nexusmods.com/article/114-api-acceptable-use-policy).
 
@@ -81,12 +81,21 @@ function Get-NexusField($obj, [string]$name) {
   return $p.Value
 }
 
+# Main's launcher number for this checkout (LauncherVersion.ps1, #5179): git
+# holds 0.0.0 in Updater.cs, so the number is worked out from the history,
+# which a shallow checkout does not have and says so. Worked out once in a
+# run, the first time a request needs it: the checkout does not move under a
+# run, so every request sends the same number. Asked of git for each request,
+# as it was from #5179 until 1 Nov, every request started two git processes,
+# and tests\test-2914-nexus-scripts.ps1 went from about 390 processes to
+# about 1300 and past its 300 seconds on a Windows runner.
+$script:NexusAppVersion = ''
 function Get-NexusAppVersion {
-  $updater = Join-Path $script:NexusHere '..\..\launcher\app\Updater.cs'
-  if (-not (Test-Path -LiteralPath $updater)) { throw ('launcher\app\Updater.cs is not beside this script (' + $updater + '), so there is no version to send as Application-Version.') }
-  $m = [regex]::Match([IO.File]::ReadAllText($updater), 'public const string Version\s*=\s*"([0-9][0-9.]*)"')
-  if (-not $m.Success) { throw 'launcher\app\Updater.cs has no Version line to send as Application-Version.' }
-  return $m.Groups[1].Value
+  if ($script:NexusAppVersion) { return $script:NexusAppVersion }
+  . (Join-Path $script:NexusHere 'LauncherVersion.ps1')
+  try { $script:NexusAppVersion = Get-LauncherVersion -RepoDir (Join-Path $script:NexusHere '..\..') }
+  catch { throw ($_.Exception.Message + ' It is sent to Nexus as Application-Version.') }
+  return $script:NexusAppVersion
 }
 
 # The address every request goes to: Nexus itself, or the harness's stand-in.

@@ -62,7 +62,7 @@
 
 . (Join-Path $PSScriptRoot 'Assert-PublishSigned.ps1')
 
-$SignOnGitHubRepo = 'EvilPatrick06/skymp'
+$SignOnGitHubRepo = 'ThornswoodRP/skymp'
 $SignOnGitHubWorkflow = 'thornswood-sign-manifest.yml'
 $SignOnGitHubRef = 'main'
 

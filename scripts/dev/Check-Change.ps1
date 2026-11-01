@@ -93,7 +93,7 @@ try {
     } else {
         $maps = Join-Path $scratch 'map'
         $env:GATE_MAP_TOKEN = $token
-        try { & (Join-Path $Here 'Gate-Map.ps1') -Fetch $maps -Repository 'EvilPatrick06/Thornswood' 2>&1 | ForEach-Object { Say ([string]$_) } }
+        try { & (Join-Path $Here 'Gate-Map.ps1') -Fetch $maps -Repository 'ThornswoodRP/Thornswood' 2>&1 | ForEach-Object { Say ([string]$_) } }
         finally { Remove-Item -LiteralPath Env:GATE_MAP_TOKEN -ErrorAction SilentlyContinue }
         $token = $null
         if ($LASTEXITCODE -ne 0) {

@@ -48,8 +48,8 @@ function token() {
   const t = now();
   const claims = {
     iss: 'https://token.actions.githubusercontent.com', aud: 'thornswood-admin', iat: t - 5, nbf: t - 5, exp: t + 300,
-    repository: 'EvilPatrick06/Thornswood-Ops', ref: 'refs/heads/main',
-    job_workflow_ref: 'EvilPatrick06/Thornswood-Ops/.github/workflows/github-admin.yml@refs/heads/main',
+    repository: 'ThornswoodRP/Thornswood-Ops', repository_id: '1435123931', ref: 'refs/heads/main',
+    job_workflow_ref: 'ThornswoodRP/Thornswood-Ops/.github/workflows/github-admin.yml@refs/heads/main',
     event_name: 'workflow_dispatch', run_id: '4013', actor: 'EvilPatrick06',
   };
   const head = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT', kid: 'gh-1' }));
@@ -94,7 +94,7 @@ function standIn(req, res) {
       return t.length === 3 && crypto.verify('RSA-SHA256', Buffer.from(t[0] + '.' + t[1]), appKey.publicKey, unb64url(t[2]));
     };
     if (P === '/jwks') return send(200, JWKS);
-    if (P === '/repos/EvilPatrick06/Thornswood/installation') return asApp() ? send(200, { id: 77, permissions: gh.perms }) : send(401, { message: 'Bad credentials' });
+    if (P === '/repos/ThornswoodRP/Thornswood/installation') return asApp() ? send(200, { id: 77, permissions: gh.perms }) : send(401, { message: 'Bad credentials' });
     if (P === '/app/installations/77/access_tokens' && req.method === 'POST') {
       if (!asApp()) return send(401, { message: 'Bad credentials' });
       const perms = body.permissions || {};
@@ -104,7 +104,7 @@ function standIn(req, res) {
       gh.tokens[t] = { repos: body.repositories || null, perms };
       return send(201, { token: t });
     }
-    const m = /^\/repos\/EvilPatrick06\/(Thornswood|Thornswood-Ops)(\/.*)?$/.exec(P);
+    const m = /^\/repos\/ThornswoodRP\/(Thornswood|Thornswood-Ops)(\/.*)?$/.exec(P);
     if (!m) return send(404, { message: 'Not Found' });
     const repo = m[1], rest = m[2] || '';
     // A token reaches only the repository it was made for, with what it holds.
@@ -210,10 +210,10 @@ const lines = r => ((r.json && r.json.lines) || []).join('\n');
     console.log('what stops it');
     fresh(); gh.runners.Thornswood = ['thornswood-vps-3'];
     r = await ask(P, { what: 'go-public' });
-    yes('a runner still registered to this repository: 409, named, nothing changed', r.status === 409 && /STOP these runners are still registered to EvilPatrick06\/Thornswood: thornswood-vps-3/.test(lines(r)) && writes().length === 0 && gh.visibility === 'private');
+    yes('a runner still registered to this repository: 409, named, nothing changed', r.status === 409 && /STOP these runners are still registered to ThornswoodRP\/Thornswood: thornswood-vps-3/.test(lines(r)) && writes().length === 0 && gh.visibility === 'private');
     fresh(); gh.envs['Thornswood-Ops'].notices = null; delete gh.envs['Thornswood-Ops'].notices;
     r = await ask(P, { what: 'go-public' });
-    yes('the ops repository without its notices key: 409, named, nothing changed', r.status === 409 && /EvilPatrick06\/Thornswood-Ops has no notices environment secret NOTICE_KEY_B64/.test(lines(r)) && writes().length === 0);
+    yes('the ops repository without its notices key: 409, named, nothing changed', r.status === 409 && /ThornswoodRP\/Thornswood-Ops has no notices environment secret NOTICE_KEY_B64/.test(lines(r)) && writes().length === 0);
     fresh(); gh.secrets['Thornswood-Ops'] = [];
     r = await ask(P, { what: 'go-public' });
     yes('the ops repository without the turnstile token: 409, nothing changed', r.status === 409 && /has no secret CLOUDFLARE_TURNSTILE_TOKEN of its own/.test(lines(r)) && writes().length === 0);
@@ -226,19 +226,19 @@ const lines = r => ((r.json && r.json.lines) || []).join('\n');
 
     console.log('the flip');
     fresh(); gh.calls = [];
-    r = await ask(P, { what: 'go-public', repositories: ['EvilPatrick06/skymp'], drop: ['BOARD_TOKEN'], visibility: 'internal' });
+    r = await ask(P, { what: 'go-public', repositories: ['ThornswoodRP/skymp'], drop: ['BOARD_TOKEN'], visibility: 'internal' });
     yes('a run answers 200 with 4 changes', r.status === 200 && r.json.ok && r.json.changed === 4);
     const w = writes();
-    yes('  the three deletes come first and the switch last', w.length === 4 && w[0].path === '/repos/EvilPatrick06/Thornswood/actions/secrets/CLOUDFLARE_TURNSTILE_TOKEN' &&
-      w[1].path === '/repos/EvilPatrick06/Thornswood/environments/desk/secrets/DESK_KEY_B64' && w[2].path === '/repos/EvilPatrick06/Thornswood/environments/notices' &&
-      w[3].method === 'PATCH' && w[3].path === '/repos/EvilPatrick06/Thornswood' && JSON.stringify(w[3].body) === '{"visibility":"public"}');
+    yes('  the three deletes come first and the switch last', w.length === 4 && w[0].path === '/repos/ThornswoodRP/Thornswood/actions/secrets/CLOUDFLARE_TURNSTILE_TOKEN' &&
+      w[1].path === '/repos/ThornswoodRP/Thornswood/environments/desk/secrets/DESK_KEY_B64' && w[2].path === '/repos/ThornswoodRP/Thornswood/environments/notices' &&
+      w[3].method === 'PATCH' && w[3].path === '/repos/ThornswoodRP/Thornswood' && JSON.stringify(w[3].body) === '{"visibility":"public"}');
     yes('  each with one token, for this repository alone, holding write for exactly what the run takes', w.every(c => c.token === w[0].token) &&
       JSON.stringify(w[0].token.repos) === '["Thornswood"]' && JSON.stringify(Object.keys(w[0].token.perms).sort()) === '["administration","environments","secrets"]' && Object.values(w[0].token.perms).every(v => v === 'write'));
     yes('  the repository is public; desk keeps NEXUS_API_KEY, the board environment and BOARD_TOKEN are left alone', gh.visibility === 'public' &&
       JSON.stringify(gh.envs.Thornswood.desk) === '["NEXUS_API_KEY"]' && !gh.envs.Thornswood.notices && JSON.stringify(gh.secrets.Thornswood) === '["BOARD_TOKEN"]' && JSON.stringify(gh.envs.Thornswood.board) === '["BOARD_TOKEN"]');
     yes('  the ops repository keeps every copy', JSON.stringify(gh.secrets['Thornswood-Ops']) === '["CLOUDFLARE_TURNSTILE_TOKEN"]' && gh.envs['Thornswood-Ops'].desk.length === 1 && gh.envs['Thornswood-Ops'].notices.length === 1);
     yes('  nothing the caller sent but the ask changed what it did', !gh.calls.some(c => /skymp/.test(c.path)));
-    yes('  it read everything back, and says what desk holds', /EvilPatrick06\/Thornswood is public; the desk environment holds NEXUS_API_KEY/.test(lines(r)));
+    yes('  it read everything back, and says what desk holds', /ThornswoodRP\/Thornswood is public; the desk environment holds NEXUS_API_KEY/.test(lines(r)));
     gh.calls = [];
     r = await ask(P, { what: 'go-public' });
     yes('a second run changes nothing and says it is done', r.status === 200 && r.json.changed === 0 && /is public and holds none of the box's secrets/.test(lines(r)) && writes().length === 0);
@@ -246,7 +246,7 @@ const lines = r => ((r.json && r.json.lines) || []).join('\n');
     console.log('a refused delete');
     fresh(); gh.refuse = 'CLOUDFLARE_TURNSTILE_TOKEN';
     r = await ask(P, { what: 'go-public' });
-    yes('stops it before the switch: 409, and the repository is still private', r.status === 409 && /STOP GitHub did not take the secret CLOUDFLARE_TURNSTILE_TOKEN \(HTTP 500: refused\); EvilPatrick06\/Thornswood is still private, and nothing after this was done/.test(lines(r)) &&
+    yes('stops it before the switch: 409, and the repository is still private', r.status === 409 && /STOP GitHub did not take the secret CLOUDFLARE_TURNSTILE_TOKEN \(HTTP 500: refused\); ThornswoodRP\/Thornswood is still private, and nothing after this was done/.test(lines(r)) &&
       gh.visibility === 'private' && writes().length === 1);
     fresh(); gh.refuse = 'visibility';
     r = await ask(P, { what: 'go-public' });

@@ -634,8 +634,8 @@ def issue(num, title, label, state='open', reason=None, pr=False,
     row = {'number': num, 'title': title, 'state': state,
            'state_reason': reason, 'closed_at': closed_at,
            'updated_at': HOUR[0] + ':%02d:%02dZ' % divmod(UPD[0], 60),
-           'html_url': 'https://github.com/EvilPatrick06/Thornswood/issues/%d' % num,
-           'repository_url': 'https://api.github.com/repos/EvilPatrick06/Thornswood',
+           'html_url': 'https://github.com/ThornswoodRP/Thornswood/issues/%d' % num,
+           'repository_url': 'https://api.github.com/repos/ThornswoodRP/Thornswood',
            'labels': [{'name': l} for l in label]}
     if pr:
         row['pull_request'] = {}
@@ -649,9 +649,15 @@ EMPTY_LISTS = set()
 DELETED = set()
 
 
+# What the stand-in GitHub calls the repository now (#5184).
+REPO_NOW = [bot.KNOWN_REPO]
+
+
 def gh(url):
     ASKED.append(url)
     path = url.split('?')[0]
+    if path.endswith('/repos/' + bot.KNOWN_REPO):
+        return {'full_name': REPO_NOW[0]}
     if path.endswith('/comments'):
         return COMMENTS.get(int(path.split('/')[-2]), [])
     if path.endswith('/timeline'):
@@ -1386,12 +1392,12 @@ df = bot._channel_named(g, 'dev-test-tasks', ('forum',))
 ds = {}
 run(bot.test_tasks_once(tf, ds, gh, me_id=me.id, now='2026-10-14T07:59:00Z'))
 run(bot.dev_tasks_once(df, ds, gh, me_id=me.id, now='2026-10-14T07:59:30Z'))
-REPO_URL = 'https://github.com/EvilPatrick06/Thornswood'
+REPO_URL = 'https://github.com/ThornswoodRP/Thornswood'
 SHA = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'
 
 
 def pr_ref(num, title, state='closed', merged='2026-10-14T07:00:00Z',
-           repo='EvilPatrick06/Thornswood'):
+           repo='ThornswoodRP/Thornswood'):
     return {'event': 'cross-referenced', 'source': {'type': 'issue', 'issue': {
         'number': num, 'title': title, 'state': state,
         'html_url': 'https://github.com/%s/pull/%d' % (repo, num),
@@ -1408,7 +1414,7 @@ timeline = [
         'number': 904, 'title': 'An issue, not a PR', 'state': 'open',
         'html_url': REPO_URL + '/issues/904'}}},
     {'event': 'referenced', 'commit_id': SHA,
-     'commit_url': 'https://api.github.com/repos/EvilPatrick06/Thornswood/commits/' + SHA},
+     'commit_url': 'https://api.github.com/repos/ThornswoodRP/Thornswood/commits/' + SHA},
     {'event': 'referenced', 'commit_id': 'f' * 40,
      'commit_url': 'https://api.github.com/repos/someone/else/commits/' + 'f' * 40},
     {'event': 'labeled', 'label': {'name': 'Dev Findings'}},
@@ -1687,18 +1693,74 @@ try:
     issue(2215, 'Moved away', ['Dev Findings'])
     run(bot.known_issues_once(kf, ks, gh, me_id=me.id))
     EMPTY_LISTS.update(['Dev Findings'])
-    ISSUES[2215]['repository_url'] = 'https://api.github.com/repos/EvilPatrick06/skymp'
+    ISSUES[2215]['repository_url'] = 'https://api.github.com/repos/ThornswoodRP/skymp'
     del said[:]
     removed = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))[2]
     yes('  and so does one moved to another repository',
-        removed == [2215] and any('took #2215 down: it moved to evilpatrick06/skymp'
+        removed == [2215] and any('took #2215 down: it moved to thornswoodrp/skymp'
                                   in x for x in said))
+    # The repository itself moved to another owner (#5184): GitHub answers
+    # its issues under the new name, and they are still the bot's. Here the
+    # bot still has the name from before the move, as a bot.env.json that
+    # sets KNOWN_ISSUES_REPO would give it.
+    known_repo = bot.KNOWN_REPO
+    bot.KNOWN_REPO = REPO_NOW[0] = 'EvilPatrick06/Thornswood'
+    EMPTY_LISTS.discard('Dev Findings')
+    issue(2216, 'Still here', ['Dev Findings'])
+    ISSUES[2216]['repository_url'] = 'https://api.github.com/repos/EvilPatrick06/Thornswood'
+    posted = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))[0]
+    yes('  (a finding in the repository is posted)', 2216 in posted)
+    EMPTY_LISTS.update(['Dev Findings'])
+    REPO_NOW[0] = 'ThornswoodRP/Thornswood'
+    ISSUES[2216]['repository_url'] = 'https://api.github.com/repos/ThornswoodRP/Thornswood'
+    del said[:]
+    removed = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))[2]
+    yes('  but one whose repository moved to another owner stays up (#5184)',
+        2216 not in removed and not any('took #2216 down' in x for x in said))
+    # and its writes go to the new name, since GitHub answers a POST to the
+    # old one with a 307 that urllib does not follow (#5184).
+    wrote = []
+
+    class _Answer:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return b'{"number": 7}'
+
+    real_open = bot.urllib.request.urlopen
+    bot.urllib.request.urlopen = lambda req, timeout=None: (wrote.append(req.full_url), _Answer())[1]
+    token = os.environ.get('GITHUB_TOKEN')
+    os.environ['GITHUB_TOKEN'] = 'stand-in'
+    try:
+        bot.github_say(2216, 'x')
+        bot.github_file('t', 'b', [])
+    finally:
+        bot.urllib.request.urlopen = real_open
+        if token is None:
+            os.environ.pop('GITHUB_TOKEN', None)
+        else:
+            os.environ['GITHUB_TOKEN'] = token
+    yes('  and its comments and new issues go to the name it has now',
+        wrote == [bot.GITHUB_API + '/repos/ThornswoodRP/Thornswood/issues/2216/comments',
+                  bot.GITHUB_API + '/repos/ThornswoodRP/Thornswood/issues'])
+    yes('  and the bot can say which kind of token it has, never the token',
+        [bot.github_token_kind(t) for t in
+         ('github_pat_x', 'ghp_x', 'ghs_x', 'gho_x', '', 'zzz')] ==
+        ['fine-grained', 'classic', 'app installation', 'oauth', 'no', 'unknown'])
+    bot.KNOWN_REPO = REPO_NOW[0] = known_repo
+    bot._KNOWN_REPO_NOW['name'] = ''
+    ISSUES[2216].update(state='closed',
+                        repository_url='https://api.github.com/repos/' + known_repo)
 
     def broken_issue(url):
         if '/issues/2299' in url.split('?')[0]:
             raise bot.urllib.error.HTTPError(url, 502, 'Bad Gateway', {}, None)
         return gh(url)
-    ISSUES[2215]['repository_url'] = 'https://api.github.com/repos/EvilPatrick06/Thornswood'
+    ISSUES[2215]['repository_url'] = 'https://api.github.com/repos/ThornswoodRP/Thornswood'
     run(bot.known_issues_once(kf, ks, gh, me_id=me.id))
     EMPTY_LISTS.update(['Dev Findings'])
     keep = sorted(th.id for th in kf.threads)

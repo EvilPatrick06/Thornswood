@@ -4,7 +4,9 @@
 # What a Claude Code cloud session needs from this repository that the cloud
 # image does not have: today, the bot's libraries in python3.12, so the bot
 # harnesses (tests/test-staff-commands.js, tests/test-help-report.js) run in
-# a cloud thread the way they run on One and in the nightly (#3055).
+# a cloud thread the way they run on One and in the nightly (#3055); and,
+# as the hook, the session's git identity, so its commits are Patrick's and
+# not Claude's (#5231, below).
 #
 # WHY IT IS RUN THIS WAY
 #
@@ -88,6 +90,30 @@ print(('already in ' if have else 'added to ') + path + ': the SessionStart hook
 PY
 elif [ "${CLAUDE_CODE_REMOTE:-}" != true ]; then
   exit 0
+fi
+
+# Who a cloud session's commits are by (#5231, Patrick's answer C on
+# q-5231-identity, 1 Nov 2026). The cloud image's git identity is Claude's,
+# and GitHub's Contributors list counts every commit author on a default
+# branch, so a fork merge commit or a direct push from a cloud thread put
+# Claude on the list. The sessions of this environment work for Patrick, so
+# their commits are his. Through the session's environment file
+# (CLAUDE_ENV_FILE, which Claude Code gives a SessionStart hook and reads
+# before every command), because GIT_AUTHOR_* and GIT_COMMITTER_* outrank any
+# git config the image holds. --register runs at image build, not as a hook,
+# and has no session to set it for.
+if [ "$register" = 0 ]; then
+  if [ -z "${CLAUDE_ENV_FILE:-}" ]; then
+    echo "Setup-CloudSession.sh: Claude Code gave this hook no CLAUDE_ENV_FILE, so this session's commits keep the image's git identity (#5231)." >&2
+  else
+    {
+      echo "export GIT_AUTHOR_NAME='EvilPatrick06'"
+      echo "export GIT_AUTHOR_EMAIL='187923600+EvilPatrick06@users.noreply.github.com'"
+      echo "export GIT_COMMITTER_NAME='EvilPatrick06'"
+      echo "export GIT_COMMITTER_EMAIL='187923600+EvilPatrick06@users.noreply.github.com'"
+    } >> "$CLAUDE_ENV_FILE"
+    echo "This session's commits are by EvilPatrick06 (#5231)."
+  fi
 fi
 
 if ! command -v python3.12 >/dev/null; then

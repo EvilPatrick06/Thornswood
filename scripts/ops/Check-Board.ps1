@@ -55,7 +55,7 @@ param(
     [string]$Issues,
     # Skip "no card", and with it the read of the open issues.
     [switch]$NoIssues,
-    [string]$GitHubRepo = 'EvilPatrick06/Thornswood',
+    [string]$GitHubRepo = 'ThornswoodRP/Thornswood',
     # Define the functions and stop, which is how the harness loads them.
     [switch]$Load
 )

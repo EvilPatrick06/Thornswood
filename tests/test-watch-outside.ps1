@@ -60,7 +60,7 @@ $ipLike = $null
 Yes 'the game''s name comes from scripts\vps\vps.json, a name and not the box''s address (#3690)' ($S.GameHost -and -not [Net.IPAddress]::TryParse($S.GameHost, [ref]$ipLike))
 Yes 'the certificate line is 14 days' ($S.CertDays -eq 14)
 Yes 'the webhook''s channel is #staff-updates, bot\staff-channel.txt''s id (#2501)' ($S.StaffChannel -eq '1549254991082946570')
-Yes 'the runners are Thornswood-Ops''s, where the box''s runners are registered since the flip (#4013), from thornswood-vps' ($S.Repo -eq 'EvilPatrick06/Thornswood-Ops' -and $S.RunnerName -eq 'thornswood-vps')
+Yes 'the runners are Thornswood-Ops''s, where the box''s runners are registered since the flip (#4013), from thornswood-vps' ($S.Repo -eq 'ThornswoodRP/Thornswood-Ops' -and $S.RunnerName -eq 'thornswood-vps')
 Yes 'signing and the off-box copy are not asked from outside any more (#2755)' (-not $S.ContainsKey('SignAccount') -and -not $S.ContainsKey('BackupsFolder'))
 
 $dir = Join-Path $Temp ('thornswood-watchoutside-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -349,19 +349,19 @@ try {
 
   # The real Get-Runners, against the fake Get-Http.
   $env:WATCH_RUNNER_TOKEN = ''
-  $g = & $realGetRunners 'EvilPatrick06/Thornswood'
+  $g = & $realGetRunners 'ThornswoodRP/Thornswood'
   Yes 'Get-Runners: no token is said, never asked without one' ($g.Error -match 'no runner token' -and $g.Error -match 'WATCH_RUNNER_TOKEN')
   $env:WATCH_RUNNER_TOKEN = 'github_pat_FAKETOKEN123'
-  $g = & $realGetRunners 'EvilPatrick06/Thornswood'
+  $g = & $realGetRunners 'ThornswoodRP/Thornswood'
   Yes 'Get-Runners: the token goes as a bearer, and the list comes back' ($script:runnerAuth -eq 'Bearer github_pat_FAKETOKEN123' -and @($g.Runners).Count -eq 2 -and @($g.Runners)[1].Status -eq 'offline' -and -not $g.Error)
   $script:ghRunners = 401
-  $g = & $realGetRunners 'EvilPatrick06/Thornswood'
+  $g = & $realGetRunners 'ThornswoodRP/Thornswood'
   Yes 'Get-Runners: a refused token is said as refused' ($g.Error -match 'refused the runner token \(HTTP 401\)')
   $script:ghRunners = 0
-  $g = & $realGetRunners 'EvilPatrick06/Thornswood'
+  $g = & $realGetRunners 'ThornswoodRP/Thornswood'
   Yes 'Get-Runners: GitHub not answering is said in words' ($g.Error -eq 'GitHub did not answer within 20 seconds')
   $script:ghRunners = 502
-  $g = & $realGetRunners 'EvilPatrick06/Thornswood'
+  $g = & $realGetRunners 'ThornswoodRP/Thornswood'
   Yes 'Get-Runners: GitHub answering 502 is said' ($g.Error -eq 'GitHub answered HTTP 502')
   Yes 'Get-Runners: no reason names the repository or holds the token' (-not ($g.Error -match 'Thornswood|FAKETOKEN'))
   $env:WATCH_RUNNER_TOKEN = ''
@@ -524,7 +524,7 @@ try {
     @($script:printed | Where-Object { $_ -match '^\s+runner\s+COULD NOT CHECK\s+\S' }).Count -gt 0 -and
     @($script:printed | Where-Object { $_ -match '^\s+runner\s+COULD NOT CHECK\s+\(about a private' }).Count -eq 0)
   $env:WATCH_RUNNER_TOKEN = 'github_pat_FAKETOKEN123'; $script:ghRunners = 401
-  $u = Unknown (& $realGetRunners 'EvilPatrick06/Thornswood').Error; $u.Private = $true
+  $u = Unknown (& $realGetRunners 'ThornswoodRP/Thornswood').Error; $u.Private = $true
   $env:WATCH_RUNNER_TOKEN = ''
   $shown = (Write-Results ([ordered]@{ runner = $u }) 6>&1 | Out-String)
   Yes '  a refused token is printed as refused, with its HTTP code, and nothing else' ($shown -match 'runner\s+COULD NOT CHECK\s+GitHub refused the runner token \(HTTP 401\)' -and $shown -notmatch 'Thornswood|FAKETOKEN')

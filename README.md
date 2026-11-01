@@ -10,7 +10,7 @@ It is in alpha and open by application. To join, apply in the
 [thornswood.net/join](https://thornswood.net/join). The game is not downloaded here.
 
 - Something broken, or an idea: [thornswood.net/report](https://thornswood.net/report),
-  the Discord, or a [new issue](https://github.com/EvilPatrick06/Thornswood/issues/new/choose).
+  the Discord, or a [new issue](https://github.com/ThornswoodRP/Thornswood/issues/new/choose).
   [SUPPORT.md](SUPPORT.md) says which fits.
 - A security hole: never as an issue. [SECURITY.md](SECURITY.md) says where.
 - Sending a change: [CONTRIBUTING.md](CONTRIBUTING.md), and

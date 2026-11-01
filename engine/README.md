@@ -7,7 +7,7 @@ each half, with the file and line for each step.
 
 ## The submodule
 
-`.gitmodules:11-15` names the fork, `https://github.com/EvilPatrick06/skymp.git`,
+`.gitmodules:11-15` names the fork, `https://github.com/ThornswoodRP/skymp.git`,
 on the branch `thornswood/engine-changes`, at `engine/skymp`. The repository
 pins a commit, not the branch. This page does not name that commit or the
 hashes built from it, because every engine change moves them: twice it named
@@ -313,8 +313,13 @@ A change to the engine goes like this:
    which moves the pin in the index, runs `Get-EngineRecords.ps1`,
    `Build-Front.ps1 -Record` and `Write-EnginePinText.ps1`, runs the checks
    and stages the change.
-5. After it merges: the server to the dev server with `Publish-Server.ps1
-   -Channel dev`, the client with the next dev Ship. A machine without that
+5. After it merges, the dev server takes it by itself (#5219):
+   `gamemode-release.yml` runs because the pin changed
+   `records\server-build.json`, puts CI's server build of the pin on a signed
+   Release beside the gamemode, and the box deploy agent swaps it in under a
+   hold and starts dev on it (docs\DEPLOY-AGENT.md, "A new server build").
+   The client goes with the next dev Ship. By hand, as before: the server
+   to the dev server with `Publish-Server.ps1 -Channel dev`. A machine without that
    build puts it on from the store on the box, where the publish or deploy
    that sent it kept it: `Publish-Server.ps1 -Channel dev -FromStore`, and
    for live `Deploy-Server.ps1 -FromStore` (#459). `-ServerBuild <zip>` sends a
@@ -367,11 +372,18 @@ choice:
   moves `engine/skymp` starts it, and the fork starts it when its push build
   ends green (the fork's `thornswood-wake-pin.yml`, with the fork's one
   secret, `THORNSWOOD_PIN_WAKE`: a fine-grained token scoped to this
-  repository that may start its workflows and nothing else). It also still
-  looks every ten minutes until the fork's wake has run for real. Each look
+  repository that may start its workflows and nothing else), and
+  `engine-pin-aside.yml` starts it when another pull request that moves
+  `engine/skymp` closes without merging. Nothing starts it on a clock: the
+  ten-minute tick went once the fork's wake had run for real (1 November
+  2026). Closing `engine-pin/next`'s own pull request starts no look, since
+  that means "not this pin"; the next fork build looks again. Each look
   asks GitHub what the pin needs
   (`scripts\release\EnginePin.ps1`, `Get-EnginePinStep`): nothing, when main
-  pins the fork's head or the fork is still building it; wait, when another
+  pins the fork's head, or when the fork is still building it and no earlier
+  head since the pin is built; while the head builds, the newest earlier
+  head the fork built green goes first, so a fork merge during a build never
+  holds the pin back, and the head follows when its build ends; wait, when another
   open pull request moves `engine/skymp` (a pin made by hand goes first);
   start `engine.yml` for the head, when the fork built it green and nothing
   recorded it; move the pin, when `engine.yml` recorded it green.
@@ -382,7 +394,7 @@ choice:
   on it and opens or updates the pull request (`Open-EnginePinPr.ps1`). The
   branch always starts from main as it is, so it never needs a merge.
 - An `engine.yml` run that ends red is never started again for that commit.
-  The tick goes red with its link until the cause is fixed and the run is
+  The look goes red with its link until the cause is fixed and the run is
   started by hand, or the fork's head moves on.
 - The run's own token opens the pull request, which GitHub allows while
   Thornswood's Actions setting "Allow GitHub Actions to create and approve
@@ -402,6 +414,14 @@ choice:
   `Test task for Thornswood #N: <title>` with the steps under it, in the shape
   `.github\pull_request_template.md` gives. The pin pull request copies both
   over, so done-on-merge.yml moves the issue when the pin merges.
+- A fork pull request also carries a `Release note:` line, the shape this
+  repository's pull requests carry (Developer-Guide.md), held to the same
+  rules by the fork's own check. The pin pull request's `Release note:` is
+  those lines joined, `none` when each says none; a fork pull request with
+  no line is named in the pin's body, and its Release note check stays red
+  until a person writes the line there. engine-pin.yml starts that check on
+  the branch, since a pull request its own token opens starts no
+  pull_request run.
 
 From a fork merge to a pin pull request ready to merge: the fork's push build
 (20 to 45 minutes), the record (about 3), the pin (about 4) and the build
@@ -535,8 +555,9 @@ Ship will have. No engine build on any machine is part of a release.
 
 It asks the fork's package of the build first (#5152): since fork #131
 every push build is also kept as
-`ghcr.io/evilpatrick06/thornswood-engine:<commit>`, for good and readable
-with no account, so an old pin ships as well as a new one, and reverting a
+`ghcr.io/thornswoodrp/thornswood-engine:<commit>` (before the fork moved to
+ThornswoodRP, `ghcr.io/evilpatrick06/thornswood-engine:<commit>`, which is
+asked second, #5184), for good and readable with no account, so an old pin ships as well as a new one, and reverting a
 pin pull request brings its engine back. The package is held to the records
 exactly as an artifact is; one that is not the records' build (the fork's
 build was run again and the records were made from the later one), or a pin

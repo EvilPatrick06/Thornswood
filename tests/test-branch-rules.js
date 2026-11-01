@@ -20,8 +20,8 @@
 //
 // So this checks two things. First, the facts the documents lean on, read off
 // the files that decide them: build.yml has one job and it is "Launcher
-// builds"; Ship.ps1 never writes to the source repository; Bump-Version.ps1
-// commits Updater.cs and nothing else; CODEOWNERS names files that exist and
+// builds"; Ship.ps1 never writes to the source repository; nothing commits
+// the launcher's number (#5179); CODEOWNERS names files that exist and
 // covers the six shared ones the ops repo's CLAUDE.md lists. Then the documents: each states
 // the four settings (since 25 September: enforce_admins off, no required
 // check, since the build check on GitHub is off), gives
@@ -176,14 +176,13 @@ yes('Ship.ps1 refuses a main release with a file in a folder a release is built 
     // (#1151) tools\ is gone and the refusal names only those folders.
     /file\(s\) in a folder a release is built from that git does not know about/.test(shipSrc));
 
-// ------------------------------------------------------------ Bump-Version.ps1
-const bump = gitCalls(read('scripts/release/Bump-Version.ps1'));
-const bumpAdds = bump.filter(function (c) { return c.sub === 'add'; });
-yes('Bump-Version.ps1 stages one path, launcher/app/Updater.cs, and nothing else',
-    bumpAdds.length === 1 && /^\s+--\s+'launcher\/app\/Updater\.cs'\s/.test(bumpAdds[0].rest + ' '));
-yes('Bump-Version.ps1 commits', bump.some(function (c) { return c.sub === 'commit'; }));
-yes('Bump-Version.ps1 pushes nothing itself; it prints the push for a person to run',
-    !bump.some(function (c) { return c.sub === 'push'; }));
+// ------------------------------------------------------------ the launcher's number
+// Bump-Version.ps1 is gone (#5179): the launcher's number is worked out from
+// git (scripts/release/LauncherVersion.ps1), so no script commits it.
+yes('Bump-Version.ps1 is gone: nothing commits the launcher\'s number',
+    !fs.existsSync(path.join(ROOT, 'scripts/release/Bump-Version.ps1')));
+yes('LauncherVersion.ps1 runs no git command that writes',
+    !gitCalls(read('scripts/release/LauncherVersion.ps1')).some(function (c) { return /^(add|commit|push|tag|update-ref)$/.test(c.sub); }));
 
 // ------------------------------------------------------------ CODEOWNERS
 const coRaw = read('.github/CODEOWNERS');
@@ -229,7 +228,7 @@ const docs = [
   { name: 'Developer-Guide.md', text: flat(claudeRaw, false) },
   { name: '.github/CODEOWNERS', text: flat(coRaw, true) }
 ];
-const PROTECTION = 'gh api repos/EvilPatrick06/Thornswood/branches/main/protection';
+const PROTECTION = 'gh api repos/ThornswoodRP/Thornswood/branches/main/protection';
 
 docs.forEach(function (d) {
   const t = d.text;
@@ -276,8 +275,8 @@ yes('Developer-Guide.md says for whom a force push to main is refused',
     /Never force push main: GitHub refuses it from write access, but not from the admin account/.test(sd));
 yes('Ship.ps1 does not say main refuses a push from everybody',
     !/refuses a push from everybody|refuses a\s+#?\s*push from everybody/i.test(flat(shipSrc, true)));
-yes('Developer-Guide.md does not say Ship bumps the version; Bump-Version.ps1 does, as its own commit',
-    !/Ship bumps/i.test(sd) && /Bump-Version\.ps1/.test(sd));
+yes('Developer-Guide.md does not say Ship bumps the version; it says the version comes from the build (#5179)',
+    !/Ship bumps/i.test(sd) && /### The version comes from the build/.test(sd) && /LauncherVersion\.ps1/.test(sd));
 yes('Developer-Guide.md does not say Ship patches the client; it checks it with Sync-Client.ps1 -Check',
     !/patches the client/i.test(sd) && /Sync-Client\.ps1 -Check/.test(sd));
 yes('Developer-Guide.md does not say the other person reads every pull request, which nothing enforces',
@@ -317,7 +316,7 @@ if (!LIVE) {
   // holds an admin to none of main's rules" is true only while none reaches main.
   let rs = null;
   try {
-    rs = JSON.parse(execSync('gh api repos/EvilPatrick06/Thornswood/rules/branches/main', { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] }).toString('utf8'));
+    rs = JSON.parse(execSync('gh api repos/ThornswoodRP/Thornswood/rules/branches/main', { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] }).toString('utf8'));
   } catch (e) {
     console.log('      ' + String(e.message).split('\n')[0]);
   }
@@ -332,7 +331,7 @@ if (!LIVE) {
   }
   let auto = null;
   try {
-    auto = execSync('gh api repos/EvilPatrick06/Thornswood --jq .allow_auto_merge', { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] }).toString('utf8').trim();
+    auto = execSync('gh api repos/ThornswoodRP/Thornswood --jq .allow_auto_merge', { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] }).toString('utf8').trim();
   } catch (e) { }
   yes('live: auto-merge is on, as the guide says (#5182; GitHub says ' + auto + ')', auto === 'true');
 }

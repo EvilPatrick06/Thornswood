@@ -11,7 +11,8 @@
 //      GitHub's published keys serves: a hand-started run of the ops
 //      repository's github-admin.yml on main passes; a push's run, a token
 //      from another workflow, another branch, a pull request, another
-//      repository (this one included), another
+//      repository (this one included, and one with the ops repository's
+//      name but not its id), another
 //      audience or issuer, an expired one, one signed by a key GitHub does
 //      not publish, one whose body was changed after signing, and one that
 //      says it needs no signature, each fail;
@@ -30,6 +31,9 @@
 //      an empty, too long or two-line description, a website that is not
 //      https, and a topic in capitals, twice, or past GitHub's 20 each stop;
 //      topics compare in any order;
+//   3c. redirects (#5184): a read GitHub moved (301) and a change it sends on
+//      (307) are followed, a change answered 301 is not, nor a redirect to
+//      another host, and a loop stops after five;
 //   4. admin.js spawned against a stand-in GitHub: anything through Caddy
 //      (X-Forwarded-For) but the setup pages is the plain 404; no token, a
 //      branch's token, and a token for another audience are 403 with nothing
@@ -122,9 +126,9 @@ function good(over) {
   const t = now();
   return Object.assign({
     iss: 'https://token.actions.githubusercontent.com', aud: 'thornswood-admin', iat: t - 5, nbf: t - 5, exp: t + 300,
-    repository: 'EvilPatrick06/Thornswood-Ops', ref: 'refs/heads/main',
-    job_workflow_ref: 'EvilPatrick06/Thornswood-Ops/.github/workflows/github-admin.yml@refs/heads/main',
-    workflow_ref: 'EvilPatrick06/Thornswood-Ops/.github/workflows/github-admin.yml@refs/heads/main',
+    repository: 'ThornswoodRP/Thornswood-Ops', repository_id: '1435123931', ref: 'refs/heads/main',
+    job_workflow_ref: 'ThornswoodRP/Thornswood-Ops/.github/workflows/github-admin.yml@refs/heads/main',
+    workflow_ref: 'ThornswoodRP/Thornswood-Ops/.github/workflows/github-admin.yml@refs/heads/main',
     event_name: 'workflow_dispatch', run_id: '4242', actor: 'EvilPatrick06',
   }, over || {});
 }
@@ -135,25 +139,32 @@ function why(token) {
 // ---- 1. the OIDC check ----------------------------------------------------------
 console.log('the OIDC check');
 yes('a hand-started run of the ops repository\'s github-admin.yml on main passes', why(sign(good())) === '');
-yes('the rules name the ops repository for the runners and this one for the records', admin.RULES.repository === 'EvilPatrick06/Thornswood-Ops' && admin.RUNNERS_REPO === 'EvilPatrick06/Thornswood-Ops' && admin.REPO === 'EvilPatrick06/Thornswood');
+yes('the rules name the ops repository for the runners and this one for the records', admin.RULES.repositoryId === '1435123931' && admin.RUNNERS_REPO === 'ThornswoodRP/Thornswood-Ops' && admin.REPO === 'ThornswoodRP/Thornswood');
 yes('one a push started fails, since a push here cannot start it there (#4013)', /started by push/.test(why(sign(good({ event_name: 'push' })))));
-yes('this repository\'s own github-admin.yml on main fails', /from EvilPatrick06\/Thornswood$/.test(why(sign(good({ repository: 'EvilPatrick06/Thornswood', job_workflow_ref: 'EvilPatrick06/Thornswood/.github/workflows/github-admin.yml@refs/heads/main' })))));
+yes('this repository\'s own github-admin.yml on main fails', /from ThornswoodRP\/Thornswood \(repository id 1365246621\)$/.test(why(sign(good({ repository: 'ThornswoodRP/Thornswood', repository_id: '1365246621', job_workflow_ref: 'ThornswoodRP/Thornswood/.github/workflows/github-admin.yml@refs/heads/main' })))));
+// #5184: the ops repository is known by its id, so its move into the
+// Thornswood organization changes nothing here.
+yes('the ops repository moved into the organization still passes, by its id', why(sign(good({ repository: 'Thornswood/Thornswood-Ops',
+  job_workflow_ref: 'Thornswood/Thornswood-Ops/.github/workflows/github-admin.yml@refs/heads/main', workflow_ref: 'Thornswood/Thornswood-Ops/.github/workflows/github-admin.yml@refs/heads/main' }))) === '');
+yes('  but a repository with its old name and another id fails', /repository id 999/.test(why(sign(good({ repository_id: '999' })))));
+yes('  and a token with no repository id fails', /repository id undefined/.test(why(sign(good({ repository_id: undefined })))));
+yes('  and the workflow from another repository, called from it, fails', /workflow/.test(why(sign(good({ job_workflow_ref: 'ThornswoodRP/Thornswood/.github/workflows/github-admin.yml@refs/heads/main' })))));
 yes('  with the audience as a list too', why(sign(good({ aud: ['x', 'thornswood-admin'] }))) === '');
-yes('another workflow on main fails', /workflow/.test(why(sign(good({ job_workflow_ref: 'EvilPatrick06/Thornswood-Ops/.github/workflows/build.yml@refs/heads/main' })))));
+yes('another workflow on main fails', /workflow/.test(why(sign(good({ job_workflow_ref: 'ThornswoodRP/Thornswood-Ops/.github/workflows/build.yml@refs/heads/main' })))));
 yes('github-admin.yml from a branch fails',
-  why(sign(good({ ref: 'refs/heads/claude/x', job_workflow_ref: 'EvilPatrick06/Thornswood-Ops/.github/workflows/github-admin.yml@refs/heads/claude/x' }))) !== '');
-yes('  even with a ref claim that says main', /workflow/.test(why(sign(good({ job_workflow_ref: 'EvilPatrick06/Thornswood-Ops/.github/workflows/github-admin.yml@refs/heads/claude/x' })))));
+  why(sign(good({ ref: 'refs/heads/claude/x', job_workflow_ref: 'ThornswoodRP/Thornswood-Ops/.github/workflows/github-admin.yml@refs/heads/claude/x' }))) !== '');
+yes('  even with a ref claim that says main', /workflow/.test(why(sign(good({ job_workflow_ref: 'ThornswoodRP/Thornswood-Ops/.github/workflows/github-admin.yml@refs/heads/claude/x' })))));
 yes('a pull request\'s run fails',
-  why(sign(good({ ref: 'refs/pull/3323/merge', event_name: 'pull_request', job_workflow_ref: 'EvilPatrick06/Thornswood-Ops/.github/workflows/github-admin.yml@refs/pull/3323/merge' }))) !== '');
+  why(sign(good({ ref: 'refs/pull/3323/merge', event_name: 'pull_request', job_workflow_ref: 'ThornswoodRP/Thornswood-Ops/.github/workflows/github-admin.yml@refs/pull/3323/merge' }))) !== '');
 yes('  and a pull_request_target run on main, by its event', /started by/.test(why(sign(good({ event_name: 'pull_request_target' })))));
-yes('another repository fails', /from EvilPatrick06\/skymp/.test(why(sign(good({ repository: 'EvilPatrick06/skymp' })))));
+yes('another repository fails', /from ThornswoodRP\/skymp/.test(why(sign(good({ repository: 'ThornswoodRP/skymp', repository_id: '1375283516' })))));
 yes('another audience fails', /audience/.test(why(sign(good({ aud: 'sigstore' })))));
 yes('another issuer fails', /issued by/.test(why(sign(good({ iss: 'https://example.com' })))));
 yes('an expired token fails', why(sign(good({ exp: now() - 1 }))) === 'expired');
 yes('one signed by a key GitHub does not publish fails', /key GitHub does not publish/.test(why(sign(good(), { kid: 'other', key: stray }))));
 yes('  or by another key under GitHub\'s key id', /signature/.test(why(sign(good(), { key: stray }))));
 const real = sign(good()).split('.');
-const changed = [real[0], b64url(JSON.stringify(good({ repository: 'EvilPatrick06/Thornswood', run_id: '1' }))), real[2]].join('.');
+const changed = [real[0], b64url(JSON.stringify(good({ repository: 'ThornswoodRP/Thornswood', run_id: '1' }))), real[2]].join('.');
 yes('one whose body was changed after signing fails', /signature/.test(why(changed)));
 yes('one that says it needs no signature fails', /not RS256/.test(why(sign(good(), { alg: 'none' }))));
 yes('something that is not a token fails', why('Bearer') === 'not a token' && why('') === 'not a token');
@@ -247,7 +258,7 @@ const mainSet = {
     { type: 'required_status_checks', parameters: { strict_required_status_checks_policy: false, required_status_checks: [{ context: 'Launcher builds' }] } }],
   bypass_actors: [],
 };
-function rstops(list) { try { admin.checkRulesets('EvilPatrick06/Thornswood', list); return ''; } catch (e) { return e.message; } }
+function rstops(list) { try { admin.checkRulesets('ThornswoodRP/Thornswood', list); return ''; } catch (e) { return e.message; } }
 const with_ = (o, k, v) => Object.assign({}, o, { [k]: v });
 yes('the two rulesets pass together', rstops([tagSet, mainSet]) === '');
 yes('no list stops, and an empty one says there are none', /no rulesets list/.test(rstops(undefined)) && rstops([]) === '');
@@ -261,7 +272,7 @@ yes('the body sent is the ruleset\'s own keys, never the record\'s note',
   JSON.stringify(Object.keys(admin.rulesetBody(tagSet))) === '["name","target","enforcement","conditions","rules","bypass_actors"]');
 // GitHub's copy, as it reads one back: ids, links and defaults of its own, lists in its own order.
 const ghCopy = (r, id) => Object.assign(JSON.parse(JSON.stringify(admin.rulesetBody(r))), {
-  id, source_type: 'Repository', source: 'EvilPatrick06/Thornswood', node_id: 'RRS_' + id, current_user_can_bypass: 'always',
+  id, source_type: 'Repository', source: 'ThornswoodRP/Thornswood', node_id: 'RRS_' + id, current_user_can_bypass: 'always',
   _links: { self: { href: 'x' } }, created_at: '2026-10-26T00:00:00Z', updated_at: '2026-10-26T00:00:00Z',
   rules: r.rules.slice().reverse().map(x => x.type === 'required_status_checks'
     ? { type: x.type, parameters: Object.assign({ do_not_enforce_on_create: false }, x.parameters) } : x),
@@ -282,13 +293,13 @@ const forkMain = {
   bypass_actors: [],
 };
 const settings = () => ({ repositories: [
-  { repository: 'EvilPatrick06/Thornswood', rulesets: [tagSet, mainSet] },
-  { repository: 'EvilPatrick06/skymp', private_vulnerability_reporting: true, rulesets: [forkMain] },
+  { repository: 'ThornswoodRP/Thornswood', rulesets: [tagSet, mainSet] },
+  { repository: 'ThornswoodRP/skymp', private_vulnerability_reporting: true, rulesets: [forkMain] },
 ] });
 yes('Thornswood and the fork pass together', sstops(settings()) === '');
-yes('the repositories it may change are Thornswood and the fork, and no other', JSON.stringify(admin.SETTINGS_REPOS) === '["EvilPatrick06/Thornswood","EvilPatrick06/skymp"]');
+yes('the repositories it may change are Thornswood and the fork, and no other', JSON.stringify(admin.SETTINGS_REPOS) === '["ThornswoodRP/Thornswood","ThornswoodRP/skymp"]');
 yes('a record with no repositories stops', /names no repositories/.test(sstops({})) && /names no repositories/.test(sstops({ repositories: [] })));
-yes('another repository stops, named', /names EvilPatrick06\/other, and the only ones/.test(sstops({ repositories: [{ repository: 'EvilPatrick06/other', rulesets: [] }] })));
+yes('another repository stops, named', /names ThornswoodRP\/other, and the only ones/.test(sstops({ repositories: [{ repository: 'ThornswoodRP/other', rulesets: [] }] })));
 yes('a repository named twice stops', /twice/.test(sstops({ repositories: [settings().repositories[1], settings().repositories[1]] })));
 yes('reporting that is not true or false stops', /true or false/.test(sstops({ repositories: [with_(settings().repositories[1], 'private_vulnerability_reporting', 'yes')] })));
 yes('immutable releases that is not true or false stops, named', /immutable_releases is true or false/.test(sstops({ repositories: [with_(settings().repositories[0], 'immutable_releases', 1)] })));
@@ -297,13 +308,14 @@ yes('auto-merge that is not true or false stops, named (#5182)', /allow_auto_mer
 yes('secret scanning that is not true or false stops, named', /secret_scanning is true or false/.test(sstops({ repositories: [with_(settings().repositories[1], 'secret_scanning', 'on')] })));
 yes('push protection without secret scanning stops', /secret_scanning_push_protection is on only with secret_scanning on too/.test(sstops({ repositories: [with_(settings().repositories[1], 'secret_scanning_push_protection', true)] })) &&
   sstops({ repositories: [Object.assign({}, settings().repositories[1], { secret_scanning: true, secret_scanning_push_protection: true })] }) === '');
-yes('a bad ruleset stops, naming its repository', /EvilPatrick06\/skymp: main targets push/.test(sstops({ repositories: [with_(settings().repositories[1], 'rulesets', [with_(forkMain, 'target', 'push')])] })));
+yes('a bad ruleset stops, naming its repository', /ThornswoodRP\/skymp: main targets push/.test(sstops({ repositories: [with_(settings().repositories[1], 'rulesets', [with_(forkMain, 'target', 'push')])] })));
 yes('a list of collaborators passes, an empty one too (nobody but the owner)', sstops({ repositories: [with_(settings().repositories[1], 'collaborators', ['Ture-Neko', 'WiccanDjinn'])] }) === '' &&
   sstops({ repositories: [with_(settings().repositories[1], 'collaborators', [])] }) === '');
 yes('collaborators that are not a list stop, named', /collaborators is a list of GitHub logins/.test(sstops({ repositories: [with_(settings().repositories[1], 'collaborators', { WiccanDjinn: 'write' })] })));
 yes('a login GitHub could not have stops', /is not a GitHub login/.test(sstops({ repositories: [with_(settings().repositories[1], 'collaborators', ['two words'])] })) &&
   /is not a GitHub login/.test(sstops({ repositories: [with_(settings().repositories[1], 'collaborators', ['-x'])] })));
-yes('the owner listed as a collaborator stops', /the owner, EvilPatrick06, is not a collaborator/.test(sstops({ repositories: [with_(settings().repositories[1], 'collaborators', ['evilpatrick06'])] })));
+yes('Patrick listed as a collaborator stops', /evilpatrick06 owns these repositories, is not a collaborator/.test(sstops({ repositories: [with_(settings().repositories[1], 'collaborators', ['evilpatrick06'])] })));
+yes('  and so does the organization (#5184)', /ThornswoodRP owns these repositories, is not a collaborator/.test(sstops({ repositories: [with_(settings().repositories[1], 'collaborators', ['ThornswoodRP'])] })));
 yes('a collaborator named twice, in any case, stops', /names the collaborator wiccandjinn twice/.test(sstops({ repositories: [with_(settings().repositories[1], 'collaborators', ['WiccanDjinn', 'wiccandjinn'])] })));
 const pc = admin.planCollaborators(['WiccanDjinn', 'NewPerson', 'Asked'],
   [{ login: 'EvilPatrick06' }, { login: 'wiccandjinn' }, { login: 'Jhinswife' }],
@@ -347,7 +359,7 @@ const gh = {
     runner(13, 'thornswood-vps-3', base.concat('thornswood-build', 'thornswood-sign')),
     runner(14, 'thornswood-vps-4', base),
   ],
-  repo: { full_name: 'EvilPatrick06/Thornswood', description: null, homepage: null, allow_auto_merge: false, security_and_analysis: { secret_scanning: { status: 'disabled' }, secret_scanning_push_protection: { status: 'disabled' } } },
+  repo: { full_name: 'ThornswoodRP/Thornswood', description: null, homepage: null, allow_auto_merge: false, security_and_analysis: { secret_scanning: { status: 'disabled' }, secret_scanning_push_protection: { status: 'disabled' } } },
   topics: [],
   instToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
   readToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
@@ -355,15 +367,15 @@ const gh = {
   settingsToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
   installed: true,
   repoToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
-  installRepos: ['EvilPatrick06/Thornswood-Ops', 'EvilPatrick06/Thornswood'],
+  installRepos: ['ThornswoodRP/Thornswood-Ops', 'ThornswoodRP/Thornswood'],
   conversion: null,
   instPerms: { administration: 'write', contents: 'read', metadata: 'read' },
   settings: {
-    '/repos/EvilPatrick06/Thornswood/actions/permissions': { enabled: true, allowed_actions: 'all', sha_pinning_required: false },
-    '/repos/EvilPatrick06/Thornswood/actions/permissions/workflow': { default_workflow_permissions: 'read', can_approve_pull_request_reviews: false },
-    '/repos/EvilPatrick06/Thornswood/actions/permissions/access': { access_level: 'none' },
-    '/repos/EvilPatrick06/Thornswood/actions/permissions/artifact-and-log-retention': { days: 90, maximum_allowed_days: 400 },
-    '/repos/EvilPatrick06/Thornswood/actions/permissions/fork-pr-workflows-private-repos': { run_workflows_from_fork_pull_requests: false, send_write_tokens_to_workflows: false, send_secrets_and_variables: false, require_approval_for_fork_pr_workflows: false },
+    '/repos/ThornswoodRP/Thornswood/actions/permissions': { enabled: true, allowed_actions: 'all', sha_pinning_required: false },
+    '/repos/ThornswoodRP/Thornswood/actions/permissions/workflow': { default_workflow_permissions: 'read', can_approve_pull_request_reviews: false },
+    '/repos/ThornswoodRP/Thornswood/actions/permissions/access': { access_level: 'none' },
+    '/repos/ThornswoodRP/Thornswood/actions/permissions/artifact-and-log-retention': { days: 90, maximum_allowed_days: 400 },
+    '/repos/ThornswoodRP/Thornswood/actions/permissions/fork-pr-workflows-private-repos': { run_workflows_from_fork_pull_requests: false, send_write_tokens_to_workflows: false, send_secrets_and_variables: false, require_approval_for_fork_pr_workflows: false },
   },
   repoNames: { secrets: ['CLOUDFLARE_TURNSTILE_TOKEN'], variables: ['BUILD_RUNNER'] },
   envNames: { board: { secrets: ['BOARD_TOKEN'], variables: [] }, notices: { secrets: ['NOTICE_KEY_B64'], variables: [] } },
@@ -372,7 +384,7 @@ const gh = {
   sets: { Thornswood: [], skymp: [] },
   pvr: { Thornswood: false, skymp: false },
   immutable: { Thornswood: false, skymp: false },
-  forkRepo: { full_name: 'EvilPatrick06/skymp', security_and_analysis: { secret_scanning: { status: 'enabled' }, secret_scanning_push_protection: { status: 'enabled' } } },
+  forkRepo: { full_name: 'ThornswoodRP/skymp', security_and_analysis: { secret_scanning: { status: 'enabled' }, secret_scanning_push_protection: { status: 'enabled' } } },
   nextRuleset: 100,
   people: { Thornswood: ['Jhinswife', 'WiccanDjinn'], skymp: ['Ture-Neko', 'WiccanDjinn'] },
   invites: { Thornswood: [], skymp: [{ id: 40, invitee: { login: 'Stale' }, permissions: 'write' }] },
@@ -404,9 +416,9 @@ function standIn(req, res) {
     const P = u.pathname;
     // repo-settings (#3683) changes Thornswood with its administration write
     // token, the About one, and the fork with the fork's alone.
-    const asAdmin = () => req.headers.authorization === 'Bearer ' + (P.startsWith('/repos/EvilPatrick06/skymp/') ? gh.forkToken : gh.aboutToken);
+    const asAdmin = () => req.headers.authorization === 'Bearer ' + (P.startsWith('/repos/ThornswoodRP/skymp/') ? gh.forkToken : gh.aboutToken);
     if (P === '/jwks') return send(200, JWKS);
-    if (P === '/repos/EvilPatrick06/Thornswood/installation' || P === '/repos/EvilPatrick06/Thornswood-Ops/installation') return !asApp() ? send(401, { message: 'Bad credentials' }) : gh.installed ? send(200, { id: 77, permissions: gh.instPerms }) : send(404, { message: 'Not Found' });
+    if (P === '/repos/ThornswoodRP/Thornswood/installation' || P === '/repos/ThornswoodRP/Thornswood-Ops/installation') return !asApp() ? send(401, { message: 'Bad credentials' }) : gh.installed ? send(200, { id: 77, permissions: gh.instPerms }) : send(404, { message: 'Not Found' });
     if (P === '/app/installations/77/access_tokens' && req.method === 'POST') {
       if (!asApp()) return send(401, { message: 'Bad credentials' });
       const perms = JSON.stringify((body && body.permissions) || {});
@@ -422,37 +434,37 @@ function standIn(req, res) {
       return send(422, { message: 'no such repositories' });
     }
     if (P === '/installation/repositories') return req.headers.authorization === 'Bearer ' + gh.repoToken ? send(200, { total_count: gh.installRepos.length, repositories: gh.installRepos.map(n => ({ full_name: n })) }) : send(401, { message: 'Bad credentials' });
-    if (P.startsWith('/repos/EvilPatrick06/Thornswood/contents/') && !asRead() && req.headers.authorization !== 'Bearer ' + gh.settingsToken) return send(401, { message: 'Bad credentials' });
-    if ((P === '/repos/EvilPatrick06/Thornswood' || P === '/repos/EvilPatrick06/Thornswood/topics') && !asAbout()) return send(401, { message: 'Bad credentials' });
-    if (P.startsWith('/repos/EvilPatrick06/Thornswood-Ops/actions/') && !asInst()) return send(401, { message: 'Bad credentials' });
-    if (P.startsWith('/repos/EvilPatrick06/Thornswood/actions/') || P.startsWith('/repos/EvilPatrick06/Thornswood/environments/')) { if (req.headers.authorization !== 'Bearer ' + gh.settingsToken) return send(401, { message: 'Bad credentials' }); }
-    if (P === '/repos/EvilPatrick06/Thornswood/contents/records') {
+    if (P.startsWith('/repos/ThornswoodRP/Thornswood/contents/') && !asRead() && req.headers.authorization !== 'Bearer ' + gh.settingsToken) return send(401, { message: 'Bad credentials' });
+    if ((P === '/repos/ThornswoodRP/Thornswood' || P === '/repos/ThornswoodRP/Thornswood/topics') && !asAbout()) return send(401, { message: 'Bad credentials' });
+    if (P.startsWith('/repos/ThornswoodRP/Thornswood-Ops/actions/') && !asInst()) return send(401, { message: 'Bad credentials' });
+    if (P.startsWith('/repos/ThornswoodRP/Thornswood/actions/') || P.startsWith('/repos/ThornswoodRP/Thornswood/environments/')) { if (req.headers.authorization !== 'Bearer ' + gh.settingsToken) return send(401, { message: 'Bad credentials' }); }
+    if (P === '/repos/ThornswoodRP/Thornswood/contents/records') {
       if (u.searchParams.get('ref') !== 'main') return send(404, { message: 'No commit found for the ref' });
       return send(200, Object.keys(gh.records).concat(['README.md']).map(n => ({ type: 'file', name: n })));
     }
-    if (P === '/repos/EvilPatrick06/Thornswood/contents/records/github-repo-settings.json') {
+    if (P === '/repos/ThornswoodRP/Thornswood/contents/records/github-repo-settings.json') {
       if (u.searchParams.get('ref') !== 'main' || !gh.settingsRecord) return send(404, { message: 'Not Found' });
       return send(200, { content: Buffer.from(JSON.stringify(gh.settingsRecord)).toString('base64') });
     }
-    let m = /^\/repos\/EvilPatrick06\/Thornswood\/contents\/records\/(.+)$/.exec(P);
+    let m = /^\/repos\/ThornswoodRP\/Thornswood\/contents\/records\/(.+)$/.exec(P);
     if (m && gh.records[m[1]] && u.searchParams.get('ref') === 'main') return send(200, { content: Buffer.from(JSON.stringify(gh.records[m[1]])).toString('base64') });
-    if (/^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/(rulesets|private-vulnerability-reporting|immutable-releases|collaborators|invitations)/.test(P) && !asAdmin()) return send(401, { message: 'Bad credentials' });
-    m = /^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/collaborators$/.exec(P);
+    if (/^\/repos\/ThornswoodRP\/(Thornswood|skymp)\/(rulesets|private-vulnerability-reporting|immutable-releases|collaborators|invitations)/.test(P) && !asAdmin()) return send(401, { message: 'Bad credentials' });
+    m = /^\/repos\/ThornswoodRP\/(Thornswood|skymp)\/collaborators$/.exec(P);
     if (m && req.method === 'GET') {
       if (u.searchParams.get('affiliation') !== 'direct') return send(400, { message: 'ask for the direct ones' });
       return send(200, [{ login: 'EvilPatrick06', role_name: 'admin' }].concat(gh.people[m[1]].map(l => ({ login: l, role_name: 'write' }))));
     }
-    m = /^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/collaborators\/([^/]+)$/.exec(P);
+    m = /^\/repos\/ThornswoodRP\/(Thornswood|skymp)\/collaborators\/([^/]+)$/.exec(P);
     if (m && req.method === 'DELETE') { const i = gh.people[m[1]].indexOf(m[2]); if (i < 0) return send(404, { message: 'Not Found' }); gh.people[m[1]].splice(i, 1); return send(204); }
     if (m && req.method === 'PUT') {
       gh.people[m[1]].push(m[2]);
       return send(204);
     }
-    m = /^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/invitations$/.exec(P);
+    m = /^\/repos\/ThornswoodRP\/(Thornswood|skymp)\/invitations$/.exec(P);
     if (m && req.method === 'GET') return send(200, gh.invites[m[1]]);
-    m = /^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/invitations\/(\d+)$/.exec(P);
+    m = /^\/repos\/ThornswoodRP\/(Thornswood|skymp)\/invitations\/(\d+)$/.exec(P);
     if (m && req.method === 'DELETE') { const i = gh.invites[m[1]].findIndex(x => x.id === Number(m[2])); if (i < 0) return send(404, { message: 'Not Found' }); gh.invites[m[1]].splice(i, 1); return send(204); }
-    m = /^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/rulesets$/.exec(P);
+    m = /^\/repos\/ThornswoodRP\/(Thornswood|skymp)\/rulesets$/.exec(P);
     if (m && req.method === 'GET') {
       if (u.searchParams.get('includes_parents') !== 'false') return send(400, { message: 'ask for this repository\'s own' });
       return send(200, gh.sets[m[1]].map(r => ({ id: r.id, name: r.name, target: r.target, enforcement: r.enforcement, source_type: 'Repository' })));
@@ -464,7 +476,7 @@ function standIn(req, res) {
       sets.push(made);
       return send(201, made);
     }
-    m = /^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/rulesets\/(\d+)$/.exec(P);
+    m = /^\/repos\/ThornswoodRP\/(Thornswood|skymp)\/rulesets\/(\d+)$/.exec(P);
     if (m) {
       const sets = gh.sets[m[1]];
       const i = sets.findIndex(r => r.id === Number(m[2]));
@@ -473,44 +485,44 @@ function standIn(req, res) {
       if (req.method === 'PUT') { sets[i] = ghCopy(body, sets[i].id); return send(200, sets[i]); }
       if (req.method === 'DELETE') { sets.splice(i, 1); return send(204); }
     }
-    m = /^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/immutable-releases$/.exec(P);
+    m = /^\/repos\/ThornswoodRP\/(Thornswood|skymp)\/immutable-releases$/.exec(P);
     if (m) {
       if (req.method === 'GET') return send(200, { enabled: gh.immutable[m[1]], enforced_by_owner: false });
       if (req.method === 'PUT') { gh.immutable[m[1]] = true; return send(204); }
       if (req.method === 'DELETE') { gh.immutable[m[1]] = false; return send(204); }
     }
-    m = /^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/private-vulnerability-reporting$/.exec(P);
+    m = /^\/repos\/ThornswoodRP\/(Thornswood|skymp)\/private-vulnerability-reporting$/.exec(P);
     if (m) {
       if (req.method === 'GET') return send(200, { enabled: gh.pvr[m[1]] });
       if (req.method === 'PUT') { gh.pvr[m[1]] = true; return send(204); }
       if (req.method === 'DELETE') { gh.pvr[m[1]] = false; return send(204); }
     }
-    if (P === '/repos/EvilPatrick06/Thornswood' && req.method === 'GET') return send(200, gh.repo);
-    if (P === '/repos/EvilPatrick06/Thornswood' && req.method === 'PATCH') {
+    if (P === '/repos/ThornswoodRP/Thornswood' && req.method === 'GET') return send(200, gh.repo);
+    if (P === '/repos/ThornswoodRP/Thornswood' && req.method === 'PATCH') {
       // GitHub switches only the security_and_analysis keys a PATCH names.
       const sa = Object.assign({}, gh.repo.security_and_analysis, body.security_and_analysis || {});
       Object.assign(gh.repo, body, { security_and_analysis: sa });
       return send(200, gh.repo);
     }
-    if (P === '/repos/EvilPatrick06/skymp') {
+    if (P === '/repos/ThornswoodRP/skymp') {
       if (req.headers.authorization !== 'Bearer ' + gh.forkToken) return send(401, { message: 'Bad credentials' });
       if (req.method === 'GET') return send(200, gh.forkRepo);
       if (req.method === 'PATCH') { Object.assign(gh.forkRepo.security_and_analysis, body.security_and_analysis || {}); return send(200, gh.forkRepo); }
     }
-    if (P === '/repos/EvilPatrick06/Thornswood/topics' && req.method === 'GET') return send(200, { names: gh.topics });
-    if (P === '/repos/EvilPatrick06/Thornswood/topics' && req.method === 'PUT') { gh.topics = body.names.slice(); return send(200, { names: gh.topics }); }
-    if (P === '/repos/EvilPatrick06/Thornswood-Ops/actions/runners') return send(200, { total_count: gh.runners.length, runners: gh.runners });
+    if (P === '/repos/ThornswoodRP/Thornswood/topics' && req.method === 'GET') return send(200, { names: gh.topics });
+    if (P === '/repos/ThornswoodRP/Thornswood/topics' && req.method === 'PUT') { gh.topics = body.names.slice(); return send(200, { names: gh.topics }); }
+    if (P === '/repos/ThornswoodRP/Thornswood-Ops/actions/runners') return send(200, { total_count: gh.runners.length, runners: gh.runners });
     // This repository's own runners, which the settings read lists.
-    if (P === '/repos/EvilPatrick06/Thornswood/actions/runners') return send(200, { total_count: gh.runners.length, runners: gh.runners });
+    if (P === '/repos/ThornswoodRP/Thornswood/actions/runners') return send(200, { total_count: gh.runners.length, runners: gh.runners });
     if (req.method === 'GET' && gh.settings[P]) return send(200, gh.settings[P]);
-    m = /^\/repos\/EvilPatrick06\/Thornswood\/(?:environments\/([^/]+)\/)?actions\/(secrets|variables)$|^\/repos\/EvilPatrick06\/Thornswood\/environments\/([^/]+)\/(secrets|variables)$/.exec(P);
+    m = /^\/repos\/ThornswoodRP\/Thornswood\/(?:environments\/([^/]+)\/)?actions\/(secrets|variables)$|^\/repos\/ThornswoodRP\/Thornswood\/environments\/([^/]+)\/(secrets|variables)$/.exec(P);
     if (m && req.method === 'GET') {
       const env = m[3] ? decodeURIComponent(m[3]) : '';
       const kind = m[2] || m[4];
       const names = env ? ((gh.envNames[env] || {})[kind] || []) : (gh.repoNames[kind] || []);
       return send(200, { total_count: names.length, [kind]: names.map(n => ({ name: n, value: kind === 'variables' ? 'the value' : undefined })) });
     }
-    m = /^\/repos\/EvilPatrick06\/Thornswood-Ops\/actions\/runners\/(\d+)\/labels(?:\/(.+))?$/.exec(P);
+    m = /^\/repos\/ThornswoodRP\/Thornswood-Ops\/actions\/runners\/(\d+)\/labels(?:\/(.+))?$/.exec(P);
     if (m) {
       const r = gh.runners.find(x => x.id === Number(m[1]));
       if (!r) return send(404, { message: 'Not Found' });
@@ -578,6 +590,47 @@ function start(stateDir, ghPort) {
   const bearer = t => ({ Authorization: 'Bearer ' + t });
   const ask4 = (headers, body) => ask(P, 'POST', '/converge', headers, body === undefined ? { what: 'runner-labels' } : body);
   try {
+    // #5184: a repository that moved answers with a redirect to where it is
+    // now; call follows it the way GitHub's REST guide says, on the same
+    // host only and at most five times.
+    console.log('redirects');
+    const seen = [];
+    const mover = http.createServer((q, s) => {
+      const c = [];
+      q.on('data', d => c.push(d));
+      q.on('end', () => {
+        seen.push({ method: q.method, url: q.url, auth: q.headers.authorization || '', body: Buffer.concat(c).toString('utf8') });
+        const go = (code, to) => { s.writeHead(code, { Location: to }); s.end(); };
+        if (q.url === '/repos/ThornswoodRP/Thornswood-Ops/x') return go(301, '/repositories/1435123931/x');
+        if (q.url === '/repos/ThornswoodRP/Thornswood-Ops/y') return go(307, '/repositories/1435123931/y');
+        if (q.url === '/away') return go(301, 'http://other.example/x');
+        if (q.url.startsWith('/loop')) return go(302, '/loop' + q.url.length);
+        s.writeHead(200, { 'Content-Type': 'application/json' });
+        s.end(JSON.stringify({ at: q.url, method: q.method }));
+      });
+    });
+    await new Promise(r => mover.listen(0, '127.0.0.1', r));
+    const M = 'http://127.0.0.1:' + mover.address().port;
+    try {
+      let a = await admin.call('GET', M + '/repos/ThornswoodRP/Thornswood-Ops/x', { Authorization: 'Bearer t' });
+      yes('a read that GitHub moved (301) is followed to where it is now', a.status === 200 && a.body.at === '/repositories/1435123931/x' &&
+        seen[seen.length - 1].auth === 'Bearer t');
+      seen.length = 0;
+      a = await admin.call('POST', M + '/repos/ThornswoodRP/Thornswood-Ops/y', { Authorization: 'Bearer t' }, { labels: ['a'] });
+      yes('  a change sent on with 307 is followed with the same method and body', a.status === 200 && a.body.method === 'POST' &&
+        seen.length === 2 && seen[1].body === '{"labels":["a"]}');
+      a = await admin.call('POST', M + '/repos/ThornswoodRP/Thornswood-Ops/x', {}, { labels: ['a'] });
+      yes('  a change answered 301 is not turned into a read; the 301 comes back', a.status === 301);
+      seen.length = 0;
+      a = await admin.call('GET', M + '/away', { Authorization: 'Bearer t' });
+      yes('  a redirect to another host is not followed, so the token goes nowhere else', a.status === 301 && /another host/.test(a.body.message) && seen.length === 1);
+      seen.length = 0;
+      a = await admin.call('GET', M + '/loop', {});
+      yes('  a loop stops after five', a.status === 302 && /more than 5/.test(a.body.message) && seen.length === 6);
+    } finally {
+      mover.close();
+    }
+
     console.log('the service');
     let r = await ask(P, 'GET', '/', {});
     yes('a plain request is the plain 404, which says which service it is', r.status === 404 && r.text === 'box admin: not here');
@@ -589,7 +642,7 @@ function start(stateDir, ghPort) {
     r = await ask4({});
     yes('no token: 403, and GitHub is asked nothing but its keys', r.status === 403 && gh.calls.every(c => c.path === '/jwks'));
     gh.calls = [];
-    r = await ask4(bearer(sign(good({ ref: 'refs/heads/claude/x', job_workflow_ref: 'EvilPatrick06/Thornswood-Ops/.github/workflows/github-admin.yml@refs/heads/claude/x' }))));
+    r = await ask4(bearer(sign(good({ ref: 'refs/heads/claude/x', job_workflow_ref: 'ThornswoodRP/Thornswood-Ops/.github/workflows/github-admin.yml@refs/heads/claude/x' }))));
     yes('a branch\'s token: 403, and nothing but the keys asked', r.status === 403 && /refs\/heads\/claude\/x/.test(r.text) && gh.calls.every(c => c.path === '/jwks'));
     r = await ask4(bearer(sign(good({ aud: 'sigstore' }))));
     yes('a token for another audience: 403', r.status === 403);
@@ -616,9 +669,9 @@ function start(stateDir, ghPort) {
     yes('two installation tokens: contents read on this repository alone, administration write on the ops repository alone (' + toks.join(' ') + ')',
       toks.length === 2 && toks.includes(JSON.stringify({ repositories: ['Thornswood'], permissions: { contents: 'read' } })) && toks.includes(JSON.stringify({ repositories: ['Thornswood-Ops'], permissions: { administration: 'write' } })));
     const recs = gh.calls.filter(c => /contents\/records/.test(c.path));
-    yes('the records come from this repository\'s main, read with the read token', recs.length > 0 && recs.every(c => c.path.startsWith('/repos/EvilPatrick06/Thornswood/contents/') && /ref=main/.test(c.path) && c.auth === 'Bearer ' + gh.readToken));
+    yes('the records come from this repository\'s main, read with the read token', recs.length > 0 && recs.every(c => c.path.startsWith('/repos/ThornswoodRP/Thornswood/contents/') && /ref=main/.test(c.path) && c.auth === 'Bearer ' + gh.readToken));
     const lists = gh.calls.filter(c => /actions\/runners/.test(c.path));
-    yes('  and the runners are the ops repository\'s, asked with its token', lists.length > 0 && lists.every(c => c.path.startsWith('/repos/EvilPatrick06/Thornswood-Ops/actions/runners') && c.auth === 'Bearer ' + gh.instToken));
+    yes('  and the runners are the ops repository\'s, asked with its token', lists.length > 0 && lists.every(c => c.path.startsWith('/repos/ThornswoodRP/Thornswood-Ops/actions/runners') && c.auth === 'Bearer ' + gh.instToken));
 
     // The sign label is on runner 3 and no record names it: #4033's case.
     gh.calls = [];
@@ -638,7 +691,7 @@ function start(stateDir, ghPort) {
     r = await ask4(bearer(sign(good())), { what: 'installation-repos', check: false });
     const repoTok = gh.calls.find(c => /access_tokens$/.test(c.path));
     yes('installation-repos lists the repositories the App is on, sorted (200)',
-      r.status === 200 && r.json.ok && JSON.stringify(r.json.repos) === '["EvilPatrick06/Thornswood","EvilPatrick06/Thornswood-Ops"]' && r.json.lines.includes('installed on EvilPatrick06/Thornswood-Ops'));
+      r.status === 200 && r.json.ok && JSON.stringify(r.json.repos) === '["ThornswoodRP/Thornswood","ThornswoodRP/Thornswood-Ops"]' && r.json.lines.includes('installed on ThornswoodRP/Thornswood-Ops'));
     yes('  with a token that reads metadata alone, for no one repository',
       repoTok && repoTok.body.repositories === undefined && JSON.stringify(repoTok.body.permissions) === '{"metadata":"read"}');
     yes('  asked with that token, and changing nothing, reading no record and no runner',
@@ -646,7 +699,7 @@ function start(stateDir, ghPort) {
     gh.installRepos = [];
     r = await ask4(bearer(sign(good())), { what: 'installation-repos' });
     yes('  an installation on no repository says so', r.status === 200 && r.json.repos.length === 0 && r.json.lines[0] === 'installed on no repository');
-    gh.installRepos = ['EvilPatrick06/Thornswood-Ops', 'EvilPatrick06/Thornswood'];
+    gh.installRepos = ['ThornswoodRP/Thornswood-Ops', 'ThornswoodRP/Thornswood'];
     r = await ask4(bearer(sign(good())), { what: 'runner-labels', records: { 'x-runners.json': { label: 'thornswood-x', runners: [4] } } });
     yes('records sent by the caller are not used', r.status === 200 && r.json.changed === 0 && !labels('thornswood-vps-4').includes('thornswood-x'));
 
@@ -665,7 +718,7 @@ function start(stateDir, ghPort) {
     yes('  in one PATCH and one PUT, with a token for this repository alone', aboutWrites().length === 2 && aboutWrites().every(c => c.auth === 'Bearer ' + gh.aboutToken) &&
       gh.calls.some(c => /access_tokens$/.test(c.path) && JSON.stringify(c.body) === '{"repositories":["Thornswood"],"permissions":{"administration":"write","contents":"read"}}') &&
       JSON.stringify(Object.keys(aboutWrites().find(c => c.method === 'PATCH').body).sort()) === '["description","homepage"]');
-    yes('  and the record came from main', gh.calls.some(c => c.path === '/repos/EvilPatrick06/Thornswood/contents/records/repo-about.json?ref=main'));
+    yes('  and the record came from main', gh.calls.some(c => c.path === '/repos/ThornswoodRP/Thornswood/contents/records/repo-about.json?ref=main'));
     gh.calls = [];
     r = await ask4(bearer(sign(good())), { what: 'repo-about' });
     yes('a second About run changes nothing', r.status === 200 && r.json.changed === 0 && aboutWrites().length === 0 && /GitHub matches it/.test(r.text));
@@ -692,7 +745,7 @@ function start(stateDir, ghPort) {
 
     // ---- 4a. repository settings ----
     console.log('repository settings');
-    const T = 'EvilPatrick06/Thornswood', S = 'EvilPatrick06/skymp';
+    const T = 'ThornswoodRP/Thornswood', S = 'ThornswoodRP/skymp';
     const rsWrites = () => gh.calls.filter(c => /\/(rulesets|private-vulnerability-reporting)/.test(c.path) && c.method !== 'GET');
     const askRs = (check, over) => ask4(bearer(sign(good(over))), { what: 'repo-settings', check: !!check });
     const has = (re) => r.json.lines.some(l => re.test(l));
@@ -703,8 +756,8 @@ function start(stateDir, ghPort) {
     gh.calls = [];
     r = await askRs(true);
     yes('a check says what would be made and switched, and changes nothing', r.status === 200 && r.json.ok && r.json.differs === 4 && r.json.changed === 0 && rsWrites().length === 0 &&
-      has(/^EvilPatrick06\/Thornswood: the ruleset release tags would be made \(active\)$/) && has(/^EvilPatrick06\/Thornswood: the ruleset main would be made \(disabled\)$/) &&
-      has(/^EvilPatrick06\/skymp: the ruleset main would be made \(active\)$/) && has(/^EvilPatrick06\/skymp: private vulnerability reporting would be switched on$/));
+      has(/^ThornswoodRP\/Thornswood: the ruleset release tags would be made \(active\)$/) && has(/^ThornswoodRP\/Thornswood: the ruleset main would be made \(disabled\)$/) &&
+      has(/^ThornswoodRP\/skymp: the ruleset main would be made \(active\)$/) && has(/^ThornswoodRP\/skymp: private vulnerability reporting would be switched on$/));
     gh.calls = [];
     r = await askRs(false);
     const posted = gh.calls.filter(c => c.method === 'POST' && /\/rulesets$/.test(c.path));
@@ -729,7 +782,7 @@ function start(stateDir, ghPort) {
     gh.calls = [];
     r = await askRs();
     yes('a second run changes nothing', r.status === 200 && r.json.changed === 0 && rsWrites().length === 0 &&
-      r.json.lines.filter(l => /GitHub matches the record for the ruleset/.test(l)).length === 3 && has(/^EvilPatrick06\/skymp: private vulnerability reporting is on, as the record says$/));
+      r.json.lines.filter(l => /GitHub matches the record for the ruleset/.test(l)).length === 3 && has(/^ThornswoodRP\/skymp: private vulnerability reporting is on, as the record says$/));
     const tagId = gh.sets.Thornswood.find(x => x.name === 'release tags').id;
     gh.sets.Thornswood.find(x => x.name === 'release tags').bypass_actors.push({ actor_id: 4, actor_type: 'RepositoryRole', bypass_mode: 'always' });
     gh.calls = [];
@@ -752,17 +805,17 @@ function start(stateDir, ghPort) {
     gh.calls = [];
     r = await askRs();
     yes('a ruleset the record does not name stops it (409), and is never deleted', r.status === 409 && /skymp: GitHub has a ruleset by hand/.test(r.text) && rsWrites().length === 0 && gh.sets.skymp.some(x => x.name === 'by hand'));
-    yes('  while the other repository is still matched', r.json.lines.filter(l => /^EvilPatrick06\/Thornswood: GitHub matches/.test(l)).length === 2);
+    yes('  while the other repository is still matched', r.json.lines.filter(l => /^ThornswoodRP\/Thornswood: GitHub matches/.test(l)).length === 2);
     gh.sets.skymp = gh.sets.skymp.filter(x => x.name !== 'by hand');
     gh.forkInstalled = false;
     gh.sets.Thornswood = gh.sets.Thornswood.filter(x => x.name !== 'main');
     gh.calls = [];
     r = await askRs();
-    yes('a repository the App is not installed on stops for it (409) with the link to the installation\'s settings', r.status === 409 && has(/^STOP EvilPatrick06\/skymp: GitHub gave the App no token \(.*\); is the App installed on it\? \S+\/settings\/installations\/77; nothing more/) &&
+    yes('a repository the App is not installed on stops for it (409) with the link to the installation\'s settings', r.status === 409 && has(/^STOP ThornswoodRP\/skymp: GitHub gave the App no token \(.*\); is the App installed on it\? \S+\/settings\/installations\/77; nothing more/) &&
       !gh.calls.some(c => c.path.startsWith('/repos/' + S + '/') && c.method !== 'GET'));
-    yes('  and the other is still put right', gh.sets.Thornswood.some(x => x.name === 'main') && has(/^EvilPatrick06\/Thornswood: the ruleset main made \(disabled\)$/));
+    yes('  and the other is still put right', gh.sets.Thornswood.some(x => x.name === 'main') && has(/^ThornswoodRP\/Thornswood: the ruleset main made \(disabled\)$/));
     gh.forkInstalled = true;
-    gh.settingsRecord = { repositories: [{ repository: 'EvilPatrick06/other', rulesets: [] }] };
+    gh.settingsRecord = { repositories: [{ repository: 'ThornswoodRP/other', rulesets: [] }] };
     gh.calls = [];
     r = await askRs();
     yes('a record naming another repository stops it, nothing changed (502)', r.status === 502 && /the only ones this changes are/.test(r.text) && rsWrites().length === 0);
@@ -784,8 +837,8 @@ function start(stateDir, ghPort) {
     gh.calls = [];
     r = await askRs(true);
     yes('a check says Thornswood\'s scanning and push protection would be switched on, and changes nothing', r.status === 200 && r.json.differs === 2 && r.json.changed === 0 && patches().length === 0 &&
-      has(/^EvilPatrick06\/Thornswood: secret scanning would be switched on$/) && has(/^EvilPatrick06\/Thornswood: push protection would be switched on$/) && scan(gh.repo) === 'disabled/disabled');
-    yes('  and says the fork\'s are on already', has(/^EvilPatrick06\/skymp: secret scanning is on, as the record says$/) && has(/^EvilPatrick06\/skymp: push protection is on, as the record says$/));
+      has(/^ThornswoodRP\/Thornswood: secret scanning would be switched on$/) && has(/^ThornswoodRP\/Thornswood: push protection would be switched on$/) && scan(gh.repo) === 'disabled/disabled');
+    yes('  and says the fork\'s are on already', has(/^ThornswoodRP\/skymp: secret scanning is on, as the record says$/) && has(/^ThornswoodRP\/skymp: push protection is on, as the record says$/));
     gh.calls = [];
     r = await askRs();
     yes('a run switches both on in one PATCH with Thornswood\'s token, and reads it back (2 changed)', r.status === 200 && r.json.ok && r.json.changed === 2 && scan(gh.repo) === 'enabled/enabled' &&
@@ -800,7 +853,7 @@ function start(stateDir, ghPort) {
     gh.calls = [];
     r = await askRs();
     yes('push protection switched off on GitHub is switched on again, sending only that key', r.status === 200 && r.json.changed === 1 && scan(gh.repo) === 'enabled/enabled' &&
-      JSON.stringify(patches()[0].body) === '{"security_and_analysis":{"secret_scanning_push_protection":{"status":"enabled"}}}' && has(/^EvilPatrick06\/Thornswood: push protection switched on$/));
+      JSON.stringify(patches()[0].body) === '{"security_and_analysis":{"secret_scanning_push_protection":{"status":"enabled"}}}' && has(/^ThornswoodRP\/Thornswood: push protection switched on$/));
 
     // Auto-merge (Patrick's A on #5182, 31 Oct 2026).
     gh.settingsRecord = settings();
@@ -808,16 +861,16 @@ function start(stateDir, ghPort) {
     gh.calls = [];
     r = await askRs(true);
     yes('a check says Thornswood\'s auto-merge would be switched on, and changes nothing (#5182)', r.status === 200 && r.json.differs === 1 && r.json.changed === 0 && patches().length === 0 &&
-      gh.repo.allow_auto_merge === false && has(/^EvilPatrick06\/Thornswood: auto-merge would be switched on$/));
+      gh.repo.allow_auto_merge === false && has(/^ThornswoodRP\/Thornswood: auto-merge would be switched on$/));
     gh.calls = [];
     r = await askRs();
     yes('a run switches it on in one PATCH of that key alone, with Thornswood\'s token, and reads it back', r.status === 200 && r.json.ok && r.json.changed === 1 && gh.repo.allow_auto_merge === true &&
       patches().length === 1 && patches()[0].auth === 'Bearer ' + gh.aboutToken && JSON.stringify(patches()[0].body) === '{"allow_auto_merge":true}' &&
-      has(/^EvilPatrick06\/Thornswood: auto-merge switched on$/));
+      has(/^ThornswoodRP\/Thornswood: auto-merge switched on$/));
     yes('  and the fork, whose entry does not name it, is not asked', !gh.calls.some(c => c.path === '/repos/' + S));
     gh.calls = [];
     r = await askRs();
-    yes('a second run changes nothing and says it is on', r.status === 200 && r.json.changed === 0 && patches().length === 0 && has(/^EvilPatrick06\/Thornswood: auto-merge is on, as the record says$/));
+    yes('a second run changes nothing and says it is on', r.status === 200 && r.json.changed === 0 && patches().length === 0 && has(/^ThornswoodRP\/Thornswood: auto-merge is on, as the record says$/));
 
     // Immutable releases (Patrick, 26 Oct 2026, #3287).
     const immu = () => gh.calls.filter(c => c.path === '/repos/' + T + '/immutable-releases' && c.method !== 'GET');
@@ -826,16 +879,16 @@ function start(stateDir, ghPort) {
     gh.calls = [];
     r = await askRs(true);
     yes('a check says Thornswood\'s immutable releases would be switched on, and changes nothing', r.status === 200 && r.json.differs === 1 && immu().length === 0 &&
-      gh.immutable.Thornswood === false && has(/^EvilPatrick06\/Thornswood: immutable releases would be switched on$/));
+      gh.immutable.Thornswood === false && has(/^ThornswoodRP\/Thornswood: immutable releases would be switched on$/));
     gh.calls = [];
     r = await askRs();
     yes('a run switches them on with one PUT and Thornswood\'s token, and reads it back', r.status === 200 && r.json.ok && r.json.changed === 1 && gh.immutable.Thornswood === true &&
       immu().length === 1 && immu()[0].method === 'PUT' && immu()[0].auth === 'Bearer ' + gh.aboutToken &&
-      gh.calls.filter(c => c.method === 'GET' && c.path === '/repos/' + T + '/immutable-releases').length === 2 && has(/^EvilPatrick06\/Thornswood: immutable releases switched on$/));
+      gh.calls.filter(c => c.method === 'GET' && c.path === '/repos/' + T + '/immutable-releases').length === 2 && has(/^ThornswoodRP\/Thornswood: immutable releases switched on$/));
     yes('  and the fork\'s, which its entry does not name, are not asked about', gh.immutable.skymp === false && !gh.calls.some(c => c.path === '/repos/' + S + '/immutable-releases'));
     gh.calls = [];
     r = await askRs();
-    yes('a second run changes nothing', r.status === 200 && r.json.changed === 0 && immu().length === 0 && has(/^EvilPatrick06\/Thornswood: immutable releases is on, as the record says$/));
+    yes('a second run changes nothing', r.status === 200 && r.json.changed === 0 && immu().length === 0 && has(/^ThornswoodRP\/Thornswood: immutable releases is on, as the record says$/));
     gh.settingsRecord.repositories[0].immutable_releases = false;
     gh.calls = [];
     r = await askRs();
@@ -852,8 +905,8 @@ function start(stateDir, ghPort) {
     gh.calls = [];
     r = await askRs(true);
     yes('a check says who would be taken off and withdrawn, names who is missing, and changes nothing', r.status === 200 && r.json.differs === 2 && r.json.changed === 0 && peopleWrites().length === 0 &&
-      has(/^EvilPatrick06\/Thornswood: Jhinswife would be taken off, as the record does not name them$/) && has(/^EvilPatrick06\/skymp: the invitation to Stale would be withdrawn/) &&
-      has(/^EvilPatrick06\/skymp: NewPerson is named but not a collaborator; Patrick invites them by hand on GitHub$/) && has(/^EvilPatrick06\/Thornswood: WiccanDjinn is a collaborator, as the record says$/));
+      has(/^ThornswoodRP\/Thornswood: Jhinswife would be taken off, as the record does not name them$/) && has(/^ThornswoodRP\/skymp: the invitation to Stale would be withdrawn/) &&
+      has(/^ThornswoodRP\/skymp: NewPerson is named but not a collaborator; Patrick invites them by hand on GitHub$/) && has(/^ThornswoodRP\/Thornswood: WiccanDjinn is a collaborator, as the record says$/));
     gh.calls = [];
     r = await askRs();
     yes('a run takes Jhinswife off Thornswood and withdraws the stale invitation, each with its own repository\'s token, and reads back (2 changed)',
@@ -864,15 +917,15 @@ function start(stateDir, ghPort) {
       gh.calls.filter(c => c.method === 'GET' && c.path.startsWith('/repos/' + T + '/collaborators?')).length === 2);
     yes('  and never the owner or a named collaborator', !peopleWrites().some(c => /EvilPatrick06$|WiccanDjinn$|Ture-Neko$/.test(c.path)));
     yes('  and never adds anybody: no PUT, the missing one only reported', !peopleWrites().some(c => c.method === 'PUT') &&
-      has(/^EvilPatrick06\/skymp: NewPerson is named but not a collaborator; Patrick invites them by hand on GitHub$/));
+      has(/^ThornswoodRP\/skymp: NewPerson is named but not a collaborator; Patrick invites them by hand on GitHub$/));
     gh.calls = [];
     r = await askRs();
     yes('a second run changes nothing and still names the missing one', r.status === 200 && r.json.changed === 0 && peopleWrites().length === 0 &&
-      has(/^EvilPatrick06\/skymp: NewPerson is named but not a collaborator/));
+      has(/^ThornswoodRP\/skymp: NewPerson is named but not a collaborator/));
     gh.people.Thornswood.push('ByHand');
     gh.calls = [];
     r = await askRs();
-    yes('someone added on GitHub by hand and not in the record is taken off again', r.status === 200 && r.json.changed === 1 && JSON.stringify(gh.people.Thornswood) === '["WiccanDjinn"]' && has(/^EvilPatrick06\/Thornswood: ByHand taken off$/));
+    yes('someone added on GitHub by hand and not in the record is taken off again', r.status === 200 && r.json.changed === 1 && JSON.stringify(gh.people.Thornswood) === '["WiccanDjinn"]' && has(/^ThornswoodRP\/Thornswood: ByHand taken off$/));
     gh.settingsRecord = settings();
 
     const tokenSeen = sign(good());

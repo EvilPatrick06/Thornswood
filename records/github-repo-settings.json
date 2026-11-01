@@ -1,8 +1,8 @@
 {
-  "about": "The rulesets, private vulnerability reporting, immutable releases and secret scanning of Thornswood and of the engine fork, EvilPatrick06/skymp (#3683, #3691). A change is a pull request to this file; once it merges, the Desk runs pwsh scripts/deploy/Set-BuildRunners.ps1 -RepoSettings (-Check first), which starts github-admin.yml in the private ops repository, and the box's admin service (scripts/vps/admin/admin.js, repo-settings) makes GitHub match it: each ruleset named here is made or put back by name, one GitHub has that this does not name stops the run and is never deleted, reporting, immutable releases, secret scanning and push protection are switched as each entry says, and where an entry lists collaborators, one GitHub has that the list does not name is taken off and an invitation to one is withdrawn; this only ever takes people off, and one it names who is not there is reported for Patrick to invite by hand. A why is this file's own note and is never sent to GitHub.",
+  "about": "The rulesets, private vulnerability reporting, immutable releases and secret scanning of Thornswood and of the engine fork, ThornswoodRP/skymp (#3683, #3691). A change is a pull request to this file; once it merges, the Desk runs pwsh scripts/deploy/Set-BuildRunners.ps1 -RepoSettings (-Check first), which starts github-admin.yml in the private ops repository, and the box's admin service (scripts/vps/admin/admin.js, repo-settings) makes GitHub match it: each ruleset named here is made or put back by name, one GitHub has that this does not name stops the run and is never deleted, reporting, immutable releases, secret scanning and push protection are switched as each entry says, and where an entry lists collaborators, one GitHub has that the list does not name is taken off and an invitation to one is withdrawn; this only ever takes people off, and one it names who is not there is reported for Patrick to invite by hand. A why is this file's own note and is never sent to GitHub.",
   "repositories": [
     {
-      "repository": "EvilPatrick06/Thornswood",
+      "repository": "ThornswoodRP/Thornswood",
       "why": "Switched on at the flip (#3721, public since 30 Oct 2026, 6:23 PM): GitHub offers private vulnerability reporting, the route SECURITY.md names, only on a public repository, and secret scanning with push protection costs a public repository nothing (#3683). Immutable releases: Patrick on the report page, 26 Oct 2026, 11:46 PM MT (#3287): a published Release's files and tag never change after it is published, and every release step here only fills a draft.",
       "private_vulnerability_reporting": true,
       "immutable_releases": true,
@@ -26,21 +26,22 @@
         },
         {
           "name": "main",
-          "why": "Patrick's A on q-3721-main-protection, 26 Oct 2026: admins included, no force push or deletion, and the build check required: the one always-run Build check result job (q-3683-required-check A), since a skipped Launcher builds counts as passing. Active since #3684's history rewrite had its force push (step 7, 31 Oct 2026) and that job runs on every pull request now the repository is public (first passed on #5066, 31 Oct 2026). Test tasks in the pull request (.github/workflows/test-tasks.yml, #5199, the redesign's part 18, 31 Oct 2026) is required beside it: the bot's own post rules read the pull request's test tasks before the merge, so one that the bot would refuse to post is fixed in the body, not found on the issue days after.",
+          "why": "Patrick's A on q-3721-main-protection, 26 Oct 2026: admins included, no force push or deletion, and the build check required: the one always-run Build check result job (q-3683-required-check A), since a skipped Launcher builds counts as passing. Active since #3684's history rewrite had its force push (step 7, 31 Oct 2026) and that job runs on every pull request now the repository is public (first passed on #5066, 31 Oct 2026). Test tasks in the pull request (.github/workflows/test-tasks.yml, #5199, the redesign's part 18, 31 Oct 2026) is required beside it: the bot's own post rules read the pull request's test tasks before the merge, so one that the bot would refuse to post is fixed in the body, not found on the issue days after. A pull request is required too (Patrick's yes on q-p20-main-needs-pr, 31 Oct 2026, 7:18 PM, the redesign's part 20): nothing reaches main except through a pull request with its checks, and auto-merge does the merging. No review is required (0 approvals), because the checks are the gate and nobody waits to press approve. Nothing in the repository pushes straight to main (searched 1 Nov 2026).",
           "target": "branch",
           "enforcement": "active",
           "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
           "rules": [
             { "type": "deletion" },
             { "type": "non_fast_forward" },
-            { "type": "required_status_checks", "parameters": { "strict_required_status_checks_policy": false, "required_status_checks": [{ "context": "Build check result", "integration_id": 15368 }, { "context": "Test tasks in the pull request", "integration_id": 15368 }] } }
+            { "type": "required_status_checks", "parameters": { "strict_required_status_checks_policy": false, "required_status_checks": [{ "context": "Build check result", "integration_id": 15368 }, { "context": "Test tasks in the pull request", "integration_id": 15368 }] } },
+            { "type": "pull_request", "parameters": { "required_approving_review_count": 0, "dismiss_stale_reviews_on_push": false, "require_code_owner_review": false, "require_last_push_approval": false, "required_review_thread_resolution": false } }
           ],
           "bypass_actors": []
         }
       ]
     },
     {
-      "repository": "EvilPatrick06/skymp",
+      "repository": "ThornswoodRP/skymp",
       "private_vulnerability_reporting": true,
       "secret_scanning": true,
       "secret_scanning_push_protection": true,

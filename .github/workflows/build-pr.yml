@@ -96,7 +96,15 @@ jobs:
       matrix:
         shard: ${{ fromJSON(needs.pick.outputs.shares) }}
     steps:
+      # Every commit and tree, no old file contents (about a second more than
+      # a shallow one, measured 1 Nov 2026): the harnesses run the release
+      # scripts on this checkout, and they work out the launcher's number
+      # from when its sources last changed (scripts\release\LauncherVersion.ps1,
+      # #5179), which a shallow checkout cannot say.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          filter: blob:none
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'

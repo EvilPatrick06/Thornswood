@@ -38,7 +38,7 @@ function yes(what, ok) { if (ok) { pass++; console.log('  ok   ' + what); } else
 function read(f) { try { return fs.readFileSync(f, 'utf8').split('\r\n').join('\n'); } catch (e) { return ''; } }
 
 const T = require(path.join(REPO, 'scripts', 'dev', 'Tested-Tree.js'));
-const REPO_NAME = 'EvilPatrick06/Thornswood';
+const REPO_NAME = 'ThornswoodRP/Thornswood';
 const TREE = 'a'.repeat(40);
 const OTHER = 'b'.repeat(40);
 
@@ -273,7 +273,8 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
     'tests/test-release-tag.ps1': 'reads release.yml\'s text for those names; sets them for Resolve-ReleaseTag.ps1 in a scratch process',
     'tests/test-3412-installer-on-github.ps1': 'reads installer.yml\'s text for those names; installer.yml is started by hand on main and is no check of a build (#3412)',
     'scripts/dev/Run-Gate.ps1': 'the gate step: the event chooses only how much of the gate runs (#3114), and a build that ran less than all of it keeps no note, held above',
-    'tests/test-3114-run-gate.ps1': 'sets those names for Run-Gate.ps1 in scratch processes, to hold what it does on each event'
+    'tests/test-3114-run-gate.ps1': 'sets those names for Run-Gate.ps1 in scratch processes, to hold what it does on each event',
+    'scripts/release/Sign-OnRunner.ps1': 'signs in the release workflows only, never in a check of a build: it reads the ref to refuse signing on any branch but main (#3930)'
   };
   const ENVREAD = /\b(GITHUB_(EVENT_NAME|EVENT_PATH|REF|REF_NAME|REF_TYPE|SHA|HEAD_REF|BASE_REF|RUN_ID|RUN_NUMBER|ACTOR))\b/;
   const found = [];

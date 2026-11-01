@@ -82,7 +82,7 @@ Everything it needs is in env:
                    TEST_FINDINGS_CHANNEL
   TESTER_ROLES     comma separated role IDs (preferred) or names that may use
                    that panel besides staff, default Playtester
-  KNOWN_ISSUES_REPO   default EvilPatrick06/Thornswood
+  KNOWN_ISSUES_REPO   default ThornswoodRP/Thornswood
   KNOWN_ISSUES_LABELS default Dev Findings,Main Findings
   KNOWN_ISSUES_EVERY  seconds between GitHub reads, default 300, never under 60
   PUBLIC_LISTS_FILE   where the site's known issues and roadmap are written,
@@ -4492,7 +4492,7 @@ async def test_task_cmd(interaction: discord.Interaction, title: str,
 #
 # GitHub: GITHUB_TOKEN in bot.env.json, a token for the issues of
 # KNOWN_ISSUES_REPO (read, and write for the comments and filed problems). No token means neither forum is kept, said once.
-KNOWN_REPO = os.environ.get('KNOWN_ISSUES_REPO', 'EvilPatrick06/Thornswood').strip()
+KNOWN_REPO = os.environ.get('KNOWN_ISSUES_REPO', 'ThornswoodRP/Thornswood').strip()
 KNOWN_LABELS = [l.strip() for l in
                 os.environ.get('KNOWN_ISSUES_LABELS',
                                'Dev Findings,Main Findings').split(',')
@@ -4624,6 +4624,54 @@ def github_changed_since(since, get=None):
     return out
 
 
+# What KNOWN_REPO is called now, once GitHub has been asked (#5184).
+_KNOWN_REPO_NOW = {'name': ''}
+
+
+def known_repo_now(get=None, again=False):
+    """owner/name GitHub gives KNOWN_REPO now, asked once a process (again
+       asks anew). A repository moved to another owner keeps its issues and
+       GET /repos/KNOWN_REPO follows the move to its new name, but GitHub
+       answers a POST to the old name with a 307 that urllib does not follow,
+       so the bot's writes go to this name. A failure to ask raises."""
+    if _KNOWN_REPO_NOW['name'] and not again:
+        return _KNOWN_REPO_NOW['name']
+    get = get or _github_get
+    repo = get('%s/repos/%s' % (GITHUB_API, KNOWN_REPO))
+    now = str(repo.get('full_name') or '').strip() if isinstance(repo, dict) else ''
+    if '/' not in now:
+        raise ValueError('GitHub answered %s with no full_name' % KNOWN_REPO)
+    _KNOWN_REPO_NOW['name'] = now
+    return now
+
+
+def is_known_repo(name, get=None):
+    """Whether owner/name is KNOWN_REPO, under the name it was given or the
+       one GitHub gives it now. A name that is neither is held to a fresh
+       answer before it counts as another repository. A failure to ask
+       raises, and the pass that asked changes nothing."""
+    name = str(name or '').strip().lower()
+    if not name:
+        return False
+    if name in (KNOWN_REPO.lower(), _KNOWN_REPO_NOW['name'].lower()):
+        return True
+    return name == known_repo_now(get, again=True).lower()
+
+
+def github_token_kind(token=None):
+    """What kind of token GITHUB_TOKEN is, by its prefix, never the token.
+       A fine-grained token is bound to one owner and reaches nothing of the
+       repository once it moves to another (#5184), so the bot says the kind
+       at start, where Get-Logs reads it."""
+    token = os.environ.get('GITHUB_TOKEN', '') if token is None else token
+    token = str(token).strip()
+    for prefix, kind in (('github_pat_', 'fine-grained'), ('ghp_', 'classic'),
+                         ('ghs_', 'app installation'), ('gho_', 'oauth')):
+        if token.startswith(prefix):
+            return kind
+    return 'no' if not token else 'unknown'
+
+
 def github_issue(number, get=None):
     get = get or _github_get
     return get('%s/repos/%s/issues/%d' % (GITHUB_API, KNOWN_REPO, int(number)))
@@ -4651,9 +4699,9 @@ def finding_gone(number, get=None):
     if not isinstance(issue, dict):
         raise ValueError('GitHub answered issue #%d with a %s, not an issue'
                          % (int(number), type(issue).__name__))
-    where = str(issue.get('repository_url') or '').lower()
-    if not where.endswith('/repos/' + KNOWN_REPO.lower()):
-        return 'it moved to %s' % (where.split('/repos/')[-1] or 'another repository')
+    where = str(issue.get('repository_url') or '').lower().split('/repos/')[-1]
+    if not is_known_repo(where, get):
+        return 'it moved to %s' % (where or 'another repository')
     if str(issue.get('state')) != 'open':
         return 'it is closed'
     if not issue_tags_found(issue):
@@ -4847,7 +4895,7 @@ def dev_task_of(issue, comments, dev_since):
     return got[-1] if got else None
 
 
-def fix_refs(timeline):
+def fix_refs(timeline, get=None):
     """
     (pull requests, commits) from the issue's timeline: every pull request of
     KNOWN_REPO that mentions the issue and is merged or still open, as dicts
@@ -4867,7 +4915,7 @@ def fix_refs(timeline):
             if not isinstance(pr, dict) or 'number' not in src:
                 continue
             repo = str((src.get('repository') or {}).get('full_name') or '')
-            if repo and repo.lower() != KNOWN_REPO.lower():
+            if repo and not is_known_repo(repo, get):
                 continue
             if src.get('state') == 'closed' and not pr.get('merged_at'):
                 continue
@@ -4877,7 +4925,8 @@ def fix_refs(timeline):
                 'url': str(src.get('html_url') or ''),
                 'merged_at': pr.get('merged_at')}
         elif ev.get('event') == 'referenced' and ev.get('commit_id'):
-            if ('/repos/%s/' % KNOWN_REPO).lower() not in str(ev.get('commit_url') or '').lower():
+            m = re.search(r'/repos/([^/]+/[^/]+)/commits/', str(ev.get('commit_url') or ''))
+            if not m or not is_known_repo(m.group(1), get):
                 continue
             sha = str(ev['commit_id'])
             if sha not in commits:
@@ -5092,7 +5141,7 @@ def github_say(number, text):
        write for this; when it cannot, the refusal is only logged."""
     token = os.environ.get('GITHUB_TOKEN', '').strip()
     req = urllib.request.Request(
-        '%s/repos/%s/issues/%d/comments' % (GITHUB_API, KNOWN_REPO, int(number)),
+        '%s/repos/%s/issues/%d/comments' % (GITHUB_API, known_repo_now(), int(number)),
         data=json.dumps({'body': text}).encode('utf-8'), method='POST',
         headers={'Accept': 'application/vnd.github+json',
                  'Authorization': 'Bearer ' + token,
@@ -5488,8 +5537,8 @@ async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=Non
         if task is None:
             return False    # the bot's own line for a fixed finding
         timeline = await loop.run_in_executor(None, github_timeline, num, get)
-        inmain = await loop.run_in_executor(None, fix_in_main,
-                                            *fix_refs(timeline), get)
+        refs = await loop.run_in_executor(None, fix_refs, timeline, get)
+        inmain = await loop.run_in_executor(None, fix_in_main, *refs, get)
         taken = [v.get('sig', '').split('\n')[0] for k, v in rec.items()
                  if k != str(num)]
         return refuse(state, 'main', num, post_problems(
@@ -5653,7 +5702,8 @@ async def dev_tasks_once(forum, state, get=None, save=None, me_id=None, now=None
                 state['_dirty'] = True
                 continue
             timeline = await loop.run_in_executor(None, github_timeline, num, get)
-            post = dev_render(issue, task, *fix_refs(timeline))
+            refs = await loop.run_in_executor(None, fix_refs, timeline, get)
+            post = dev_render(issue, task, *refs)
         try:
             if post is None:
                 if have:
@@ -6941,7 +6991,7 @@ def github_file(title, body, labels):
     if not token:
         raise RuntimeError('no GITHUB_TOKEN in bot.env.json')
     req = urllib.request.Request(
-        '%s/repos/%s/issues' % (GITHUB_API, KNOWN_REPO),
+        '%s/repos/%s/issues' % (GITHUB_API, known_repo_now()),
         data=json.dumps({'title': title, 'body': body, 'labels': labels}).encode('utf-8'),
         method='POST',
         headers={'Accept': 'application/vnd.github+json',
@@ -7758,6 +7808,7 @@ async def on_ready():
         asyncio.create_task(watch_lines())
 
     log('up as %s' % client.user)
+    log('github: the issues of %s, with a %s token' % (KNOWN_REPO, github_token_kind()))
 
     await register_commands()
 

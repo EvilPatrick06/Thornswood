@@ -47,7 +47,15 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
+      # Every commit and tree, no old file contents (about a second more than
+      # a shallow one, measured 1 Nov 2026): the harnesses run the release
+      # scripts on this checkout, and they work out the launcher's number
+      # from when its sources last changed (scripts\release\LauncherVersion.ps1,
+      # #5179), which a shallow checkout cannot say.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          filter: blob:none
 
       - name: Install the eslint the lint harness copies
         if: ${{ contains(inputs.harnesses, 'test-eslint-amp-path') }}

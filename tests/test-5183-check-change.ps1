@@ -133,7 +133,7 @@ exit 0
     # ---- 3. a token and a map
     $r = Invoke-Check -token 't0ken'
     Yes ('with a token and a map it runs what the change reaches and what always runs (' + $(if ($r.Asked) { $r.Asked.Only } else { 'nothing' }) + ')') ($r.Code -eq 0 -and $r.Asked -and $r.Asked.Only -eq 'test-a.js test-c.js' -and $r.Text -match '2 of the gate''s 3 harnesses')
-    Yes '  the token reached Gate-Map.ps1 through GATE_MAP_TOKEN only, for this repository' ($r.Given -eq 't0ken||EvilPatrick06/Thornswood')
+    Yes '  the token reached Gate-Map.ps1 through GATE_MAP_TOKEN only, for this repository' ($r.Given -eq 't0ken||ThornswoodRP/Thornswood')
     Yes '  and no harness saw a token' ($r.Asked -and -not $r.Asked.Tokens)
     Yes '  with a throttle of the cores, six at most' ($r.Asked -and $r.Asked.Throttle -ge 1 -and $r.Asked.Throttle -le 6)
     Yes '  and says push it when everything passed' ($r.Text -match 'Push it\.')
