@@ -2149,9 +2149,12 @@ function listFiles() {
     // the page builds an address from it.
     const sha256 = String(m.sha256 || '').toLowerCase();
     const hash = /^[0-9a-f]{64}$/.test(sha256) ? sha256 : '';
+    // Who the installer is signed by, as Publish-Installer's sign gate held it
+    // (#5275): the name Windows shows as the publisher. An entry from before
+    // that has none, and the page then names nobody rather than a wrong name.
     out.push({ name, size: st.size, at: st.mtimeMs, hidden: !!m.hidden,
       label: m.label || name, version: m.version || '', note: m.note || '',
-      sha256: hash });
+      sha256: hash, publisher: typeof m.publisher === 'string' ? m.publisher.trim() : '' });
   }
   out.sort((a, b) => b.at - a.at);
   return out;
