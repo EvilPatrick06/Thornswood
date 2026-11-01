@@ -125,7 +125,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           ./scripts/release/Open-EnginePinPr.ps1
-          exit $LASTEXITCODE
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # The test task check reads the pull request's body, so it starts
+          # once the pull request has it; its result is required (#5199).
+          gh workflow run test-tasks.yml --repo $env:GITHUB_REPOSITORY --ref engine-pin/next
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::the test task check could not be started on engine-pin/next'; exit 1 }
 
   make:
     name: Make the pin
@@ -238,4 +242,8 @@ jobs:
           gh workflow run build-pr.yml --repo $env:GITHUB_REPOSITORY --ref engine-pin/next
           if ($LASTEXITCODE -ne 0) { Write-Host '::error::the build check could not be started on engine-pin/next'; exit 1 }
           ./scripts/release/Open-EnginePinPr.ps1
-          exit $LASTEXITCODE
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # The test task check reads the pull request's body, so it starts
+          # once the pull request has it; its result is required (#5199).
+          gh workflow run test-tasks.yml --repo $env:GITHUB_REPOSITORY --ref engine-pin/next
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::the test task check could not be started on engine-pin/next'; exit 1 }
