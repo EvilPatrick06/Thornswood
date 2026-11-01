@@ -26,6 +26,7 @@
   Writes only its scratch folder, in the system's temp folder, and deletes it.
 #>
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 $repo = Split-Path -Parent $PSScriptRoot
 $script:pass = 0
 $script:fail = 0
@@ -99,7 +100,7 @@ exit 0
     # whose own gh is signed in.
     $bin = Join-Path $scratch 'bin'
     $null = New-Item -ItemType Directory -Path $bin
-    if ($IsWindows -or $env:OS -eq 'Windows_NT') { Set-Content -LiteralPath (Join-Path $bin 'gh.cmd') -Value "@exit /b 1" }
+    if ($OnWindows) { Set-Content -LiteralPath (Join-Path $bin 'gh.cmd') -Value "@exit /b 1" }
     else { Set-Content -LiteralPath (Join-Path $bin 'gh') -Value "#!/bin/sh`nexit 1"; & chmod +x (Join-Path $bin 'gh') }
     $env:PATH = $bin + [IO.Path]::PathSeparator + $keepEnv['PATH']
 
