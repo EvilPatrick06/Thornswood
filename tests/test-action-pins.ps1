@@ -131,8 +131,10 @@ foreach ($want in 'build.yml', 'nightly.yml', 'release.yml', 'drop-claims.yml', 
 # tests\test-3534-clone-report.ps1, and pr-events.yml (#5185) only prints
 # which pull request changed, with no token, held by
 # tests\test-5185-board-sync.js. board-read.yml runs one action since #5185,
-# the board App's token.
-$noActions = @('drop-claims.yml', 'expire-claims.yml', 'done-on-merge.yml', 'area-label.yml', 'release-tag.yml', 'engine-prune.yml', 'clone-report.yml', 'pr-events.yml', 'engine-pin-aside.yml')
+# the board App's token. promote-main.yml (#5181) reads a Release and the
+# Deployments through gh and makes one Deployment, checking nothing out, held
+# by tests\test-5181-promote-main.ps1.
+$noActions = @('drop-claims.yml', 'expire-claims.yml', 'done-on-merge.yml', 'area-label.yml', 'release-tag.yml', 'engine-prune.yml', 'clone-report.yml', 'pr-events.yml', 'engine-pin-aside.yml', 'promote-main.yml')
 
 $all = @()
 foreach ($f in $files) {

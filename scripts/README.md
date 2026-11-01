@@ -87,7 +87,9 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [dev/Check-Change.ps1](dev/Check-Change.ps1) | Runs, before a push, the gate harnesses this branch's change can reach, from main's nightly map, in a cloud container or on a PC (#5183). |
 | [dev/Check-Controls.ps1](dev/Check-Controls.ps1) | Every control in the launcher is found at runtime by name. |
 | [dev/Check-Outside.ps1](dev/Check-Outside.ps1) | Walks the path a first install takes through the things this project does not run itself, and says which of them is broken or has moved. |
+| [dev/Check-Parse.ps1](dev/Check-Parse.ps1) | Says whether every PowerShell script and every game script parses (#5291). |
 | [dev/Check-PrBody.ps1](dev/Check-PrBody.ps1) | The parts of a pull request's body that a release reads, checked while the pull request is open (#5179). .github\workflows\pr-body.yml runs it on every pull request when it is opened, pushed to or its body is edited, so fixing the body is enough to turn it green. |
+| [dev/Check-Push.ps1](dev/Check-Push.ps1) | The pre-push hook's checks (#5291): every script parses and the writing rules hold, in the commit being pushed, before it leaves the machine. |
 | [dev/Check-Secrets.ps1](dev/Check-Secrets.ps1) | Read only. Looks for anything that must never leave a machine: in the files this repository tracks, in a pack or installer zip, in the installer's staged folder, or in a built program. |
 | [dev/Check-Serena.ps1](dev/Check-Serena.ps1) | Read only. Says how Claude Code on this machine starts Serena, and times one start the way Claude Code makes it: from the repo folder, over stdin and stdout, until Serena answers initialize and lists its tools. |
 | [dev/Check-Swallow.ps1](dev/Check-Swallow.ps1) | Counts the silent catches in the launcher and in the PowerShell under scripts\ and installer\, file by file, and fails when any file has more than scripts\dev\swallow-baseline.txt allows, or fewer than it allows with its line not yet lowered. |
@@ -98,6 +100,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [dev/Gate-Map.ps1](dev/Gate-Map.ps1) | Fetches the newest map of which gate harnesses a change can reach: the gate-map artifact of main's nightly trace on GitHub's runner (#5183, #4009). |
 | [dev/Install-Serena.ps1](dev/Install-Serena.ps1) | Installs Serena once, at the version in scripts\dev\serena-version.txt, and points Claude Code on this machine at the installed program, so a session start runs Serena straight away instead of resolving it first. |
 | [dev/Install-Thornswood.ps1](dev/Install-Thornswood.ps1) | Everything the client needs, in one run, in the order it has to happen in. |
+| [dev/Launcher-Reach.ps1](dev/Launcher-Reach.ps1) | Says whether a pull request's change reaches the job "Launcher builds" (#5292): launcher=true or launcher=false, to the step's outputs. |
 | [dev/Lint.ps1](dev/Lint.ps1) | Reports ruff, eslint and PSScriptAnalyzer findings, warnings only, over the files it is given or the whole tree, with each pinned tool fetched once per machine. |
 | [dev/Measure-Reclaim.ps1](dev/Measure-Reclaim.ps1) | How much disk deleting a folder would ACTUALLY free. |
 | [dev/Merge-HarnessReports.ps1](dev/Merge-HarnessReports.ps1) | Merges the JUnit reports of a run's harness shares into one report, and writes the failing checks, by name, to the run's summary (#5295). |
@@ -233,6 +236,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/New-SkyrimFilesRecord.ps1](release/New-SkyrimFilesRecord.ps1) | Records every file of the pinned Skyrim build, from the depot manifests the Downgrade asks Steam for, into records\skyrim-files.json. |
 | [release/Nexus-Run.ps1](release/Nexus-Run.ps1) | Runs one of the Nexus scripts with Patrick's Nexus API key from a session that does not hold the key, a cloud thread included (#2841). |
 | [release/Nexus.ps1](release/Nexus.ps1) | The one place the release scripts talk to Nexus Mods from, with Patrick's personal API key (#2914). |
+| [release/NexusModPlan.ps1](release/NexusModPlan.ps1) | What Vortex would install from one mod archive, worked out the way Install-NexusRevision.ps1 lays a whole revision out (NexusLayout.cs), for a mod the collection does not carry yet (#5189). |
 | [release/NexusPublished.ps1](release/NexusPublished.ps1) | The newest published revision of a Nexus collection, as Nexus says it now (#4068). |
 | [release/Note-Repeats.ps1](release/Note-Repeats.ps1) | Whether a note tells a channel something it has already been told (#3320). |
 | [release/Note-Rules.ps1](release/Note-Rules.ps1) | What release notes may say. Ship.ps1 dot-sources this and refuses notes that break it, before anything is built. tests\test-note-rules.ps1 drives the same function, so the rule and its test cannot disagree. |
@@ -253,6 +257,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Publish-Update.ps1](release/Publish-Update.ps1) | Diffs the current build against the last published state, packs only what changed, sends it to the site (thornswood.net/feed[-dev]/assets/<sha256>, #897), and updates version.json so everyone's launcher picks it up. |
 | [release/Publish-VirusTotal.ps1](release/Publish-VirusTotal.ps1) | Optional manual tool: sends a file to VirusTotal, or says plainly that it is not sending and carries on. Not called from publish. |
 | [release/Read-JsonFile.ps1](release/Read-JsonFile.ps1) | ConvertFrom-ThornswoodJson: JSON text read from a file, parsed, or a stop that names the file. |
+| [release/Read-NexusFile.ps1](release/Read-NexusFile.ps1) | Reads one file of a Nexus mod with Patrick's Nexus API key and says what a change to records\collection.json needs from it (#5189). |
 | [release/RecordShape.ps1](release/RecordShape.ps1) | The shape and version each high-risk JSON record must have, checked fail closed (#2180, first slice). docs\JSON-STATE-INVENTORY.md lists every critical JSON file, who writes it and who reads it. |
 | [release/Refresh-DevNews.ps1](release/Refresh-DevNews.ps1) | Marks the dev feed's notes DEV again against what main has published, and sets its mainVersion, with no release. |
 | [release/Release-Baseline.ps1](release/Release-Baseline.ps1) | What a release is diffed against, and the record each release publishes of what it left installed (#441). |

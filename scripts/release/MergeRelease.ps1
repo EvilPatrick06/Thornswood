@@ -7,8 +7,11 @@
   PowerShell 7. tests\test-5179-merge-release.ps1 drives every function.
 
       . ./scripts/release/MergeRelease.ps1
-      New-MergeReleaseNames -Utc <DateTime> -Run <n>
+      New-MergeReleaseNames -Utc <DateTime> [-Taken <tags>]
           @{ Tag = 'build-20261101.7'; Velopack = '2026.1101.7' }
+      Resolve-MergeReleaseSince -Commit <sha> -Subject <scriptblock> [-RepoDir .]
+          where this history's notes start: the Release before's commit, or
+          the same merge in this history when the history was rewritten
       Get-MergeReleasePrevious [-Repo owner/name]
           the newest published build-* Release and its manifest, or $null
       Get-MergeReleasePrint -Manifest <obj> -Part <name>
@@ -20,12 +23,23 @@
           whether this merge makes a Velopack package, and so builds the
           launcher with the release's Velopack version
 
-  THE NAMES. One time and one run number give both: the tag the agent
-  applies, build-<yyyyMMdd>.<run>, and the Velopack version, which must be
-  SemVer and must grow with every release: <yyyy>.<M*100+d>.<run> (no
-  leading zero, so 2 Jan is 102). Within a year the month and day grow, and
-  the run number grows with every run of the workflow, so a later release is
-  always the higher version.
+  THE NAMES. The day and a number give both: the tag the agent applies,
+  build-<yyyyMMdd>.<n>, and the Velopack version, which must be SemVer and
+  must grow with every release: <yyyy>.<M*100+d>.<n> (no leading zero, so
+  2 Jan is 102). n is one more than the highest the day's tags and Releases
+  (drafts too) already use, so a name is never taken twice. It was the run
+  number until 1 Nov, when renaming the workflow started its runs at 1 again
+  and the first run asked for build-20261101.1, a tag the gamemode workflow
+  had made that morning. Runs never overlap (one concurrency group), and a
+  later day or a higher n is always the higher version.
+
+  WHERE THE NOTES START. The commit of the Release before, when this history
+  holds it. The history was rewritten on 1 Nov (#5231), so a Release from
+  before then names a commit this history does not hold, and GitHub can
+  compare nothing to it. That Release's merge is still here under another
+  id with the same title, ending in its pull request's number, (#N), so the
+  first-parent commit of this history whose title ends the same is where
+  the notes start. No such commit, or more than one, and it stops.
 
   WHAT COUNTS AS A CHANGE. Every Release carries every part, so any of them
   can be put back by its tag; only a part whose content changed asks for a
@@ -55,13 +69,35 @@
 #>
 
 function New-MergeReleaseNames {
-  param([Parameter(Mandatory = $true)][DateTime]$Utc, [Parameter(Mandatory = $true)][int]$Run)
-  if ($Run -lt 1) { throw "run number $Run is not 1 or more" }
+  param([Parameter(Mandatory = $true)][DateTime]$Utc, [string[]]$Taken = @())
   $u = $Utc.ToUniversalTime()
-  return [pscustomobject]@{
-    Tag      = ('build-{0}.{1}' -f $u.ToString('yyyyMMdd'), $Run)
-    Velopack = ('{0}.{1}.{2}' -f $u.Year, ($u.Month * 100 + $u.Day), $Run)
+  $day = $u.ToString('yyyyMMdd')
+  $n = 0
+  foreach ($t in @($Taken)) {
+    if ([string]$t -match ('^build-' + $day + '\.(\d{1,9})$')) { $n = [Math]::Max($n, [int]$Matches[1]) }
   }
+  $n++
+  return [pscustomobject]@{
+    Tag      = ('build-{0}.{1}' -f $day, $n)
+    Velopack = ('{0}.{1}.{2}' -f $u.Year, ($u.Month * 100 + $u.Day), $n)
+  }
+}
+
+function Resolve-MergeReleaseSince {
+  param([Parameter(Mandatory = $true)][string]$Commit, [Parameter(Mandatory = $true)][scriptblock]$Subject, [string]$RepoDir = '.')
+  if ($Commit -notmatch '^[0-9a-f]{40}$') { throw "the Release before names $Commit, which is not a commit" }
+  $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+  try {
+    & git -C $RepoDir merge-base --is-ancestor $Commit HEAD 2>$null
+    $inHistory = ($LASTEXITCODE -eq 0)
+  } finally { $ErrorActionPreference = $eap }
+  if ($inHistory) { return $Commit }
+  $title = [string](& $Subject $Commit)
+  if ($title -notmatch '\(#(\d+)\)\s*$') { throw "the Release before is commit $Commit, which this history does not hold, and its title ($title) names no pull request to find it by" }
+  $end = '(#' + $Matches[1] + ')'
+  $hits = @(& git -C $RepoDir log --first-parent --format='%H%x09%s' HEAD | Where-Object { ($_ -split "`t", 2)[1].TrimEnd().EndsWith($end) })
+  if ($hits.Count -ne 1) { throw "the Release before is commit $Commit, which this history does not hold, and $($hits.Count) commits here end in $end, not one" }
+  return ($hits[0] -split "`t", 2)[0]
 }
 
 function Get-MergeReleasePrint {
