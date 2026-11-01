@@ -1702,6 +1702,22 @@ Ship asks the dev server which of our plugins it holds, by size and sha256. When
 
 The note is what people read. The first line is a title of three words or more, from the person's side. Then one line starting with `- ` for each thing they will notice. Ship refuses a title that is shorter, a note with no `- ` line, an issue number, a file name, a setting name, and the word the Words section bans.
 
+The note is written in the pull request, not at release time (#5179). Its body has a `Release note:` line with the title on it and the `- ` lines directly under it, or `Release note: none` when nobody would notice the change in the game, the launcher, the site or Discord. The "Release note" check (`.github/workflows/pr-body.yml`) holds it to the rules above while the pull request is open, and runs again when the body is edited. Dependabot's pull requests say none by rule.
+
+```text
+Release note: The forge shows the price before you pay
+- The forge window lists each metal a piece takes and how much.
+```
+
+At release time the note is joined from every pull request merged since the last dev release, in merge order, and printed ready for Ship:
+
+```powershell
+pwsh -NoProfile -File scripts/release/Collect-ReleaseNotes.ps1 -OutFile $env:TEMP\note.txt
+.\scripts\release\Ship.ps1 -Channel dev (Get-Content $env:TEMP\note.txt -Raw)
+```
+
+It stops and names any merged pull request with no `Release note:` line, and says so when every change says none.
+
 ```powershell
 .\scripts\release\Ship.ps1 -Channel dev "The Downgrade button shows its progress and says why it stopped
 - A bar under the Downgrade button shows how far the downgrade has got.

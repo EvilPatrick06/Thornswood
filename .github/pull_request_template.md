@@ -13,6 +13,18 @@ change per pull request. -->
 <!-- What you ran or did, and what you saw. "Not checked" is an answer too; leave
 nothing blank. -->
 
+## Release note
+
+<!-- What people read about this change in the launcher's News, on the site and
+in Discord. A headline of three words or more, then at least one line starting
+with "- " directly under it. Plain words: never the banned word, no em dashes, no issue
+or pull request numbers, no file or code names, no version in the headline.
+"Release note: none" when nobody would notice the change in the game, the
+launcher, the site or Discord. The "Release note" check reads it, and the
+release carries it as written. -->
+
+Release note: 
+
 ## Before you send it
 
 - [ ] It changes one thing.
