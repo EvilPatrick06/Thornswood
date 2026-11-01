@@ -274,11 +274,6 @@ function Hash-SiteFeed([string]$channelDir) {
     if (-not $f) { return 'absent' }
     return ((Split-Path -Leaf $f) + '|' + (Hash $f))
 }
-function Read-Version([string]$path) {
-    $m = [regex]::Match([IO.File]::ReadAllText($path), 'Version\s*=\s*"([^"]+)"')
-    if ($m.Success) { return $m.Groups[1].Value }
-    return ''
-}
 
 try {
     foreach ($d in @((Join-Path $repo 'launcher\app'), (Join-Path $repo 'scripts\release'), $rel, $relDev, $bin,
@@ -342,10 +337,13 @@ if ($env:TS_DRY_NEXUS_PUBLISHED) { return [int]$env:TS_DRY_NEXUS_PUBLISHED }
 return [int]$env:TS_DRY_COLLECTION_REVISION
 '@)
     $updaterCs = Join-Path $repo 'launcher\app\Updater.cs'
-    # Git holds 0.0.0 there, and the launcher's number comes from when its
-    # sources last changed (LauncherVersion.ps1, #5179): the git stand-in below
-    # answers that they last changed at 5:45 PM UTC on 1 Nov 2026, 2026.1101.1745.
-    [IO.File]::WriteAllText($updaterCs, "        public const string Version = `"0.0.0`";`r`n")
+    # The launcher's number comes from when its sources last changed
+    # (LauncherVersion.ps1, #5179): the git stand-in below answers that they
+    # last changed at 5:45 PM UTC on 1 Nov 2026, 2026.1101.1745. It goes into
+    # the build as -p:Version and no source file holds it (#4825), so no run of
+    # Ship may change this file; it is fingerprinted after each one.
+    [IO.File]::WriteAllText($updaterCs, "        public static readonly string Version = BuiltVersion();`r`n")
+    $updaterWas = Hash $updaterCs
     # Issue #1081: Ship runs scripts\dev\Check-Words.ps1 before it builds.
     # This stand-in passes. tests\test-ship-check-words.ps1 runs the real
     # script against a planted hit. A stand-in here keeps this dry run on
@@ -378,7 +376,7 @@ return [int]$env:TS_DRY_COLLECTION_REVISION
     # The build writes its exe into -OutDir and the install copies that one
     # into the root, as the real ones do: Ship reads back that the exe in the
     # root is the one in -OutDir by its sha256 (#5156).
-    Stub 'Build-Launcher' '[string]$Root, [string]$OutDir, [switch]$NoPause' @'
+    Stub 'Build-Launcher' '[string]$Root, [string]$OutDir, [switch]$NoPause, [switch]$NoSign, [string]$Version' @'
 [void](New-Item -ItemType Directory -Force -Path $OutDir)
 [IO.File]::WriteAllText((Join-Path $OutDir 'Thornswood.exe'), 'the launcher this run built')
 '@
@@ -412,18 +410,18 @@ if (-not $NoPush) { [void](Receive-FeedStore $(if ($Channel) { $Channel } else {
 $vf = Join-Path $ReleaseDir 'version.json'
 $feedWas = Get-Content -LiteralPath $vf -Raw | ConvertFrom-Json
 $was = [string]$feedWas.launcherVersion
-# The launcher number the real one records: -VersionOverride, else with
-# -Launcher the number in launcher\app\Updater.cs beside it, else the feed's
-# own (a Ship that sends no launcher keeps the one the feed offers). With a
-# launcher it records that launcher's fingerprint; without, the feed's stays.
+# The launcher number the real one records: with -Launcher, -VersionOverride,
+# the number the exe was built with, and it stops without one, since no source
+# file holds it (#4825); without -Launcher the feed's own (a Ship that sends no
+# launcher keeps the one the feed offers). With a launcher it records that
+# launcher's fingerprint; without, the feed's stays.
 $now = $was
 $inputsNow = if ($feedWas.PSObject.Properties['launcherInputs']) { [string]$feedWas.launcherInputs } else { '' }
 if ($Launcher) {
-    $m = [regex]::Match([IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\..\launcher\app\Updater.cs')), 'Version\s*=\s*"([^"]+)"')
-    if ($m.Success) { $now = $m.Groups[1].Value }
+    if (-not $VersionOverride) { Write-Host 'STOP. No launcher number was given. Pass -VersionOverride with the number the exe was built with (Ship does).'; exit 1 }
+    $now = $VersionOverride
     $inputsNow = [string]$LauncherInputs
 }
-if ($VersionOverride) { $now = $VersionOverride }
 # With the release record the real one writes (#444): one name, 20990101-0000,
 # for the pack, the launcher it offers and the commit it was built from.
 $ch = if ($Channel -eq 'dev') { 'dev' } else { 'main' }
@@ -574,6 +572,11 @@ if ($target -match '^repos/[^/]+/[^/]+/actions/workflows/release\.yml/runs\?') {
     Yes ("V a dev -DryRun -Package runs to the end (exit {0})" -f $v.Code) ($v.Code -eq 0 -and $v.Out -match 'Dry run finished')
     $pub = Called $v 'Publish-Update'
     Yes 'V the publisher ran on dev, told not to upload and not to push' ($pub.Count -eq 1 -and $pub[0] -match ' -Channel dev\b' -and $pub[0] -match ' -NoUpload\b' -and $pub[0] -match ' -NoPush\b')
+    # The number goes into the build and to the publisher, the same one (#4825).
+    $vb = Called $v 'Build-Launcher'
+    $vNum = if ($vb.Count -eq 1) { [regex]::Match($vb[0], ' -Version (\S+)').Groups[1].Value } else { '' }
+    Yes ('V the launcher is built with the number it goes out as, and the publisher is given that one' + $(if ($vb.Count) { ' (' + $vb[0] + ')' } else { '' })) (
+        $vNum -ne '' -and $pub.Count -eq 1 -and $pub[0] -match (' -VersionOverride ' + [regex]::Escape($vNum) + '(\s|$)'))
     foreach ($n in 'Package-Thornswood', 'Publish-Installer', 'Publish-News', 'Publish-Discord', 'Request-Restart',
                    'Publish-PostShip') {
         Yes "V $n.ps1 is not called" ((Called $v $n).Count -eq 0)
@@ -583,7 +586,7 @@ if ($target -match '^repos/[^/]+/[^/]+/actions/workflows/release\.yml/runs\?') {
     Yes 'V the dev feed is byte for byte what it was' ((Hash $devFeed) -eq $was.dev)
     Yes '  and so is the dev baseline' ((Hash $devBase) -eq $was.devBase)
     Yes '  and the main feed is not touched' ((Hash $feed) -eq $was.feed)
-    Yes '  and Updater.cs is on the 0.0.0 git holds' ((Read-Version $updaterCs) -eq '0.0.0')
+    Yes '  and the launcher''s source is as it was: no file holds the number' ((Hash $updaterCs) -eq $updaterWas)
 
     # ---- R: a real Ship -Package on main ----------------------------------------------
     $devBeforeMain = Hash-SiteFeed $siteDevDir
@@ -747,7 +750,7 @@ if ($target -match '^repos/[^/]+/[^/]+/actions/workflows/release\.yml/runs\?') {
         $h.Code -eq 1 -and $h.Out -match 'is a folder Vortex deploys into' -and $h.Out -match 'Nothing was built')
     Yes '  before anything is built, installed or published' (
         (Called $h 'Build-Launcher').Count -eq 0 -and (Called $h 'Install-Launcher').Count -eq 0 -and (Called $h 'Publish-Update').Count -eq 0)
-    Yes '  and Updater.cs is on the 0.0.0 git holds' ((Read-Version $updaterCs) -eq '0.0.0')
+    Yes '  and the launcher''s source is as it was: no file holds the number' ((Hash $updaterCs) -eq $updaterWas)
 
     # ---- N: the ship root could not be brought up to date (#2019) ------------------------
     # Update-ShipRoot.ps1 stood in for, exiting 1 as it does when the tool or
@@ -766,7 +769,7 @@ if ($target -match '^repos/[^/]+/[^/]+/actions/workflows/release\.yml/runs\?') {
         (Called $nr 'Build-Launcher').Count -eq 0 -and (Called $nr 'Install-Launcher').Count -eq 0 -and (Called $nr 'Publish-Update').Count -eq 0 -and
         (Called $nr 'Publish-News').Count -eq 0 -and (Called $nr 'Publish-Discord').Count -eq 0 -and (Called $nr 'Request-Restart').Count -eq 0)
     Yes '  and nothing left the machine' (@(Away $nr | Where-Object { $_ -notmatch '^git ' }).Count -eq 0 -and @(Away $nr | Where-Object { $_ -match '\b(push|tag)\b' }).Count -eq 0)
-    Yes '  and Updater.cs is on the 0.0.0 git holds' ((Read-Version $updaterCs) -eq '0.0.0')
+    Yes '  and the launcher''s source is as it was: no file holds the number' ((Hash $updaterCs) -eq $updaterWas)
 
     # ---- I: the collection cannot build the animation and body files (#1692, #3715) ----
     # Build-Generated.ps1 stood in for: its dry run stops, as it does when a
@@ -835,7 +838,7 @@ if ($target -match '^repos/[^/]+/[^/]+/actions/workflows/release\.yml/runs\?') {
             (Called $j 'Build-Launcher').Count -eq 0 -and (Called $j 'Install-Launcher').Count -eq 0 -and
             (Called $j 'Go').Count -eq 0 -and (Called $j 'Publish-Update').Count -eq 0)
         Yes '  and it no longer says it in yellow and carries on' ($j.Out -notmatch 'so SkyUI''s menus were not read' -and $j.Out -notmatch 'Dry run finished')
-        Yes '  and Updater.cs is on the 0.0.0 git holds' ((Read-Version $updaterCs) -eq '0.0.0')
+        Yes '  and the launcher''s source is as it was: no file holds the number' ((Hash $updaterCs) -eq $updaterWas)
         Yes '  and the installed launcher is the one it had' ([IO.File]::ReadAllText($skyExe) -eq 'the launcher as installed')
 
         [IO.File]::WriteAllText($nodeStandIn, $nodeLine + "`r`nexit ([int]`$env:TS_NODE_EXIT)`r`n")
@@ -848,7 +851,7 @@ if ($target -match '^repos/[^/]+/[^/]+/actions/workflows/release\.yml/runs\?') {
             $k.Code -eq 1 -and $k.Out -match 'STOP\. SkyUI''s menus could not all be read \(Check-SkyUIMenus\.js exit 1\)')
         Yes '  after the check really ran on the game folder' ($ran.Count -eq 1 -and $ran[0] -match 'Check-SkyUIMenus\.js' -and $ran[0].Contains((Join-Path $skyRoot 'Game\Data')))
         Yes '  and nothing is published' ((Called $k 'Publish-Update').Count -eq 0 -and (Away $k).Count -eq 0)
-        Yes '  and Updater.cs is on the 0.0.0 git holds' ((Read-Version $updaterCs) -eq '0.0.0')
+        Yes '  and the launcher''s source is as it was: no file holds the number' ((Hash $updaterCs) -eq $updaterWas)
 
         # L: the same folder, a check that passes, runs to the end.
         $env:TS_NODE_EXIT = '0'
@@ -881,7 +884,7 @@ if ($target -match '^repos/[^/]+/[^/]+/actions/workflows/release\.yml/runs\?') {
         $nb = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-DryRun', '-Root', $rootDev, '-DistRoot', $dist, '-NoPause')
         Yes ("N a Ship from a Vortex a revision behind the record is refused (exit {0})" -f $nb.Code) ($nb.Code -ne 0 -and $nb.Out -match ('collection is on revision ' + $recRev) -and $nb.Out -match ('Vortex is on revision ' + ($recRev - 1)))
         Yes '  and nothing was built or published' ((Called $nb 'Publish-Update').Count -eq 0 -and $nb.Out -match 'Nothing was built or published')
-        Yes '  and Updater.cs is on the 0.0.0 git holds' ((Read-Version $updaterCs) -eq '0.0.0')
+        Yes '  and the launcher''s source is as it was: no file holds the number' ((Hash $updaterCs) -eq $updaterWas)
         $env:TS_DRY_COLLECTION_REVISION = '0'
         $nu = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-DryRun', '-Root', $rootDev, '-DistRoot', $dist, '-NoPause')
         Yes ("N a Ship from a Vortex that cannot say its revision is refused, never guessed (exit {0})" -f $nu.Code) ($nu.Code -ne 0 -and $nu.Out -match 'does not say which collection revision' -and (Called $nu 'Publish-Update').Count -eq 0)
@@ -893,7 +896,7 @@ if ($target -match '^repos/[^/]+/[^/]+/actions/workflows/release\.yml/runs\?') {
         $env:TS_DRY_NEXUS_PUBLISHED = [string]($recRev + 1)
         $no = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-DryRun', '-Root', $rootDev, '-DistRoot', $dist, '-NoPause')
         Yes ("O a Ship while Nexus has a newer revision than the record is refused (exit {0})" -f $no.Code) ($no.Code -ne 0 -and $no.Out -match ('Collection revision ' + ($recRev + 1) + ' is published on Nexus') -and $no.Out -match ('still on ' + $recRev))
-        Yes '  and nothing was built or published, and Updater.cs did not move' ((Called $no 'Publish-Update').Count -eq 0 -and (Read-Version $updaterCs) -eq '0.0.0')
+        Yes '  and nothing was built or published, and the launcher''s source did not move' ((Called $no 'Publish-Update').Count -eq 0 -and (Hash $updaterCs) -eq $updaterWas)
         $env:TS_DRY_NEXUS_PUBLISHED = 'none'
         $nn = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-DryRun', '-Root', $rootDev, '-DistRoot', $dist, '-NoPause')
         Yes ("O a Ship while Nexus does not answer is refused, never taken as current (exit {0})" -f $nn.Code) ($nn.Code -ne 0 -and $nn.Out -match 'Nexus did not say which revision' -and (Called $nn 'Publish-Update').Count -eq 0)
