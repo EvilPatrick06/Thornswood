@@ -84,8 +84,13 @@ const said = one ? one[1] : '';
 yes('it names the drive the other side is on', said.indexOf('" + theirs + "') >= 0 || said.indexOf('+ theirs +') >= 0);
 yes("it names Thornswood's folder and the drive it is on",
     said.indexOf('Paths.Root') >= 0 && said.indexOf('Volume(Paths.Root)') >= 0);
-yes('the first way out is installing Thornswood on the other drive',
-    said.indexOf('Install Thornswood on ') >= 0 && said.indexOf('setup program') >= 0);
+yes('the first way out is installing Thornswood on the other drive, with Thornswood-Setup.exe',
+    said.indexOf('Install Thornswood on ') >= 0 && said.indexOf('Thornswood-Setup.exe') >= 0);
+// Velopack's Setup.exe over an install asks to replace it, takes Velopack's
+// folder with install-root.txt away, and the first start's install window
+// asks for the drive again (Shell.Run, InstallPlace.Recorded).
+yes("and says the install window is where the drive is chosen",
+    said.indexOf("install window asks where to put it") >= 0);
 yes('and it says where that lands, <drive>\\Thornswood',
     said.indexOf('\\\\Thornswood') >= 0);
 yes('the second way out is passed in, so each side names its own screen',

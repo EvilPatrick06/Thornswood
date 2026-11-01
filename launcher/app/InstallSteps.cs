@@ -508,9 +508,9 @@ namespace Thornswood
             // removes, or the install folder would never come out empty.
             CopyIfThere(Path.Combine(choice.Package, "SOURCE CODE.txt"), Path.Combine(Root, "SOURCE CODE.txt"));
 
-            // Full GPL / AGPL texts and the voice libraries' licences beside SOURCE
-            // CODE.txt (#421; installer\licences\README.txt lists them).
-            foreach (string lic in new[] { "GPL-3.0.txt", "AGPL-3.0.txt", "Concentus-LICENSE.txt", "SharpSRTP-LICENSE.txt", "BouncyCastle-LICENSE.txt" })
+            // Full GPL / AGPL texts and the launcher's libraries' licences beside
+            // SOURCE CODE.txt (#421, #4823; installer\licences\README.txt lists them).
+            foreach (string lic in LicenceFiles)
                 CopyIfThere(Path.Combine(choice.Package, lic), Path.Combine(Root, lic));
 
             // The licence texts of the libraries inside the SkyMP files, which
@@ -525,6 +525,24 @@ namespace Thornswood
                 CopyTree(libFrom, libTo);
             }
         }
+
+        /// <summary>
+        /// The licence texts the package carries beside SOURCE CODE.txt and the
+        /// install puts beside it in Root: the GPL and AGPL of the SkyMP files,
+        /// and the texts of every library built into the launcher or shipped
+        /// with it (#421, #4823). Build-SetupFiles.ps1 packs the same names
+        /// from installer\licences, whose README.txt says where each is from,
+        /// and Uninstall.cs removes them.
+        /// </summary>
+        internal static readonly string[] LicenceFiles =
+        {
+            "GPL-3.0.txt", "AGPL-3.0.txt",
+            "Concentus-LICENSE.txt", "SharpSRTP-LICENSE.txt", "BouncyCastle-LICENSE.txt",
+            "dotnet-LICENSE.txt", "dotnet-THIRD-PARTY-NOTICES.txt",
+            "Avalonia-LICENSE.txt", "MicroCom-LICENSE.txt", "Tmds.DBus-LICENSE.txt",
+            "SkiaSharp-LICENSE.txt", "SkiaSharp-THIRD-PARTY-NOTICES.txt", "ANGLE-LICENSE.txt",
+            "Velopack-LICENSE.txt", "Velopack-Rust-crates.txt", "NLayer-LICENSE.txt",
+        };
 
         static void CopyIfThere(string from, string to)
         {

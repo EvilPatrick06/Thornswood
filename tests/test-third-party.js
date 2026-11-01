@@ -1047,6 +1047,30 @@ yes('installer/licences/GPL-3.0.txt exists', (function () {
   })());
 });
 yes('installer/licences/WebView2-LICENSE.txt is gone with the web view', !fs.existsSync(path.join(ROOT, 'installer', 'licences', 'WebView2-LICENSE.txt')));
+// The launcher's libraries' texts go with the install as files (#4823): one
+// list in InstallSteps.LicenceFiles, the same names in Build-SetupFiles.ps1,
+// every file of installer/licences on it, and Uninstall.cs removing the list.
+(function () {
+  const licDir = path.join(ROOT, 'installer', 'licences');
+  const onDisk = fs.readdirSync(licDir).filter(function (f) { return f !== 'README.txt'; }).sort();
+  const steps = fs.readFileSync(path.join(ROOT, 'launcher', 'app', 'InstallSteps.cs'), 'utf8');
+  const m = /static readonly string\[\] LicenceFiles =\s*\{([\s\S]*?)\};/.exec(steps);
+  const listed = m ? (m[1].match(/"[^"]+"/g) || []).map(function (s) { return s.slice(1, -1); }).sort() : [];
+  yes('InstallSteps.LicenceFiles names every file in installer/licences but README.txt, and nothing else',
+      listed.length > 0 && JSON.stringify(listed) === JSON.stringify(onDisk));
+  const setup = fs.readFileSync(path.join(ROOT, 'scripts', 'release', 'Build-SetupFiles.ps1'), 'utf8');
+  const s = /\$launcherLicences = @\(([\s\S]*?)\)/.exec(setup);
+  const packed = s ? (s[1].match(/'[^']+'/g) || []).map(function (x) { return x.slice(1, -1); }) : [];
+  const wantPacked = listed.filter(function (f) { return f !== 'GPL-3.0.txt' && f !== 'AGPL-3.0.txt'; });
+  yes('Build-SetupFiles.ps1 packs the same launcher licence texts (GPL and AGPL come with SOURCE CODE.txt)',
+      packed.length > 0 && JSON.stringify(packed.slice().sort()) === JSON.stringify(wantPacked));
+  const uninstall = fs.readFileSync(path.join(ROOT, 'launcher', 'app', 'Uninstall.cs'), 'utf8');
+  yes('Uninstall.cs removes every file of InstallSteps.LicenceFiles',
+      /foreach \(string lic in InstallSteps\.LicenceFiles\) leave\.Add\(Path\.Combine\(Paths\.Root, lic\)\);/.test(uninstall));
+  const readme = fs.readFileSync(path.join(licDir, 'README.txt'), 'utf8');
+  const unread = onDisk.filter(function (f) { return readme.indexOf('\n  ' + f) < 0 && readme.indexOf('\r\n  ' + f) < 0; });
+  yes('installer/licences/README.txt says where each text is from' + (unread.length ? ', not: ' + unread.join(', ') : ''), unread.length === 0);
+})();
 // 1.0.1 has no GPL file in it; 1.0.0, which revisions 1 and 2 still install,
 // has ___systemPolyfill.js and skyrim-platform's licence beside it.
 const polyRows = runtimeSec.split('\n').filter(function (l) {
