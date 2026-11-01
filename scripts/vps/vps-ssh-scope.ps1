@@ -167,7 +167,7 @@ function Test-TakesSshd($Rule) {
 # itself, unless Set-SshScope.ps1 cancels it first.
 function Register-Rollback([string]$Saved) {
     $cmd = "`$s = Get-Content -Raw -LiteralPath '" + $Saved + "' | ConvertFrom-Json; foreach (`$r in `$s.rules) { if (`$r.store -eq 'Local') { Set-NetFirewallRule -PolicyStore PersistentStore -Name `$r.name -RemoteAddress @(`$r.remote) } else { Set-NetFirewallRule -PolicyStore localhost -Name `$r.name -RemoteAddress @(`$r.remote) } }; gpupdate.exe /target:computer /force | Out-Null; Unregister-ScheduledTask -TaskName '" + $RollbackTask + "' -Confirm:`$false"
-    $a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -Command "' + $cmd + '"')
+    $a = New-ScheduledTaskAction -Execute (Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe') -Argument ('-NoProfile -Command "' + $cmd + '"')
     $t = New-ScheduledTaskTrigger -Once -At ((Get-Date).AddMinutes(10))
     $p = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
     Register-ScheduledTask -TaskName $RollbackTask -Action $a -Trigger $t -Principal $p -Force | Out-Null
