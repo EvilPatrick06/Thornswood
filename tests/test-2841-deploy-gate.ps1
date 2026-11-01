@@ -129,6 +129,8 @@ Yes 'Install-Backup installs, runs or reads through the gate, never -Remove, -As
     (Words 'Install-Backup -Remove') -eq 'REFUSED' -and (Words 'Install-Backup -AsSystem') -eq 'REFUSED' -and (Words 'Install-Backup -Root x') -eq 'REFUSED' -and
     (Words 'Install-Backup -KeyOut x') -eq 'REFUSED' -and (Words 'Install-Backup -TaskName x') -eq 'REFUSED' -and (Words 'Install-Backup -At 01:00Z') -eq 'REFUSED')
 $ib = Text 'scripts\deploy\Install-Backup.ps1'
+# A Windows checkout may hold it CRLF (core.autocrlf), and the checks below read line breaks.
+$ib = $ib.Replace("`r`n", "`n")
 Yes '  -FromGate runs only under the gate, refuses what the verb leaves out, and never copies, sends or makes the passphrase' (
     $ib.Contains("if (`$env:THORNSWOOD_GATE -ne '1') { Die '-FromGate is for the deploy gate") -and
     $ib.Contains("if (`$Remove -or `$AsSystem -or @(`$handPicked).Count) { Die 'through the gate") -and
