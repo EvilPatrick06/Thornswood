@@ -45,8 +45,8 @@
       "private_vulnerability_reporting": true,
       "secret_scanning": true,
       "secret_scanning_push_protection": true,
-      "collaborators": ["Ture-Neko", "WiccanDjinn"],
-      "collaborators_why": "The fork's collaborators as GitHub had them on 31 Oct 2026, written down so that anybody given push here by hand and not added to this list is taken off at the next run.",
+      "collaborators": ["WiccanDjinn"],
+      "collaborators_why": "The fork's collaborators as GitHub had them on 1 Nov 2026, after Ture-Neko was taken off the fork (Patrick's A on q-5231-ture, #5231), written down so that anybody given push here by hand and not added to this list is taken off at the next run.",
       "rulesets": [
         {
           "name": "thornswood/engine-changes: pull request, green build, no force push or deletion",
