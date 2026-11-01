@@ -14,7 +14,7 @@ public static class Program
     const string Usage = """
         thornswood-agent version
         thornswood-agent check   [--config <agent.json>]
-        thornswood-agent deploy  --environment dev --tag <build-...> [--config <agent.json>]
+        thornswood-agent deploy  --environment dev|site|discord --tag <build-...> [--config <agent.json>]
         thornswood-agent once    [--config <agent.json>]
         thornswood-agent service [--config <agent.json>]
 
@@ -66,8 +66,10 @@ public static class Program
         // works before the App holds Deployments (Patrick's step on the App).
         var asks = verb == "deploy" ? AppTokens.ReleasesOnly : AppTokens.Permissions;
         var gh = new GitHub(cfg.Api, cfg.Repo, new AppTokens(cfg.Api, cfg.Repo, cfg.AdminState, http, permissions: asks), http);
-        var servers = cfg.Environments.ToDictionary(kv => kv.Key, kv => new Server(kv.Value, http));
-        var agent = new Agent(cfg, gh, new WindowsVerifier(WindowsVerifier.BuiltInSigner), servers, Version, exe, Log);
+        var servers = cfg.Environments.Where(kv => kv.Value.Kind == EnvConfig.ServerKind).ToDictionary(kv => kv.Key, kv => new Server(kv.Value, http));
+        var control = new WindowsAppControl();
+        var apps = cfg.Environments.Where(kv => kv.Value.Kind != EnvConfig.ServerKind).ToDictionary(kv => kv.Key, kv => new App(kv.Value, http, control));
+        var agent = new Agent(cfg, gh, new WindowsVerifier(WindowsVerifier.BuiltInSigner), servers, Version, exe, Log) { Apps = apps };
 
         switch (verb)
         {
