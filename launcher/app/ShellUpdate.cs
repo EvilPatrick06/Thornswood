@@ -199,6 +199,7 @@ namespace Thornswood
             if (!asked) return;
             launcherFailSaid = "";
             pendingLauncher = launcher;
+            Upkeep.LauncherWaiting = launcher == null ? null : launcher.Version;
             if (!string.IsNullOrEmpty(note) && note != launcherSaid)
             {
                 launcherSaid = note;
