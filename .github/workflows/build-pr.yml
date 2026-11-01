@@ -707,15 +707,10 @@ jobs:
     # for something seriously wrong.
     timeout-minutes: 20
     steps:
-      # Every commit and tree, no old file contents, as the gate's shares
-      # check out: the launcher's number comes from when its sources last
-      # changed (scripts\release\LauncherVersion.ps1, #5179), which a shallow
-      # checkout cannot say, and the publish below takes that number as a
-      # Ship does.
+      # One commit, no history: this job checks the tree alone (#3182), and
+      # the publish below takes the number a bare build carries rather than
+      # the one history gives a release.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
-          filter: blob:none
 
       # The hosted image ships whatever node, python and .NET it has this
       # month; these are pinned so a check means the same thing every month.
@@ -774,8 +769,9 @@ jobs:
           # builds it; tests\test-2019-ship-roots.ps1 on the gate runs it on
           # a pretend root.
           $out = Join-Path $env:RUNNER_TEMP 'shiproot'
-          dotnet build scripts\release\ShipRoot\ShipRoot.csproj --nologo -v minimal --disable-build-servers -c Release -o $out
-          if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $out 'Thornswood-ShipRoot.exe'))) { Write-Host '::error file=scripts/release/ShipRoot/ShipRoot.csproj::the ship root tool did not build, see the lines above'; exit 1 }
+          dotnet build scripts\release\ShipRoot\ShipRoot.csproj -c Release -o $out --nologo -v minimal --disable-build-servers
+          if ($LASTEXITCODE -ne 0) { throw "the ship root tool did not build (dotnet build exit $LASTEXITCODE)" }
+          if (-not (Test-Path -LiteralPath (Join-Path $out 'Thornswood-ShipRoot.exe'))) { throw 'the ship root tool did not build: no Thornswood-ShipRoot.exe' }
 
       - name: Check Windows PowerShell 5.1 reads the writing check as PowerShell 7 does
         shell: pwsh
