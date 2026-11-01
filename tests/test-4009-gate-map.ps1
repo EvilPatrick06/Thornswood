@@ -177,6 +177,7 @@ Yes 'Gate-Map.ps1 has no -Hand left' (-not $gm.Contains('[switch]$Hand'))
 # ---- 4. gate-map.yml
 $w = [IO.File]::ReadAllText((Join-Path (Join-Path (Join-Path $repo '.github') 'workflows') 'gate-map.yml')).Replace("`r`n", "`n")
 Yes 'gate-map.yml runs nightly, by hand, and on a pull request that changes the trace' ($w -match "(?m)^  schedule:\n    - cron: '[^']+'" -and $w -match '(?m)^  workflow_dispatch:' -and $w -match '(?m)^  pull_request:\n    paths:')
+Yes '  its gate step ends 0 with the gate''s code kept, so the map is read whatever the gate did' ($w -match "(?m)^          Add-Content -LiteralPath \`$env:GITHUB_OUTPUT -Value \('code=' \+ \`$LASTEXITCODE\)\r?\n          exit 0\r?\n")
 Yes '  keeps gate-map only from main, and never from a pull request' ($w -match "(?ms)- name: Keep the map\n\s+if: github\.event_name != 'pull_request' && github\.ref == 'refs/heads/main'\n.*?name: gate-map\n")
 Yes '  keeps a pull request''s as gate-map-trial' ($w -match "(?ms)- name: Keep the trial map\n\s+if: github\.event_name == 'pull_request'\n.*?name: gate-map-trial\n")
 Yes '  traces on windows-2022, where node''s stats are opens the trace sees' ($w -match '(?m)^    runs-on: windows-2022$')

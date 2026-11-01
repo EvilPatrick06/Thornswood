@@ -35,8 +35,8 @@
 # that lost an event is refused and keeps no map.
 #
 # WHERE IT RUNS. GitHub's hosted windows-2022, free on a public repository;
-# about twenty minutes. No secret. The run's own token is not given to any
-# harness. Not windows-latest, measured on 1 Nov 2026 (run 41261388357):
+# the whole gate took 847 s under the trace (run 41261695410, no event
+# lost). No secret. The run's own token is not given to any harness. Not windows-latest, measured on 1 Nov 2026 (run 41261388357):
 # there, on Windows Server 2025, the trace's self-test saw every open but
 # node's: fs.statSync on a file that is there and one that is not left no
 # Kernel-File create event at all, so a .js harness's stats would be missing
@@ -104,11 +104,14 @@ jobs:
         run: |
           # build.yml's gate, all of it in one job, since a trace has to see
           # every harness on one machine. Its exit code is kept for the last
-          # step; the map is taken either way.
+          # step, and this step ends 0, so the map is taken either way: a
+          # pwsh step otherwise ends with the last exit code, and the steps
+          # after it would not run (run 41261695410, one harness red).
           $keep = Join-Path $env:RUNNER_TEMP 'gate-trace'
           $null = New-Item -ItemType Directory -Force -Path $keep
           .\scripts\dev\Run-Gate.ps1 -Throttle 6 -BudgetSeconds 2700 -StartLog (Join-Path $keep 'starts.jsonl')
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ('code=' + $LASTEXITCODE)
+          exit 0
 
       - name: Stop the trace
         if: always() && steps.start.outcome == 'success'
