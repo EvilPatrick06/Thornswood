@@ -701,11 +701,14 @@ namespace Thornswood
         /// names a release record this install has not synced to, that is one
         /// entry standing for the whole release (Sync.cs, #1050), and no pack
         /// is replayed. Otherwise every pack id not in applied.txt, in order.
+        /// Nothing on dev, where the game files come with the launcher's
+        /// Velopack package (Velo.GameFromPackage, SyncPackage.cs).
         /// </summary>
-        public static List<Pack> Pending(VersionDoc v)
+        public static List<Pack> Pending(Config cfg, VersionDoc v)
         {
             var list = new List<Pack>();
-            Pack release = RecordDue(v);
+            if (Velo.GameFromPackage(cfg)) return list;
+            Pack release = RecordDue(cfg, v);
             if (release != null) { list.Add(release); return list; }
             var done = Applied();
             if (v == null || v.packs == null) return list;

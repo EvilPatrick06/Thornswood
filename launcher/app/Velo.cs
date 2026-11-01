@@ -105,10 +105,12 @@ namespace Thornswood
         /// launcher, "main" for the live one. The same answer the update feed
         /// goes by (Updater.FeedUrl): config.json's Channel or UpdateBranch.
         ///
-        /// Every merge release packs on "dev" (merge-release.yml). Main is the
-        /// same package after Patrick approves it (#5181), published with a
-        /// releases.main.json of its own; until that exists a main launcher
-        /// finds no update and says so.
+        /// Every merge release that makes a package packs it for both
+        /// channels, from the same files, and lists both in its one signed
+        /// record (merge-release.yml). Velopack writes the channel into the
+        /// package, so main's is a package of its own; it is held back and
+        /// published only by Patrick's approval (#5181). Until one is, a main
+        /// launcher finds no update and says so.
         /// </summary>
         public static string ChannelFor(Config cfg)
         {
@@ -116,6 +118,27 @@ namespace Thornswood
                        (string.Equals(cfg.Channel, "dev", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(cfg.UpdateBranch, "dev", StringComparison.OrdinalIgnoreCase));
             return dev ? "dev" : "main";
+        }
+
+        /// <summary>
+        /// THE LINE BETWEEN THE PACKAGE AND THE FEED FOR THE GAME FILES (#4825).
+        /// True when Thornswood's game files come from the Velopack package of
+        /// each launcher update (Updater, SyncPackage.cs), and the feed's
+        /// release record and packs are not this install's (Sync.cs, Pending).
+        ///
+        /// Dev only, and on purpose. The plan has one update channel carry both
+        /// the launcher and the game payload, and the dev channel has a package
+        /// on every merge that changes either. Main has none until Patrick
+        /// approves one (#5181), so a main launcher whose game files waited on
+        /// a package would get none: main stays on the feed's record until main
+        /// has packages. Then this is Installed alone, and the feed's game path
+        /// (Sync.cs fetching from the site) retires. A launcher Velopack did not
+        /// install (a build into a test root) has no package, and stays on the
+        /// feed too.
+        /// </summary>
+        public static bool GameFromPackage(Config cfg)
+        {
+            return Installed && ChannelFor(cfg) == "dev";
         }
 
         // The update that goes in when this launcher exits (ApplyOnExit).

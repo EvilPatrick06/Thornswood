@@ -138,7 +138,7 @@ namespace Thornswood
             }
             if (v == null) return;
             bool newLauncher = Updater.IsNewer(v.launcherVersion, Updater.Version) && !string.IsNullOrEmpty(v.launcherUrl);
-            List<Pack> packs = Updater.Pending(v);
+            List<Pack> packs = Updater.Pending(cfg, v);
             var parts = new List<string>();
             if (newLauncher) parts.Add("launcher " + v.launcherVersion + ", and this one is " + Updater.Version);
             if (packs.Count > 0) parts.Add(packs.Count + (packs.Count == 1 ? " mod update" : " mod updates"));
@@ -216,7 +216,7 @@ namespace Thornswood
                 foreach (Issue i in l) if (i.Kind == IssueKind.Update) waiting = true;
                 if (waiting)
                     l.Add(Issue.Of(IssueKind.OursLost, what, "The update Fix takes puts them back.", "Install now, on the card above Play, puts them back.", true));
-                else if (v != null && v.record != null)
+                else if (Updater.CanResync(cfg, v))
                     l.Add(Issue.Of(IssueKind.OursLost, what, "Fix checks every file of this release and fetches the ones that are missing or changed.",
                         "The release's files could not be fetched; its line in the log says why. Press Fix again when thornswood.net answers.", true));
                 else
@@ -398,7 +398,7 @@ namespace Thornswood
                 }
                 // Thornswood's own files, from the release this install is
                 // on, when no update is waiting to bring them anyway.
-                if (kinds.Contains(IssueKind.OursLost) && !kinds.Contains(IssueKind.Update) && v != null && v.record != null)
+                if (kinds.Contains(IssueKind.OursLost) && !kinds.Contains(IssueKind.Update) && Updater.CanResync(cfg, v))
                 {
                     try
                     {
