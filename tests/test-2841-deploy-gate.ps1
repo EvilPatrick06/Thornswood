@@ -118,6 +118,31 @@ Yes 'Set-InboundRules takes -Check and -Own, never another box, user, record or 
 Yes 'Setup-Discord runs on the box and only audits or checks: -Prune, -Posts, -Give and another guild wait for Patrick' ((Words 'Setup-Discord -Audit') -eq '-OnBox|-Audit' -and
     (Words 'Setup-Discord -Prune') -eq 'REFUSED' -and (Words 'Setup-Discord -Posts') -eq 'REFUSED' -and (Words 'Setup-Discord -Give x') -eq 'REFUSED' -and (Words 'Setup-Discord -Guild 1') -eq 'REFUSED')
 Yes 'Check-Site takes nothing of the caller''s' ((Words 'Check-Site') -eq '-NoPause' -and (Words 'Check-Site -Who 1') -eq 'REFUSED' -and (Words 'Check-Site -Site x') -eq 'REFUSED')
+# Box keys and runners, renewed from the cloud and never made new (#2862,
+# Patrick's A on q-retire-box-keys, 31 Oct 2026).
+Yes 'Renew-BoxKey takes desk or notices and nothing else: no name, environment, repository or file' ((Words 'Renew-BoxKey -Which desk') -eq '-NoPause|-Which|desk' -and
+    (Words 'Renew-BoxKey -Which notices') -eq '-NoPause|-Which|notices' -and (Words 'Renew-BoxKey -Which cloud') -eq 'REFUSED' -and
+    (Words 'Renew-BoxKey -Which desk -AdminState x') -eq 'REFUSED' -and (Words 'Renew-BoxKey -Name djinn') -eq 'REFUSED')
+Yes 'Install-Runner runs from the gate with a number, -Status, -Lock or -NetworkOnly: never -Remove, -OffBox, another repository, name or folder' (
+    (Words 'Install-Runner -Number 2') -eq '-FromGate|-AllowHost|pypi.org,files.pythonhosted.org,registry.npmjs.org|-NoPause|-Number|2' -and
+    (Words 'Install-Runner -Number 2 -Status') -ne 'REFUSED' -and (Words 'Install-Runner -Remove') -eq 'REFUSED' -and (Words 'Install-Runner -OffBox') -eq 'REFUSED' -and
+    (Words 'Install-Runner -Repo x/y') -eq 'REFUSED' -and (Words 'Install-Runner -RunnerName x') -eq 'REFUSED' -and (Words 'Install-Runner -Root C:/x') -eq 'REFUSED' -and
+    (Words 'Install-Runner -Number 100') -eq 'REFUSED' -and (Words 'Install-Runner -AllowHost x') -eq 'REFUSED')
+$rk = Text 'scripts/vps/Renew-BoxKey.ps1'
+Yes '  Renew-BoxKey keeps the old line until the secret holds the new key, and puts the file back on any stop before that' (
+    $rk.IndexOf('[IO.File]::WriteAllLines($KeysFile, [string[]](@($have) + $newLine)') -gt 0 -and
+    $rk.IndexOf('[IO.File]::WriteAllLines($KeysFile, [string[]](@($have) + $newLine)') -lt $rk.IndexOf('& $ssh -n -F none -i $keyFile') -and
+    $rk.IndexOf('& $ssh -n -F none -i $keyFile') -lt $rk.IndexOf('& gh secret set $K.Secret') -and
+    $rk.IndexOf('& gh secret set $K.Secret') -lt $rk.IndexOf('Where-Object { $old -notcontains $_ }') -and
+    $rk.Contains('if ($changed -and -not $done) { [IO.File]::WriteAllBytes($KeysFile, $before) }'))
+Yes '  its key goes only to the two fixed secrets of the ops repository, with the old line''s options and the App''s environments token' (
+    $rk.Contains("`$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'") -and $rk.Contains("Secret = 'DESK_KEY_B64'") -and $rk.Contains("Secret = 'NOTICE_KEY_B64'") -and
+    $rk.Contains('$newLine = $opts + '' '' + $bare + $tag') -and $rk.Contains('Get-ThornswoodOpsAccess -Repo $RepoRoot -For keys') -and
+    $rk.Contains('does not let in main alone'))
+$ir = Text 'scripts/deploy/Install-Runner.ps1'
+Yes '  Install-Runner from the gate is the ops repository''s, with the App''s runners token, and puts back only a runner the records or GitHub already name' (
+    $ir.Contains("`$Repo = 'EvilPatrick06/Thornswood-Ops'") -and $ir.Contains('Get-ThornswoodOpsAccess -Repo') -and $ir.Contains('-For runners') -and
+    $ir.Contains('is in no runner record and not registered on') -and $ir.IndexOf('function Invoke-Gh') -lt $ir.IndexOf('is in no runner record and not registered on'))
 # Publish-Server through the gate is the dev server's, from the box's store,
 # and nothing else (#4987): main stays with a Main run Patrick approves.
 Yes 'Publish-Server is held to -Channel dev' ((Words 'Publish-Server') -eq '-Channel|dev' -and

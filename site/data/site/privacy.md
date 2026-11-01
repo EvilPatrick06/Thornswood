@@ -2,7 +2,7 @@
 
 What Thornswood keeps about you, why, and how to have it deleted.
 
-Last changed: 30 October 2026.
+Last changed: 1 November 2026.
 
 Thornswood is a free fan project run by a small team in their own time. It is
 not a company. This page is written plainly rather than legally, and it is

@@ -313,6 +313,25 @@
         "Audit": "switch",
         "Check": "switch"
       }
+    },
+    "Renew-BoxKey": {
+      "script": "scripts/vps/Renew-BoxKey.ps1",
+      "timeoutMinutes": 10,
+      "fixed": ["-NoPause"],
+      "params": {
+        "Which": "^(desk|notices)$"
+      }
+    },
+    "Install-Runner": {
+      "script": "scripts/deploy/Install-Runner.ps1",
+      "timeoutMinutes": 45,
+      "fixed": ["-FromGate", "-AllowHost", "pypi.org,files.pythonhosted.org,registry.npmjs.org", "-NoPause"],
+      "params": {
+        "Number": "^[1-9][0-9]?$",
+        "Status": "switch",
+        "Lock": "switch",
+        "NetworkOnly": "switch"
+      }
     }
   }
 }
