@@ -2,8 +2,8 @@
   <!--
     The launcher's voice, run by the voice harnesses (tests\voice-launcher.js
     builds and starts it). It compiles the launcher's own VoiceSession.cs,
-    VoiceLoop.cs, VoicePeer.cs, VoiceIce.cs, VoiceStun.cs, VoiceMix.cs and
-    Swallow.cs as they are, with a stand-in for the parts that need Windows
+    VoiceLoop.cs, VoicePeer.cs, VoiceIce.cs, VoiceStun.cs, VoiceMix.cs,
+    VoiceHrtf.cs (with the HRTF responses) and Swallow.cs as they are, with a stand-in for the parts that need Windows
     (the microphone and speakers, VoiceAudio.cs) and for Config and Paths,
     which the session only carries. Since #4823 voice is C# and not a page,
     so the harnesses that ran voice-host.html's script in node's vm run this
@@ -49,7 +49,11 @@
     <Compile Include="../../launcher/app/VoiceIce.cs" Link="launcher/VoiceIce.cs" />
     <Compile Include="../../launcher/app/VoiceStun.cs" Link="launcher/VoiceStun.cs" />
     <Compile Include="../../launcher/app/VoiceMix.cs" Link="launcher/VoiceMix.cs" />
+    <Compile Include="../../launcher/app/VoiceHrtf.cs" Link="launcher/VoiceHrtf.cs" />
     <Compile Include="../../launcher/app/Swallow.cs" Link="launcher/Swallow.cs" />
+    <!-- The HRTF responses, under the name VoiceHrtf.cs asks for, as the
+         launcher embeds them. -->
+    <EmbeddedResource Include="../../launcher/hrtf-composite.wav" LogicalName="hrtf-composite.wav" />
   </ItemGroup>
 
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />

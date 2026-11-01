@@ -187,3 +187,10 @@ sockets the harness answers for the service, and `clock: 'real'` with
 `wire: 'ws'` connects it to a voice service the harness started, with real
 connections between launchers. The header of `voice-launcher.js` has the
 calls.
+
+`test-voice-hrtf.js` holds the launcher's HRTF panner (`launcher\app\VoiceHrtf.cs`)
+to Chrome's own: the driver's `--hrtf` tool renders a signal through it, and
+`tests\chrome-audio.js` renders the same signal through a PannerNode in a
+headless Chrome over the DevTools protocol, with node's own WebSocket and no
+packages. `chrome-audio.js` finds Chrome on its own (CHROME names one); with
+none on the machine those checks say SKIP.

@@ -70,6 +70,7 @@ namespace Thornswood
 
         static int Main(string[] args)
         {
+            if (args.Length > 0 && args[0] == "--hrtf") return HrtfTool.Run(args);
             string clockArg = "real", wireArg = "ws";
             double jitter = -1;
             for (int i = 0; i + 1 < args.Length; i += 2)

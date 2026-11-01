@@ -39,12 +39,15 @@ const PROJ = path.join(__dirname, 'voice-launcher', 'VoiceDriver.csproj');
 // What the driver is built from: its own files, the launcher's voice files it
 // links, and the launcher's project, whose package versions it takes.
 function sources() {
-  const list = [PROJ, path.join(__dirname, 'voice-launcher', 'Driver.cs'), path.join(__dirname, 'voice-launcher', 'StandIns.cs'),
-    path.join(REPO, 'launcher', 'app', 'Thornswood.csproj')];
+  const own = path.join(__dirname, 'voice-launcher');
+  const list = [PROJ, path.join(REPO, 'launcher', 'app', 'Thornswood.csproj')]
+    .concat(fs.readdirSync(own).filter((f) => /\.cs$/.test(f)).sort().map((f) => path.join(own, f)));
   const proj = fs.readFileSync(PROJ, 'utf8');
   const re = /<Compile Include="\.\.\/\.\.\/launcher\/app\/([^"]+)"/g;
   let m;
   while ((m = re.exec(proj))) { list.push(path.join(REPO, 'launcher', 'app', m[1])); }
+  const res = /<EmbeddedResource Include="\.\.\/\.\.\/launcher\/([^"]+)"/g;
+  while ((m = res.exec(proj))) { list.push(path.join(REPO, 'launcher', m[1])); }
   return list;
 }
 

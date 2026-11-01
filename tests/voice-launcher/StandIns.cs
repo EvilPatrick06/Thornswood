@@ -86,8 +86,8 @@ namespace Thornswood
         /// <summary>
         /// How loud each pitch is in what played over the last half second:
         /// the amplitude of that tone (Goertzel), so a voice heard in front at
-        /// full level reads about 0.21 (0.3 at equal power in two ears,
-        /// averaged), and a voice not heard reads about nothing.
+        /// full level reads about 0.25 (the tone through the HRTF panner,
+        /// both ears averaged), and a voice not heard reads about nothing.
         /// </summary>
         public double Hear(double hz)
         {
