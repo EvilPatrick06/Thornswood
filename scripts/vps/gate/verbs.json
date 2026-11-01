@@ -87,7 +87,9 @@
         "Status": "switch",
         "Tag": "^agent-v[0-9]{1,4}\\.[0-9]{1,4}\\.[0-9]{1,6}$",
         "NoBotPass": "switch",
-        "EndHung": "switch"
+        "EndHung": "switch",
+        "Main": "switch",
+        "NoMain": "switch"
       }
     },
     "Install-Voice": {

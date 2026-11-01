@@ -151,8 +151,25 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           . ./scripts/release/MergeRelease.ps1
-          $n = New-MergeReleaseNames -Utc (Get-Date).ToUniversalTime() -Run ([int]$env:GITHUB_RUN_NUMBER)
-          try { $prev = Get-MergeReleasePrevious }
+          $now = (Get-Date).ToUniversalTime()
+          # Every name the day already uses, tags and Releases (drafts too).
+          $refs = gh api "repos/$($env:GITHUB_REPOSITORY)/git/matching-refs/tags/build-$($now.ToString('yyyyMMdd'))." --jq '.[].ref'
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::GitHub did not list the build tags'; exit 1 }
+          $rels = gh api "repos/$($env:GITHUB_REPOSITORY)/releases?per_page=100" --jq '.[].tag_name'
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::GitHub did not list the Releases'; exit 1 }
+          $taken = @($refs | ForEach-Object { $_ -replace '^refs/tags/', '' }) + @($rels)
+          $n = New-MergeReleaseNames -Utc $now -Taken $taken
+          try {
+            $prev = Get-MergeReleasePrevious
+            $since = if ($prev) {
+              Resolve-MergeReleaseSince -Commit $prev.Commit -Subject {
+                param($c)
+                $m = gh api "repos/$($env:GITHUB_REPOSITORY)/commits/$c" --jq '.commit.message'
+                if ($LASTEXITCODE -ne 0) { throw "GitHub did not hand over commit $c" }
+                @($m)[0]
+              }
+            } else { '' }
+          }
           catch { Write-Host ('::error::' + $_.Exception.Message); exit 1 }
           $prevFile = Join-Path $env:RUNNER_TEMP 'previous-manifest.json'
           if ($prev) {
@@ -163,7 +180,8 @@ jobs:
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("tag=" + $n.Tag)
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("velopack=" + $n.Velopack)
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("previous=" + $(if ($prev) { $prev.Tag } else { '' }))
-          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("since=" + $(if ($prev) { $prev.Commit } else { '' }))
+          if ($prev -and $since -ne $prev.Commit) { Write-Host "its commit is not in this history (rewritten, #5231); the same merge here is $since" }
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("since=" + $since)
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("previous_manifest=" + $(if ($prev) { $prevFile } else { '' }))
 
       # Before anything is built: a missing Release note line stops the run
