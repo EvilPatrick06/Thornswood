@@ -130,7 +130,7 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
             {
                 logf(swapZip == null ? "the bot pass first, on a throwaway copy of the server with this gamemode (#5196)"
                                      : "the bot pass first, on a throwaway copy of the server with this gamemode and the new server build (#5196)");
-                var bp = await (MakeBotPass?.Invoke(srv.Env) ?? new BotPass(srv.Env, Tasks)).Run(f.Files, logf, ct, swapZip);
+                var bp = await (MakeBotPass?.Invoke(srv.Env) ?? new BotPass(srv.Env, Tasks)).Run(f.Files, m.Parts["bot"].Select(x => x.Name).ToList(), logf, ct, swapZip);
                 if (bp.State != "success") return bp;
                 logf(bp.Summary);
             }

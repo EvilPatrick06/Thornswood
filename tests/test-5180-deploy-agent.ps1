@@ -218,7 +218,7 @@ $h = @{}; $want = ''
     $wf = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\merge-release.yml'))
     Yes 'merge-release.yml puts the bot pass in every Release' ($wf.Contains('-BotFiles $bot') -and $wf.Contains("@('Bot-Pass.js', 'bot.js', 'character.js')") -and $wf.Contains("- 'scripts/bot/Bot-Pass.js'"))
     $cs = [IO.File]::ReadAllText((Join-Path $Repo 'tools\DeployAgent\BotPass.cs'))
-    Yes '  the same three files the agent asks the bot part for' ($cs.Contains('BotFiles = ["Bot-Pass.js", "bot.js", "character.js"]'))
+    Yes '  and the agent takes that part whole, needing only the file the task runs' ($cs.Contains('public const string Runs = "Bot-Pass.js";') -and $cs.Contains('foreach (var n in bot) Files.Copy(files[n], Path.Combine(BotDir, n));') -and -not $cs.Contains('BotFiles ='))
     $r = Probe 'Deploy-Release.ps1' 'DEPLOYED: probe' @('-Tag', 'build-20261101.3')
     Yes 'Deploy-Release.ps1: the script it sends the box parses and runs the agent''s deploy for dev' ($null -ne $r -and $r.Parses -and $r.Code -eq 0 -and $r.Text.Contains("deploy --environment 'dev' --tag 'build-20261101.3'"))
     $r = Probe 'Deploy-Release.ps1' 'DEPLOYED: probe' @('-Tag', 'v1.2.3')
