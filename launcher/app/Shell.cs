@@ -202,6 +202,10 @@ namespace Thornswood
         [STAThread]
         static void Main(string[] args)
         {
+            // Velopack first (#4825): when it runs the exe about an install, an
+            // update or an uninstall, this answers and the process ends here.
+            Velo.Start(args);
+
             // PerMonitorV2 is in the application manifest (#463), and Avalonia
             // rescales on WM_DPICHANGED by itself; WindowFit keeps the window
             // inside the work area when the scale changes.
@@ -259,21 +263,30 @@ namespace Thornswood
                     Ask.Tell(ex.ToString(), "Thornswood could not start", Ask.Icon.Error);
                 }
             }
+
+            // The very last thing: an update downloaded and checked while the
+            // launcher ran goes in now that the window has closed, everything
+            // it put back is back and the lock is let go (Velo.ExitApply).
+            Velo.ExitApply();
         }
 
         /// <summary>
         /// The single-instance lock, one per install. It used to be one name
         /// for every copy on the machine, which was right when there was one
         /// copy. The dev build lives in its own folder beside the main one and
-        /// both may be open at once, so the folder is part of the name.
+        /// both may be open at once, so the folder is part of the name: the
+        /// install's (Velo.InstallRoot), else the one given with -root, else
+        /// the folder above the exe's, as Run picks it for Paths.Init.
         /// </summary>
         static string MutexName(string[] args)
         {
             string root = null;
             try
             {
-                for (int i = 0; i < args.Length - 1; i++)
-                    if (args[i].Equals("-root", StringComparison.OrdinalIgnoreCase)) root = args[i + 1];
+                root = Velo.InstallRoot;
+                if (string.IsNullOrEmpty(root))
+                    for (int i = 0; i < args.Length - 1; i++)
+                        if (args[i].Equals("-root", StringComparison.OrdinalIgnoreCase)) root = args[i + 1];
                 if (string.IsNullOrEmpty(root))
                     root = Path.GetDirectoryName(Path.GetDirectoryName(Environment.ProcessPath));
                 root = Path.GetFullPath(root).TrimEnd('\\').ToLowerInvariant();
@@ -332,16 +345,23 @@ namespace Thornswood
             // Run, until its window closes.
             AppBuilder.Configure<App>().UsePlatformDetect().SetupWithoutStarting();
 
+            // Where Thornswood is: the folder the install recorded (Velo.
+            // InstallRoot), else the one given with -root, else the folder
+            // above the exe's, which is a launcher built into a test root
+            // (Paths.Init), the same order as the lock in MutexName.
+            //
             // The first start after Velopack's Setup.exe put the launcher down
-            // is the install (#4824): no folder recorded and none given, so the
-            // install window asks where and puts Thornswood there. Closed
-            // without installing, the launcher ends. Installed, it stays up
-            // until the launcher's own window is on screen (InstallWindow says
-            // why), and closing it then does not end anything. Somebody sent
-            // here by Windows Settings to uninstall is not asked to install.
-            string recorded = InstallPlace.Recorded();
+            // is the install (#4824): Velopack installed it, no folder is
+            // recorded and none was given, so the install window asks where
+            // and puts Thornswood there. Closed without installing, the
+            // launcher ends. Installed, it stays up until the launcher's own
+            // window is on screen (InstallWindow says why), and closing it then
+            // does not end anything. Somebody sent here by Windows Settings to
+            // uninstall is not asked to install.
+            string recorded = Velo.InstallRoot;
             InstallWindow installing = null;
-            if (root == null && recorded == null && !askedToUninstall)
+            if (recorded != null) root = recorded;
+            else if (root == null && Velo.Installed && !askedToUninstall)
             {
                 installing = new InstallWindow();
                 installing.Show();
@@ -349,7 +369,6 @@ namespace Thornswood
                 if (installed == null) return;
                 root = installed;
             }
-            else if (recorded != null) root = recorded;
 
             Paths.Init(root);
             // The log and the support zips are kept for LocalKeep.Days days on
@@ -473,10 +492,10 @@ namespace Thornswood
 
             // The shortcut points at whatever icon file the last build wrote,
             // and an update brings a new one. Quiet unless it actually had to
-            // move something. After a self-update the previous exe is still
-            // sitting as .old; Ensure sees that and rewrites icons even when
-            // the path string did not change, so blank desktop icons do not
-            // stick until someone opens Settings.
+            // move something. A launcher that changed since the last pass (an
+            // update, a rebuild) rewrites the icons even when the path string
+            // did not change (Icons.Due), so blank desktop icons do not stick
+            // until someone opens Settings.
             ThreadPool.QueueUserWorkItem(delegate
             {
                 int moved = 0;
@@ -554,41 +573,27 @@ namespace Thornswood
             // back. It plays from this process (MenuMusic.cs, #3207).
             Dispatcher.UIThread.Post(new Action(StartMenuMusic), DispatcherPriority.ApplicationIdle);
 
-            // The self update's way back. A launcher that got as far as drawing
-            // its window started cleanly, so the copy of the one before it can
-            // go, and not before: the update script watches for that copy to
-            // disappear and puts it back if this one closes first. SelfSwap.cs.
+            // The rest of an update to the launcher itself, once its window is
+            // up. Velopack started this launcher straight after putting the
+            // update in (Velo.Restarted), so the shortcut icons are redrawn,
+            // which is when blank ones show up, and the same Fix Install an
+            // update that needs no restart runs follows (#3201), after the
+            // icon pass so the two never race.
             win.ContentRendered += delegate
             {
                 try { LogStartTime(); } catch (Exception ex) { Swallow.Note("Shell.Run, saying how long the start took", ex); }
-                string self = Environment.ProcessPath;
-                ThreadPool.QueueUserWorkItem(delegate
-                {
-                    // Capture before Settle deletes .old. The early Icons.Ensure
-                    // usually runs while .old is still there; if it raced after
-                    // Settle, this second pass still forces the shortcut redraw.
-                    bool afterUpdate = false;
-                    try { afterUpdate = File.Exists(SelfSwap.OldOf(self)); } catch { /* path unreadable: skip the second icon pass */ }
-                    string said = null;
-                    try { said = SelfSwap.Settle(self); } catch (Exception ex) { Swallow.Note("Shell.Run, clearing the copy the self update kept", ex); }
-                    if (afterUpdate)
+                if (Velo.Restarted)
+                    ThreadPool.QueueUserWorkItem(delegate
                     {
                         int moved = 0;
-                        try { moved = Icons.Ensure(true); } catch (Exception ex) { Swallow.Note("Shell.Run, refreshing shortcut icons after self update", ex); }
+                        try { moved = Icons.Ensure(true); } catch (Exception ex) { Swallow.Note("Shell.Run, refreshing shortcut icons after the update", ex); }
                         if (moved > 0)
                             try { Dispatcher.UIThread.Post((Action)delegate { Log("Shortcut icon brought up to date after the update."); }); } catch (Exception ex) { Swallow.Note("Shell.Run, saying shortcut icons were refreshed", ex); }
-                        // The rest of the update that restarted the launcher
-                        // (#3201): the same Fix Install now runs after an
-                        // update that needs no restart, after the icon pass so
-                        // the two never race. Not without a folder of our own,
-                        // where the offer to make one (OwnGameAtStart) is the
-                        // thing to answer first.
+                        // Not without a folder of our own, where the offer to
+                        // make one (OwnGameAtStart) is the thing to answer first.
                         if (!Paths.Collection)
                             try { Dispatcher.UIThread.Post((Action)delegate { RunFix(true); }); } catch (Exception ex) { Swallow.Note("Shell.Run, the scan after the launcher update", ex); }
-                    }
-                    if (string.IsNullOrEmpty(said)) return;
-                    try { Dispatcher.UIThread.Post((Action)delegate { Log(said); }); } catch (Exception ex) { Swallow.Note("Shell.Run, saying what the self update left", ex); }
-                });
+                    });
                 // Message boxes belong to the window from here on, so they
                 // stay in front of it and keep it from being used meanwhile.
                 try { Ask.Owner = win.TryGetPlatformHandle().Handle; } catch (Exception ex) { Swallow.Note("Shell.Run, giving message boxes the window", ex); }

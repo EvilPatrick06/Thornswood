@@ -133,8 +133,8 @@ namespace Thornswood
 
         /// <summary>
         /// Whether the shortcuts need redrawing even where IconLocation already
-        /// reads right, issue #887. A rebuild or a Ship copies a new exe over
-        /// the old one and leaves no .old, and Install-Launcher used to delete
+        /// reads right, issue #887. An update, a rebuild or a Ship puts a new
+        /// exe where the old one was, and Install-Launcher used to delete
         /// the icon file the Start menu and pinned shortcuts name; Windows then
         /// drew them blank and kept that. So Profile\icons.stamp remembers the
         /// icon and the exe (size, write time) of the last redraw, and a start
@@ -223,14 +223,15 @@ namespace Thornswood
         /// Returns how many it had to change, so a start that changed nothing
         /// can stay quiet. Never throws and never restarts anything.
         ///
-        /// Pass force after a self-update: Windows can blank the cached picture
-        /// for a shortcut even when IconLocation still names the right file, and
-        /// a quiet Ensure then skips the notify that would redraw it. Force
+        /// Pass force after an update to the launcher (Velo.Restarted): Windows
+        /// can blank the cached picture for a shortcut even when IconLocation
+        /// still names the right file, and a quiet Ensure then skips the
+        /// notify that would redraw it. Force
         /// rewrites the same IconLocation, tells Explorer about each .lnk, and
         /// asks ie4uinit to refresh, without killing Explorer (Repair still does
         /// that from Settings when somebody needs the heavy pass). Ensure also
         /// forces itself when the exe or the icon changed since the last pass
-        /// (Due), which covers a rebuild or a Ship that leaves no .old.
+        /// (Due), which covers an update, a rebuild or a Ship.
         /// </summary>
         public static int Ensure()
         {
@@ -245,14 +246,9 @@ namespace Thornswood
             string exe = LauncherExe;
             string want = (icon == null ? exe : icon) + ",0";
 
-            // SelfSwap keeps the previous exe as Thornswood.exe.old until this
-            // window has drawn. Seeing that file means this is the first start
-            // after an update, which is when blank icons show up.
-            if (!force)
-            {
-                try { if (File.Exists(exe + ".old")) force = true; } catch { /* .old gone mid-check: treat as ordinary start */ }
-            }
-            // A rebuild or a Ship leaves no .old; the stamp catches those.
+            // A launcher that changed since the last pass (an update, a
+            // rebuild, a Ship), which is when blank icons show up: the stamp
+            // says so.
             if (!force && Due(exe, want, iconWritten)) force = true;
 
             int changed = 0;
@@ -315,7 +311,7 @@ namespace Thornswood
                                     string now = sc.IconLocation;
                                     // Force rewrites even when the string matches: the
                                     // .lnk timestamp and a shell notify are what clear a
-                                    // blank cache entry after SelfSwap replaced the exe.
+                                    // blank cache entry after an update replaced the exe.
                                     if (forced || !string.Equals(now, want, StringComparison.OrdinalIgnoreCase))
                                     {
                                         sc.IconLocation = want;
@@ -365,7 +361,7 @@ namespace Thornswood
             {
                 // The icon file first, since Windows keeps the picture against
                 // its path, then one .lnk at a time: ASSOCCHANGED alone leaves
-                // blank shortcut icons after a self-update on some machines.
+                // blank shortcut icons after an update on some machines.
                 if (icon != null)
                     try { SHChangeNotifyPath(SHCNE_UPDATEITEM, SHCNF_PATHW | SHCNF_FLUSH, icon, null); } catch (Exception ex) { Swallow.Note("Icons.Ensure, notify icon file", ex); }
                 foreach (string lnk in touchedLinks)
