@@ -124,6 +124,22 @@ $body.Add('')
 $body.Add('## How you checked it'); $body.Add('')
 $body.Add(("Made by scripts/release/Update-EnginePin.ps1 (#5148) from engine.yml run {0} ({1}), which recorded the fork's push build of this commit. The four records came from its log, the front was built again with Build-Front.ps1 -Record, and the pin blocks of THIRD-PARTY.md and credits.md were written from the records. Check-Records.ps1, tests/test-one-engine.js, tests/test-third-party.js and Write-EnginePinText.ps1 -Check passed before it was pushed. The server module's SHA256 is ``{2}``." -f $Run, $r.html_url, $facts.ServerSha256))
 $body.Add('')
+# The release note (plan part 8): the fork pull requests' own lines joined,
+# none when each says none. With a fork pull request that has no line, none
+# is written here: the line is left for a person, and the Release note check
+# stays red until it is there.
+$body.Add('## Release note'); $body.Add('')
+if ($notes.NoNote.Count) {
+    $body.Add(('Fork pull request(s) {0} carry no "Release note:" line. Write the line for them here, the way Developer-Guide.md says.' -f ((@($notes.NoNote | ForEach-Object { 'fork #' + $_ })) -join ', ')))
+    if ($notes.ReleaseNote) { $body.Add(''); $body.Add('The others say:'); foreach ($l in @($notes.ReleaseNote -split "`n")) { $body.Add('    ' + $l) } }
+} elseif ($notes.ReleaseNote) {
+    $nl = @($notes.ReleaseNote -split "`n")
+    $body.Add('Release note: ' + $nl[0])
+    foreach ($l in @($nl | Select-Object -Skip 1)) { $body.Add($l) }
+} else {
+    $body.Add('Release note: none')
+}
+$body.Add('')
 $body.Add('Whose work: mine')
 $body.Add('')
 $body.Add('## For the Thornswood team'); $body.Add('')

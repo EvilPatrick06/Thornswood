@@ -402,6 +402,14 @@ choice:
   `Test task for Thornswood #N: <title>` with the steps under it, in the shape
   `.github\pull_request_template.md` gives. The pin pull request copies both
   over, so done-on-merge.yml moves the issue when the pin merges.
+- A fork pull request also carries a `Release note:` line, the shape this
+  repository's pull requests carry (Developer-Guide.md), held to the same
+  rules by the fork's own check. The pin pull request's `Release note:` is
+  those lines joined, `none` when each says none; a fork pull request with
+  no line is named in the pin's body, and its Release note check stays red
+  until a person writes the line there. engine-pin.yml starts that check on
+  the branch, since a pull request its own token opens starts no
+  pull_request run.
 
 From a fork merge to a pin pull request ready to merge: the fork's push build
 (20 to 45 minutes), the record (about 3), the pin (about 4) and the build

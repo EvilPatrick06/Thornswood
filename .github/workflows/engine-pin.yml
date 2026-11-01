@@ -147,6 +147,9 @@ jobs:
           # once the pull request has it; its result is required (#5199).
           gh workflow run test-tasks.yml --repo $env:GITHUB_REPOSITORY --ref engine-pin/next
           if ($LASTEXITCODE -ne 0) { Write-Host '::error::the test task check could not be started on engine-pin/next'; exit 1 }
+          # And the release note check, for the same reason (plan part 8).
+          gh workflow run pr-body.yml --repo $env:GITHUB_REPOSITORY --ref engine-pin/next
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::the release note check could not be started on engine-pin/next'; exit 1 }
 
   make:
     name: Make the pin
@@ -264,3 +267,6 @@ jobs:
           # once the pull request has it; its result is required (#5199).
           gh workflow run test-tasks.yml --repo $env:GITHUB_REPOSITORY --ref engine-pin/next
           if ($LASTEXITCODE -ne 0) { Write-Host '::error::the test task check could not be started on engine-pin/next'; exit 1 }
+          # And the release note check, for the same reason (plan part 8).
+          gh workflow run pr-body.yml --repo $env:GITHUB_REPOSITORY --ref engine-pin/next
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::the release note check could not be started on engine-pin/next'; exit 1 }
