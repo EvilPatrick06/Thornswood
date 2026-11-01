@@ -1,0 +1,103 @@
+# Checks the test tasks a pull request carries in its body against the bot's
+# own post rules, before the merge (#5199; the redesign's part 18).
+#
+# WHY. A fix people would notice carries "Test task for #N: <title>" in its
+# pull request, with its Server line and steps. done-on-merge.yml copies that
+# block onto the issue at the merge, and the bot reads it and checks its rules
+# (post_problems in bot/bot.py) only when it goes to post it: for a Main one,
+# when the main release carries the fix, days later. A block that broke a
+# rule then sat on an issue in Done with a refusal comment under it, for a
+# thread that had finished long before. Here the same function reads it while
+# the pull request is open, so it is fixed by editing the body.
+#
+# WHAT IT DOES. bot/pr_tasks.py reads every block the way done-on-merge.yml
+# does and holds each against post_problems, for the forum its Server line
+# names, and against what only a pull request can get wrong: two of one kind
+# for one issue, a body that also closes the issue (the merge would close it
+# before the task is copied), and an issue that is closed, missing or a pull
+# request. A body with no block passes. Its own harness,
+# bot/test-5199-pr-tasks.py, runs first, so a check that reads nothing
+# cannot pass by accident. pr_tasks.py's header says the rest.
+#
+# WHEN. Opened, pushed to, reopened, and edited: an edit to the body is how a
+# refused test task is fixed, so the edit runs it again. A newer event
+# cancels the older run of the same pull request. Started by hand on a
+# branch, it reads the open pull request whose head that branch is. Either
+# way the body is read from GitHub as it is now, not from the event.
+#
+# THE RESULT IS REQUIRED. The main ruleset requires this job, "Test tasks in
+# the pull request", beside Build check result
+# (records/github-repo-settings.json), so a pull request merges, by hand or
+# by auto-merge, only once its test tasks would post.
+#
+# WHERE IT RUNS. GitHub's hosted Ubuntu runner, free on a public repository,
+# about half a minute. The bot's libraries come from bot/requirements.txt by
+# hash, as the nightly installs them, because pr_tasks.py imports bot.py
+# itself rather than a copy of its rules. Nothing from the pull request is
+# pasted into the step's text. The run's own token reads the pull request
+# and the issues; it writes nothing.
+#
+# Every action is named by a full length commit SHA with its tag in the
+# comment, for the reason build.yml gives.
+name: Test tasks (pull requests)
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+  # engine-pin.yml starts it on engine-pin/next once it has opened or
+  # updated the pin's pull request: that pull request is opened with the
+  # run's own token, which starts no pull_request run, and this result is
+  # required.
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+concurrency:
+  group: test-tasks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    name: Test tasks in the pull request
+    runs-on: ubuntu-latest
+    # An install and a few reads. Past this it is stuck, not slow.
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            bot
+            .github/workflows/done-on-merge.yml
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install the bot's libraries
+        shell: bash
+        run: |
+          # Into a venv of this run's own, by hash, wheels only, the way
+          # nightly.yml and Install-Bot.ps1 install them (#2190).
+          python -m venv "$RUNNER_TEMP/bot-venv"
+          "$RUNNER_TEMP/bot-venv/bin/python" -m pip install --quiet --disable-pip-version-check --require-hashes --only-binary :all: -r bot/requirements.txt
+
+      - name: Run the check's own harness
+        shell: bash
+        env:
+          DISCORD_TOKEN: not-a-real-token
+          THORNSWOOD_BOT_DATA: ${{ runner.temp }}/bot-data
+        run: |
+          mkdir -p "$THORNSWOOD_BOT_DATA"
+          "$RUNNER_TEMP/bot-venv/bin/python" bot/test-5199-pr-tasks.py
+
+      - name: Check the test tasks in the body
+        shell: bash
+        env:
+          DISCORD_TOKEN: not-a-real-token
+          THORNSWOOD_BOT_DATA: ${{ runner.temp }}/bot-data
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.ref_name }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          "$RUNNER_TEMP/bot-venv/bin/python" bot/pr_tasks.py
