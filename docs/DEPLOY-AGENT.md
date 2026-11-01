@@ -33,7 +33,7 @@ server build** (the engine).
 | Site, Discord bot | Applied by the agent (#5190, #5187): a merge that changes either makes a Deployment to **Site** or **Discord bot** with the Release's `site.zip` or `discord.zip`, and the agent swaps it in the way Deploy-Docs and Install-Bot -CodeOnly do. See "The site, the Discord bot and voice" below. |
 | Dev voice | Applied with dev's Deployment (#5187): voice has no Deployment of its own, because the gamemode pushes positions to it. |
 | Release news | After a Deployment goes in, the agent leaves its Release's notes for the bot, which posts them once (#5187). See "Release news" below. |
-| Launcher and game files | Not the agent's job: they reach people through the launcher's feed and a Ship. The release workflow (#5179) moves them onto Releases. |
+| Launcher and game files | Not the agent's job: they reach people through the launcher's feed and a Ship. Since #5179 every Release carries them as well (the signed launcher, the game files and the Velopack packages of both), attested, for the launcher's move to Velopack; the agent logs them as left alone. |
 | Bot pass before each dev Deployment | Once `Install-DeployAgent` has set up its task, every Deployment waits on a bot pass on a throwaway copy of dev with the new gamemode (#5196, below). A FAIL fails the Deployment and dev keeps what it runs. A deploy by tag (the gate's `Deploy-Release`, a rollback) does not wait on one. |
 | Parity check after a deploy | Not yet. The agent is to run `Check-ProdParity.ps1` after each deploy and file what differs as an issue, never putting it back by itself. That needs the parity scripts on the box from a signed Release, and the App to hold Issues write; until then the `Check-ProdParity` gate verb runs it. |
 
@@ -63,11 +63,12 @@ the App holds Deployments.
 
 ## How a change reaches dev
 
-1. A pull request that changes `game/gamemode.js` or
-   `records/server-build.json` (an engine pin) merges to main.
-2. [gamemode-release.yml](../.github/workflows/gamemode-release.yml) runs on
+1. A pull request that changes `game/`, `launcher/`, the bot pass or a
+   record (`records/server-build.json` is an engine pin) merges to main.
+2. [merge-release.yml](../.github/workflows/merge-release.yml) runs on
    GitHub's Windows runner in the `release` environment (main only). It
-   fetches CI's build of the pin, held to the records
+   builds or carries the signed launcher, builds the game files over dev's
+   last release (Build-GameFiles.ps1), fetches CI's build of the pin, held to the records
    (Get-EngineArtifact.ps1, the server zip ServerArtifact.ps1 makes),
    stamps the gamemode (`thornswood-build.json`, BuildStamp.ps1), writes a
    manifest listing the gamemode, its stamp, the server zip and the record
@@ -77,7 +78,8 @@ the App holds Deployments.
    ([Sign-OnRunner.ps1](../scripts/release/Sign-OnRunner.ps1)), then
    publishes the Release `build-<date>.<run>` from a draft (Releases here
    are immutable once published) and makes a Deployment to the environment
-   **Dev server** naming it.
+   **Dev** naming it. A merge that changed none of the parts publishes
+   nothing; the workflow's header says how a change is told.
 3. Within a minute the agent sees the Deployment, marks it in progress, and
    downloads `manifest.json` and `manifest.cat`. The catalog has to pass
    `launcher\app\Signature.cs`, the same check every installed launcher
@@ -203,7 +205,7 @@ a copy of dev that nobody plays on:
    `Install-DeployAgent -Status` prints the last pass.
 
 The bot pass rides in the gamemode Release as a part of its own, `bot`
-(gamemode-release.yml, `New-SignedManifest.ps1 -BotFiles`), so the bot that
+(merge-release.yml, `New-SignedManifest.ps1 -BotFiles`), so the bot that
 checks a gamemode comes from the same commit and is signed with it. A change
 to the bot alone makes a Release too.
 
@@ -269,14 +271,17 @@ whose notes start "Nothing people would notice" (merge-release.yml's line for
 a merge whose pull requests say none), and one deployed over a day ago, are
 written down without a post. A rollback by tag is not news and leaves none.
 
-## Why "Dev server" and not "Dev"
+## Why "Dev"
 
-Deployments to **Dev** and **Main** already exist. `release-files.yml` writes
-one with `Record-Deployment.ps1` after each release goes out, as a record,
-with a success status straight away. The agent's Deployments say what should
-run, which is a different meaning, so they use their own environment until
-the release workflow (#5179) makes one Deployment carry both meanings and
-`Record-Deployment.ps1` goes in the same pull request.
+Until #5179, `release-files.yml` wrote a Deployment to **Dev** or **Main**
+with `Record-Deployment.ps1` after each release went out, as a record with a
+success straight away, and the agent's Deployments used an environment of
+their own, **Dev server**. The merge release now makes the one Deployment to
+**Dev**: it says what dev should run, and the agent's status on it says
+whether it does. `Record-Deployment.ps1` went in the same pull request. The
+old records in **Dev** all carry a success, so the agent never applies them;
+the old **Dev server** Deployments are history. **Main** gets the same
+Release deployed after Patrick's Approve click (#5181).
 
 ## What it holds and what it can do
 

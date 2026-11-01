@@ -16,6 +16,11 @@
 //   home.html builds the download block from /api/public. The whole /downloads
 //     branch of the page script is lifted and run with the fetch stubbed.
 //
+// The publisher takes the same trip (#5275, Patrick's answer A on
+// q-installer-publisher): Publish-Installer writes the signer its sign gate
+// held the exe to, listFiles passes it on, and the page says "Published by"
+// that name, the one Windows shows, and never "Thornswood".
+//
 // Read only. Writes to a temp folder and nowhere else.
 const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
@@ -57,6 +62,8 @@ async function main() {
   yes('there is an exe entry for the one file build and one for the pair',
       exeBlocks.length === 2);
   const hashVar = hashLine ? /^\$(\w+)/.exec(hashLine)[1] : '(none)';
+  yes('both of them carry the sign gate\'s signer as publisher',
+      exeBlocks.length === 2 && exeBlocks.every((b) => /\bpublisher\s*=\s*\$expectWho\b/.test(b)));
   yes('and both of them carry the hash as sha256',
       exeBlocks.length === 2 && exeBlocks.every((b) =>
         new RegExp('\\bsha256\\s*=\\s*\\$' + hashVar + '\\b').test(b)));
@@ -77,6 +84,7 @@ async function main() {
       hashLine,
       "$Version = 'launcher 1.2.3'",
       "$exeOut = 'Thornswood-Setup.exe'",
+      "$expectWho = 'Someone Signing'",
       "$zipOut = 'Thornswood-Setup.zip'",
       'foreach ($single in @($true, $false)) {',
       metaBlock,
@@ -110,6 +118,8 @@ async function main() {
         const kind = i === 0 ? 'one file build' : 'pair';
         yes(kind + ': files.json gets the exe\'s SHA-256 under sha256',
             String(e.sha256 || '').toLowerCase() === want);
+        yes(kind + ': files.json names the signer the sign gate held it to as publisher',
+            e.publisher === 'Someone Signing');
         yes(kind + ': and the label, version and note are still there',
             e.label === 'Thornswood installer' && e.version === 'launcher 1.2.3' && !!e.note);
       }
@@ -130,7 +140,7 @@ async function main() {
     const meta = {
       // Get-FileHash writes upper case.
       'Thornswood-Setup.exe': { label: 'Thornswood installer',
-        version: 'launcher 1.2.3', sha256: good.toUpperCase() },
+        version: 'launcher 1.2.3', sha256: good.toUpperCase(), publisher: 'Someone Signing' },
       'Thornswood-Setup.zip': { label: 'payload', hidden: true,
         sha256: '"><img src=x onerror=alert(1)>' }
     };
@@ -153,6 +163,9 @@ async function main() {
     const e = by['Thornswood-Setup.exe'] || {};
     yes('/api/public carries the exe\'s sha256', e.sha256 === good);
     yes('in lower case', e.sha256 === good.toLowerCase());
+    yes('/api/public carries the exe\'s publisher', e.publisher === 'Someone Signing');
+    yes('an entry with no publisher sends an empty one',
+        (by['Thornswood-Setup.zip'] || {}).publisher === '');
     yes('a value that is not a SHA-256 does not go out',
         (by['Thornswood-Setup.zip'] || {}).sha256 === '');
     yes('a file files.json says nothing about is not listed at all (#3798)',
@@ -206,7 +219,7 @@ async function main() {
     const H = sha(Buffer.from('thornswood'));
     const exe = (size, hash, extra) => Object.assign({ name: 'Thornswood-Setup.exe', size: size,
       at: 2, hidden: false, label: 'Thornswood installer', version: '2026-09-24 01:00',
-      note: '', sha256: hash }, extra || {});
+      note: '', sha256: hash, publisher: 'Someone & Signing' }, extra || {});
     const zip = (hidden) => ({ name: 'Thornswood-Setup.zip', size: 385154603,
       at: 1, hidden: hidden, label: 'payload', version: '', note: '', sha256: '' });
     const SIZE = /\d (KB|MB|GB)\b/;
@@ -228,6 +241,9 @@ async function main() {
       yes(c[0] + ': the SHA-256 is printed', p.indexOf('SHA-256') >= 0 && p.indexOf(H) >= 0);
       yes(c[0] + ': beside the size and the date',
           SIZE.test(p) && p.indexOf('9-24-2026 1:00 AM') >= 0 && p.indexOf(H) > p.indexOf('9-24-2026'));
+      yes(c[0] + ': it says it is published by the signer Windows shows',
+          p.indexOf('Published by Someone &amp; Signing<br>') >= 0);
+      yes(c[0] + ': and never by Thornswood', !/Published by Thornswood/.test(html));
       yes(c[0] + ': with no VirusTotal report line',
           !/virustotal/i.test(html) && !/VirusTotal report/.test(html));
       yes(c[0] + ': and no SmartScreen / publisher warn above the button',
@@ -239,6 +255,9 @@ async function main() {
     yes('no hash on the site: the size and date still show', / MB/.test(small(none)));
     yes('and no SHA-256 line and nothing about VirusTotal at all',
         none.indexOf('SHA-256') < 0 && !/virustotal/i.test(none));
+    const nobody = small(await render({ files: [exe(560000000, H, { publisher: '' })] }));
+    yes('an entry from before the publisher was written names nobody',
+        / MB/.test(nobody) && !/Published by/.test(nobody));
     const old = await render({ files: [exe(560000000, undefined)] });
     yes('a site older than this, with no sha256 field at all, shows no hash either',
         old.indexOf('SHA-256') < 0 && !/virustotal/i.test(old) && / MB/.test(small(old)));

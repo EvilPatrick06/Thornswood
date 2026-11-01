@@ -36,7 +36,7 @@ public sealed class Config
 
     public static EnvConfig DefaultDev() => new()
     {
-        GitHubEnvironment = "Dev server",
+        GitHubEnvironment = "Dev",
         Root = @"C:\Thornswood-Server-Dev",
         Turn = @"C:\Thornswood-Backup",
         Store = @"C:\Thornswood-Deploys",
@@ -158,8 +158,8 @@ public sealed class Config
             // Dev, the site and the Discord bot. Main waits on the Main
             // environment with Patrick's approval (#5181).
             if (name is not ("dev" or AppKinds.Site or AppKinds.Discord)) throw new ConfigException($"environment \"{name}\": this agent applies dev, site and discord only so far (#5180, #5190, #5187)");
-            if (e.GitHubEnvironment is "" or "Dev" or "Main")
-                throw new ConfigException($"environment {name}: githubEnvironment \"{e.GitHubEnvironment}\" must be named, and not Dev or Main, which hold the release records");
+            if (e.GitHubEnvironment is "" or "Main")
+                throw new ConfigException($"environment {name}: githubEnvironment \"{e.GitHubEnvironment}\" must be named, and not Main, whose Deployments wait on Patrick's approval (#5181)");
             if (e.Root == "" || !(Path.IsPathRooted(e.Root) || e.Root.Contains(@":\"))) throw new ConfigException($"environment {name}: root \"{e.Root}\" is not a full path");
             if (e.Kind != EnvConfig.ServerKind)
             {
@@ -210,12 +210,11 @@ public sealed class EnvConfig
     /// data folder, the one folder on the box served to the outside. "" keeps
     /// them in the agent's own log only.</summary>
     public string LogDir { get; set; } = "";
-    /// <summary>The Deployment environment applied for this server. Not "Dev":
-    /// Deployments to Dev and Main are written after a release goes out, as a
-    /// record (scripts/release/Record-Deployment.ps1), and already carry a
-    /// success. The agent's say what should run, so they have an environment
-    /// of their own until the release workflow (#5179) makes one Deployment
-    /// both and Record-Deployment retires.</summary>
+    /// <summary>The Deployment environment applied for this server: Dev, where
+    /// the merge release (.github/workflows/merge-release.yml, #5179) makes a
+    /// Deployment for each Release whose parts changed. Deployments the old
+    /// Record-Deployment.ps1 wrote there already carry a success, so they are
+    /// never applied again.</summary>
     public string GitHubEnvironment { get; set; } = "";
     /// <summary>The game server's folder.</summary>
     public string Root { get; set; } = "";

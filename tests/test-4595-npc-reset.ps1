@@ -103,7 +103,8 @@ function New-Server([string]$name) {
         'marked'    = @('11:Skyrim.esm', (Form '11:Skyrim.esm' 1 -1 $null @([ordered]@{ baseId = 5; count = 1; npcEquipment = $true })))
         'patrol'    = @('ff', (Form 'ff' 1 -1 ([ordered]@{ thornswoodNpcPatrol = [ordered]@{ road = 'r1'; slot = 0 } })))
         'staffkept' = @('100', (Form '100' 1 -1 ([ordered]@{ thornswoodNpcCommanded = [ordered]@{ keep = $true } })))
-        'staffrun'  = @('101', (Form '101' 1 -1 ([ordered]@{ thornswoodNpcCommanded = [ordered]@{ run = 'abc' } })))
+        # one marked item and one without the mark counts as without it
+        'staffrun'  = @('101', (Form '101' 1 -1 ([ordered]@{ thornswoodNpcCommanded = [ordered]@{ run = 'abc' } }) @([ordered]@{ baseId = 5; count = 1; npcEquipment = $true }, [ordered]@{ baseId = 15; count = 2 })))
         'runtime'   = @('102', (Form '102' 1 -1))
         # other references
         'chest'     = @('20:Skyrim.esm', (Form '20:Skyrim.esm' 0 -1))
@@ -145,7 +146,8 @@ try {
     Yes 'S a survey moves nothing and writes nothing' (($before.Keys.Count -eq $after.Keys.Count) -and -not @($before.Keys | Where-Object { $after[$_] -ne $before[$_] }).Count)
     Yes 'S it names 6 NPCs, 3 characters kept, 2 other references, 2 not read' ((Line $s 'NPCRESET') -eq 'NPCRESET|6|3|2|2')
     Yes 'S by kind' ((Line $s 'NPCKINDS') -eq 'NPCKINDS|placed=2|patrol=1|staff-run=1|staff-kept=1|runtime=1')
-    Yes 'S one NPC carries the mark, the rest do not' ((Line $s 'NPCMARKS') -eq 'NPCMARKS|1|5')
+    Yes 'S one NPC has every item marked, two have an item without the mark, three carry nothing' ((Line $s 'NPCMARKS') -eq 'NPCMARKS|1|2|3')
+    Yes 'S the survey says the three counts in words' ((Get-Content -Raw -LiteralPath (Join-Path $Repo 'scripts/ops/Reset-Npcs.ps1')) -match "an item without it: \{1\}; nothing: \{2\}")
     Yes 'S one character holds kill history for one NPC being moved' ((Line $s 'KILLHISTORY') -eq 'KILLHISTORY|1|1')
     Yes 'S the creature staff kept is named with its record and place' ((Line $s 'STAFFKEPT') -eq 'STAFFKEPT|100|13bbf:Skyrim.esm|3c:Skyrim.esm|10,-21,30')
     Yes 'S each file not read is named' (@(Line $s 'NOTREAD').Count -eq 2 -and @(Line $s 'NOTREAD' | Where-Object { $_ -like 'NOTREAD|30_Skyrim.esm.json|*' }).Count -eq 1)
