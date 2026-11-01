@@ -233,12 +233,11 @@ namespace Thornswood
                             "\n\nThe usual reason is that a different profile is active in Vortex. Open Vortex, go to " +
                             "Profiles, and press Enable under Thornswood. Close Skyrim first if it is open.\n\n" +
                             "Pressing Fix will not help with this one. Fix repairs the plugin list, it cannot install a mod." +
-                            (canOpen ? "\n\nIf you have never installed the collection, press Yes to open its page and install it in Vortex." : ""),
+                            (canOpen ? "\n\nIf you have never installed the collection, press Yes to open it and install it in Vortex." : ""),
                             "Thornswood", canOpen ? MessageBoxButton.YesNo : MessageBoxButton.OK, MessageBoxImage.Warning);
                         if (canOpen && open == MessageBoxResult.Yes)
                         {
-                            try { Process.Start(new ProcessStartInfo(CollectionLink()) { UseShellExecute = true }); }
-                            catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
+                            OpenCollection();
                         }
                     }
                     else
