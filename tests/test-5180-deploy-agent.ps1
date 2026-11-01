@@ -14,7 +14,9 @@
     - Deploy-Release.ps1 and Install-DeployAgent.ps1 send the box scripts that
       parse; the install one carries the signer read from Updater.cs, the
       launcher's own Signature.cs and the repository it was given, and no
-      account name is written into either script or the agent.
+      account name is written into either script or the agent. The install
+      script's choice of Release, run against a stand-in GitHub that answers
+      with one array, takes the newest agent-v tag by version.
     - The agent compiles launcher/app/Signature.cs in from where it lives,
       and keeps no copy of its own.
     - The agent's Deployments use "Dev server" on both sides, never Dev or
@@ -111,6 +113,27 @@ try {
             Yes '  and the launcher''s own Signature.cs' ($r.Text.Contains($b64))
             Yes '  and writes the repository it was given into agent.json' ($r.Text.Contains("-NotePropertyName repo -NotePropertyValue 'O/R'"))
             Yes '  and runs the service as LocalSystem with restart on an error exit' ($r.Text.Contains('obj= LocalSystem') -and $r.Text.Contains('failureflag'))
+            # How it picks the Release, run against a stand-in GitHub that hands
+            # each JSON array back as one object, the way Invoke-RestMethod does:
+            # the box once refused agent-v1.0.6 because the list was read whole.
+            $at = $r.Text.IndexOf('$tag = $want'); $end = $r.Text.IndexOf('function Fetch(')
+            $picked = ''
+            if ($at -ge 0 -and $end -gt $at) {
+                $pick = Join-Path $tmp 'pick.ps1'
+                [IO.File]::WriteAllText($pick, @'
+function Invoke-RestMethod { param($Uri, $Headers)
+  if ($Uri -like '*/git/matching-refs/tags/agent-v') {
+    $list = @('agent-v1.0.9', 'agent-v1.0.10', 'agent-v1.0.2', 'agent-v2.0.0-rc') | ForEach-Object { [pscustomobject]@{ ref = 'refs/tags/' + $_ } }
+    Write-Output -NoEnumerate @($list) }
+  elseif ($Uri -match '/releases/tags/(.+)$') { [pscustomobject]@{ tag_name = $Matches[1]; draft = $false } }
+  else { throw "no such address in the stand-in: $Uri" } }
+function Refuse($w) { 'REFUSED: ' + $w; exit 1 }
+$h = @{}; $want = ''
+
+'@ + $r.Text.Substring($at, $end - $at))
+                $picked = (& pwsh -NoProfile -File $pick 2>&1 | Out-String).Trim()
+            }
+            Yes ('  and takes the newest agent-v tag''s Release when GitHub answers with one array: ' + $picked) ($picked -eq 'release agent-v1.0.10')
         }
     }
     $r = Probe 'Deploy-Release.ps1' 'DEPLOYED: probe' @('-Tag', 'build-20261101.3')
