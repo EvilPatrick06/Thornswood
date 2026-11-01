@@ -118,8 +118,8 @@ function Test-GameRunning { param([string]$Root) Write-Asked 'Test-GameRunning' 
 '@
 
 $stubBuild = @'
-param([string]$Src, [string]$Root, [string]$OutDir, [switch]$NoPause, [string]$With = 'csc')
-Add-Content -LiteralPath $env:TS_TEST_CALLS -Value ('build|' + $Root + '|' + $OutDir + '|' + [bool]$NoPause)
+param([string]$Src, [string]$Root, [string]$OutDir, [switch]$NoPause, [switch]$NoSign, [string]$Version)
+Add-Content -LiteralPath $env:TS_TEST_CALLS -Value ('build|' + $Root + '|' + $OutDir + '|' + [bool]$NoPause + '|' + $Version)
 if ($env:TS_TEST_BUILD_EXIT -and $env:TS_TEST_BUILD_EXIT -ne '0') { exit ([int]$env:TS_TEST_BUILD_EXIT) }
 $dir = $OutDir
 if (-not $dir) { $dir = Join-Path $Root 'Launcher' }
@@ -148,7 +148,7 @@ exit 0
 
 function Split-Call([string]$line) {
     $f = $line -split '\|'
-    return [pscustomobject]@{ What = $f[0]; Root = $f[1]; Dir = $(if ($f.Count -gt 2) { $f[2] } else { '' }); NoPause = $(if ($f.Count -gt 3) { $f[3] } else { '' }) }
+    return [pscustomobject]@{ What = $f[0]; Root = $f[1]; Dir = $(if ($f.Count -gt 2) { $f[2] } else { '' }); NoPause = $(if ($f.Count -gt 3) { $f[3] } else { '' }); Version = $(if ($f.Count -gt 4) { $f[4] } else { '' }) }
 }
 
 $saved = @{ TEMP = $env:TEMP; TMP = $env:TMP; RUNNER_TEMP = $env:RUNNER_TEMP; TS_TEST_CLOSE_LOG = $env:TS_TEST_CLOSE_LOG;
@@ -430,6 +430,7 @@ try {
         $i = @($s.Calls | Where-Object { $_.What -eq 'install' })
         Yes "S1 Ship's build block runs to the end when both halves work ($($s.Result))" ($s.Result -eq 'ok')
         Yes 'S2 it builds once, for its own root, with -NoPause' (($b.Count -eq 1) -and ($b[0].Root -eq $s.Root) -and ($b[0].NoPause -eq 'True'))
+        Yes 'S2b and gives the build the number it worked out, which goes in as -p:Version (#4825)' (($b.Count -eq 1) -and ($b[0].Version -eq '1.0.0'))
         Yes 'S3 into a folder of its own, not the install it is about to replace' (($b.Count -eq 1) -and $b[0].Dir -and ($b[0].Dir.TrimEnd('\') -ne (Join-Path $s.Root 'Launcher')))
         Yes 'S4 then installs once, into the same root, from that folder, with -NoPause' (($i.Count -eq 1) -and ($i[0].Root -eq $s.Root) -and ($b.Count -eq 1) -and ($i[0].Dir -eq $b[0].Dir) -and ($i[0].NoPause -eq 'True'))
         Yes 'S5 build first, install second' (($s.Calls.Count -ge 2) -and ($s.Calls[0].What -eq 'build') -and ($s.Calls[1].What -eq 'install'))
@@ -438,11 +439,13 @@ try {
         $s = Invoke-ShipBuild '1' '0'
         Yes "S7 a failed build stops the release ($($s.Result))" ($s.Result -like 'DIE: The launcher build stopped*')
         Yes 'S8 and nothing is installed after it' (@($s.Calls | Where-Object { $_.What -eq 'install' }).Count -eq 0)
-        Yes 'S9 and the version is put back' (@($s.Calls | Where-Object { $_.What -eq 'unbump' }).Count -eq 1)
+        # Since #4825 the number goes into the build as -p:Version and no source
+        # file holds it, so a stop has nothing to put back (Unbump went).
+        Yes 'S9 and there is nothing to put back: no source file holds the number' (@($s.Calls | Where-Object { $_.What -eq 'unbump' }).Count -eq 0)
 
         $s = Invoke-ShipBuild '0' '1'
         Yes "S10 a failed install stops the release ($($s.Result))" ($s.Result -like 'DIE: Putting the new launcher*')
-        Yes 'S11 and the version is put back' (@($s.Calls | Where-Object { $_.What -eq 'unbump' }).Count -eq 1)
+        Yes 'S11 and there is nothing to put back here either' (@($s.Calls | Where-Object { $_.What -eq 'unbump' }).Count -eq 0)
     }
 
     # ---- 7. Install-Thornswood's launcher step ----------------------------------

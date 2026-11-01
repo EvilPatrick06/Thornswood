@@ -155,12 +155,13 @@ function Set-Site($release) {
 function Drop-Site { if (Test-Path -LiteralPath $siteFiles) { Remove-Item -LiteralPath $siteFiles -Recurse -Force } }
 
 # Die is Ship's own exit; here it throws, so a refusal comes back as its words.
-# Unbump records that it was asked, so the gate putting the version back before
-# it stops is checked the way the real gate calls it.
+# There is no Unbump: since #4825 the number goes into the build as -p:Version
+# and no source file holds it, so the gate has nothing to put back before it
+# stops, and a gate that still asked for it would stop on a missing command
+# rather than on its own words.
 function Say($m, $c) { }
 function Head($m) { }
 function Die($m) { throw ('STOP. ' + $m) }
-function Unbump($why) { $global:tsUnbumped += @($why) }
 . ([scriptblock]::Create($measure))
 $gateSb = [scriptblock]::Create($gate)
 
@@ -168,7 +169,6 @@ $gateSb = [scriptblock]::Create($gate)
 function Ask-Installer { return (Measure-Installer) }
 # '' when the gate lets the release through, the STOP line when it does not.
 function Gate([bool]$dev, [bool]$hotfix, [bool]$dry, [bool]$pkg) {
-    $global:tsUnbumped = @()
     $Dev = $dev; $DryRun = $dry; $Package = $pkg
     Set-Variable -Name hotfix -Value $hotfix
     try { . $gateSb | Out-Null; return '' }
@@ -290,7 +290,7 @@ try {
     Yes "GATE main and behind stops the release, with no zip on this disk: '$r'" ($r -like 'STOP.*')
     Yes 'GATE it says how far behind and which release the installer carries' ($r -match '\b2 releases behind' -and $r -match '20260601-1200')
     Yes 'GATE it offers -Package and Package-Thornswood.ps1' ($r -match '-Package' -and $r -match 'Package-Thornswood\.ps1')
-    Yes 'GATE it puts the version back before it stops' (@($global:tsUnbumped).Count -ge 1)
+    Yes 'GATE it stops with nothing to put back first: no source file holds the number (#4825)' ($r -like 'STOP.*' -and $gate -notmatch '\bUnbump\b')
 
     $r = Gate $false $false $false $true
     Yes "GATE main with -Package is not refused, the rebuild is coming: '$r'" ($r -eq '')
@@ -312,7 +312,7 @@ try {
     Set-Site ''
     $r = Gate $false $false $false $false
     Yes "GATE main with an installer that does not say its release stops: '$r'" ($r -like 'STOP.*' -and $r -match 'cannot be told')
-    Yes 'GATE and puts the version back first' (@($global:tsUnbumped).Count -ge 1)
+    Yes 'GATE and has nothing to put back first' ($gate -notmatch '\bUnbump\b')
     Yes 'GATE and offers -Package' ($r -match '-Package')
 
     Drop-Site

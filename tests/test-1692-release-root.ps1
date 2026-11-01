@@ -138,8 +138,11 @@ try {
     $ship = $texts['Ship.ps1']
     $vortex = $ship.IndexOf("Test-Path -LiteralPath (Join-Path `$Root 'Game\Data\vortex.deployment.json')")
     Yes 'Ship refuses a folder Vortex deploys into' ($vortex -gt 0)
-    Yes '  before the version moves and before anything is built' (
-        $vortex -gt 0 -and $vortex -lt $ship.IndexOf('function Unbump') -and $vortex -lt $ship.IndexOf("'Build-Launcher.ps1') -Root"))
+    # The version is worked out once, by Get-LauncherVersion; since #4825 it goes
+    # into the build as -p:Version and no file is changed for it (Unbump went).
+    $versionAt = $ship.IndexOf('try { $current = Get-LauncherVersion -RepoDir $RepoDir }')
+    Yes '  before the version is worked out and before anything is built' (
+        $vortex -gt 0 -and $versionAt -gt 0 -and $vortex -lt $versionAt -and $vortex -lt $ship.IndexOf("'Build-Launcher.ps1') -Root"))
     $gen = $ship.IndexOf("Head 'Animation and body files'")
     Yes 'Ship asks whether the collection builds the animation and body files before the launcher is built or installed' (
         $gen -gt 0 -and $gen -lt $ship.IndexOf("'Build-Launcher.ps1') -Root") -and $gen -lt $ship.IndexOf("'Install-Launcher.ps1')") -and
