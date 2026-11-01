@@ -42,8 +42,8 @@ const clone = o => JSON.parse(JSON.stringify(o));
 // 1. the record's rules
 console.log('1. the record');
 yes('the real records/github-apps.json holds its own rules', checkRecord(real).length === 0);
-yes('  it names the six Bots\' two Apps, the box admin App, the watcher and the pin robot',
-  ['thornswood-bramble', 'thornswood-workers', 'thornswood-box-admin', 'thornswood-watch', 'thornswood-pin-robot'].every(s => real.apps.some(a => a.slug === s)));
+yes('  it names the six Bots\' two Apps, the box admin App, the watcher, the pin robot and the board App',
+  ['thornswood-bramble', 'thornswood-workers', 'thornswood-box-admin', 'thornswood-watch', 'thornswood-pin-robot', 'thornswood-board'].every(s => real.apps.some(a => a.slug === s)));
 yes('  only Bramble\'s App may change a workflow', real.apps.filter(a => a.permissions.workflows).map(a => a.slug).join() === 'thornswood-bramble');
 yes('  no App holds administration but the box admin App and the watcher (read)',
   real.apps.filter(a => a.permissions.administration).map(a => a.slug + ' ' + a.permissions.administration).sort().join() === 'thornswood-box-admin write,thornswood-watch read');
@@ -127,7 +127,7 @@ function asGitHub(record) {
   r = await run(s.url, real);
   yes('an App holding more fails, exit 1, and names it', r.code === 1 && /FAIL  thornswood-workers holds workflows write, which the record does not give it/.test(r.out));
   yes('an App GitHub will not show fails with its answer', /FAIL  thornswood-watch: GitHub answered 404: Not Found/.test(r.out));
-  yes('  the others still pass', /PASS  thornswood-bramble /.test(r.out) && /2 of 5 apps differ/.test(r.out));
+  yes('  the others still pass', /PASS  thornswood-bramble /.test(r.out) && /2 of 6 apps differ/.test(r.out));
   s.server.close();
 
   const broken = clone(real); delete broken.apps[1].why.contents;

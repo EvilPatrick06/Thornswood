@@ -146,6 +146,33 @@
     "metadata": "Every App holds it; GitHub gives it read and nothing else.",
     "pull_requests": "Opens or updates the pin's pull request (Open-EnginePinPr.ps1)."
    }
+  },
+  {
+   "slug": "thornswood-board",
+   "id": 5570326,
+   "for": "the org board \"Thornswood To Do\" (#1): board.yml moves cards and board-read.yml reads them (#5185)",
+   "held_by": "the board environment of Thornswood, main only (BOARD_APP_KEY)",
+   "installed_on": [
+    "ThornswoodRP/Thornswood"
+   ],
+   "never_on": [
+    "ThornswoodRP/Thornswood-Ops",
+    "ThornswoodRP/skymp",
+    "ThornswoodRP/Thornswood-Hermes"
+   ],
+   "permissions": {
+    "issues": "write",
+    "metadata": "read",
+    "organization_projects": "write",
+    "pull_requests": "read"
+   },
+   "events": [],
+   "why": {
+    "issues": "Reads and edits the issues the board's cards stand for, as board.yml asks (#5185).",
+    "metadata": "Every App holds it; GitHub gives it read and nothing else.",
+    "organization_projects": "Adds and moves cards on the org board; board-read.yml asks for read only when it mints its token.",
+    "pull_requests": "Reads the pull requests that link to an issue on the board; it never writes one."
+   }
   }
  ],
  "patrick_agents": [
