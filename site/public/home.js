@@ -740,6 +740,11 @@ if (AGE_PATHS[here] && !ageOk()) {
     // The button belongs under the step that tells you to take it, not above
     // the list where it is the first thing you meet and the instructions are
     // something you scroll past afterwards.
+    // "Published by" names who Windows names (#5275, Patrick's answer A on
+    // q-installer-publisher): the signer Publish-Installer's sign gate held the
+    // exe to, carried in files.json. It said "Thornswood", which is not what the
+    // Windows prompt says next. An entry with no publisher names nobody.
+    var by = exe && exe.publisher ? 'Published by ' + esc(exe.publisher) + '<br>' : '';
     var grab = '';
     if (!exe) {
       grab = '<p class="faint">' + (zip
@@ -749,7 +754,7 @@ if (AGE_PATHS[here] && !ageOk()) {
     } else if (single || !zip || zip.hidden) {
       grab = '<div class="grab"><a class="btn first" href="/file/' + encodeURIComponent(exe.name) + '">' +
              'Download the installer</a>' +
-             '<p class="also faintly">Published by Thornswood<br>' + esc(human(exe.size)) +
+             '<p class="also faintly">' + by + esc(human(exe.size)) +
              (exe.version ? ' · ' + esc(clock(exe.version)) : '') + sum(exe) + '</p></div>';
     } else {
       grab = '<div class="grab"><a class="btn first" href="/file/' + encodeURIComponent(exe.name) + '">' +
@@ -758,7 +763,7 @@ if (AGE_PATHS[here] && !ageOk()) {
              encodeURIComponent(zip.name) + '">' + esc(zip.name) + '</a>, ' +
              esc(human(zip.size)) + '. Both into the same folder, then run the exe. ' +
              'Do not unzip anything yourself.</p>' +
-             '<p class="also faintly">Published by Thornswood<br>' + esc(human(exe.size)) + ' and ' +
+             '<p class="also faintly">' + by + esc(human(exe.size)) + ' and ' +
              esc(human(zip.size)) + (exe.version ? ' · ' + esc(clock(exe.version)) : '') +
              sum(exe) + '</p></div>';
     }
