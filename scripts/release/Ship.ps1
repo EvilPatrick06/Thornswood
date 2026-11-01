@@ -9,8 +9,9 @@
 
   THE VERSION COMES FROM THE BUILD (#5179). The launcher's number is the
   time its sources last changed on main (scripts\release\LauncherVersion.ps1),
-  worked out here from git, so no pull request moves it; git holds 0.0.0 in
-  Updater.cs. Ship only reads this repository and writes nothing back to it. A
+  worked out here from git, so no pull request moves it, and handed to the
+  compile as -p:Version (Build-Launcher.ps1), which is where the launcher reads
+  it (#4825). Ship only reads this repository and writes nothing to it. A
   main release is refused if anything is uncommitted or unpushed, or if a
   file in a folder a release is built from is one git does not know, so what
   ships and what is written down are the same thing.
@@ -106,8 +107,8 @@
 
 .PARAMETER Version
   A dev build's number, for example 2026.1101.1745.1, in place of the one
-  Ship would work out from the dev feed. It is written into app\Updater.cs for
-  the build and put back afterwards, so it only ever lives in the dev feed.
+  Ship would work out from the dev feed. The build gets it as -p:Version
+  (Build-Launcher.ps1), so it only ever lives in the exe and the dev feed.
 
   A main release refuses it. Main ships main's number for its sources, the
   time they last changed (LauncherVersion.ps1); that same number is let
@@ -1439,32 +1440,14 @@ if ($newestWhy) { Die $newestWhy }
 Say ("  collection revision {0}, the one records\collection-plugins.json names and the newest on Nexus" -f $revBuilt) 'Green'
 
 # ------------------------------------------------------------ version
-$updaterCs = Join-Path $Here '..\..\launcher\app\Updater.cs'
-if (-not (Test-Path $updaterCs)) { Die "Could not find $updaterCs" }
-
-# Every write of Updater.cs goes through here, with no byte order mark, the
-# way it is committed. Set-Content
-# -Encoding UTF8 adds a mark in Windows PowerShell 5.1 and none in
-# PowerShell 7, so a Ship run from 5.1 left Updater.cs changed in git with
-# nothing changed but those three bytes (#2035).
-function Write-UpdaterCs([string]$text) {
-    [IO.File]::WriteAllText($updaterCs, $text, (New-Object Text.UTF8Encoding $false))
-}
-
-$src = Get-Content $updaterCs -Raw
-$m = [regex]::Match($src, 'Version\s*=\s*"([^"]+)"')
-if (-not $m.Success) { Die 'Could not read the version out of app\Updater.cs' }
-# THE VERSION COMES FROM THE BUILD (#5179). $committed is what git holds in
-# Updater.cs, 0.0.0, and never a number; $current is main's number for these
-# sources, the time the launcher last changed (LauncherVersion.ps1). Until
-# 1 Nov 2026 $current was the committed line, so every launcher change needed
-# a pull request moving it before main could ship it (#5192 among four in a
-# hundred merges). Below, "main's number" means $current.
-$committed = $m.Groups[1].Value
-if (-not (Test-LauncherVersionPlaceholder $src)) {
-    Die ("Updater.cs says $committed, and git holds $script:LauncherVersionPlaceholder there: a build that stopped left its number in, " +
-         'or something wrote one. git checkout -- launcher/app/Updater.cs puts it back. Nothing was built.')
-}
+# THE VERSION COMES FROM THE BUILD (#5179). $current is main's number for
+# these sources, the time the launcher last changed (LauncherVersion.ps1).
+# Until 1 Nov 2026 it was a committed line in Updater.cs, so every launcher
+# change needed a pull request moving it before main could ship it (#5192
+# among four in a hundred merges). Below, "main's number" means $current.
+# Since #4825 nothing writes it into Updater.cs for the build either: the
+# build takes it as -p:Version (Build-Launcher.ps1 -Version) and the launcher
+# reads it from its own file, so a stopped run leaves no source file changed.
 try { $current = Get-LauncherVersion -RepoDir $RepoDir }
 catch { Die ($_.Exception.Message + ' Nothing was built.') }
 $MainSourceAligned = $false
@@ -1766,14 +1749,12 @@ if (-not $Dev -and -not $ModsOnly) {
     if ($mainNow -and $mainNow.Version) { Assert-DevVersionSelection $target $current $true @() @($mainNow) $LauncherInputs }
 }
 
-# Written in for the build whatever the number, since git's is 0.0.0, and put
-# back to that by Unbump on a stop or after the build.
+# Handed to the build as -p:Version (Build-Launcher.ps1 -Version below), or,
+# on main, the number CI built v$target with (release.yml).
 Head 'Version'
 if ($target -ne $current) { Say "  main's number for these sources is $current; this goes out as $target" 'Green' }
 else { Say "  $target, main's number for these sources" 'Green' }
 if ($devLine -and $devLine.Why -and -not $ModsOnly) { Say "  $($devLine.Why)" 'DarkGray' }
-$src = $src -replace 'Version\s*=\s*"[^"]+"', ('Version = "' + $target + '"')
-Write-UpdaterCs $src
 
 # A main release ships the exe CI built for v$target, so the launcher on main
 # has to be the launcher at that tag (Get-LauncherDrift above, issue #883).
@@ -1792,18 +1773,10 @@ if (-not $Dev -and (Test-Path -LiteralPath (Join-Path $RepoDir '.git'))) {
     }
 }
 
-# The new version goes into Updater.cs before anything is built, because the
-# exe has to carry it. Anything that stops the release after that point has to
-# put it back, or a failed run burns a number and the launcher people are
-# running claims a version that was never published.
-function Unbump([string]$why) {
-    if ($target -eq $committed) { return }
-    $back = Get-Content $updaterCs -Raw
-    $back = $back -replace 'Version\s*=\s*"[^"]+"', ('Version = "' + $committed + '"')
-    Write-UpdaterCs $back
-    Head 'Version'
-    Say "  put back to $committed, $why" 'Yellow'
-}
+# Nothing is put back when a run stops (#4825): the number goes into the
+# build as -p:Version and never into a source file, so a failed run changes
+# nothing in this checkout. Until then Unbump wrote git's 0.0.0 back into
+# Updater.cs on every stop.
 
 # ------------------------------------------------------------ setup program
 # A main release with -Package builds the installer around the setup program
@@ -1817,7 +1790,6 @@ if ($Package -and -not $Dev -and -not $DryRun) {
     $stubDir = & (Join-Path $Here 'Get-ScratchDir.ps1') ('Thornswood-setup-' + (Split-Path -Leaf $Root.TrimEnd('\')))
     $why = Get-ReleaseStub (Get-SourceRepo $RepoDir) $target $stubDir
     if ($why) {
-        Unbump 'there is no verified setup program to package'
         Die $why
     }
     $ciStub = Join-Path $stubDir 'setup-stub.exe'
@@ -1852,9 +1824,8 @@ if ($FromFeed -and $revMoveFrom) {
     if ($Channel -eq 'main') {
         $carriedRev = 0
         try { $feedOfDev = Read-SiteFeed 'dev'; if ($null -ne $feedOfDev -and $feedOfDev.PSObject.Properties['collectionRevision']) { [void][int]::TryParse([string]$feedOfDev.collectionRevision, [ref]$carriedRev) } }
-        catch { Unbump 'the dev feed could not be read'; Die ('The dev feed could not be read, so whether dev has carried revision ' + $revBuilt + ' is not known. Nothing was built or published: ' + $_.Exception.Message) }
+        catch { Die ('The dev feed could not be read, so whether dev has carried revision ' + $revBuilt + ' is not known. Nothing was built or published: ' + $_.Exception.Message) }
         if ($carriedRev -ne $revBuilt) {
-            Unbump 'dev has not carried the revision'
             Die ('This release moves main to collection revision ' + $revBuilt + ', and the dev feed is on revision ' + $carriedRev + '. Whether the revision builds the animation and body files is asked on dev first, by every launcher before Play: Ship dev on it, then main. Nothing was built or published.')
         }
         Say ('  the dev feed already carries revision ' + $revBuilt + ', so dev''s launchers have built them on it') 'Green'
@@ -1870,7 +1841,6 @@ if ($FromFeed -and $revMoveFrom) {
     & (Join-Path $Here '..\mods\Build-Generated.ps1') -Root $Root -DryRun -NoPause
     $genExit = $LASTEXITCODE
     if ($genExit -ne 0) {
-        Unbump 'the collection cannot build the animation and body files'
         Die ("The collection installed here cannot build Thornswood's animation and body files (Build-Generated.ps1 -DryRun exit $genExit, the STOP above says why), " +
              'and every launcher on this release would refuse Play. Put it right in Vortex, bring the folder up to date, and Ship again. Nothing was built or published.')
     }
@@ -1887,7 +1857,6 @@ if ($FromFeed -and $revMoveFrom) {
 # node stops the release here, before the launcher is built and installed,
 # Go.ps1 copies anything, or anything is published.
 if ($GameDir -and -not (Get-Command node -ErrorAction SilentlyContinue)) {
-    Unbump 'node is not on this machine'
     Die ('node is not on this machine, and Ship reads SkyUI''s menus in the game folder with it (scripts\mods\Check-SkyUIMenus.js), ' +
          'so a release never gives everybody the SkyUI error box on the way in. Install it with ' +
          'winget install --id OpenJS.NodeJS.LTS -e (Developer-Guide.md, "Install the tools"), open a new window, and Ship again. ' +
@@ -1920,7 +1889,6 @@ if (-not $ModsOnly) {
         try {
             $ciSigner = Get-ExpectedSignerFragment -RepoRoot $RepoDir
         } catch {
-            Unbump 'ExpectedSigner could not be read'
             Die ($_.Exception.Message + ' Nothing was published.')
         }
         $hold = { param($p, $who) Get-SignedFileRefusal $p $who $RepoDir }
@@ -1928,7 +1896,6 @@ if (-not $ModsOnly) {
             Head "Main's launcher, from main's feed"
             $why = Get-FeedLauncher $MainLauncher $buildOut $ciSigner $hold
             if ($why) {
-                Unbump 'main''s launcher could not be taken from its feed'
                 Die $why
             }
             Say ("  $($MainLauncher.Version), sha256 and signature checked") 'Green'
@@ -1936,7 +1903,6 @@ if (-not $ModsOnly) {
             Head 'The launcher dev tried, from the dev feed'
             $why = Get-FeedLauncher $DevTriedLauncher $buildOut $ciSigner $hold
             if ($why) {
-                Unbump 'the launcher dev tried could not be taken from its feed'
                 Die $why
             }
             Say ("  $($DevTriedLauncher.Version), built from these same sources, sha256 and signature checked") 'Green'
@@ -1947,7 +1913,6 @@ if (-not $ModsOnly) {
             if (-not $why) { $why = Get-ReleaseLauncher $srcRepo $target $buildOut }
             if (-not $why) { $why = & $hold (Join-Path $buildOut 'Thornswood.exe') $ciSigner }
             if ($why) {
-                Unbump 'there is no signed launcher from GitHub'
                 Die ($why + ' Nothing was published.')
             }
             Say ("  v$target, verified against SHA256SUMS and the launcher's own check, {0:n0} KB" -f ((Get-Item (Join-Path $buildOut 'Thornswood.exe')).Length / 1KB)) 'Green'
@@ -1966,7 +1931,6 @@ if (-not $ModsOnly) {
         Say "  taking the exe CI built for v$target from $srcRepo" 'DarkGray'
         $why = Get-ReleaseLauncher $srcRepo $target $buildOut
         if ($why) {
-            Unbump 'there is no verified launcher to ship'
             Die $why
         }
         Say ("  verified against SHA256SUMS, {0:n0} KB" -f ((Get-Item (Join-Path $buildOut 'Thornswood.exe')).Length / 1KB)) 'Green'
@@ -1978,19 +1942,17 @@ if (-not $ModsOnly) {
         try {
             $ciSigner = Get-ExpectedSignerFragment -RepoRoot $RepoDir
         } catch {
-            Unbump 'ExpectedSigner could not be read'
             Die ($_.Exception.Message + ' Nothing was published.')
         }
         $why = Set-ReleaseLauncherSignature (Join-Path $buildOut 'Thornswood.exe') (Join-Path $Here 'Sign-Artifact.ps1') $ciSigner
         if ($why) {
-            Unbump 'the launcher from CI is not signed'
             Die $why
         }
         Say '  Authenticode Valid, signed by ExpectedSigner' 'Green'
     }
     else {
         Head 'Building the launcher'
-        & (Join-Path $Here 'Build-Launcher.ps1') -Root $Root -OutDir $buildOut -NoPause
+        & (Join-Path $Here 'Build-Launcher.ps1') -Root $Root -OutDir $buildOut -NoPause -Version $target
         $buildCode = $LASTEXITCODE
 
         <#
@@ -2011,7 +1973,6 @@ if (-not $ModsOnly) {
           announcing that nothing had been published.
         #>
         if ($buildCode -ne 0) {
-            Unbump 'the launcher build failed'
             Die ('The launcher build stopped with exit code ' + $buildCode +
                  '. Nothing was published. The errors are above.')
         }
@@ -2024,7 +1985,6 @@ if (-not $ModsOnly) {
     & (Join-Path $Here 'Install-Launcher.ps1') @installArgs
     $installCode = $LASTEXITCODE
     if ($installCode -ne 0) {
-        Unbump 'the launcher could not be put in place'
         Die ('Putting the new launcher into ' + $launchDir + ' stopped with exit code ' + $installCode +
              '. Nothing was published. The errors are above.')
     }
@@ -2044,7 +2004,6 @@ if (-not $ModsOnly) {
         $inPlace = ((Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $meant -Algorithm SHA256).Hash)
     }
     if (-not $inPlace) {
-        Unbump 'nothing was put in place'
         Die 'The launcher is not in place. Look at the errors above.'
     }
     Say ("  in place, {0:n0} KB" -f ((Get-Item $exe).Length / 1KB)) 'Green'
@@ -2061,15 +2020,6 @@ if (-not $ModsOnly) {
     }
 }
 
-# The exe is built or taken by now, so Updater.cs goes back to git's 0.0.0 for
-# either channel (#5179); the number lives in the exe and the feed.
-if ($target -ne $committed) {
-    $back = Get-Content $updaterCs -Raw
-    $back = $back -replace 'Version\s*=\s*"[^"]+"', ('Version = "' + $committed + '"')
-    Write-UpdaterCs $back
-    Say "  source put back to $committed, the exe carries $target" 'DarkGray'
-    $committed = $target   # so nothing below tries to unbump a version the source no longer has
-}
 
 # ------------------------------------------------------------ the feed's launcher
 # A main release with -Package that keeps the feed's launcher (above, or
@@ -2123,7 +2073,6 @@ if ($Package -and -not $Dev -and -not $DryRun -and $ModsOnly -and -not $FromFeed
 Head 'The front'
 try { & (Join-Path $Here 'Build-Front.ps1') }
 catch {
-    Unbump 'the front could not be built'
     Die ('The front could not be built from the pinned fork commit: ' + $_.Exception.Message)
 }
 
@@ -2138,7 +2087,6 @@ if ($GameDir) { $goArgs['Game'] = $GameDir } else { $goArgs['Vortex'] = $true }
 # Except for one thing: a file this repository tracks that Go.ps1 could not
 # find, which is a path gone wrong and exits 1 (issue #440, phase 0).
 if ($LASTEXITCODE -ne 0) {
-    Unbump 'Go.ps1 could not find files this repository has'
     Die 'Go.ps1 could not find files this repository has. Run .\scripts\release\Go.ps1 -SkipServer to see which. Nothing was published.'
 }
 
@@ -2161,11 +2109,9 @@ if ($GameDir) {
     }
     if ($stale.Count) {
         foreach ($line in $stale) { Say "  $line" 'Red' }
-        Unbump 'the in game plugins are not this source'
         Die 'The plugins in the game folder are not the ones in this repo. Nothing was published.'
     }
     if ($seen -eq 0) {
-        Unbump 'there are no in game plugins to ship'
         Die 'game\plugins has no .js in it. Nothing was published.'
     }
     Say "  $seen plugin(s) in the game folder match this source" 'Green'
@@ -2189,7 +2135,6 @@ if ($FromFeed) {
     try {
         $twProfile = Assert-VortexProfile 'Thornswood'
     } catch {
-        Unbump 'Vortex profile Thornswood was not found'
         Die $_.Exception.Message
     }
     $copies = @{
@@ -2211,7 +2156,6 @@ if ($FromFeed) {
     $diffs += @(Get-LoadOrderCopyDiffs $loCopies)
     if ($diffs.Count -gt 0) {
         foreach ($line in $diffs) { Say "  $line" 'Red' }
-        Unbump 'load order copies diverge'
         Die ("Load order copies that must match diverge:`n  " + ($diffs -join "`n  ") + "`nBake OwnGame from the Thornswood Vortex profile (launcher Settings, Maintenance, bring the folder up to date), or fix the lists, then Ship again.")
     }
     Say ("  Thornswood profile at $twProfile; load order copies agree") 'Green'
@@ -2235,11 +2179,9 @@ $syncArgs = @{ Check = $true; NoPause = $true }
 if ($GameDir) { $syncArgs['Game'] = $GameDir }
 & (Join-Path $Here 'Sync-Client.ps1') @syncArgs
 if ($LASTEXITCODE -eq 2) {
-    Unbump 'the client in the game folder is not the recorded build'
     Die 'The game folder does not hold the recorded client. Run .\scripts\release\Sync-Client.ps1, then Ship again.'
 }
 if ($LASTEXITCODE -ne 0) {
-    Unbump 'the client build could not be checked'
     Die 'Sync-Client.ps1 refused, and says why above. The client that matches the record is CI''s build of the pin: .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild ci, then Ship again (engine\README.md, A Ship machine takes CI''s build).'
 }
 
@@ -2272,7 +2214,6 @@ if ($FromFeed -and $revMoveFrom) {
             Get-ThornswoodCollectionStore -RecordPath (Join-Path $repoFull 'records\collection-plugins.json') -Fetch { param($w, $h) Invoke-ThornswoodCollectionFetch -Work $w -Head $h -Repo $repoFull }.GetNewClosure() -Say { param($m) Write-Host $m -ForegroundColor DarkGray }
         }
     } catch {
-        Unbump 'the revision''s files for SkyUI''s check are not on the box'
         Die ("SkyUI's menu check reads revision $revBuilt's own files, and the box could not hold them: " + $_.Exception.Message + ' Nothing was published.')
     }
     $skyuiWork = & (Join-Path $Here 'Get-ScratchDir.ps1') 'Thornswood-skyui-move'
@@ -2297,11 +2238,9 @@ if ($FromFeed -and $revMoveFrom) {
     & node (Join-Path $Here '..\mods\Check-SkyUIMenus.js') --data $skyuiData --plugins $skyuiPlugins --gone (@(Get-ShipDeleteAlways) -join ';') --quiet
     $skyuiExit = $LASTEXITCODE
     if ($skyuiExit -eq 2) {
-        Unbump 'SkyUI''s menus are not the version its script wants'
         Die ("In revision $revBuilt, with our files over it, SkyUI's menus are not the version its script wants, so everybody would get the SkyUI error box on the way in. The lines above say which file wins and where it comes from. Nothing was published.")
     }
     if ($skyuiExit -ne 0) {
-        Unbump 'SkyUI''s menus could not all be read'
         Die ("SkyUI's menus in revision $revBuilt could not all be read (Check-SkyUIMenus.js exit $skyuiExit), so whether everybody gets the SkyUI error box on the way in is not known. The UNREAD and FAIL lines above say which file. Nothing was published.")
     }
     Say ("  revision {0}'s SkyUI, with our files over it, passes: its check read the box's store of the revision" -f $revBuilt) 'Green'
@@ -2318,12 +2257,10 @@ if ($FromFeed -and $revMoveFrom) {
         foreach ($feedProp in $feedRecordJson.PSObject.Properties) { $feedRecord[$feedProp.Name] = [string]$feedProp.Value }
     }
     if (-not $feedRecord.Count) {
-        Unbump 'the last release''s record is not in the feed root'
         Die "There is no record of the last release at $feedRecordFile, so what SkyUI's menu check reads cannot be compared with it. New-FeedRoot.ps1 writes it; run the Ship again."
     }
     $skyuiMoved = @(Get-ShipSkyUIFeedChange $GameDir $feedRecord @(Get-ShipDeleteAlways))
     if ($skyuiMoved.Count) {
-        Unbump 'SkyUI''s files changed and the check cannot read them here'
         Die ("This release changes what SkyUI's menu check reads (" + (($skyuiMoved | Select-Object -First 5) -join ', ') + "), and that check reads the collection's archives, which are on One, not here. Ship this from One. Nothing was published.")
     }
     Say '  no SkyUI script, menu or archive differs from the last release''s, so its check holds' 'Green'
@@ -2333,7 +2270,6 @@ if ($FromFeed -and $revMoveFrom) {
     & node (Join-Path $Here '..\mods\Check-SkyUIMenus.js') --data (Join-Path $GameDir 'Data') --plugins $skyuiPlugins --gone (@(Get-ShipDeleteAlways) -join ';') --quiet
     $skyuiExit = $LASTEXITCODE
     if ($skyuiExit -eq 2) {
-        Unbump 'SkyUI''s menus are not the version its script wants'
         Die 'SkyUI''s menus in the game folder are not the version its script wants, so everybody would get the SkyUI error box on the way in. See the lines above for which file wins and where it comes from, fix that, and Ship again.'
     }
     # Anything else, 1 for a menu, a script or a plugins.txt it could not read
@@ -2341,7 +2277,6 @@ if ($FromFeed -and $revMoveFrom) {
     # pass: an unread menu may be the one that does not match, and the box it
     # would bring up is on every login, on both channels.
     if ($skyuiExit -ne 0) {
-        Unbump 'SkyUI''s menus could not all be read'
         Die ("SkyUI's menus could not all be read (Check-SkyUIMenus.js exit $skyuiExit), so whether everybody gets the SkyUI error box on the way in is not known. " +
              'The UNREAD and FAIL lines above say which file. Fix or replace it in the game folder, and Ship again.')
     }
@@ -2432,7 +2367,6 @@ function Measure-Installer {
 if (-not $Dev -and -not $hotfix -and -not $DryRun -and -not $Package) {
     try { [void](Receive-FeedStore 'main' $MainReleaseDir) }
     catch {
-        Unbump 'the main feed could not be read for the installer check'
         Die ('Could not receive the main feed from the VPS, so how far behind the installer is cannot be counted and nothing was published: ' + $_.Exception.Message)
     }
 }
@@ -2441,12 +2375,10 @@ if (-not $Dev -and -not $hotfix -and -not $DryRun -and -not $Package) {
     $rebuild = ('Rebuild it as part of this release by adding -Package, or run .\scripts\release\Package-Thornswood.ps1 -OneFile ' +
                 'first, which publishes it, then Ship.')
     if (-not $ins.Known) {
-        Unbump 'how far behind the installer is could not be told'
         Die ("How far behind the installer on the site is cannot be told: $($ins.Why). A main release does not go out " +
              "past an installer nobody can measure. $rebuild")
     }
     if ($ins.Behind -gt 0) {
-        Unbump 'the installer is behind and nothing here was going to rebuild it'
         Die (("The installer on the site (Thornswood-Setup.exe) carries release {0} and is {1} release{2} behind, and a main release would leave it further behind. " -f `
                  $ins.Release, $ins.Behind, $(if ($ins.Behind -eq 1) { '' } else { 's' })) +
              "Anyone installing from it would sit through all of those on first launch. $rebuild")
@@ -2467,7 +2399,6 @@ $signCfg = Join-Path $Here '..\..\records\signing\signing.json'
 # here either.
 $signWhy = if ($FromFeed) { Get-SignOnGitHubRefusal $RepoDir } else { Get-SigningConfigRefusal -ConfigPath $signCfg -RepoRoot $RepoDir }
 if ($signWhy) {
-    Unbump 'this machine cannot sign'
     Die $signWhy
 }
 if (-not $ModsOnly) {
@@ -2475,7 +2406,6 @@ if (-not $ModsOnly) {
     try {
         $expectWho = Get-ExpectedSignerFragment -RepoRoot $RepoDir
     } catch {
-        Unbump 'ExpectedSigner could not be read'
         Die ($_.Exception.Message + ' Nothing was published.')
     }
     # From the feed: held already, before it was installed, when it is still
@@ -2488,7 +2418,6 @@ if (-not $ModsOnly) {
     }
     else { $signWhy = Get-PublishSignRefusal -Path $pubExe -ExpectedSigner $expectWho }
     if ($signWhy) {
-        Unbump 'the launcher is not signed for publish'
         Die $signWhy
     }
     Say ("  publish sign gate: $(Split-Path -Leaf $pubExe) Authenticode Valid, ExpectedSigner $expectWho") 'Green'
@@ -2582,17 +2511,11 @@ if ($DryRun) {
     # AND THE VERSION, which is the third file and was missed.
     #
     # The two above were put back because a dry run had twice consumed the next
-    # real release. Updater.cs is the same fault with a different face: the bump
-    # happens before the build, because the exe has to carry the number, and
-    # nothing put it back. Measured 21 September: a dry run went 1.1.67 to
-    # 1.1.68, left it there, and the real Ship that followed minutes later went
-    # 1.1.68 to 1.1.69. 1.1.68 does not exist and never will.
-    #
-    # Unbump is the function written for exactly this and its own comment says
-    # why: "a failed run burns a number and the launcher people are running
-    # claims a version that was never published." A dry run is a run that does
-    # not publish, so it is one of those.
-    Unbump 'the dry run published nothing'
+    # real release. Updater.cs was the same fault with a different face until
+    # #4825: the number was written into it before the build and a dry run
+    # left it there (21 September: 1.1.67 to 1.1.68, and the real Ship minutes
+    # later to 1.1.69). The build takes the number as -p:Version now, so there
+    # is no source file to put back.
     Say '  dry run cleaned up: the feed, the baseline and the version are as they were' 'DarkGray'
 }
 
@@ -2648,7 +2571,6 @@ if (-not $DryRun -and $published -eq 0) {
         Say 'Read the publisher output above for the reason. The Discord has not' 'Red'
         Say 'been told, the server has not been touched, and nobody has been sent' 'Red'
         Say 'an update that does not exist.' 'Red'
-        if ($target -ne $committed) { Unbump 'the publish failed' }
         Write-Host ''
         if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
         exit 1
@@ -2704,16 +2626,13 @@ if ($published -ne 0 -and $published -ne 2) {
     Write-Host ''
     Say "The publisher stopped with exit code $published, so NOTHING was published." 'Red'
     Say 'The error is above, in the Publishing section.' 'Red'
-    if ($target -ne $committed) { Unbump 'the publish failed' }
     Say 'Nobody has been told and nobody has been moved. Fix it and run this again.' 'Yellow'
     Write-Host ''
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
     exit 1
 }
 
-# Exit code 2 means the publisher found nothing worth a release. The version
-# was already bumped and written into Updater.cs before the build, so put it
-# back rather than leaving a number that was never published.
+# Exit code 2 means the publisher found nothing worth a release.
 #
 # AND NOBODY IS TOLD. Everything after this block announces a release: the
 # remirror, the site news, the Discord post, the server's countdown and the
@@ -2722,10 +2641,6 @@ if ($published -ne 0 -and $published -ne 2) {
 # still brings the dev feed's DEV marks up to date with main (Dev-News.ps1);
 # it says how that went in $global:ThornswoodDevMarks, read back here.
 if ($published -eq 2) {
-    if ($target -ne $committed) {
-        Unbump 'nothing was published'
-        Say '  Rebuild the launcher next time you do ship, so the exe matches.' 'DarkGray'
-    }
     Show-Installer
     Head 'Done'
     Say 'Nothing was released. The build already matches the last release.' 'Yellow'

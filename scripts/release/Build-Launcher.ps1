@@ -1,26 +1,35 @@
 <#
   Build-Launcher.ps1
-  Compiles the launcher into a real Thornswood.exe. The install is inside it
-  (launcher\app\Install*.cs, #4824): there is no setup program of its own to
-  build any more, and Velopack's Setup.exe is made where the launcher is packed.
+  Publishes the launcher, Thornswood.exe and the native libraries beside it.
+  The install is inside the launcher (launcher\app\Install*.cs, #4824), so
+  there is no setup program of its own to build: Velopack's Setup.exe is made
+  where the launcher is packed (merge-release.yml).
 
-  It runs MSBuild on launcher\app\Thornswood.csproj, with the MSBuild of Visual Studio 2022 or its
-  free Build Tools (Find-MSBuild.ps1 says whether this machine has it;
-  Developer-Guide.md "Setting up a machine" has the one install line). Your
-  friends never compile anything - they get the finished exe in the bundle.
+  THE LAUNCHER (#4823, #4825). Avalonia on .NET 10, compiled to native code
+  and self-contained (Patrick, 27 Oct 2026, docs/studies/launcher-stack):
+      dotnet publish launcher\app\Thornswood.csproj -c Release -r win-x64
+                     -p:PublishAot=true -p:Version=<number>
+  into -OutDir. That needs the .NET 10 SDK and, for the native step, the
+  Visual Studio 2022 C++ build tools ("Desktop development with C++"), which
+  Native AOT links with; it publishes on Windows only. The folder it leaves is
+  what a merge release packs with Velopack (merge-release.yml): the exe, the
+  native libraries Avalonia draws with, and Thornswood.pdb, the symbols, which
+  nothing packs. Every program in it is signed (below), because the launcher
+  refuses an update with a program in it that Thornswood did not sign
+  (launcher\app\VeloPackage.cs).
+
+  Nothing here needs MSBuild or the .NET Framework any more: the setup stub,
+  the last thing built with them, went with #4824. Your friends never compile
+  anything - they get the finished program from Setup.exe.
 
   THE SWITCH (#498, Patrick's option C, 11 Oct; done 15 Oct). Until then this
   script called the .NET Framework csc that ships inside Windows directly,
   with sixty lines finding framework assemblies by hand, and held the launcher
   to C# 5, because that compiler knows nothing newer and was the only one every
-  machine that built the launcher had. The project files were added on 12 Oct
-  (#2362) and built the same exe both ways (the figures are on #498); what
-  kept the old build was the VPS build runners, which had no MSBuild until
-  Bootstrap-VPS.ps1 -IncludeBuildTools put it there. Now there is one build:
-  what goes into each exe (sources, references, resources, icon, stamped
-  manifest, file details, LangVersion) is written in the project files and
-  nowhere else, and this script is the two build lines, the checks the project
-  files cannot make, and the signing.
+  machine that built the launcher had. Since then what goes into each exe
+  (sources, references, resources, icon, manifest, file details, LangVersion)
+  is written in the project files and nowhere else, and this script is the
+  build lines, the checks the project files cannot make, and the signing.
 
   It builds into the DEV install by default, not the one you play on. Running
   this by hand used to overwrite C:\Thornswood\Launcher, so a build nobody had
@@ -31,7 +40,7 @@
   Ship.ps1 passes -Root itself, so a real release still builds where it should.
   Pass -Root 'C:\Thornswood' if you genuinely mean the one you play on.
 
-  IT BUILDS AND DOES NOTHING ELSE. It writes Thornswood.exe into -OutDir, which
+  IT BUILDS AND DOES NOTHING ELSE. It writes the launcher into -OutDir, which
   is <Root>\Launcher unless told otherwise. It
   closes no game and no launcher, and it does not touch the Desktop, the icon
   cache or Explorer. Those are Install-Launcher.ps1, which Ship.ps1 runs after
@@ -54,11 +63,12 @@ param(
     # For a test build that never ships, so it spends no signing; Ship never
     # passes it, and Ship and Publish-Installer refuse an unsigned exe.
     [switch]$NoSign,
-    # The number the exe carries (scripts\release\LauncherVersion.ps1, #5179).
-    # Ship.ps1 and release.yml write theirs into Updater.cs themselves before
-    # they call this; given here it must be the one they wrote. Left out on a
-    # checkout whose Updater.cs holds git's 0.0.0, this checkout's own number
-    # is worked out from its history and written in for the compile.
+    # The number the exe carries, passed to the compile as -p:Version and
+    # read back by the launcher from its own file (Updater.Version, #4825).
+    # A merge release passes its Velopack version (MergeRelease.ps1), so the
+    # exe and the package it goes out in carry one number; Ship.ps1 and
+    # release.yml pass theirs (LauncherVersion.ps1, #5179). Left out, this
+    # checkout's own number is worked out from its history.
     [string]$Version
 )
 
@@ -83,12 +93,14 @@ if ($Root.TrimEnd('\\') -ieq [string](& (Join-Path $Here 'Where.ps1') Install)) 
     Say '  this is the install you play on, not the dev one' 'Yellow'
 }
 
-# ------------------------------------------------------------ MSBuild
-. (Join-Path $Here 'Find-MSBuild.ps1') -Load
-$found = Find-ThornswoodMSBuild
-if (-not $found.MSBuild) { Die 'MSBuild was not found on this machine. The launcher builds with Visual Studio 2022 or its Build Tools with the MSBuild component; Developer-Guide.md "Setting up a machine" has the install line. On a VPS runner: .\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments ''-IncludeBuildTools -SkipFirewall''.' }
-if (-not $found.RefAssemblies) { Die 'The .NET Framework 4.8.1 reference assemblies are not on this machine. They are the Build Tools component Microsoft.Net.Component.4.8.1.TargetingPack; Developer-Guide.md "Setting up a machine" has the install line.' }
-Say "  $($found.MSBuild)" 'DarkGray'
+# ------------------------------------------------------------ the tools
+# The .NET 10 SDK's dotnet (launcher\app\Thornswood.csproj is an SDK
+# project, #4823).
+$dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
+if (-not $dotnet) { Die 'dotnet was not found on this machine. The launcher builds with the .NET 10 SDK (https://dotnet.microsoft.com/download/dotnet/10.0) and, for the native step, the Visual Studio 2022 C++ build tools; Developer-Guide.md "Setting up a machine" has the install lines.' }
+$sdks = @(& $dotnet.Source --list-sdks 2>$null | Where-Object { $_ -match '^10\.' })
+if ($sdks.Count -eq 0) { Die 'This machine has dotnet but no .NET 10 SDK (dotnet --list-sdks lists none starting 10.). The launcher targets .NET 10; install the SDK and build again.' }
+Say "  dotnet $(($sdks[-1] -split ' ')[0])" 'DarkGray'
 $proj = Join-Path $Src 'Thornswood.csproj'
 if (-not (Test-Path -LiteralPath $proj)) { Die "Thornswood.csproj is not at $proj. It is in the repository, so the path is wrong; nothing was built." }
 
@@ -120,83 +132,78 @@ if (Test-Path -LiteralPath $exe) {
 }
 
 # ------------------------------------------------------------ the number
-# THE VERSION COMES FROM THE BUILD (#5179). Git holds 0.0.0 in Updater.cs,
-# and both projects read the number from there (the const the updater
-# compares, the file details, the manifest identity), so the real one is
-# written in for the compile and the bytes git holds are put back after it,
-# whatever happens. Ship.ps1 and release.yml have already written theirs (a
-# dev number among them); a hand build or a test build takes this checkout's
-# own, so a launcher built here never sees the feed's number as newer and
-# replaces itself.
+# THE VERSION COMES FROM THE BUILD (#5179, #4825). It goes into the compile as
+# -p:Version, which is the exe's file version and assembly version, and the
+# launcher reads it from there (Updater.Version). Nothing writes a source
+# file for it: until #4825 this wrote the number into Updater.cs for the
+# compile and put git's 0.0.0 back after. A hand build or a test build takes
+# this checkout's own number, so a launcher built here never sees the
+# published one as newer.
 . (Join-Path $Here 'LauncherVersion.ps1')
-$updaterCs = Join-Path $Src 'Updater.cs'
-if (-not (Test-Path -LiteralPath $updaterCs)) { Die "Updater.cs is not at $updaterCs. It is in the repository, so the path is wrong; nothing was built." }
-$updaterBytes = [IO.File]::ReadAllBytes($updaterCs)
-$updaterText = [Text.Encoding]::UTF8.GetString($updaterBytes)
-$have = [regex]::Match($updaterText, 'Version\s*=\s*"([^"]+)"')
-if (-not $have.Success) { Die 'Updater.cs has no Version = "..." line, so the exe would carry no version. Nothing was built.' }
-$stamp = $false
-if (Test-LauncherVersionPlaceholder $updaterText) {
-    if (-not $Version) {
-        try { $Version = Get-LauncherVersion -RepoDir (Join-Path $Here '..\..') }
-        catch { Die ($_.Exception.Message + ' Pass -Version to build with a number of your own. Nothing was built.') }
-    }
-    if ($Version -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') { Die "-Version $Version is not a.b.c or a.b.c.d. Nothing was built." }
-    # A file version and a manifest identity hold each part in 0 to 65534.
-    if (@($Version.Split('.') | Where-Object { [long]$_ -gt 65534 }).Count) { Die "-Version $Version has a part over 65534, which a Windows file version cannot hold. Nothing was built." }
-    $stamp = $true
-} elseif ($Version -and $Version -ne $have.Groups[1].Value) {
-    Die "Updater.cs already says $($have.Groups[1].Value), written by whatever called this, and -Version says $Version. Nothing was built."
-} else {
-    $Version = $have.Groups[1].Value
+if (-not $Version) {
+    try { $Version = Get-LauncherVersion -RepoDir (Join-Path $Here '..\..') }
+    catch { Die ($_.Exception.Message + ' Pass -Version to build with a number of your own. Nothing was built.') }
 }
+if ($Version -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') { Die "-Version $Version is not a.b.c or a.b.c.d. Nothing was built." }
+# A file version holds each part in 0 to 65534.
+if (@($Version.Split('.') | Where-Object { [long]$_ -gt 65534 }).Count) { Die "-Version $Version has a part over 65534, which a Windows file version cannot hold. Nothing was built." }
 Say "  launcher $Version" 'DarkGray'
 
-try {
-    if ($stamp) {
-        $stamped = [regex]::Replace($updaterText, 'Version\s*=\s*"[^"]+"', ('Version = "' + $Version + '"'), 1)
-        [IO.File]::WriteAllText($updaterCs, $stamped, (New-Object Text.UTF8Encoding $false))
-    }
-
-    Head 'Compiling'
-    # -nr:false: without it MSBuild leaves its worker processes running after the
-    # build, holding files under out\obj, and a runner names them as left behind.
-    # UseSharedCompilation=false for the same reason (#3169): otherwise the Csc
-    # task hands each compile to the Roslyn compiler server, VBCSCompiler, which
-    # stays up about ten minutes after the last one. A build here compiles each
-    # project once, so the server never serves a second compile; it only lingers.
-    $msbArgs = @('-nologo', '-v:minimal', '-nr:false', '-p:UseSharedCompilation=false', '-p:Configuration=Release')
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    & $found.MSBuild (Resolve-Path -LiteralPath $proj).Path @msbArgs ('-p:OutDir=' + $outDir.TrimEnd('\') + '\')
-    $rc = $LASTEXITCODE
-    $ErrorActionPreference = $old
-    if ($rc -ne 0 -or -not (Test-Path $exe)) { Die "MSBuild exited with $rc" }
-    Say ("  Thornswood.exe  {0:n0} KB" -f ((Get-Item $exe).Length / 1KB)) 'Green'
-    $pdb = [IO.Path]::ChangeExtension($exe, '.pdb')
-    if (Test-Path -LiteralPath $pdb) {
-        Say ("  Thornswood.pdb  {0:n0} KB (kept beside the exe; packs and the installer leave it out)" -f ((Get-Item $pdb).Length / 1KB)) 'DarkGray'
-    } else {
-        Say '  Thornswood.pdb did not appear beside the exe' 'Yellow'
-    }
+Head 'Publishing the launcher'
+# Native AOT for win-x64 (the project says so too; said here so a change to
+# the project cannot quietly make the release a JIT build). Into a scratch
+# folder first, then into -OutDir, so a publish that fails leaves the folder
+# as it was. --disable-build-servers (#3169): otherwise the build servers stay
+# up after the build, holding files under out\obj, and a runner names them
+# as left behind.
+$pubDir = Join-Path ([IO.Path]::GetTempPath()) ('ThornswoodLauncherPublish-' + [guid]::NewGuid().ToString('N'))
+$old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+& $dotnet.Source publish (Resolve-Path -LiteralPath $proj).Path --nologo -v minimal --disable-build-servers `
+    -c Release -r win-x64 --self-contained true -p:PublishAot=true "-p:Version=$Version" -o $pubDir
+$rc = $LASTEXITCODE
+$ErrorActionPreference = $old
+$pubExe = Join-Path $pubDir 'Thornswood.exe'
+if ($rc -ne 0 -or -not (Test-Path -LiteralPath $pubExe)) {
+    if (Test-Path -LiteralPath $pubDir) { Remove-Item -LiteralPath $pubDir -Recurse -Force }
+    Die "dotnet publish exited with $rc"
 }
-finally {
-    # The bytes git holds, exactly, so nothing shows as changed.
-    if ($stamp) { [IO.File]::WriteAllBytes($updaterCs, $updaterBytes) }
+# The exe must say the number it was built with; the launcher reads it there.
+$fileVersion = (Get-Item -LiteralPath $pubExe).VersionInfo.FileVersion
+$want = if ($Version.Split('.').Count -eq 3) { "$Version.0" } else { $Version }
+if ($fileVersion -ne $want) {
+    Remove-Item -LiteralPath $pubDir -Recurse -Force
+    Die "The published Thornswood.exe says file version $fileVersion, and it was built as $Version. Nothing was put in $outDir."
+}
+# The folder's launcher files are replaced, and nothing else in it is touched.
+foreach ($f in @(Get-ChildItem -LiteralPath $pubDir -File)) {
+    Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $outDir $f.Name) -Force
+}
+Remove-Item -LiteralPath $pubDir -Recurse -Force
+$programs = @(Get-ChildItem -LiteralPath $outDir -File | Where-Object { $_.Extension -in '.exe', '.dll' })
+foreach ($p in $programs) { Say ("  {0}  {1:n0} KB" -f $p.Name, ($p.Length / 1KB)) 'Green' }
+$pdb = [IO.Path]::ChangeExtension($exe, '.pdb')
+if (Test-Path -LiteralPath $pdb) {
+    Say ("  Thornswood.pdb  {0:n0} KB (kept beside the exe; packs and the installer leave it out)" -f ((Get-Item $pdb).Length / 1KB)) 'DarkGray'
+} else {
+    Say '  Thornswood.pdb did not appear beside the exe' 'Yellow'
 }
 
 # ------------------------------------------------------------ signing
 #
-# Sign the launcher here.
+# Sign every program of the launcher here: Thornswood.exe and each native
+# library beside it, because the launcher refuses an update carrying a program
+# Thornswood did not sign (VeloPackage.cs).
 #
 # This does nothing at all unless records\signing\signing.json exists, so Djinn's machine
 # and the pull request build carry on exactly as before. See the header of
-# Sign-Artifact.ps1 for what that file holds.
+# Sign-Artifact.ps1 for what that file holds. GitHub's runner signs with Sign-OnRunner.ps1 instead,
+# after a -NoSign build (merge-release.yml).
 $signer = Join-Path $Here 'Sign-Artifact.ps1'
 if ($NoSign) {
     Say '  not signing: -NoSign, a test build that never ships' 'DarkGray'
 } elseif (Test-Path -LiteralPath $signer) {
     Head 'Signing'
-    & $signer -Path $exe
+    & $signer -Path @($programs | ForEach-Object { $_.FullName })
     if ($LASTEXITCODE -ne 0) { Die 'Signing failed. Nothing was published.' }
 }
 
@@ -214,7 +221,7 @@ if (-not $NoPause) { [void](Read-Host 'Enter to close') }
 #
 # A PowerShell script that runs off the end does not reset $LASTEXITCODE: the
 # caller sees whatever the last native command left behind, and this script runs
-# MSBuild and signtool. Ship.ps1 reads that code to decide whether a release may
-# go out, so a stray value here would either hide a failure or stop a good build
-# for no reason.
+# dotnet and signtool. Ship.ps1 reads that code to decide whether a
+# release may go out, so a stray value here would either hide a failure or stop
+# a good build for no reason.
 exit 0
