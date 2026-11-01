@@ -77,7 +77,13 @@
   build is made in a folder of its own and then renamed into place, so two
   harnesses run side by side by the gate never write into one folder. A
   loaded assembly holds its file open on Windows, so the folders are never
-  removed under a harness; deleting out\ clears them.
+  removed under a harness; deleting out\ clears them. A harness build is for
+  this machine's runtime identifier, so it carries the native libraries of
+  this machine only, beside the dll where .NET looks for them, and every
+  package file in a build is a hard link to the NuGet cache where the disk
+  allows one, so a build costs the disk only what it compiled. Copied, one
+  build of the whole launcher was 580 MB (the native libraries of seventeen
+  platforms) and the launcher project itself 224 MB.
 
   Add-Type and CodeDom were never the build's compiler (#2821): they compile
   with whatever runtime PowerShell runs on, not with the project's settings
@@ -183,6 +189,9 @@ function Build-LauncherCode {
         '    <EnableDefaultItems>false</EnableDefaultItems>',
         '    <UseAppHost>false</UseAppHost>',
         '    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>',
+        '    <CreateHardLinksForCopyLocalIfPossible>true</CreateHardLinksForCopyLocalIfPossible>',
+        ('    <RuntimeIdentifier>' + [Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier + '</RuntimeIdentifier>'),
+        '    <SelfContained>false</SelfContained>',
         '    <GenerateDocumentationFile>false</GenerateDocumentationFile>',
         '    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>'
     ) + @(if ($Main) { '    <StartupObject>' + [Security.SecurityElement]::Escape($Main) + '</StartupObject>' }) + @(
@@ -277,7 +286,7 @@ function Build-LauncherProject {
     try {
         $bin = Join-Path $work 'bin'
         $sep = [IO.Path]::DirectorySeparatorChar
-        $said = & $LauncherDotnet build $launcherProjPath -c Release -o $bin ('-p:BaseIntermediateOutputPath=' + (Join-Path $work 'obj') + $sep) ('-p:BaseOutputPath=' + (Join-Path $work 'out') + $sep) -nologo -v:q '-clp:NoSummary;ErrorsOnly' 2>&1 | Out-String
+        $said = & $LauncherDotnet build $launcherProjPath -c Release -o $bin ('-p:BaseIntermediateOutputPath=' + (Join-Path $work 'obj') + $sep) ('-p:BaseOutputPath=' + (Join-Path $work 'out') + $sep) '-p:CreateHardLinksForCopyLocalIfPossible=true' -nologo -v:q '-clp:NoSummary;ErrorsOnly' 2>&1 | Out-String
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath (Join-Path $bin 'Thornswood.dll'))) {
             throw ('Build-LauncherProject: the .NET SDK refused launcher\app\Thornswood.csproj:' + [Environment]::NewLine + $said.Trim())
         }
