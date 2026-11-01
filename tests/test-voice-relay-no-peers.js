@@ -209,7 +209,7 @@ const OFFER = { t: 'sdp', from: 2, sdp: { type: 'offer', sdp: 'v=0' } };
     fs.readdirSync(dir, { withFileTypes: true }).forEach(function (d) {
       const full = path.join(dir, d.name);
       if (d.isDirectory()) { sources(full, out); }
-      else if (/\.(cs|ps1|xaml)$/i.test(d.name)) { out.push(full); }
+      else if (/\.(cs|ps1|axaml)$/i.test(d.name)) { out.push(full); }
     });
     return out;
   }
@@ -221,8 +221,13 @@ const OFFER = { t: 'sdp', from: 2, sdp: { type: 'offer', sdp: 'v=0' } };
   yes('nothing in the launcher or installer writes a firewall rule or asks for administrator' +
       (asks.length ? ' (' + asks.map(function (f) { return path.relative(root, f); }).join(', ') + ')' : ''),
       asks.length === 0);
-  const words = fs.readFileSync(path.join(root, 'launcher', 'ui.xaml'), 'utf8') +
-                fs.readFileSync(path.join(root, 'installer', 'setup', 'Bootstrap.cs'), 'utf8');
+  // The window's words are its compiled markup since #4823, and the installer
+  // is the launcher's own Install*.cs since #4824.
+  const app = path.join(root, 'launcher', 'app');
+  const said = fs.readdirSync(app).filter(function (n) { return /\.axaml$|^Install.*\.cs$/i.test(n); });
+  yes('the launcher\'s window markup and installer code are where this reads them', said.length > 0 &&
+      said.some(function (n) { return /\.axaml$/i.test(n); }) && said.some(function (n) { return /^Install/i.test(n); }));
+  const words = said.map(function (n) { return fs.readFileSync(path.join(app, n), 'utf8'); }).join('\n');
   yes('Settings and the installer no longer say Windows asks for administrator',
       !/asks for administrator/i.test(words));
 }
