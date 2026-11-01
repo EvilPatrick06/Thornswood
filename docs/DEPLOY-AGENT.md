@@ -184,9 +184,10 @@ a copy of dev that nobody plays on:
 4. Bot-Pass.js starts the copy, waits for it to say this gamemode loaded,
    and has a bot log in the way the game does as a profile nobody has. It
    checks, a line each: **loads**, **login**, **new** (the race menu is
-   open), **face** (a face is sent, the race menu closes and the plain
-   clothes arrive), **saved** (the world on disk holds the character by
-   name), **restart** (the copy is stopped and started again and loads
+   open and creation starts: the plain clothes arrive), **face** (only then
+   is a face sent, and the race menu closes; a face sent earlier is kept as
+   the starting face and closes nothing), **saved** (the world on disk
+   holds the character by name), **restart** (the copy is stopped and started again and loads
    again) and **loads back** (a second bot logs in as the same profile and
    gets the same character, where it was saved, with no race menu).
 5. Every line goes in the Deployment's log. All PASS and the gamemode goes
