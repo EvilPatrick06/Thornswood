@@ -31,7 +31,7 @@ public sealed class ControlException(string message) : Exception(message);
 /// Start-ScheduledTask), and .NET for the processes and the TCP port.</summary>
 public sealed class WindowsServerControl : IServerControl
 {
-    static string PowerShell(string command, Dictionary<string, string> env)
+    internal static string PowerShell(string command, Dictionary<string, string> env)
     {
         var ps = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
         var psi = new ProcessStartInfo(ps, ["-NoProfile", "-NonInteractive", "-Command", command])

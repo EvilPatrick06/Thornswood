@@ -34,7 +34,9 @@
     - from the team (owner, member or collaborator), a body longer than the
       plain shape: more than 8 lines that are not blank. A comment whose
       first line is "Test task:" or "Roadmap:" keeps its own shape and is
-      not measured. A stranger's report and a bot's text are not measured.
+      not measured. A stranger's report and a bot's text are not measured,
+      and neither is a staff notice (an issue labelled "notice: staff",
+      #5187): its body is the notice, up to 1800 characters.
   Nothing made before $Floor is read: that is the re-file's work (#3692).
 
   The token is the workflow's own GITHUB_TOKEN (issues: read). Nothing here
@@ -128,7 +130,8 @@ function Find-NotPlain {
     foreach ($i in $issues) {
         $b = @(Test-Plain -Text ([string]$i.title + "`n" + [string]$i.body) -Team $false)
         # The title is one line; only the body is held to the length.
-        $len = @(Test-Plain -Text ([string]$i.body) -Team (Test-Team $i))
+        $notice = @($i.labels | ForEach-Object { if ($_ -is [string]) { $_ } else { [string]$_.name } }) -contains 'notice: staff'
+        $len = @(Test-Plain -Text ([string]$i.body) -Team ((Test-Team $i) -and -not $notice))
         $all = @($b + @($len | Where-Object { $_ -like 'longer*' }) | Select-Object -Unique)
         if ($all.Count) { $found += [pscustomobject]@{ Kind = 'issue'; Number = [int]$i.number; Where = ('issue #' + $i.number); Rules = $all } }
     }

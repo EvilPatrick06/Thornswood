@@ -54,6 +54,18 @@
   Deployment waits on a pass (tools\DeployAgent\BotPass.cs). -NoBotPass
   takes it off again.
 
+  THE SITE AND THE DISCORD BOT (#5190, #5187). agent.json names them, each
+  only where its full install has set it up (the task Thornswood Docs, the
+  service ThornswoodBot), and the agent then applies every Deployment to
+  Site and to Discord bot: the Release's site.zip or discord.zip swapped in
+  the way Deploy-Docs.ps1 and Install-Bot.ps1 -CodeOnly swap the app, with
+  the logs in the dev server's data folder. Where the bot is, it also makes
+  C:\Thornswood-Deploys\for-bot, which only SYSTEM, Administrators and the
+  bot's account read, for the release news the agent leaves after each
+  Deployment and the bot posts. Where dev voice is set up (the task
+  Thornswood Dev Voice, Install-Voice.ps1), a Release's voice goes in with
+  dev's Deployment, before the gamemode that pushes positions to it.
+
   WHAT IT CANNOT DO YET. Until the box admin App holds Deployments: Read and
   write (its permissions page, then Accept on its installation, an owner's
   step), the agent runs and every pass says GitHub gave it no token; -Status
@@ -271,6 +283,42 @@ if (-not `$cfg.environments) { `$cfg | Add-Member -NotePropertyName environments
 if (-not `$cfg.environments.dev) { `$cfg.environments | Add-Member -NotePropertyName dev -NotePropertyValue (New-Object PSObject) -Force }
 `$cfg.environments.dev | Add-Member -NotePropertyName logBase -NotePropertyValue '$logBase' -Force
 'agent.json names $Repo'
+
+# The site and the Discord bot (#5190, #5187): the agent swaps in each
+# Deployment to Site and to Discord bot. Their logs go in the dev server's
+# data folder beside dev's, the one folder on the box served to the outside.
+# Named only where the app is set up, by its full install (Deploy-Docs.ps1,
+# Install-Bot.ps1); a box without one gets no Deployments applied for it.
+foreach (`$app in @(
+    @{ name = 'site'; there = [bool](Get-ScheduledTask -TaskName 'Thornswood Docs' -ErrorAction SilentlyContinue); what = 'the site''s task Thornswood Docs' },
+    @{ name = 'discord'; there = [bool](Get-Service -Name 'ThornswoodBot' -ErrorAction SilentlyContinue); what = 'the bot''s service ThornswoodBot' })) {
+  `$cfg.environments.PSObject.Properties.Remove(`$app.name)
+  if (-not `$app.there) { 'apps: ' + `$app.name + ' left out, ' + `$app.what + ' is not on this box'; continue }
+  `$e = New-Object PSObject
+  `$e | Add-Member -NotePropertyName logDir -NotePropertyValue 'C:\Thornswood-Server-Dev\data'
+  `$e | Add-Member -NotePropertyName logBase -NotePropertyValue '$logBase'
+  `$cfg.environments | Add-Member -NotePropertyName `$app.name -NotePropertyValue `$e -Force
+  'apps: ' + `$app.name + ' named; the agent applies its Deployments'
+}
+
+# Dev voice (#5187): a Release's voice part goes in with dev's Deployment,
+# into the folder Install-Voice.ps1 set up, under its task.
+`$cfg.environments.dev.PSObject.Properties.Remove('voice')
+if (Get-ScheduledTask -TaskName 'Thornswood Dev Voice' -ErrorAction SilentlyContinue) {
+  `$cfg.environments.dev | Add-Member -NotePropertyName voice -NotePropertyValue (New-Object PSObject) -Force
+  'voice: dev voice named; a Release''s voice goes in with dev''s Deployment'
+} else { 'voice: dev voice left out, its task Thornswood Dev Voice is not on this box' }
+
+# The release news (#5187): after a Deployment goes in, the agent leaves its
+# Release's notes in for-bot for the bot to post (tools\DeployAgent\News.cs).
+# Only the bot's own account reads there besides SYSTEM and Administrators.
+`$newsDir = 'C:\Thornswood-Deploys\for-bot'
+if (Get-Service -Name 'ThornswoodBot' -ErrorAction SilentlyContinue) {
+  New-Item -ItemType Directory -Force -Path `$newsDir | Out-Null
+  & icacls.exe `$newsDir /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' 'NT SERVICE\ThornswoodBot:(OI)(CI)RX' | Out-Null
+  if (`$LASTEXITCODE -eq 0) { 'news: ' + `$newsDir + ' is there, readable by the bot; the agent leaves each Release''s news in it' }
+  else { 'NEWS: icacls could not set the rules on ' + `$newsDir + ', so the bot may not read the news there' }
+} else { 'news: the bot''s service ThornswoodBot is not on this box, so no news is left for it' }
 
 # The bot pass (#5196): its folder, its task, and agent.json naming the
 # folder only once the task runs as its own SID with rights there alone.

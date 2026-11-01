@@ -115,7 +115,7 @@ public sealed class Server(EnvConfig env, HttpClient http)
         catch (Exception e) when (e is TimeoutException or IOException or UnauthorizedAccessException) { return new Outcome("failure", "not applied: " + e.Message); }
         using var _ = turn;
 
-        var stamp = Now().ToString("yyyyMMdd-HHmmss");
+        var stamp = Swap.FreeStamp(Root, Now());
         var prevName = ".prev-" + stamp;
         var prev = Path.Combine(Root, prevName);
         // Not .stage-*: Deploy-DevGamemode.ps1 clears every .stage-* it finds
@@ -319,7 +319,7 @@ public sealed class Server(EnvConfig env, HttpClient http)
         try { rec = ServerBuild.Read(record); }
         catch (Exception e) when (e is JsonException or DecoderFallbackException) { return new Outcome("failure", "not applied: the Release's server-build.json does not read: " + e.Message); }
 
-        var stamp = Now().ToString("yyyyMMdd-HHmmss");
+        var stamp = Swap.FreeStamp(Root, Now());
         var prevName = ".prev-" + stamp;
         var prev = Path.Combine(Root, prevName);
         var stage = Path.Combine(Root, ".agent-stage-" + stamp);

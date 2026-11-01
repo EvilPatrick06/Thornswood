@@ -18,19 +18,25 @@
 #   game      the game files: dev's last release from the site with this
 #             commit's own files built over it, as one zip and its list
 #             (Build-GameFiles.ps1), the folder a Ship -FromFeed builds
+#   site      the site's zip (App-Part.ps1): server.js, its public pages
+#   discord   the Discord bot's zip: its code, not its token or records
+#   voice     the voice service's zip, which rides dev's Deployment
 #   velopack  when the launcher or the game files changed: the Velopack
 #             package of both on the one channel "dev" (Patrick's B on #3209:
 #             one channel for the launcher and the game payload), with its
 #             feed files and a delta from the Velopack release before. No
 #             installer and no portable copy go out: nothing here installs a
 #             launcher until the Velopack launcher (#4823 to #4825) reads it
-# The agent applies gamemode, bot and server today and names the other parts
-# in its log; later slices of #5180 and #5190 apply them.
+# The agent applies gamemode, bot, server, site, discord and voice and names
+# the other parts in its log.
 #
 # WHAT CHANGED. Each part is compared with the same part of the newest build
 # Release before (MergeRelease.ps1 says what is compared). A merge that
 # changed no part publishes nothing and asks for nothing. Otherwise the
-# Release goes out and Dev gets a Deployment.
+# Release goes out, and each place a changed part runs gets a Deployment:
+# Dev for any part but the site and the bot, Site when the site changed and
+# Discord bot when the bot did (#5190, #5187). A merge that changed only the
+# site puts nothing on dev.
 #
 # THE NOTES. The Release's body is the note people read: the Release note
 # lines of the pull requests merged since the Release before, joined and held
@@ -60,6 +66,13 @@
 #
 # Any of these Releases can be put on dev by its tag, which is how dev is put
 # back: pwsh scripts/vps/Box-Run.ps1 -Line 'Deploy-Release -Tag <tag>'.
+#
+# The site and the Discord bot get Deployments of their own, to Site and to
+# Discord bot, with the part beside the tag; the agent swaps in that part's
+# zip (docs/DEPLOY-AGENT.md, "The site, the Discord bot and voice") and leaves
+# the Release's notes for the bot's news once it is up. Neither environment
+# waits on an approval: they are what Deploy-Docs and Install-Bot -CodeOnly
+# put out by hand on any merge until now.
 name: Merge release
 
 on:
@@ -72,6 +85,23 @@ on:
       - 'scripts/bot/Bot-Pass.js'
       - 'scripts/bot/bot.js'
       - 'scripts/bot/character.js'
+      # What App-Part.ps1 puts in the site, the Discord bot and voice.
+      - 'site/server.js'
+      - 'site/public/**'
+      - 'site/data/site/**'
+      - 'bot/bot.py'
+      - 'bot/_pyguard.py'
+      - 'bot/trust.py'
+      - 'bot/card.py'
+      - 'bot/staff-channel.txt'
+      - 'bot/dev-channel.txt'
+      - 'bot/requirements.txt'
+      - 'bot/factions.json'
+      - 'bot/assets/join-card.png'
+      - 'voice/voice-server.js'
+      - 'voice/headlines.js'
+      - 'scripts/vps/Server-Log.js'
+      - 'scripts/release/App-Part.ps1'
       - 'scripts/release/Build-GameFiles.ps1'
       - 'scripts/release/Build-Front.ps1'
       - 'scripts/release/Build-Launcher.ps1'
@@ -234,6 +264,21 @@ jobs:
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("zip=" + $zip)
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("list=" + (Join-Path $out 'game-files.json'))
 
+      # The same files give the same bytes (App-Part.ps1), so an app whose
+      # files no merge touched is not a change.
+      - name: Zip the site, the Discord bot and voice
+        id: apps
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'apps'
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          foreach ($p in 'site', 'discord', 'voice') {
+            $zip = Join-Path $dir "$p.zip"
+            ./scripts/release/App-Part.ps1 -Part $p -Out $zip
+            if ($LASTEXITCODE -ne 0) { Write-Host "::error::App-Part.ps1 could not make the $p zip; the lines above say why"; exit 1 }
+            Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("$p=" + $zip)
+          }
+
       # A first manifest, unsigned, of every part but velopack, only to see
       # what changed since the Release before (MergeRelease.ps1).
       - name: Stamp the gamemode and see what changed
@@ -246,6 +291,9 @@ jobs:
           LAUNCHER_VERSION: ${{ steps.launcher.outputs.version }}
           GAME_ZIP: ${{ steps.game.outputs.zip }}
           GAME_LIST: ${{ steps.game.outputs.list }}
+          SITE_ZIP: ${{ steps.apps.outputs.site }}
+          DISCORD_ZIP: ${{ steps.apps.outputs.discord }}
+          VOICE_ZIP: ${{ steps.apps.outputs.voice }}
           PREVIOUS_MANIFEST: ${{ steps.names.outputs.previous_manifest }}
         run: |
           . .\scripts\release\BuildStamp.ps1
@@ -258,7 +306,8 @@ jobs:
           $s = Save-ThornswoodBuildStamp -Gamemode $gm -Channel dev -RepoDir . -Path $stamp
           Write-Host (Format-ThornswoodBuildStamp $s)
           $bot = @('Bot-Pass.js', 'bot.js', 'character.js') | ForEach-Object { Join-Path 'scripts\bot' $_ }
-          $adds = @("launcher=$($env:LAUNCHER_EXE)", "game=$($env:GAME_ZIP)", "game=$($env:GAME_LIST)")
+          $adds = @("launcher=$($env:LAUNCHER_EXE)", "game=$($env:GAME_ZIP)", "game=$($env:GAME_LIST)",
+                    "site=$($env:SITE_ZIP)", "discord=$($env:DISCORD_ZIP)", "voice=$($env:VOICE_ZIP)")
           Set-Content -LiteralPath (Join-Path $env:RUNNER_TEMP 'parts.txt') -Value $adds
           $probe = Join-Path $env:RUNNER_TEMP 'probe'
           ./scripts/release/New-SignedManifest.ps1 -Out $probe -Tag $env:TAG -Commit $env:GITHUB_SHA -Part gamemode -Files $gm, $stamp -BotFiles $bot -ServerZip $env:SERVER_ZIP -Add $adds -LauncherVersion $env:LAUNCHER_VERSION -NoCatalog
@@ -274,6 +323,12 @@ jobs:
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("parts=" + ($changed -join ','))
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("release=" + $(if ($changed.Count) { 'yes' } else { 'no' }))
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("velopack=" + $(if ($changed -contains 'launcher' -or $changed -contains 'game') { 'yes' } else { 'no' }))
+          # Where each changed part runs (header, WHAT CHANGED): the site and
+          # the bot have environments of their own, and everything else is dev.
+          $apps = @($changed | Where-Object { $_ -in 'site', 'discord' })
+          $dev = @($changed | Where-Object { $_ -notin 'site', 'discord' })
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("dev=" + $(if ($dev.Count) { 'yes' } else { 'no' }))
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("apps=" + ($apps -join ','))
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("gamemode=" + $gm)
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("stamp=" + $stamp)
 
@@ -392,7 +447,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { Write-Host "::error::the draft $($env:TAG) could not be published"; exit 1 }
 
       - name: Ask the dev server for it (a Deployment to Dev)
-        if: ${{ steps.changed.outputs.release == 'yes' }}
+        if: ${{ steps.changed.outputs.release == 'yes' && steps.changed.outputs.dev == 'yes' }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -418,3 +473,39 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or -not $id) { Write-Host '::error::GitHub made no Deployment'; exit 1 }
           Write-Host "Deployment $id asks Dev for $($env:TAG); the box deploy agent applies it and says how it went on it"
           Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value "Deployment $id asks **Dev** for **$($env:TAG)** (changed: $($env:PARTS)): https://github.com/$($env:GITHUB_REPOSITORY)/deployments"
+
+      # One Deployment for each app that changed, with the part beside the
+      # tag (header, THE DEPLOYMENT). The box deploy agent applies each and
+      # the bot posts the Release's news once, in the dev updates channel,
+      # however many places it reached.
+      - name: Ask the site and the Discord bot for it (Deployments to Site and Discord bot)
+        if: ${{ steps.changed.outputs.release == 'yes' && steps.changed.outputs.apps != '' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.names.outputs.tag }}
+          APPS: ${{ steps.changed.outputs.apps }}
+        run: |
+          $where = @{ site = 'Site'; discord = 'Discord bot' }
+          foreach ($part in ($env:APPS -split ',')) {
+            $environment = $where[$part]
+            if (-not $environment) { Write-Host "::error::$part has no environment of its own"; exit 1 }
+            # The live site and the live bot: production, and never transient.
+            $body = [ordered]@{
+              ref = $env:GITHUB_SHA
+              task = 'deploy'
+              environment = $environment
+              auto_merge = $false
+              required_contexts = @()
+              production_environment = $true
+              transient_environment = $false
+              payload = [ordered]@{ release = $env:TAG; part = $part }
+              description = "Release $($env:TAG): $part"
+            }
+            $file = Join-Path $env:RUNNER_TEMP "deployment-$part.json"
+            [IO.File]::WriteAllText($file, ($body | ConvertTo-Json -Depth 4 -Compress))
+            $id = gh api --method POST "repos/$($env:GITHUB_REPOSITORY)/deployments" --input $file --jq .id
+            if ($LASTEXITCODE -ne 0 -or -not $id) { Write-Host "::error::GitHub made no Deployment to $environment"; exit 1 }
+            Write-Host "Deployment $id asks $environment for the $part of $($env:TAG)"
+            Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value "Deployment $id asks **$environment** for **$($env:TAG)** ($part): https://github.com/$($env:GITHUB_REPOSITORY)/deployments"
+          }

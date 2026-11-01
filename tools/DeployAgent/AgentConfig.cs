@@ -54,6 +54,62 @@ public sealed class Config
         StartSeconds = 170,
     };
 
+    /// <summary>The site (#5190): one app on the box, run by the scheduled task
+    /// Deploy-Docs.ps1 sets up, answering on loopback port 3001 behind Caddy.
+    /// A merge that changes it makes a Deployment to "Site".</summary>
+    public static EnvConfig DefaultSite() => new()
+    {
+        Kind = AppKinds.Site,
+        GitHubEnvironment = "Site",
+        Root = @"C:\Thornswood-Docs",
+        Store = @"C:\Thornswood-Deploys",
+        Task = "Thornswood Docs",
+        Health = "http://127.0.0.1:3001/",
+        Watch = @"C:\Thornswood-Watch",
+        // Deploy-Docs.ps1's -Wait.
+        WaitSeconds = 30,
+    };
+
+    /// <summary>The Discord bot (#5187): the Windows service ThornswoodBot that
+    /// Install-Bot.ps1 sets up. A merge that changes it makes a Deployment to
+    /// "Discord bot".</summary>
+    public static EnvConfig DefaultDiscord() => new()
+    {
+        Kind = AppKinds.Discord,
+        GitHubEnvironment = "Discord bot",
+        Root = @"C:\Thornswood-Bot",
+        Store = @"C:\Thornswood-Deploys",
+        Service = "ThornswoodBot",
+        Watch = @"C:\Thornswood-Watch",
+        // Install-Bot.ps1's -Wait: connecting to Discord and reading the roles takes a while.
+        WaitSeconds = 90,
+    };
+
+    /// <summary>Dev voice (#5187): the task Install-Voice.ps1 registers for
+    /// C:\Thornswood-Voice-Dev, answering on loopback port 7789 behind
+    /// Caddy's /voice-dev. It goes in with dev's Deployment when the Release
+    /// carries a voice part.</summary>
+    public static EnvConfig DefaultDevVoice() => new()
+    {
+        Kind = AppKinds.Voice,
+        Root = @"C:\Thornswood-Voice-Dev",
+        Store = @"C:\Thornswood-Deploys",
+        Task = "Thornswood Dev Voice",
+        Health = "http://127.0.0.1:7789/health",
+        Watch = @"C:\Thornswood-Watch",
+        // Install-Voice.ps1's -Wait.
+        WaitSeconds = 30,
+    };
+
+    /// <summary>The environment a name in agent.json starts from.</summary>
+    public static EnvConfig DefaultFor(string name) => name switch
+    {
+        "dev" => DefaultDev(),
+        AppKinds.Site => DefaultSite(),
+        AppKinds.Discord => DefaultDiscord(),
+        _ => new EnvConfig(),
+    };
+
     static readonly Regex RepoShape = new(@"^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$");
 
     /// <summary>Reads agent.json. Each environment it names starts from that
@@ -76,8 +132,7 @@ public sealed class Config
             {
                 foreach (var e in envs.EnumerateObject())
                 {
-                    var baseEnv = e.Name == "dev" ? DefaultDev() : new EnvConfig();
-                    c.Environments[e.Name] = baseEnv.Overlay(e.Value);
+                    c.Environments[e.Name] = DefaultFor(e.Name).Overlay(e.Value);
                 }
             }
             else
@@ -100,13 +155,28 @@ public sealed class Config
         if (Environments.Count == 0) throw new ConfigException("no environment is named, so there is nothing to look after");
         foreach (var (name, e) in Environments)
         {
-            // The first slice is dev alone. Main waits on the Main environment
-            // with Patrick's approval (#5181), Bot and Site on their own slices.
-            if (name != "dev") throw new ConfigException($"environment \"{name}\": this agent applies dev only so far (#5180 first slice)");
+            // Dev, the site and the Discord bot. Main waits on the Main
+            // environment with Patrick's approval (#5181).
+            if (name is not ("dev" or AppKinds.Site or AppKinds.Discord)) throw new ConfigException($"environment \"{name}\": this agent applies dev, site and discord only so far (#5180, #5190, #5187)");
             if (e.GitHubEnvironment is "" or "Main")
                 throw new ConfigException($"environment {name}: githubEnvironment \"{e.GitHubEnvironment}\" must be named, and not Main, whose Deployments wait on Patrick's approval (#5181)");
             if (e.Root == "" || !(Path.IsPathRooted(e.Root) || e.Root.Contains(@":\"))) throw new ConfigException($"environment {name}: root \"{e.Root}\" is not a full path");
+            if (e.Kind != EnvConfig.ServerKind)
+            {
+                if (e.Kind == AppKinds.Site && (e.Health == "" || e.Task == "")) throw new ConfigException($"environment {name}: the site needs its health address and its task");
+                if (e.Kind == AppKinds.Site && !Uri.TryCreate(e.Health, UriKind.Absolute, out _)) throw new ConfigException($"environment {name}: health \"{e.Health}\" is not an address");
+                if (e.Kind == AppKinds.Discord && e.Service == "") throw new ConfigException($"environment {name}: the bot needs its service's name");
+                if (e.WaitSeconds < 10) throw new ConfigException($"environment {name}: waitSeconds must be 10 or more");
+                if (e.LogDir != "" && !(Path.IsPathRooted(e.LogDir) || e.LogDir.Contains(@":\"))) throw new ConfigException($"environment {name}: logDir \"{e.LogDir}\" is not a full path");
+                continue;
+            }
             if (e.Health == "") throw new ConfigException($"environment {name}: no health address");
+            if (e.Voice is { } v)
+            {
+                if (v.Root == "" || !(Path.IsPathRooted(v.Root) || v.Root.Contains(@":\"))) throw new ConfigException($"environment {name}: voice root \"{v.Root}\" is not a full path");
+                if (v.Task == "" || !Uri.TryCreate(v.Health, UriKind.Absolute, out _)) throw new ConfigException($"environment {name}: voice needs its task and its health address");
+                if (v.WaitSeconds < 10) throw new ConfigException($"environment {name}: voice waitSeconds must be 10 or more");
+            }
             if (e.LoadSeconds < 10 || e.TurnSeconds < 10 || e.StartSeconds < 10) throw new ConfigException($"environment {name}: loadSeconds, turnSeconds and startSeconds must be 10 or more");
             if (e.BotPassRoot != "")
             {
@@ -120,9 +190,26 @@ public sealed class Config
     }
 }
 
-/// <summary>One server the agent looks after.</summary>
+/// <summary>One server, or one app beside them, the agent looks after.</summary>
 public sealed class EnvConfig
 {
+    public const string ServerKind = "server";
+    /// <summary>What it is: a game server ("server"), the site ("site") or
+    /// the Discord bot ("discord"). Set by the environment's name; agent.json
+    /// does not change it.</summary>
+    public string Kind { get; set; } = ServerKind;
+    /// <summary>A server's voice service, which goes in with its Deployments
+    /// (#5187). null when agent.json names none for it.</summary>
+    public EnvConfig? Voice { get; set; }
+    /// <summary>The Windows service an app runs as (the bot's ThornswoodBot).</summary>
+    public string Service { get; set; } = "";
+    /// <summary>How long a started app has to answer before its old files go back.</summary>
+    public int WaitSeconds { get; set; } = 30;
+    /// <summary>Where an app's Deployment logs go, with LogBase the address
+    /// they are read at. Install-DeployAgent.ps1 points it at the dev server's
+    /// data folder, the one folder on the box served to the outside. "" keeps
+    /// them in the agent's own log only.</summary>
+    public string LogDir { get; set; } = "";
     /// <summary>The Deployment environment applied for this server: Dev, where
     /// the merge release (.github/workflows/merge-release.yml, #5179) makes a
     /// Deployment for each Release whose parts changed. Deployments the old
@@ -181,6 +268,16 @@ public sealed class EnvConfig
         Task = S("task", Task);
         Watch = S("watch", Watch);
         StartSeconds = I("startSeconds", StartSeconds);
+        Service = S("service", Service);
+        WaitSeconds = I("waitSeconds", WaitSeconds);
+        LogDir = S("logDir", LogDir);
+        if (e.TryGetProperty("voice", out var vo) && vo.ValueKind == JsonValueKind.Object)
+        {
+            var v = (Voice ?? Config.DefaultDevVoice()).Overlay(vo);
+            v.Store = Store;
+            v.Watch = Watch;
+            Voice = v;
+        }
         return this;
     }
 }

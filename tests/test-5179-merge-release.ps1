@@ -23,8 +23,10 @@
       path, every *.pdb left out.
     - merge-release.yml: what starts it, signing and the draft in the release
       environment, the notes before anything is built, Velopack on the one
-      dev channel with no installer, the attestation on every file, and the
-      Deployment to Dev, the only one any workflow makes.
+      dev channel with no installer, the attestation on every file, the
+      site, the Discord bot and voice zipped as parts (#5190, #5187), and the
+      Deployments: Dev when a part dev runs changed, Site and Discord bot when
+      theirs did. No other workflow makes one.
 
   Writes only under its own folder in TEMP, which it removes. Exit 1 when
   any check fails.
@@ -201,9 +203,21 @@ try {
     Yes '  and runs only when the launcher or the game files changed' ($wf.Contains("if: `${{ steps.changed.outputs.velopack == 'yes' }}") -and $wf.Contains("`$changed -contains 'launcher' -or `$changed -contains 'game'"))
     Yes 'every file of the Release is attested, by a pinned action' ($wf -match 'uses: actions/attest-build-provenance@[0-9a-f]{40} # v' -and $wf.Contains('subject-path: ${{ steps.files.outputs.subjects }}') -and
         $wf -match '(?m)^\s+id-token: write\s*$' -and $wf -match '(?m)^\s+attestations: write\s*$')
-    Yes 'a merge that changed nothing publishes nothing' ($wf.Contains("release=") -and ([regex]::Matches($wf, [regex]::Escape("if: `${{ steps.changed.outputs.release == 'yes' }}"))).Count -ge 5)
+    Yes 'a merge that changed nothing publishes nothing' ($wf.Contains("release=") -and ([regex]::Matches($wf, [regex]::Escape("if: `${{ steps.changed.outputs.release == 'yes' }}"))).Count -ge 4)
     Yes 'the Release is published from a draft, as a prerelease, never as latest, with the notes as its body' ($wf.Contains('--draft --prerelease') -and $wf.Contains('--draft=false') -and $wf.Contains('--latest=false') -and $wf.Contains('--notes-file $env:NOTES'))
     Yes 'the Deployment goes to Dev with the Release''s tag, which the agent applies' ($wf.Contains("environment = 'Dev'") -and $wf.Contains('payload = [ordered]@{ release = $env:TAG }'))
+    # The site, the Discord bot and voice (#5190, #5187).
+    $appsAt = $wf.IndexOf('- name: Zip the site, the Discord bot and voice'); $stampAt = $wf.IndexOf('- name: Stamp the gamemode and see what changed')
+    Yes 'the site, the Discord bot and voice are zipped by App-Part.ps1 before the parts are compared' ($appsAt -gt 0 -and $stampAt -gt $appsAt -and
+        $wf.Contains("foreach (`$p in 'site', 'discord', 'voice')") -and $wf.Contains('./scripts/release/App-Part.ps1 -Part $p -Out $zip'))
+    Yes '  and each is a part of every Release' ($wf.Contains('"site=$($env:SITE_ZIP)", "discord=$($env:DISCORD_ZIP)", "voice=$($env:VOICE_ZIP)"'))
+    $appPaths = @(@('site/server.js', 'site/public/**', 'site/data/site/**', 'bot/bot.py', 'bot/dev-channel.txt', 'bot/staff-channel.txt', 'bot/requirements.txt', 'bot/assets/join-card.png',
+        'voice/voice-server.js', 'voice/headlines.js', 'scripts/vps/Server-Log.js', 'scripts/release/App-Part.ps1') | Where-Object { $wf -notmatch ("(?m)^\s+- '" + [regex]::Escape($_) + "'\s*$") })
+    Yes ('  and a merge that changes one of their files starts it' + $(if ($appPaths) { ': not ' + ($appPaths -join ', ') } else { '' })) ($appPaths.Count -eq 0)
+    Yes 'dev gets a Deployment only when a part dev runs changed' ($wf.Contains("if: `${{ steps.changed.outputs.release == 'yes' && steps.changed.outputs.dev == 'yes' }}") -and
+        $wf.Contains("`$dev = @(`$changed | Where-Object { `$_ -notin 'site', 'discord' })"))
+    Yes 'the site and the bot each get a Deployment of their own with the part beside the tag' ($wf.Contains("`$where = @{ site = 'Site'; discord = 'Discord bot' }") -and
+        $wf.Contains('payload = [ordered]@{ release = $env:TAG; part = $part }') -and $wf.Contains("if: `${{ steps.changed.outputs.release == 'yes' && steps.changed.outputs.apps != '' }}"))
     $wfs = @(Get-ChildItem -LiteralPath (Join-Path $Repo '.github/workflows') -Filter *.yml -File | Where-Object { [IO.File]::ReadAllText($_.FullName) -match 'Record-Deployment|gamemode-release' } | ForEach-Object { $_.Name })
     Yes ('no other workflow records a Deployment or names the old gamemode release' + $(if ($wfs) { ': ' + ($wfs -join ', ') } else { '' })) ($wfs.Count -eq 0 -or ($wfs.Count -eq 2 -and $wfs -contains 'merge-release.yml' -and $wfs -contains 'release-files.yml' -and
         -not ([IO.File]::ReadAllText((Join-Path $Repo '.github/workflows/release-files.yml'))).Contains('deployments: write')))
