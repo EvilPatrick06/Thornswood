@@ -385,6 +385,7 @@ namespace Thornswood
             Stats.Load();
             Keep.BuildName = cfg.BuildName;
             Icons.BuildName = cfg.BuildName;
+            Icons.Dev = cfg.IsDev;
             Art.Dev = cfg.IsDev;
             Discord.Channel = cfg.Channel;
 

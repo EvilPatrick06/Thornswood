@@ -75,7 +75,6 @@ using System;
 namespace Thornswood
 {
     public static class Paths { public static string Root, LauncherDir, ProfileDir; }
-    public static class Art { public static bool Dev; }
     public static class Swallow { public static void Note(string where, Exception ex) { } }
 }
 '@
@@ -89,7 +88,6 @@ namespace Thornswood
 
     $icons = $asm.GetType('Thornswood.Icons')
     $paths = $asm.GetType('Thornswood.Paths')
-    $art = $asm.GetType('Thornswood.Art')
     $nps = [Reflection.BindingFlags]'NonPublic, Static'
     $due = $icons.GetMethod('Due', $nps)
     $remember = $icons.GetMethod('Remember', $nps)
@@ -176,11 +174,11 @@ namespace Thornswood
     New-Item -ItemType Directory -Force -Path (Join-Path $devRoot 'Launcher'), (Join-Path $devRoot 'Profile') | Out-Null
     $paths.GetField('LauncherDir').SetValue($null, (Join-Path $devRoot 'Launcher'))
     $paths.GetField('ProfileDir').SetValue($null, (Join-Path $devRoot 'Profile'))
-    $art.GetField('Dev').SetValue($null, $true)
+    $icons.GetField('Dev').SetValue($null, $true)
     $r = IconNow
     Yes "the dev build's IconFile is icon-$devHash.ico (app-dev.ico)" ($r.Path -and (Split-Path -Leaf $r.Path) -eq "icon-$devHash.ico")
     Yes 'the dev install does not read the main install''s stamp' ([bool]$due.Invoke($null, @($exe, $want, $false)))
-    $art.GetField('Dev').SetValue($null, $false)
+    $icons.GetField('Dev').SetValue($null, $false)
 
     # #3205: removal finds shortcuts by what they run, not by name. A pin left
     # behind under Thornswood.lnk made the next pin "Thornswood (2)".

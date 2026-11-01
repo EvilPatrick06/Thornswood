@@ -134,6 +134,26 @@ $asm = Add-LauncherType -Source $configSrc, $stub
 $T = $asm.GetType('Thornswood.Updater')
 ```
 
+A few launcher files are also loaded by scripts with `Add-Type`, which under
+Windows PowerShell 5.1 is the .NET Framework's own compiler: C# 5, and none
+of .NET 10's libraries (`scripts\mods\LoadOrder.ps1` loads
+`VortexProfileState.cs`, `scripts\mods\Generated.ps1` loads `Generated.cs`
+and the files beside it, `scripts\release\Go.ps1` loads `LastPlugin.cs` and
+the `FromGame*.cs` files). A harness for such a file (`test-2791-last-plugin`,
+`test-2827-from-game`, `test-vortex-profile-state`) dot-sources
+`tests\Framework-Csc.ps1` as well and builds the file with
+`Build-FrameworkCode` too: a .NET Framework 4.8 project at C# 5, through the
+same .NET SDK, which fetches the Framework's reference assemblies as a
+package, so it works on Linux as well. So a file that only .NET 10 compiles
+fails in the harness, not on the machine that runs the script. It is for
+compiling only; off Windows there is no .NET Framework to run the result on.
+The file's header has every switch:
+
+```
+. (Join-Path $PSScriptRoot 'Framework-Csc.ps1')
+$null = Build-FrameworkCode -File (Join-Path $App 'VortexProfileState.cs') -Reference System.Xml
+```
+
 Before issue #2821 eighteen harnesses compiled launcher code with `Add-Type`
 or a `CSharpCodeProvider`, copied from one to the next: C# 5 under Windows
 PowerShell and .NET 8's libraries under pwsh, never the build's compiler.

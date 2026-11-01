@@ -2300,7 +2300,8 @@ channels when the collection installed there could not build them.
 installs stay apart from the build folders, so he has the same files as
 everybody else. So every Ship first runs `scripts\release\Update-ShipRoot.ps1`,
 which builds `Thornswood-ShipRoot.exe` from `scripts\release\ShipRoot`
-(all of `launcher\app` with its own entry point, so OwnGame has one
+(OwnGame and the launcher files it calls, none of the window's, built
+with the .NET 10 SDK and its own entry point, so OwnGame has one
 implementation) and runs OwnGame's own Make or Refresh on the root: a new root
 takes Thornswood's own files of the channel's release from its feed, as an
 install does, and a root made at older rules or from another folder is brought
