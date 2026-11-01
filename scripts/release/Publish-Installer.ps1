@@ -218,6 +218,11 @@ foreach ($pair in $send) {
   Write-Host "  $($pair[1])"
 }
 
+# publisher is the name the sign gate above held the exe to, ExpectedSigner,
+# which is the subject Windows names as the publisher. The Downloads page
+# prints it (#5275, Patrick's answer A on q-installer-publisher), so the page
+# and the prompt someone meets next say the same name, and the name is still
+# written only in Updater.cs.
 if ($single) {
   $meta = @{
     $exeOut = @{
@@ -225,6 +230,7 @@ if ($single) {
       version = $Version
       sha256  = $exeSha
       release = $installerRelease
+      publisher = $expectWho
       note    = 'One file. Download it and run it.'
     }
   }
@@ -239,6 +245,7 @@ if ($single) {
       version = $Version
       sha256  = $exeSha
       release = $installerRelease
+      publisher = $expectWho
       note    = 'One file. Download it and run it. It gets the mods itself, about 700 MB.'
     }
     $zipOut = @{

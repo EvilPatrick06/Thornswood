@@ -19,7 +19,7 @@
       address as it is with no revision or no collection in it (compiled and
       run with the build's compiler on Windows; SKIP elsewhere);
     - no button, card or box in the launcher opens cfg.CollectionUrl as it
-      stands: each goes through CollectionLink;
+      stands: each goes through OpenCollection, whose page is CollectionLink;
     - the ahead state has its own Play label and tooltip, saying nothing
       needs installing, and no install button on the bar or the Diagnostics
       card, and a press that slips in opens nothing;
@@ -70,10 +70,16 @@ Yes 'it builds the revision page from the slug' ($urlMethod.Contains('"/revision
 $link = Method $shell 'static string CollectionLink()'
 Yes 'Shell.CollectionLink opens the feed''s revision' ($link.Contains('Checks.CollectionRevisionUrl(cfg, Updater.FeedCollectionRevision)'))
 Yes 'nothing opens the bare collection address any more' (-not ([regex]::IsMatch($all, 'ProcessStartInfo\(cfg\.CollectionUrl\)')))
-Yes 'the bar''s button, the missing-mods box and the cards open CollectionLink' (
-    ([regex]::Matches($update, 'new ProcessStartInfo\(CollectionLink\(\)\)')).Count -eq 1 -and
-    ([regex]::Matches($play, 'new ProcessStartInfo\(CollectionLink\(\)\)')).Count -eq 1 -and
-    $packs.Contains('string url = CollectionLink();'))
+# Since #5200 each button is OpenCollection, which opens Vortex at the same
+# revision where Vortex answers Nexus links, and CollectionLink otherwise
+# (test-5200-collection-in-vortex.ps1).
+$open = Method $shell 'static void OpenCollection()'
+Yes 'the bar''s button, the missing-mods box and the cards open the revision, through OpenCollection' (
+    ([regex]::Matches($update, 'OpenCollection\(\);')).Count -eq 1 -and
+    ([regex]::Matches($play, 'OpenCollection\(\);')).Count -eq 1 -and
+    $packs.Contains('b.Click += delegate { OpenCollection(); };') -and
+    $open.Contains('string page = CollectionLink();') -and
+    -not ([regex]::IsMatch($update + $play + $packs, 'ProcessStartInfo\((CollectionLink\(\)|url)\)')))
 $buttonText = Method $shell 'static string CollectionButtonText()'
 Yes 'the button names the revision it opens' ($buttonText.Contains('"Open revision " + wants'))
 

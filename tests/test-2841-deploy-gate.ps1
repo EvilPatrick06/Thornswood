@@ -239,9 +239,10 @@ Yes '  Ship-OnBox.ps1 runs Ship.ps1 from the feed, keeping the launcher only whe
 Yes '  a main Ship goes from the branch main at the fetched origin/main' ($shipBox.Contains("checkout --quiet -B main refs/remotes/origin/main"))
 # The DEV marks and the shipped issues read main's history and the release
 # tags, which the gate's one-commit checkout has not got (#5133).
-Yes '  a Ship deepens the gate''s checkout to main''s history and tags before it runs, and keeps origin/main at the commit the gate read' (
-    $shipBox.Contains("'fetch', '--quiet', '--unshallow', '--tags', 'origin', '+refs/heads/main:refs/remotes/origin/main'") -and
-    $shipBox.Contains("'fetch', '--quiet', '--tags', 'origin', '+refs/heads/main:refs/remotes/origin/main'") -and
+Yes '  a Ship deepens the gate''s checkout to main''s history and tags as origin has them (a moved tag too, #5231) before it runs, and keeps origin/main at the commit the gate read' (
+    $shipBox.Contains("'fetch', '--unshallow', 'origin', '+refs/heads/main:refs/remotes/origin/main', '+refs/tags/*:refs/tags/*'") -and
+    $shipBox.Contains("'fetch', 'origin', '+refs/heads/main:refs/remotes/origin/main', '+refs/tags/*:refs/tags/*'") -and
+    -not $shipBox.Contains("'--tags'") -and -not $shipBox.Contains("'fetch', '--quiet'") -and
     $shipBox.Contains('update-ref refs/remotes/origin/main $head') -and
     $shipBox.IndexOf('--unshallow') -gt $shipBox.IndexOf('checkout --quiet -B main') -and
     $shipBox.IndexOf('--unshallow') -lt $shipBox.IndexOf("& (Join-Path `$Here 'Ship.ps1') @ship"))

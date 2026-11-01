@@ -17,9 +17,12 @@
   again. Wipe-Saves.ps1 is not this: it starts every character over and sets
   aside every register beside them.
 
-  RUN IT ONLY ON A SERVER THAT ALREADY RUNS #98. An NPC made again by an
-  engine before it is unmarked again. -Survey says how many NPCs carry the
-  mark (NPCMARKS) before and after.
+  IT RUNS ONLY ON A SERVER THAT ALREADY RUNS #98. An NPC made again by an
+  engine before it is unmarked again. So the box step reads the
+  server-build.json in the server's folder and moves nothing unless it is
+  the build records\server-build.json holds on main (every pin since 31 Oct
+  carries #98); a survey says which build it found (SERVERBUILD) and what
+  the NPCs carry (NPCMARKS).
 
   -Server dev or -Server main, required: the folder is the one each deploy
   uses (C:\Thornswood-Server-Dev, task 'Thornswood Dev Server', and
@@ -95,6 +98,7 @@ function Q([string]$s) { return "'" + ($s -replace "'", "''") + "'" }
 # and for a reset the hold, the stop and the wait (Reset-Character.ps1's
 # way, #2871 and #5155).
 $stopAndMove = [IO.File]::ReadAllText((Join-Path $Here '..\deploy\StopAndMove.ps1'))
+$build = [IO.File]::ReadAllText((Join-Path $Here '..\..\records\server-build.json')) -replace '^\uFEFF', '' | ConvertFrom-Json
 $readyWait = [IO.File]::ReadAllText((Join-Path $Here '..\deploy\ServerReadyWait.ps1'))
 $boxScript = @"
 `$ErrorActionPreference = 'Continue'
@@ -104,18 +108,24 @@ $ThornswoodNpcReset
 `$Want = $(Q $Server)
 `$Stamp = $(Q $stamp)
 `$Survey = `$$([bool]$Survey)
+`$WantCommit = $(Q ([string]$build.source.commit))
+`$WantSha = $(Q ([string]$build.sha256))
 "@ + "`r`n" + $(if ($Survey) { '' } else { (Get-ThornswoodHoldScript -Script 'Reset-Npcs.ps1') + $stopAndMove + "`r`n" + $readyWait }) + "`r`n" + @'
 $settings = Join-Path $Root 'server-settings.json'
 $cfg = $null
 try { $cfg = [IO.File]::ReadAllText($settings) -replace '^\uFEFF', '' | ConvertFrom-Json }
 catch { 'STOP|' + $settings + ' will not read (' + $_.Exception.Message + '), so it is not known which server this is. Nothing was touched.'; exit 1 }
 if ([string]$cfg.thornswoodServer -ne $Want) { 'STOP|' + $settings + ' says thornswoodServer is ' + [string]$cfg.thornswoodServer + ', not ' + $Want + '. Nothing was touched.'; exit 1 }
+$serverBuild = Test-ThornswoodServerBuild $Root $WantCommit $WantSha
+$serverBuild
 if ($Survey) {
   $out = @(Invoke-ThornswoodNpcReset -Root $Root -Stamp $Stamp)
   $out
   if (@($out | Where-Object { "$_" -like 'STOP|*' }).Count) { exit 1 }
   exit 0
 }
+# A server without #98 would make the NPCs again unmarked.
+if (-not $serverBuild.StartsWith('SERVERBUILD|same|')) { 'STOP|The server in ' + $Root + ' is not the build main''s records\server-build.json holds, so NPCs made again might be unmarked. Nothing was stopped or moved.'; exit 1 }
 $port = 0
 [void][int]::TryParse([string]$cfg.port, [ref]$port)
 if ($port -le 0) { 'STOP|' + $settings + ' names no port, so the server is not known. Nothing was stopped or moved.'; exit 1 }
@@ -200,8 +210,16 @@ function Show-Lines($lines) {
     $b = "$l" -split '\|'
     switch ($b[0]) {
       'NPCRESET'    { Say ("  NPCs: {0}   characters kept: {1}   other references kept: {2}   not read, kept: {3}" -f $b[1], $b[2], $b[3], $b[4]) 'Yellow' }
+      'SERVERBUILD' {
+        $mine = if ($b[3]) { '{0} ({1})' -f $b[2].Substring(0, [math]::Min(12, $b[2].Length)), $b[3].Substring(0, 8) } else { $b[2] }
+        $main = '{0} ({1})' -f $b[4].Substring(0, [math]::Min(12, $b[4].Length)), $b[5].Substring(0, [math]::Min(8, $b[5].Length))
+        switch ($b[1]) {
+          'same'  { Say ("  server build: fork {0}, the one main's record holds" -f $mine) 'DarkGray' }
+          default { Say ("  server build: {0}; main's record holds fork {1}. A reset moves nothing until they match." -f $mine, $main) 'Yellow' }
+        }
+      }
       'NPCKINDS'    { Say ('  of them: ' + (($b | Select-Object -Skip 1) -join ', ')) 'DarkGray' }
-      'NPCMARKS'    { Say ("  NPCs carrying the engine's own-gear mark (#98): {0}; without it: {1}" -f $b[1], $b[2]) 'DarkGray' }
+      'NPCMARKS'    { Say ("  what they carry: every item with the engine's own-gear mark (#98): {0}; an item without it: {1}; nothing: {2}" -f $b[1], $b[2], $b[3]) 'DarkGray' }
       'KILLHISTORY' { if ([int]$b[1]) { Say ("  {0} character(s) hold kill-contract history for {1} of these NPCs; each of those NPCs starts again at life 0" -f $b[1], $b[2]) 'Yellow' } }
       'STAFFKEPT'   { Say ("  a creature staff kept: {0}, record {1}, in {2} at {3}" -f $b[1], $b[2], $b[3], $b[4]) 'Yellow' }
       'NOTREAD'     { Say ("  kept, not read: {0} ({1})" -f $b[1], $b[2]) 'Yellow' }

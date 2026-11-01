@@ -23,6 +23,7 @@ at the root.
 | [DEPLOY-AGENT.md](DEPLOY-AGENT.md) | The box deploy agent (#5180): deploying a signed Release by its tag through the gate and rolling back, how a merge reaches the dev server by itself, what it holds, how it updates itself and how it is installed. |
 | [SIGNED-RELEASES.md](SIGNED-RELEASES.md) | The signed release design (#2163): what gets signed and how, custody, rotation, revocation, the rollout that keeps every checksum, and the test-only pilot. |
 | [CLEAN-INSTALL-RUN.md](CLEAN-INSTALL-RUN.md) | The checklist for a stranger's first install, and what each step should show. |
+| [COLLECTION-CHANGES.md](COLLECTION-CHANGES.md) | How a mod is added, taken out or moved: a pull request to records/collection.json, its check, and the merge that drafts and publishes the revision (#5189). |
 | [COLLECTION-REVISION-2.md](COLLECTION-REVISION-2.md) | The Vortex pass for collection revision 2, step by step, and the exact plugin order a clean install must land in. |
 | [COLLECTION-REVISION-3.md](COLLECTION-REVISION-3.md) | Collection revision 3 (#1262): the Unofficial Skyrim Special Edition Patch at 4.3.8a, its two rules and the 49-position order. Local side only until published. |
 | [COLLECTION-REVISION-6.md](COLLECTION-REVISION-6.md) | Collection revision 6: Thornswood Content 1.4, Atlas Map Markers SE out, and the cheddars_mashups.esl rule that ended LOOT's cyclic interactions (#4070), made in one run. |

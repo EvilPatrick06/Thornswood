@@ -197,12 +197,7 @@ namespace Thornswood
                 b.MinWidth = 96;
                 Grid.SetColumn(b, 1); g.Children.Add(b);
 
-                string url = CollectionLink();
-                b.Click += delegate
-                {
-                    try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
-                    catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
-                };
+                b.Click += delegate { OpenCollection(); };
             }
 
             // Open to everybody (#428): anyone can download in the alpha, and

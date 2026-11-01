@@ -54,6 +54,12 @@ and exits 1 when anything failed. A harness that reads something only one
 machine has, such as the game folder, says SKIP for that part and checks the
 rest.
 
+Those lines are what the gate's report is made of (#5295). Every line that
+starts PASS, FAIL, SKIP or NOT RUN, after any spaces, is one check, named
+by the rest of the line, in the report scripts\dev\Nightly-Harnesses.ps1
+-Report writes and on the run's page. So give each check a line of its own
+that names it, and print nothing else that starts with one of those words.
+
 ## A harness that needs Windows
 
 Windows PowerShell 5.1, cmd.exe, a scheduled task, a folder's ACL and the

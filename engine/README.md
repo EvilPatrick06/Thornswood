@@ -314,7 +314,7 @@ A change to the engine goes like this:
    `Build-Front.ps1 -Record` and `Write-EnginePinText.ps1`, runs the checks
    and stages the change.
 5. After it merges, the dev server takes it by itself (#5219):
-   `gamemode-release.yml` runs because the pin changed
+   `merge-release.yml` runs because the pin changed
    `records\server-build.json`, puts CI's server build of the pin on a signed
    Release beside the gamemode, and the box deploy agent swaps it in under a
    hold and starts dev on it (docs\DEPLOY-AGENT.md, "A new server build").

@@ -90,7 +90,8 @@ yml.forEach(function (l) {
 // 31 Oct 2026: "gate" runs the gate harnesses in shares beside the build;
 // the required "Build check result" (#3683, build-pr.yml) needs both.
 // #5183: "pick" builds nothing; it says what each share of the gate runs.
-const main = jobs.filter(function (j) { return j.id !== 'tested' && j.id !== 'gate' && j.id !== 'pick'; });
+// #5295: "report" builds nothing either; it merges the shares' reports.
+const main = jobs.filter(function (j) { return j.id !== 'tested' && j.id !== 'gate' && j.id !== 'pick' && j.id !== 'report'; });
 yes('build.yml has exactly one build job beside its gate (found ' + main.length + ')', main.length === 1);
 const prYml = read('.github/workflows/build-pr.yml');
 yes('  and the required check of a pull request needs the build and the gate both', /\n    name: Build check result\n    needs: \[launcher, gate\]\n/.test(prYml));
@@ -253,6 +254,20 @@ yes('Developer-Guide.md says auto-merge is on (#5182)', /auto-merge is on/i.test
 yes('Developer-Guide.md gives gh pr merge --auto --squash', guideText.indexOf('gh pr merge --auto --squash') !== -1);
 yes('Developer-Guide.md does not say auto-merge is off', !/auto-merge is off/i.test(guideText));
 yes('Developer-Guide.md says main\'s ruleset requires Build check result', /ruleset[^.]*requires[^.]*Build check result/.test(guideText));
+
+// #5296 (the redesign's part 5, Patrick's A on 31 Oct 2026): main's ruleset
+// requires the merge queue, squash, each pull request passing on its own, and
+// the guide says auto-merge puts a green pull request in it.
+const settings = JSON.parse(fs.readFileSync(path.join(ROOT, 'records', 'github-repo-settings.json'), 'utf8'));
+const mainRules = ((((settings.repositories || []).find(r => r.repository === 'ThornswoodRP/Thornswood') || {}).rulesets || []).find(r => r.name === 'main') || {}).rules || [];
+const mq = mainRules.find(r => r && r.type === 'merge_queue');
+const mqp = (mq && mq.parameters) || {};
+yes('main\'s ruleset requires the merge queue (#5296)', !!mq);
+yes('  squash, each pull request passing on its own, merging as soon as one passes',
+    mqp.merge_method === 'SQUASH' && mqp.grouping_strategy === 'ALLGREEN' && mqp.min_entries_to_merge === 1 && mqp.min_entries_to_merge_wait_minutes === 0);
+yes('  with every setting GitHub needs given',
+    ['max_entries_to_build', 'max_entries_to_merge', 'check_response_timeout_minutes'].every(k => Number.isInteger(mqp[k]) && mqp[k] > 0));
+yes('Developer-Guide.md says auto-merge puts a green pull request in the merge queue', /puts it in the merge queue/.test(guideText));
 
 const sd = docs[0].text;
 // #3617. While enforce_admins is off, "GitHub refuses it" is true only for

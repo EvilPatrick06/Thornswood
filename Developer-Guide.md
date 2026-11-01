@@ -5,7 +5,7 @@ This is the one guide for working on Thornswood. A first day starts at section 1
 The outline nests, and the table of contents follows it. A part is a numbered section. A group inside it is a subsection. A step inside that is a sub-subsection.
 
 - Repository: https://github.com/ThornswoodRP/Thornswood
-- Board: https://github.com/users/EvilPatrick06/projects/1
+- Board: https://github.com/orgs/ThornswoodRP/projects/1
 - Site: https://thornswood.net
 - Staff pages: https://thornswood.net/hub
 - Long glossary: [docs/GLOSSARY.md](docs/GLOSSARY.md)
@@ -797,7 +797,7 @@ git switch main
 git pull
 ```
 
-Auto-merge is on for the repository (#5182, Patrick's A on 31 Oct). Turn it on for your pull request as soon as it is open and you are confident in the change: GitHub squash-merges it by itself the moment `Build check result` is green, and main's ruleset refuses a merge past red for everybody. On the website the button is **Enable auto-merge**. A merge gets no line in #staff-updates, and neither does the release that carries it. GitHub deletes the branch after a squash merge. Turn auto-merge on only for a pull request you understand. Leave one you do not.
+Auto-merge is on for the repository (#5182, Patrick's A on 31 Oct). Turn it on for your pull request as soon as it is open and you are confident in the change: the moment `Build check result` is green, GitHub puts it in the merge queue (#5296), and main's ruleset refuses a merge past red for everybody. The queue runs the build and the test task check again on its merge of your pull request onto the newest main, with the whole gate, and squash-merges it when they pass; main's own build then finds that run and builds nothing again. A pull request that fails there leaves the queue: fix it on the same branch and push, and auto-merge puts it back. `gh pr merge` cannot delete the branch while the queue is on, and does not need to: GitHub deletes it after the merge. On the website the button is **Enable auto-merge**. A merge gets no line in #staff-updates, and neither does the release that carries it. GitHub deletes the branch after a squash merge. Turn auto-merge on only for a pull request you understand. Leave one you do not.
 
 What you run after the merge depends on what the pull request touched. A dev release is [section 3](#3-how-to-release-to-dev). A main release is [section 4](#4-how-to-release-to-main).
 
@@ -976,8 +976,9 @@ there is today and the issue that converts each one that does not stay.
 
 #### Everything we need to do goes on the board
 
-The one record of outstanding work is the Thornswood To Do board:
-https://github.com/users/EvilPatrick06/projects/1
+The one record of outstanding work is the Thornswood To Do board, a board of
+the ThornswoodRP organization: https://github.com/orgs/ThornswoodRP/projects/1
+(it was Patrick's own account's until #5185 moved it, 1 Nov 2026).
 
 Each piece of work is an issue on this repository, and every issue is on the
 board. Decided by Patrick on 25 Sep and approved in #staff-general: the list moved there
@@ -1003,10 +1004,25 @@ How to use it:
   goes against a decision there says so and asks for the decision to be
   changed, instead of quietly reopening it (#3192).
 - Order is the do-order. A new issue gets the Order of where it belongs, not
-  the end; a number between two others (52.5) is fine.
+  the end; a number between two others (52.5) is fine. Every open issue
+  carries one (Patrick, 27 Oct, #3534): a new issue's card gets 10000 plus
+  its number by itself, and the label `order: <number>` (`order: 52.5`) moves
+  it to where it belongs, which is how a cloud thread moves one too
+  (`.github\workflows\board.yml` sets the Order and takes the label off).
+  The weekly review places what `scripts\ops\Check-Board.ps1` names without
+  one or sharing one, and looks again at what nobody has touched for 30 days
+  (`scripts\ops\List-Untouched.ps1`), never closing it for that.
+- Every issue has a type: Bug, Feature or Task. A form sets it; an issue
+  filed through the API says it (`-f type=Bug`), and one with none gets Bug
+  when it is labelled `bug` or a Findings label, Feature for `Suggestion`,
+  and Task otherwise (`.github\workflows\board.yml`).
 - Work that fits an existing issue is an edit or a comment on it, not a
   second issue. Say in it what is left; what was measured goes with the
-  evidence ("How an issue and a comment are written", below).
+  evidence ("How an issue and a comment are written", below). A new issue
+  whose title is like an open one's gets a comment naming it
+  (`.github\workflows\duplicate-check.yml`, #5185); if it is the same
+  problem, close the new one as a duplicate of the old, and if not, say on
+  it how it differs. Nothing is closed for you.
 - Uncommitted changes sitting in the repo are outstanding work and belong on
   the board too.
 - Labels: `area:` is the part of the project, `needs: patrick` marks what
@@ -1029,30 +1045,30 @@ How to use it:
   Status: the `wave:` labels and `needs: the live server` were retired on
   22 Oct (#3192), because nothing read them and Order had replaced them.
 - Status: In Progress the moment work starts, Done when it is merged and only
-  needs testing (Patrick, 19 Oct). The board's Status options are Todo, In
-  Progress and Done; never add one through the API, which rewrites every
-  option and can clear the Status on every card. Move the card on the board,
-  or add the label `board: <Status>` to the issue (`board: In Progress`, `board: Done`):
-  `.github\workflows\board-status.yml` sets the card's Status and takes the
-  label off again (#2863). The label `order: <number>` (`order: 52.5`) sets
-  the card's Order the same way, and the label is deleted afterwards. A cloud
-  Claude thread is refused GraphQL, which the board needs, so these labels
-  are how it moves a card:
-  `gh api -X POST repos/ThornswoodRP/Thornswood/issues/<N>/labels -f "labels[]=board: In Progress"`.
-  To see the cards, `pwsh scripts/ops/Read-Board.ps1` starts
+  needs testing (Patrick, 19 Oct). Nobody moves a card: the Status follows
+  what GitHub knows (#5185, `.github\workflows\board.yml` and
+  `scripts\ops\Sync-Board.js`). A closed issue is Done. An open one is In
+  Progress while a pull request that names it (`Closes`, `Fixes`,
+  `Resolves`, `Refs` or `Part of #N`, or its test task) is open, or while it
+  carries a `claimed:` label; Done once a merged pull request carries its
+  test task; Todo otherwise. So to move a card, change the fact: open the
+  pull request, put the claim on, or close the issue, and the card follows
+  within a minute. The Status options are Todo, In Progress and Done; never
+  add one through the API, which rewrites every option and can clear the
+  Status on every card. The `board:` labels did this by hand until #5185 and
+  are gone. To see the cards, `pwsh scripts/ops/Read-Board.ps1` starts
   `.github\workflows\board-read.yml`, which reads every card's Status and
-  Order on a VPS runner and changes nothing, and writes them to board.json
-  (#3192).
+  Order and changes nothing, and writes them to board.json (#3192).
 - A pull request that finishes an issue says `Closes #N`, so merging closes
-  it and the board moves it to Done. Say in the pull request which issues moved.
+  it and its card goes to Done. Say in the pull request which issues moved.
 - A fix people would notice is the exception: its pull request says `Refs #N`,
   and the issue stays open until the fix reaches main (Patrick, 11 Oct: dev
   is where the team checks that nothing breaks the game, and main is where
   testers test, since we are in alpha). The pull request carries the test
   task as `Test task for #N: <a title of at most 45 characters>`, then
   numbered steps in plain English and what should happen, with no issue
-  numbers, links or code. At the merge, `.github\workflows\done-on-merge.yml`
-  moves the issue to Done and writes the test task on it. The main Ship that
+  numbers, links or code. At the merge its card goes to Done by itself, and
+  `.github\workflows\done-on-merge.yml` writes the test task on the issue. The main Ship that
   carries the merge closes it (#3279): after it tags the release,
   `scripts\release\Close-ShippedIssues.ps1` reads the board and closes every
   open issue in Done whose done-on-merge comment names a merge the release was
@@ -1199,9 +1215,8 @@ and known issues are what is on the board whose fix has not landed yet
   Findings` whose fix has not landed: it has no test task and is not in
   Done. The bot takes the post down the moment a `Test task:` comment is
   written on it, Done on merge writes its `Pull request #N merged` comment
-  on it (with `board: Done`, which board-status.yml takes off again within
-  a minute), or it closes or loses its label. A card moved to Done by hand
-  with no merge keeps its post: the bot cannot read the board. A merged
+  on it, or it closes or loses its label. Nobody moves a card by hand since
+  #5185, so the comment and the board's Done always come together. A merged
   pull request alone does not take it down (Patrick, 26 Oct, #3140), so a
   measuring step or a partial fix leaves the post up. Every known issue is
   in the threads' work queue, so one is fixed in its turn and none waits
@@ -1422,8 +1437,10 @@ The short form of the rules. The same decisions, with the dates they were made, 
   admin account too, whatever `enforce_admins` says, so GitHub refuses a
   merge past red for everybody. And since 31 Oct auto-merge is on (#5182,
   Patrick's A): turn it on when the pull request opens, with
-  `gh pr merge --auto --squash`, and GitHub squash-merges it the moment
-  `Build check result` is green, so nobody waits to press merge. Turning it on
+  `gh pr merge --auto --squash`, and GitHub puts it in the merge queue the
+  moment `Build check result` is green, so nobody waits to press merge. The
+  queue (#5296, the redesign's part 5) checks it once more on the newest
+  main, with the whole gate, and squash-merges it. Turning it on
   is the moment you say you are confident in the change. The last classic
   setting, "require branches to be up to date" with no check listed, was
   removed on 27 Sep at Patrick's word ("we use the VPS's build checker").
@@ -2310,7 +2327,7 @@ it per session and ignores which profile Vortex has on.
 
 - This guide. The table at the top is the way in. `CLAUDE.md` in the private ops repo: what applies to a
   Claude on top of these rules. The To Do board,
-  https://github.com/users/EvilPatrick06/projects/1: all outstanding work.
+  https://github.com/orgs/ThornswoodRP/projects/1: all outstanding work.
 - `README.md`: what the repo is and where to start. A customer's install is
   the site's join page, `site\data\site\join.md`; setting up a
   developer's machine is "Setting up a machine" above.
@@ -2366,7 +2383,7 @@ The Pull requests tab lists open pull requests. `gh pr create` adds yours. The s
 - [About pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests)
 - [GitHub flow](https://docs.github.com/en/get-started/using-github/github-flow), the short version of branch, pull request, merge
 - This repository: https://github.com/ThornswoodRP/Thornswood
-- The board: https://github.com/users/EvilPatrick06/projects/1
+- The board: https://github.com/orgs/ThornswoodRP/projects/1
 
 ### B. Git
 
