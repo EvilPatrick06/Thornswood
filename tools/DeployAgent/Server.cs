@@ -160,6 +160,12 @@ public sealed class Server(EnvConfig env, HttpClient http)
         // A Release from before #5191 carries no tables and leaves the folder as it is.
         var newTree = withTables ? Tables.Tree(Path.Combine(stage, Tables.Dir)) : oldTree;
         var changes = oldBlob != newBlob || oldTree != newTree;
+        // A load is held to a tables tree only when the gamemode loading it
+        // reads tables, which is known from that gamemode.js and not from the
+        // folder: a gamemode from before #5191 beside a folder a later one
+        // left logs no tree, and a Release put back across #5191 is one.
+        var newHeld = Tables.Reads(Path.Combine(stage, "gamemode.js")) ? newTree : "";
+        var oldHeld = Tables.Reads(gm) ? oldTree : "";
         log($"the running gamemode is git blob {oldBlob}" + (oldTree != "" ? $" with tables tree {oldTree}" : "") + $"; it, its stamp and its tables are kept in {prevName}");
 
         var sl = new ServerLog(Root);
@@ -184,7 +190,7 @@ public sealed class Server(EnvConfig env, HttpClient http)
         if (why == "" && changes)
         {
             log($"put in git blob {newBlob}" + (newTree != "" ? $" and tables tree {newTree} ({Tables.Count(tablesAt)} tables)" : "") + $", waiting up to {env.LoadSeconds} seconds for server.log to say they loaded");
-            var (got, said) = sl.AwaitLoad(newBlob, newTree, wait, Tick);
+            var (got, said) = sl.AwaitLoad(newBlob, newHeld, wait, Tick);
             foreach (var l in Redact(said)) log("  " + l);
             if (got != "") why = "the new gamemode did not take: " + got;
         }
@@ -212,9 +218,13 @@ public sealed class Server(EnvConfig env, HttpClient http)
         log("putting the previous files back");
         var clean = true;
         sl.Mark();
-        for (int i = placed.Count - 1; i >= 0; i--)
+        // The tables go back first, as they went in first: the old gamemode.js
+        // arriving is what starts the reload, and that load reads the folder,
+        // so it has to be the old one by then. The files follow in the reverse
+        // of the order they went in.
+        var undo = placed.Where(r => r == Tables.Dir).Concat(Enumerable.Reverse(placed).Where(r => r != Tables.Dir)).ToList();
+        foreach (var rel in undo)
         {
-            var rel = placed[i];
             var kept = Path.Combine(prev, rel);
             if (rel == Tables.Dir)
             {
@@ -249,7 +259,7 @@ public sealed class Server(EnvConfig env, HttpClient http)
             else if (changes && placed.Contains("gamemode.js"))
             {
                 log($"the old gamemode is back on disk, waiting up to {env.LoadSeconds} seconds for the server to load it");
-                var (got, said) = sl.AwaitLoad(oldBlob, oldTree, wait, Tick);
+                var (got, said) = sl.AwaitLoad(oldBlob, oldHeld, wait, Tick);
                 foreach (var l in Redact(said)) log("  " + l);
                 if (got != "") { log("the old gamemode did not take either: " + got); clean = false; }
             }
@@ -349,6 +359,8 @@ public sealed class Server(EnvConfig env, HttpClient http)
         var withTables = files.ContainsKey(Tables.Zip);
         // A Release from before #5191 carries no tables and leaves the folder as it is.
         var newTree = withTables ? Tables.Tree(Path.Combine(stage, Tables.Dir)) : Tables.Tree(tablesAt);
+        // Held only when the new gamemode reads tables (see ApplyGamemode).
+        var newHeld = Tables.Reads(Path.Combine(stage, "gamemode.js")) ? newTree : "";
         log($"the stage checks out: server build {rec.Short}, {sums.Count} file(s) held to its record, and gamemode git blob {newBlob}" +
             (newTree != "" ? $" with tables tree {newTree}" : ""));
 
@@ -407,7 +419,7 @@ public sealed class Server(EnvConfig env, HttpClient http)
             if (why == "")
             {
                 log($"swapped in {placed.Count} file(s); the ones they replaced are in {prevName}");
-                why = await StartAndCheck(port, resPort, newBlob, newTree, log, ct);
+                why = await StartAndCheck(port, resPort, newBlob, newHeld, log, ct);
             }
             if (why == "")
             {
@@ -447,7 +459,8 @@ public sealed class Server(EnvConfig env, HttpClient http)
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { log($"COULD NOT PUT THE OLD {Tables.Dir} BACK: {e.Message}"); clean = false; }
             if (clean)
             {
-                var back = await StartAndCheck(port, resPort, Files.GamemodeBlob(Path.Combine(Root, "gamemode.js")), Tables.Tree(tablesAt), log, ct);
+                var backGm = Path.Combine(Root, "gamemode.js");
+                var back = await StartAndCheck(port, resPort, Files.GamemodeBlob(backGm), Tables.Reads(backGm) ? Tables.Tree(tablesAt) : "", log, ct);
                 if (back != "") { log("the previous server build is back and does not answer either: " + back); clean = false; }
                 else log("the previous server build is back and answering");
             }

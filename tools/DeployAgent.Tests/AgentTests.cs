@@ -167,9 +167,11 @@ sealed class FakeVerifier(bool badFile = false) : IVerifier
 /// <summary>A server folder and an engine that, like the real one, loads
 /// gamemode.js again when it changes and says how it went in server.log. A
 /// change is new bytes or a new write time, as the engine's watcher sees a
-/// file put over it (chokidar compares what stat gives). The gamemode logs the
-/// tree of the gamemode-tables folder it read (#5191). A gamemode, or a table,
-/// holding BROKEN does not load.</summary>
+/// file put over it (chokidar compares what stat gives). A gamemode that reads
+/// tables (#5191), one carrying the line that names them, logs the tree of
+/// the gamemode-tables folder it read; one from before #5191 logs no tree,
+/// whatever folder sits beside it. A gamemode, or a table, holding BROKEN
+/// does not load.</summary>
 sealed class FakeServer : IDisposable
 {
     public const string EngineSays = "[thornswood] gamemode did not load; the error is above";
@@ -199,10 +201,11 @@ sealed class FakeServer : IDisposable
     string LoadLines(string gm, byte[] b)
     {
         var dir = Path.Combine(Root, Tables.Dir);
+        var reads = Encoding.UTF8.GetString(b).Contains(Tables.TreeSaid);
         var broken = Encoding.UTF8.GetString(b).Contains("BROKEN") ||
-                     (Directory.Exists(dir) && Directory.GetFiles(dir).Any(f => File.ReadAllText(f).Contains("BROKEN")));
+                     (reads && Directory.Exists(dir) && Directory.GetFiles(dir).Any(f => File.ReadAllText(f).Contains("BROKEN")));
         if (broken) return $"SyntaxError: Unexpected token at 10.1.2.3:7787\n{EngineSays}\n";
-        var tree = Tables.Tree(dir);
+        var tree = reads ? Tables.Tree(dir) : "";
         return $"[thornswood] gamemode.js is git blob {Thornswood.DeployAgent.Files.GamemodeBlob(gm)}, {b.Length} bytes\n" +
                (tree != "" ? $"[thornswood] gamemode tables are git tree {tree}, {Tables.Count(dir)} files, in {dir}\n" : "") +
                "[thornswood] gamemode client scripts abc (3), changed since the last load\n";
@@ -511,7 +514,7 @@ public sealed class AgentTests : IDisposable
         PutTables(s, OldTables);
         var oldTree = Tables.Tree(Path.Combine(s.Root, Tables.Dir));
         var (newFiles, newRec) = Build(ForkB);
-        PinRelease(gh, "build-11", "// gamemode for B\n", newFiles, newRec, tables: new() { ["DATA.json"] = "{\"a\":3}\n" });
+        PinRelease(gh, "build-11", Reading("gamemode for B"), newFiles, newRec, tables: new() { ["DATA.json"] = "{\"a\":3}\n" });
         var outc = await a.DeployTag("dev", "build-11", default);
         Assert.Equal("success", outc.State);
         Assert.Contains("with tables tree", outc.Summary);
@@ -522,7 +525,7 @@ public sealed class AgentTests : IDisposable
         // A table that stops the load on the new engine goes back with it.
         var (b2Files, b2Rec) = Build(ForkA);
         var before = Tables.Tree(Path.Combine(s.Root, Tables.Dir));
-        PinRelease(gh, "build-12", "// gamemode for A\n", b2Files, b2Rec, tables: new() { ["DATA.json"] = "BROKEN\n" });
+        PinRelease(gh, "build-12", Reading("gamemode for A"), b2Files, b2Rec, tables: new() { ["DATA.json"] = "BROKEN\n" });
         var bad = await a.DeployTag("dev", "build-12", default);
         Assert.Equal("failure", bad.State);
         Assert.Equal(before, Tables.Tree(Path.Combine(s.Root, Tables.Dir)));
@@ -587,14 +590,18 @@ public sealed class AgentTests : IDisposable
 
     static readonly Dictionary<string, string> OldTables = new() { ["DATA.json"] = "{\n\"a\":1\n}\n", ["WELLS.json"] = "[]\n" };
 
+    /// <summary>A gamemode that reads its tables, as game/gamemode.js does from #5191.</summary>
+    static string Reading(string name) => $"// {name}\nlog('{Tables.TreeSaid}' + t.tree);\n";
+
     [Fact]
     public async Task ATablesOnlyChangeIsReloadedAndHeldToItsTree()
     {
         var (a, gh, s, _, _) = Make();
         PutTables(s, OldTables);
+        File.WriteAllText(Path.Combine(s.Root, "gamemode.js"), Reading("tables gamemode"));
         var oldTree = Tables.Tree(Path.Combine(s.Root, Tables.Dir));
         // The same gamemode.js the server runs: only a table changed.
-        GamemodeRelease(gh, "build-1", "// old gamemode\r\n", new() { ["DATA.json"] = "{\n\"a\":2\n}\n", ["WELLS.json"] = "[]\n" });
+        GamemodeRelease(gh, "build-1", Reading("tables gamemode"), new() { ["DATA.json"] = "{\n\"a\":2\n}\n", ["WELLS.json"] = "[]\n" });
         var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
         Assert.Equal("in_progress,success", string.Join(",", gh.States(id)));
@@ -616,14 +623,17 @@ public sealed class AgentTests : IDisposable
     {
         var (a, gh, s, _, _) = Make();
         PutTables(s, OldTables);
+        // The old gamemode reads tables too, so its load after the put-back
+        // reads the folder, which has to be the old one by then.
+        File.WriteAllText(Path.Combine(s.Root, "gamemode.js"), Reading("old tables gamemode"));
         var oldTree = Tables.Tree(Path.Combine(s.Root, Tables.Dir));
-        GamemodeRelease(gh, "build-2", "// new gamemode\n", new() { ["DATA.json"] = "BROKEN\n", ["WELLS.json"] = "[]\n" });
+        GamemodeRelease(gh, "build-2", Reading("new gamemode"), new() { ["DATA.json"] = "BROKEN\n", ["WELLS.json"] = "[]\n" });
         var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-2\"}");
         await a.Pass("dev", default);
         var last = gh.Last(id)!;
         Assert.Equal("failure", (string)last["state"]!);
         Assert.Contains("previous gamemode is back", (string)last["description"]!);
-        Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
+        Assert.Equal(Reading("old tables gamemode"), s.Read("gamemode.js"));
         Assert.Equal(oldTree, Tables.Tree(Path.Combine(s.Root, Tables.Dir)));
         Assert.Empty(Directory.GetDirectories(s.Root, ".agent-stage-*"));
     }
@@ -637,6 +647,47 @@ public sealed class AgentTests : IDisposable
         GamemodeRelease(gh, "build-0", "// a gamemode with its tables inside\n");
         Assert.Equal("success", (await a.DeployTag("dev", "build-0", default)).State);
         Assert.Equal(tree, Tables.Tree(Path.Combine(s.Root, Tables.Dir)));
+    }
+
+    [Fact]
+    public async Task ARollBackAcrossTheTablesLoadsTheOldGamemodeBesideTheFolder()
+    {
+        var (a, gh, s, _, _) = Make();
+        GamemodeRelease(gh, "build-20", "// a gamemode with its tables inside\n");
+        GamemodeRelease(gh, "build-21", Reading("tables gamemode"), OldTables);
+        Assert.Equal("success", (await a.DeployTag("dev", "build-21", default)).State);
+        Assert.True(Directory.Exists(Path.Combine(s.Root, Tables.Dir)));
+        // Back to a Release from before #5191: it logs no tree and is not held to one.
+        var back = await a.DeployTag("dev", "build-20", default);
+        Assert.Equal("success", back.State);
+        Assert.Equal("// a gamemode with its tables inside\n", s.Read("gamemode.js"));
+    }
+
+    [Fact]
+    public async Task APutBackToAGamemodeFromBeforeTheTablesIsNotHeldToTheFolder()
+    {
+        var (a, gh, s, _, _) = Make();
+        // A gamemode from before #5191 runs beside a folder a later one left.
+        PutTables(s, OldTables);
+        var tree = Tables.Tree(Path.Combine(s.Root, Tables.Dir));
+        GamemodeRelease(gh, "build-22", Reading("new gamemode"), new() { ["DATA.json"] = "BROKEN\n" });
+        var outc = await a.DeployTag("dev", "build-22", default);
+        Assert.True(outc.State == "failure", outc.State + ": " + outc.Summary);
+        Assert.Contains("previous gamemode is back", outc.Summary);
+        Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
+        Assert.Equal(tree, Tables.Tree(Path.Combine(s.Root, Tables.Dir)));
+    }
+
+    [Fact]
+    public void AGamemodeReadsTablesOnlyWhenItNamesThem()
+    {
+        var dir = Temp();
+        var gm = Path.Combine(dir, "gamemode.js");
+        File.WriteAllText(gm, "// a gamemode with its tables inside\n");
+        Assert.False(Tables.Reads(gm));
+        File.WriteAllText(gm, Reading("tables gamemode"));
+        Assert.True(Tables.Reads(gm));
+        Assert.False(Tables.Reads(Path.Combine(dir, "none.js")));
     }
 
     [Theory]
@@ -679,6 +730,10 @@ public sealed class AgentTests : IDisposable
         catch (System.ComponentModel.Win32Exception) { return; } // no git here
         Assert.Equal(want, Tables.Tree(t));
         Assert.Equal("", Tables.Tree(Path.Combine(dir, "none")));
+        // An empty folder is git's empty tree, the id the gamemode works out for one too.
+        var empty = Path.Combine(dir, "empty");
+        Directory.CreateDirectory(empty);
+        Assert.Equal("4b825dc642cb6eb9a060e54bf8d69288fbee4904", Tables.Tree(empty));
     }
 
     [Fact]

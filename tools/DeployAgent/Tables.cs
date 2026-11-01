@@ -44,6 +44,16 @@ public static class Tables
         return Convert.ToHexStringLower(sha.GetHashAndReset());
     }
 
+    /// <summary>The line a gamemode that reads tables logs as it loads, after
+    /// its blob (game/gamemode.js, tableFolder).</summary>
+    public const string TreeSaid = "gamemode tables are git tree ";
+
+    /// <summary>Whether this gamemode.js reads tables, so its load is held to
+    /// their tree: it carries the line that names them. One from before #5191
+    /// does not, whatever folder sits beside it.</summary>
+    public static bool Reads(string gamemode) =>
+        File.Exists(gamemode) && File.ReadAllText(gamemode).Contains(TreeSaid, StringComparison.Ordinal);
+
     /// <summary>The table files in a folder, for a count in the log.</summary>
     public static int Count(string dir) => Directory.Exists(dir) ? Names(dir).Count : 0;
 

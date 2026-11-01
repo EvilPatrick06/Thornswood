@@ -93,10 +93,13 @@ the App holds Deployments.
    the gamemode reads as it loads (#5191), carried in the Release as
    `gamemode-tables.zip` and held to the manifest like the other files; a
    Release without that zip leaves the folder as it is.
-5. `server.log` has to say the new gamemode's git blob loaded, and from
-   #5191 the git tree id of its tables folder too (the reload Reload.ps1
-   uses, #3196), and then the health address has to answer.
-6. If either does not happen, the old files go back the same way and the
+5. `server.log` has to say the new gamemode's git blob loaded, and the git
+   tree id of its tables folder too when that gamemode reads tables (it
+   carries the line that logs them; one from before #5191 does not, whatever
+   folder is beside it) (the reload Reload.ps1 uses, #3196), and then the
+   health address has to answer.
+6. If either does not happen, the old files go back, the tables folder first
+   so the reload the old gamemode.js starts reads the old tables, and the
    old gamemode has to load again. The Deployment says **failure** and that
    the previous gamemode is back. If even that does not take, it says
    **error**, and dev needs `Deploy-DevGamemode.ps1 -PutBack`.
