@@ -27,7 +27,9 @@
        with no records stops saying so; records of another commit than the
        index pins stop, naming the update-index line; with the pin moved, the
        records are written (exit 0), the old licence text is gone, and the
-       log was read from the job that succeeded.
+       log was read from the job that succeeded; a gh of 2.92 or newer, which
+       refuses a log's escape sequences unless told, is told (#5202), and an
+       older one is not.
 
   Writes only in its own scratch folder, which it removes. Needs git.
 #>
@@ -147,6 +149,10 @@ try {
     [IO.File]::WriteAllText($ghFake, @'
 $state = $env:TS_GH_STATE
 [IO.File]::AppendAllText((Join-Path $state 'calls.txt'), (($args -join ' ') + "`n"))
+# TS_GH_NEW: a gh of 2.92 or newer, which names --allow-escape-sequences in
+# its help and refuses a log (whose colours are escape sequences) without it.
+if ($args[0] -eq 'api' -and $args[1] -eq '--help') { if ($env:TS_GH_NEW) { 'FLAGS'; '  --allow-escape-sequences   Allow terminal escape sequences in the output' }; exit 0 }
+if ($env:TS_GH_NEW -and $args[0] -eq 'api' -and $args[1] -match '/logs$' -and $args -notcontains '--allow-escape-sequences') { [Console]::Error.WriteLine('the response contains terminal escape sequences; pass --allow-escape-sequences to output it anyway'); exit 1 }
 if ($args[0] -eq 'api' -and $args[1] -eq 'repos/EvilPatrick06/Thornswood/actions/runs/40400000000') { [IO.File]::ReadAllText((Join-Path $state 'run.json')); exit 0 }
 if ($args[0] -eq 'api' -and $args[1] -eq 'repos/EvilPatrick06/Thornswood/actions/runs/40400000000/jobs') { [IO.File]::ReadAllText((Join-Path $state 'jobs.json')); exit 0 }
 if ($args[0] -eq 'api' -and $args[1] -match '^repos/EvilPatrick06/Thornswood/actions/jobs/(\d+)/logs$') { [IO.File]::ReadAllLines((Join-Path $state ('log-' + $Matches[1] + '.txt'))); exit 0 }
@@ -184,6 +190,14 @@ if ($args[0] -eq 'api' -and $args[1] -match '^repos/EvilPatrick06/Thornswood/act
         [IO.File]::ReadAllText((Join-Path $repo 'records/server-build.json')) -eq (Server-Record $commit) -and (Test-Path -LiteralPath (Join-Path $repo 'records/client-build.json')))
     Yes '3.   and the old licence text is gone' (-not (Test-Path -LiteralPath (Join-Path $repo 'records/client-licences/old-port.txt')) -and (Test-Path -LiteralPath (Join-Path $repo 'records/client-licences/zlib.txt')))
     Yes '3.   read from the log of the job that succeeded' ([IO.File]::ReadAllText((Join-Path $gh 'calls.txt')) -match 'actions/jobs/222/logs' -and -not ([IO.File]::ReadAllText((Join-Path $gh 'calls.txt')) -match 'actions/jobs/111/logs'))
+    Yes '3.   an older gh, with no such flag, is not given --allow-escape-sequences' ([IO.File]::ReadAllText((Join-Path $gh 'calls.txt')) -notmatch 'allow-escape-sequences')
+    # #5202: engine-pin.yml stopped here on 31 Oct 2026, its runner's gh
+    # refusing the log for its colours.
+    [IO.File]::WriteAllText((Join-Path $gh 'calls.txt'), '', $utf8)
+    $env:TS_GH_NEW = '1'
+    try { $r = Take } finally { Remove-Item -LiteralPath 'Env:TS_GH_NEW' -ErrorAction SilentlyContinue }
+    Yes ("3. a gh that refuses a log's escape sequences is told --allow-escape-sequences, and the records are written (exit {0})" -f $r.Code) ($r.Code -eq 0 -and
+        [IO.File]::ReadAllText((Join-Path $gh 'calls.txt')) -match 'actions/jobs/222/logs --allow-escape-sequences')
 }
 finally {
     Remove-Item -LiteralPath 'Env:TS_GH_STATE' -ErrorAction SilentlyContinue

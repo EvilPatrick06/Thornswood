@@ -30,6 +30,9 @@
   bits is refused.
 #>
 
+# Get-GhLogFlags, for reading a job's log (#5202).
+. (Join-Path $PSScriptRoot '..\release\LogHandBack.ps1')
+
 # A key for one run: Public goes with the run, Private stays in the session.
 function New-ThornswoodSealKey {
     $rsa = [Security.Cryptography.RSA]::Create(3072)
@@ -116,10 +119,13 @@ function Read-ThornswoodSealedLog([string]$Repo, [long]$Run) {
     try {
         $jobs = @(& gh api "repos/$Repo/actions/runs/$Run/jobs" --jq '.jobs[].id' 2>&1 | ForEach-Object { "$_" })
         if ($LASTEXITCODE -ne 0) { return @{ Bytes = $null; Why = ('the run''s jobs could not be read: ' + ($jobs -join ' ')) } }
+        # The log keeps the runner's colours, which a newer gh hands over
+        # only when told (Get-GhLogFlags, #5202).
+        $flags = Get-GhLogFlags
         foreach ($job in $jobs) {
             if ($job -notmatch '^[0-9]+$') { continue }
-            $log = @(& gh api "repos/$Repo/actions/jobs/$job/logs" 2>&1 | ForEach-Object { "$_" })
-            if ($LASTEXITCODE -ne 0) { return @{ Bytes = $null; Why = ('the log of job ' + $job + ' could not be read: ' + (($log | Select-Object -Last 1) -join '')) } }
+            $log = @(& gh api "repos/$Repo/actions/jobs/$job/logs" @flags 2>&1 | ForEach-Object { "$_" })
+            if ($LASTEXITCODE -ne 0) { return @{ Bytes = $null; Why = ('the log of job ' + $job + ' could not be read: ' + ((($log | Select-Object -Last 1) -join '') -replace "`e", '')) } }
             $parts = @{}; $end = $null
             foreach ($line in $log) {
                 # Each line of a job's log starts with its time.

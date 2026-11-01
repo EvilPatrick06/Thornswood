@@ -4,7 +4,8 @@
   A file handed back from a workflow run in its job's log rather than as an
   artifact. Dot-sourced by .github\workflows\engine.yml, which prints the
   records it makes this way, and scripts\release\Get-EngineRecords.ps1, which
-  reads them back (#3399). tests\test-3399-engine-records.ps1.
+  reads them back (#3399). tests\test-3399-engine-records.ps1. Every reader of
+  a job's log asks Get-GhLogFlags what gh needs told first (#5202).
 
   WHY. This repository's artifact storage is private, metered over the month,
   and was used up on 25 Oct (#3410): engine.yml's upload was refused, and
@@ -24,6 +25,21 @@
 
   Keep it Windows PowerShell 5.1 and pwsh alike.
 #>
+
+# What gh needs told to hand a job's log over: a runner's log carries
+# terminal escape sequences (its colours), and gh 2.92 and newer refuse an
+# answer that holds any (CVE-2026-45803) unless told
+# --allow-escape-sequences. engine-pin.yml stopped on that on 31 Oct 2026 and
+# made no pin (#5202). The log only ever goes into a variable and is read
+# line by line for its marks; nothing of it is written to a terminal as it
+# is. An older gh has no such flag and refuses no log, so the flag is given
+# only when gh's own help names it. $Gh is the gh to ask (a test's stand-in).
+function Get-GhLogFlags([string]$Gh = 'gh') {
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    try { $help = (& $Gh api --help 2>&1 | Out-String) } catch { $help = '' } finally { $ErrorActionPreference = $old }
+    if ($help -match '--allow-escape-sequences') { return '--allow-escape-sequences' }
+    return
+}
 
 # The lines that hand $Bytes back under $Mark, for the step to print.
 function Get-LogHandBackLines([string]$Mark, [byte[]]$Bytes) {
