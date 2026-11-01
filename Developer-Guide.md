@@ -1174,7 +1174,10 @@ and known issues are what is on the board whose fix has not landed yet
   one: checking that a fix works is its Main test task, written when it
   reaches main, however soon that is (#613: Patrick found one in
   #dev-test-tasks, 22 Oct). Staff only. Written as soon as a build carries
-  the work, open issue or closed, and posted at once, whole, with links to
+  the work, open issue or closed: from the pull request's block, the dev
+  Ship that carries the merge writes it on the issue with its Build: line
+  naming that release (`Close-ShippedIssues.ps1 -Dev`, #5199), so nobody
+  writes it by hand. It is posted at once, whole, with links to
   the issue, its pull requests and commits. It does not hold the issue
   open: the main Ship that carries the fix closes it all the same. It stays
   up while the fix is on main and after the issue closes, beside the Main
