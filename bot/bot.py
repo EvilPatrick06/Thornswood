@@ -4611,6 +4611,22 @@ def _github_get(url):
         return json.loads(r.read().decode('utf-8'))
 
 
+def pass_failure(e):
+    """How a pass failed, for the log: the kind, and for an answer from
+       GitHub its status and the path it asked for, so a failure names
+       itself (#5184: 110 lines saying only "HTTPError"). Never the token:
+       the request carries it in a header, and neither the path nor str(e)
+       holds it."""
+    kind = type(e).__name__
+    if isinstance(e, urllib.error.HTTPError):
+        url = str(getattr(e, 'url', None) or getattr(e, 'filename', None) or '')
+        path = url[len(GITHUB_API):] if url.startswith(GITHUB_API) else url.split('?')[0]
+        return '%s %s on %s' % (kind, getattr(e, 'code', '?'), path or '(no path)')
+    if isinstance(e, urllib.error.URLError):
+        return '%s (%s)' % (kind, type(getattr(e, 'reason', None)).__name__)
+    return kind
+
+
 def _github_rows(got, url):
     """A page of a GitHub list, which is a list. Anything else is an answer
        that is not the list, and is raised, never read as no issues: a pass
@@ -5476,11 +5492,26 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
     Comments are read only for an issue GitHub says changed since the last
     pass (its updated_at), or whose record was made with an older form of
     the post (KNOWN_FORM), so an untouched issue costs nothing. A label put
-    on or a comment written moves updated_at, so nothing else is read.
+    on or a comment written moves updated_at, so nothing else is read. That
+    holds for an issue that ends with no post as well (a test task, a merged
+    fix, a post that breaks a rule): state['known_read'] keeps the updated_at
+    it was read at. Until 1 Nov only a posted issue was remembered, so every
+    pass read the comments of every other one again (#5184).
     """
     loop = asyncio.get_running_loop()
     issues = await loop.run_in_executor(None, github_open_findings, get)
     rec = state.setdefault('issues', {})
+    read = state.setdefault('known_read', {})
+    for key in [k for k in read if int(k) not in issues]:
+        read.pop(key, None)
+        state['_dirty'] = True
+
+    def unposted(key, mark):
+        # Read at this update time and left with no post (mark), or with the
+        # post already up kept as it was (mark + '|kept').
+        if read.get(key) != mark:
+            read[key] = mark
+            state['_dirty'] = True
     # Records from before #known-issues was a forum point at messages in a
     # channel that is gone: they are forgotten, not deleted again.
     for key, have in list(rec.items()):
@@ -5506,12 +5537,20 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
                 and have.get('form') == KNOWN_FORM):
             listed.add(num)
             continue
+        mark = '%s|%s' % (issue.get('updated_at'), KNOWN_FORM)
+        if have and read.get(key) == mark + '|kept':
+            listed.add(num)         # its post breaks a rule: the one up stays
+            continue
+        if not have and read.get(key) == mark:
+            continue                # read at this update time: no post
         comments = await loop.run_in_executor(None, github_comments, num, get)
         if _all_marked(issue, comments, TASK_MARK, room=None):
             why[key] = 'it has a "Test task:" comment'
+            unposted(key, mark)
             continue                # it has a test task: being checked, not known
         if merged_fix(comments):
             why[key] = 'done-on-merge wrote its merged fix on it'
+            unposted(key, mark)
             continue                # fixed, waiting on main: not a known issue
         title, body, tags = known_of(issue, comments)
         taken = [v.get('sig', '').split('\n')[0] for k, v in rec.items() if k != key]
@@ -5521,8 +5560,11 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
             if have:
                 listed.add(num)     # the post already up stays as it was
             why[key] = 'its post breaks a rule'
+            unposted(key, mark + ('|kept' if have else ''))
             continue
         listed.add(num)
+        if read.pop(key, None) is not None:
+            state['_dirty'] = True
         sig = _sig(title, body, tags)
         if have:
             if have.get('sig') != sig:
@@ -5611,6 +5653,22 @@ async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=Non
             fix_in_main=inmain, taken_titles=taken), say)
 
     closed = await loop.run_in_executor(None, github_closed_since, since, get)
+    # Each closed issue read at its update time and left with no post (or
+    # with the post up kept as it was, '|kept'), so it is read again only
+    # once it changes. Until 1 Nov only a posted issue was remembered, and
+    # every pass read the comments of every other issue closed since 'since'
+    # again: about 1,200 calls a pass, the whole hourly allowance in four
+    # passes (#5184).
+    read = state.setdefault('tasks_read', {})
+    for key in [k for k in read if int(k) not in closed]:
+        read.pop(key, None)
+        state['_dirty'] = True
+
+    def unposted(key, mark):
+        if read.get(key) != mark:
+            read[key] = mark
+            state['_dirty'] = True
+
     posted, edited, removed = [], [], []
     for num in sorted(closed):
         key = str(num)
@@ -5621,11 +5679,15 @@ async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=Non
         if (have and have.get('updated') == issue.get('updated_at')
                 and have.get('form') == TASK_FORM):
             continue
+        mark = '%s|%s' % (issue.get('updated_at'), TASK_FORM)
+        if read.get(key) == (mark + '|kept' if have else mark):
+            continue                # read at this update time: nothing to do
         comments = await loop.run_in_executor(None, github_comments, num, get)
         task = test_task_of(issue, comments, dev_since)
         new_enough = (str(issue.get('closed_at') or '') >= since
                       or (task is not None and task[2] >= since))
         if not have and not new_enough:
+            unposted(key, mark)
             continue
         post = task_post_of(issue, comments, dev_since)
         if post is None:
@@ -5641,11 +5703,15 @@ async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=Non
                 rec.pop(key, None)
                 state['_dirty'] = True
                 removed.append(num)
+            unposted(key, mark)
             continue
         title, body, tags = post
         sig = _sig(title, body, tags)
         if (not have or have.get('sig') != sig) and await broken(num, issue, comments, post):
+            unposted(key, mark + ('|kept' if have else ''))
             continue        # not posted, and a post already up keeps its text
+        if read.pop(key, None) is not None:
+            state['_dirty'] = True
         if have:
             if have.get('sig') != sig:
                 try:
@@ -6111,9 +6177,15 @@ async def watch_known_issues():
             else:
                 said_lists = False
         except Exception as e:
-            # Never the URL with the token, and never the token: the request
-            # carries it in a header, which str(e) does not print.
-            log('known issues: a pass failed: %s' % type(e).__name__)
+            log('known issues: a pass failed: %s' % pass_failure(e))
+            # What it read before it failed is kept, so the next pass does
+            # not read it again, after a restart as well (#5184).
+            if state.get('_dirty'):
+                try:
+                    _known_save(state)
+                except OSError as e2:
+                    log('known issues: could not save %s after the failed '
+                        'pass (%s)' % (KNOWN_STATE, type(e2).__name__))
         await asyncio.sleep(KNOWN_EVERY)
 
 

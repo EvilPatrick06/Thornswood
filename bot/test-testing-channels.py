@@ -710,6 +710,22 @@ yes('  and a record from the old text channel is forgotten, not acted on',
 posted, edited, removed = run(bot.known_issues_once(kf, st, gh, me_id=me.id))
 yes('a second pass posts and removes nothing', posted == [] and removed == []
     and len(kf.threads) == 2)
+# A finding that ends with no post is read once at each update time, not on
+# every pass (#5184: only posted issues were remembered).
+issue(14, 'Has a task', ['Dev Findings'])
+COMMENTS[14] = [{'body': 'Test task: Ride the ferry\nServer: Dev\nBoard it.\nYou arrive.'}]
+run(bot.known_issues_once(kf, st, gh, me_id=me.id))
+ASKED[:] = []
+posted, edited, removed = run(bot.known_issues_once(kf, st, gh, me_id=me.id))
+yes('a finding with a test task is not posted, and the next pass does not read '
+    'its comments again',
+    posted == [] and len(kf.threads) == 2
+    and not [u for u in ASKED if '/issues/14/comments' in u]
+    and st['known_read'].get('14', '').startswith(ISSUES[14]['updated_at']))
+issue(14, 'Has a task', ['Dev Findings'])
+ASKED[:] = []
+run(bot.known_issues_once(kf, st, gh, me_id=me.id))
+yes('  it is read again once it changes', [u for u in ASKED if '/issues/14/comments' in u] != [])
 path = os.path.join(TMP, 'known-issues.json')
 bot._known_save(dict(st, _dirty=True), path)
 posted, _, _ = run(bot.known_issues_once(kf, bot._state_read(path), gh, me_id=me.id))
@@ -781,6 +797,27 @@ yes('  but not a fixed issue with neither, and not one closed as not planned',
     and sorted(posted) == [31, 32, 35])
 posted, edited, removed = run(bot.test_tasks_once(tf, tst, gh, me_id=me.id))
 yes('a second pass posts nothing twice', posted == [] and len(tf.threads) == 3)
+ASKED[:] = []
+run(bot.test_tasks_once(tf, tst, gh, me_id=me.id))
+yes('a fixed issue with no test task is read once, not on every pass: no '
+    'comments are read when nothing changed (#5184)',
+    not [u for u in ASKED if u.split('?')[0].endswith('/comments')]
+    and tst['tasks_read'].get('33', '').startswith(ISSUES[33]['updated_at']))
+COMMENTS[33] = [{'body': 'Test task: Build the release\nIt builds.'}]
+issue(33, 'Tooling only', ['area: Release'], state='closed', reason='completed',
+      closed_at='2026-10-12T05:02:00Z')
+posted, edited, removed = run(bot.test_tasks_once(tf, tst, gh, me_id=me.id))
+yes('  and once it changes it is read again, and posted when it has one now',
+    posted == [33] and '33' not in tst['tasks_read'])
+_e = bot.urllib.error.HTTPError(bot.GITHUB_API + '/repos/o/r/issues/5/comments?per_page=100&page=1',
+                                403, 'Forbidden', {}, None)
+yes('a failed pass names the call: its status and the path asked, never the host',
+    bot.pass_failure(_e) == 'HTTPError 403 on /repos/o/r/issues/5/comments?per_page=100&page=1'
+    and bot.pass_failure(ValueError('x')) == 'ValueError')
+_src5 = _insp.getsource(bot.watch_known_issues)
+yes('  and what it read before it failed is saved',
+    "log('known issues: a pass failed: %s' % pass_failure(e))" in _src5
+    and _src5.index('pass_failure(e)') < _src5.index('_known_save(state)', _src5.index('pass_failure(e)')))
 issue(32, 'Gold resets', ['Main Findings'])
 posted, edited, removed = run(bot.test_tasks_once(tf, tst, gh, me_id=me.id))
 yes('a reopened issue loses its test task post',
