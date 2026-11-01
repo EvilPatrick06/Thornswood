@@ -148,6 +148,15 @@ for (const f of starters) {
   yes(f + ' waits for its own service to say it is listening before asking it anything',
       !!waits[f] && /await listening\(srv, (PORT|port)\)/.test(text[f]));
 }
+// The bot pass starts the service through scripts/bot/relay.js (#5196), on
+// the port its copy's settings name, and asks it nothing (not /token) until
+// that copy has said it is listening there.
+{
+  const relay = fs.readFileSync(path.join(REPO_DIR, 'scripts', 'bot', 'relay.js'), 'utf8');
+  yes('scripts/bot/relay.js waits for its own service to say it is listening on its port before asking it anything',
+      relay.indexOf("new RegExp('\\\\[voice\\\\] listening on 127\\\\.0\\\\.0\\\\.1:' + this.port + '\\\\b')") >= 0 &&
+      relay.indexOf('if (this.lines.some((l) => said.test(l))) { return \'\'; }') >= 0);
+}
 
 // ------------------------------------------------------ the site's own word
 const sites = files.filter((f) => f !== SELF && /spawn\(/.test(text[f]) && /THORNSWOOD_DOCS_PORT/.test(text[f]));
