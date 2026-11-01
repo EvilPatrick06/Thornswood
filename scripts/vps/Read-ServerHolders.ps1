@@ -42,10 +42,17 @@
     5. with -DefenderFrom, the lines of Defender's own log (MPLog, in
        C:\ProgramData\Microsoft\Windows Defender\Support) from that minute
        for -DefenderMinutes minutes, the lines naming the folder first. The
-       time is UTC, written yyyy-MM-ddTHH:mm. A log line with a Z is read as
-       UTC, and one without as the box's own time, which it prints.
+       time is UTC, written yyyy-MM-ddTHH:mm. Each line whose minute is in
+       the window in either clock, UTC or the box's, is printed as written
+       and marked with the clock it matched, with each log's first and last
+       lines as written, because the log does not say which clock it uses;
+    6. with -TraceSeconds, Windows's own trace of every open of the folder
+       itself for that long (Start-ThornswoodOpenTrace in StopAndMove.ps1,
+       which the installer reads when a move is refused), with one open of
+       its own as a marker, so the trace is proved to read back on the box.
 
-  Reads only: it opens the folder to ask who holds it, copies each handle it
+  Reads only: it opens the folder to ask who holds it, records a trace
+  session for -TraceSeconds and removes its file, copies each handle it
   looks at into itself to read its path and closes the copy, and reads
   Defender's settings and log. It stops nothing, changes nothing and sends
   nothing anywhere. Windows PowerShell 5.1 and pwsh, on the box as SYSTEM
@@ -61,7 +68,13 @@ param(
     [string]$DefenderFrom = '',
     # How many minutes of it, from -DefenderFrom.
     [ValidateRange(1, 60)]
-    [int]$DefenderMinutes = 3
+    [int]$DefenderMinutes = 3,
+    # Records Windows's open trace (StopAndMove.ps1) for this many seconds
+    # and says every open of the folder itself in that time, its own marker
+    # open among them, which proves the trace the installer reads when a move
+    # is refused reads back on this box.
+    [ValidateRange(0, 60)]
+    [int]$TraceSeconds = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -185,11 +198,25 @@ try {
 } catch { Bad ('Defender''s settings: ' + $_.Exception.Message) }
 
 # ---- 5. Defender's own log for a window --------------------------------------
+# Matched by the text each line starts with, in both clocks, because which
+# clock a line's time is in is what the first run could not tell: read as
+# box time, the newest log's last line was hours ahead of the box's clock,
+# and nothing fell in the window (1 Nov 2026). So each line in the window is
+# printed as it is, marked with the clock its minute matched, with the first
+# and last lines of each log as they are, for the reader to judge.
 if ($from) {
     $to = $from.AddMinutes($DefenderMinutes)
     $offset = [TimeZoneInfo]::Local.GetUtcOffset($from)
+    $zone = 'UTC' + $(if ($offset -lt [TimeSpan]::Zero) { '-' } else { '+' }) + $offset.Duration().ToString('hh\:mm')
+    $asUtc = @{}
+    $asBox = @{}
+    for ($i = 0; $i -lt $DefenderMinutes; $i++) {
+        $asUtc[$from.AddMinutes($i).ToString('yyyy-MM-ddTHH:mm', [Globalization.CultureInfo]::InvariantCulture)] = $true
+        $asBox[[TimeZoneInfo]::ConvertTimeFromUtc($from.AddMinutes($i), [TimeZoneInfo]::Local).ToString('yyyy-MM-ddTHH:mm', [Globalization.CultureInfo]::InvariantCulture)] = $true
+    }
     Say ''
-    Say ('5. Defender''s log (MPLog) from {0} to {1} UTC; a line without a Z is read as box time, UTC{2}{3}:' -f $from.ToString('yyyy-MM-dd HH:mm'), $to.ToString('HH:mm'), $(if ($offset -lt [TimeSpan]::Zero) { '-' } else { '+' }), $offset.Duration().ToString('hh\:mm'))
+    Say ('5. Defender''s log (MPLog), {0} to {1} UTC ({2} to {3} box time, {4}), lines as written:' -f $from.ToString('yyyy-MM-dd HH:mm'), $to.ToString('HH:mm'),
+        [TimeZoneInfo]::ConvertTimeFromUtc($from, [TimeZoneInfo]::Local).ToString('yyyy-MM-dd HH:mm'), [TimeZoneInfo]::ConvertTimeFromUtc($to, [TimeZoneInfo]::Local).ToString('HH:mm'), $zone)
     $dir = Join-Path $env:ProgramData 'Microsoft\Windows Defender\Support'
     $logs = @(Get-ChildItem -LiteralPath $dir -Filter 'MPLog-*.log' -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime)
     if (-not $logs.Count) { Bad ('no MPLog-*.log in ' + $dir) }
@@ -197,8 +224,8 @@ if ($from) {
     $other = @()
     $leaf = Split-Path -Leaf $Root
     foreach ($f in $logs) {
-        $first = $null
-        $last = $null
+        $first = ''
+        $tail = New-Object 'System.Collections.Generic.Queue[string]'
         try {
             $fs = New-Object IO.FileStream($f.FullName, [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
             # UTF-16 when it starts with that byte order mark, else UTF-8.
@@ -207,17 +234,20 @@ if ($from) {
             $rd = New-Object IO.StreamReader($fs, $enc, $true)
             try {
                 while ($null -ne ($line = $rd.ReadLine())) {
-                    $m = [regex]::Match($line, '^\s*(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(\.\d+)?(Z)?')
+                    $m = [regex]::Match($line, '^\s*(\d{4}-\d\d-\d\dT\d\d:\d\d)')
                     if (-not $m.Success) { continue }
-                    $t = [DateTime]::ParseExact($m.Groups[1].Value, 'yyyy-MM-ddTHH:mm:ss', [Globalization.CultureInfo]::InvariantCulture)
-                    $utc = if ($m.Groups[3].Success) { [DateTime]::SpecifyKind($t, 'Utc') } else { [DateTime]::SpecifyKind($t, 'Local').ToUniversalTime() }
-                    if (-not $first) { $first = $utc }
-                    $last = $utc
-                    if ($utc -lt $from -or $utc -ge $to) { continue }
-                    if ($line.IndexOf($leaf, [StringComparison]::OrdinalIgnoreCase) -ge 0) { $naming += ($f.Name + ': ' + $line.Trim()) } else { $other += ($f.Name + ': ' + $line.Trim()) }
+                    if (-not $first) { $first = $line.Trim() }
+                    $tail.Enqueue($line.Trim()); if ($tail.Count -gt 2) { [void]$tail.Dequeue() }
+                    $k = $m.Groups[1].Value
+                    $clock = if ($asUtc.ContainsKey($k)) { 'UTC' } elseif ($asBox.ContainsKey($k)) { 'box time' } else { '' }
+                    if (-not $clock) { continue }
+                    $entry = $f.Name + ' [its minute is the window''s as ' + $clock + ']: ' + $line.Trim()
+                    if ($line.IndexOf($leaf, [StringComparison]::OrdinalIgnoreCase) -ge 0) { $naming += $entry } else { $other += $entry }
                 }
             } finally { $rd.Dispose(); $fs.Dispose() }
-            Say ('  {0}: {1} bytes, its lines from {2} to {3} UTC' -f $f.Name, $f.Length, $(if ($first) { $first.ToString('yyyy-MM-dd HH:mm:ss') } else { '?' }), $(if ($last) { $last.ToString('yyyy-MM-dd HH:mm:ss') } else { '?' }))
+            Say ('  {0}: {1} bytes ({2})' -f $f.Name, $f.Length, $enc.WebName)
+            Say ('    first line: ' + $(if ($first) { $first } else { '(none with a time)' }))
+            foreach ($l in $tail) { Say ('    near the end: ' + $l) }
         } catch { Bad ($f.Name + ': ' + $_.Exception.Message) }
     }
     Say ('  lines in the window naming ' + $leaf + ': ' + $naming.Count)
@@ -226,6 +256,24 @@ if ($from) {
     Say ('  other lines in the window: ' + $other.Count)
     foreach ($l in @($other | Select-Object -First 150)) { Say ('    ' + $l) }
     if ($other.Count -gt 150) { Say ('    and ' + ($other.Count - 150) + ' more') }
+}
+
+# ---- 6. Windows's open trace, for -TraceSeconds -----------------------------
+if ($TraceSeconds) {
+    Say ''
+    Say ('6. Windows''s open trace of ' + $Root + ' for ' + $TraceSeconds + ' second(s), with one open of it by this process (pid ' + $PID + ') as a marker:')
+    $trace = Start-ThornswoodOpenTrace ('thornswood-holders-' + $PID)
+    if (-not $trace) { Bad ('the trace: ' + $ThornswoodTraceWhy) }
+    else {
+        try {
+            Start-Sleep -Milliseconds 500
+            $null = [ThornswoodOpeners]::Of([IO.Path]::GetFullPath($Root))
+            Start-Sleep -Seconds $TraceSeconds
+        } finally { Stop-ThornswoodOpenTrace $trace }
+        $read = @(Read-ThornswoodOpenTrace $trace $Root)
+        foreach ($l in $read) { Say ('  ' + $l) }
+        if (-not @($read | Where-Object { $_ -match ('process ' + $PID + ' \S+ opened ') }).Count) { Bad 'the trace did not show this process''s own marker open, so it would not show a holder either' }
+    }
 }
 
 Say ''

@@ -70,6 +70,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here 'Find-MSBuild.ps1') -Load
 . (Join-Path $Here 'Assert-PublishSigned.ps1')
 . (Join-Path $Here 'Feed-Store.ps1')
+. (Join-Path $Here 'LauncherVersion.ps1')   # main's launcher number from git (#5179)
 # Each check below is a row, not a stop: what fails is said, and the rest are still asked.
 $ErrorActionPreference = 'Continue'
 $script:VpsAddress = Get-ThornswoodVpsAddress
@@ -295,10 +296,11 @@ function Get-LauncherRows([string]$Channel, [string]$Root, [bool]$Named = $false
 # signature, and puts it there before anything is published, so that passes
 # too; a feed that names no whole launcher (no launcherUrl or no 64 digit
 # launcherSha256) is what still warns, because that Ship stops. Which of the two
-# a Ship does: a launcher on main's feed under another number than
-# launcher\app\Updater.cs is never kept, because Updater.cs is one of the
-# files the launcher is built from, and one under the same number may be.
-# $Current is Updater.cs's number, $Feed main's feed as the site serves it
+# a Ship does: a launcher on main's feed under another number than main's
+# for these sources is never kept, because that number moves whenever one of
+# the files the launcher is built from does (LauncherVersion.ps1), and one
+# under the same number may be.
+# $Current is main's number for these sources, $Feed main's feed as the site serves it
 # ($null when it could not be read) and $Exe <root>\Launcher\Thornswood.exe.
 function Get-PackageLauncherRows([string]$Current, $Feed, [string]$Exe) {
   $what = 'a launcher for -Package to put in the installer'
@@ -619,15 +621,12 @@ if (-not $Dev) {
                      (Join-Path $RepoDir 'records\server-build.json') `
                      @((& $where ServerDist), (& $where Payload)))) { Show-Row $r }
   # Main's feed as the site serves it, as Ship reads it (Get-PublishedLauncher),
-  # and the number this checkout's launcher carries, as Publish-Update reads it.
+  # and main's number for this checkout's launcher, as Ship works it out from
+  # git (LauncherVersion.ps1, #5179); '' when git cannot say.
   $mainFeed = $null
   try { $mainFeed = Read-SiteFeed 'main' } catch { $mainFeed = $null }
   $current = ''
-  $updaterCs = Join-Path $RepoDir 'launcher\app\Updater.cs'
-  if (Test-Path -LiteralPath $updaterCs) {
-    $vm = [regex]::Match([IO.File]::ReadAllText($updaterCs), 'Version\s*=\s*"([^"]+)"')
-    if ($vm.Success) { $current = $vm.Groups[1].Value }
-  }
+  try { $current = Get-LauncherVersion -RepoDir $RepoDir } catch { $current = '' }
   foreach ($r in @(Get-PackageLauncherRows $current $mainFeed $(if ($Root) { Join-Path $Root 'Launcher\Thornswood.exe' } else { '' }))) { Show-Row $r }
 }
 

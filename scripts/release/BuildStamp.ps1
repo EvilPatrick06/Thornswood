@@ -12,7 +12,8 @@
         "commit":                the repo's short commit when it was stamped,
         "gamemodeMatchesCommit": false when gamemode.js had edits not in it,
         "gamemodeSha256":        the gamemode.js this describes,
-        "launcherVersion":       launcher\app\Updater.cs, the number Ship reads,
+        "launcherVersion":       main's launcher number for this checkout's
+                                 sources (LauncherVersion.ps1), '' without history,
         "feedVersion":           what that channel's version.json offers,
         "stampedUtc":            when the stamp was made
       }
@@ -38,8 +39,9 @@
   tell, which is not the same as true.
 
   TWO VERSIONS, because a dev build carries a number no source file does.
-  Ship puts 1.1.92.2 into Updater.cs for the build and then puts 1.1.92 back,
-  so the four part number exists only in the dev feed's version.json. The
+  Ship puts a dev number (2026.1101.1745.2) into Updater.cs for the build
+  and then puts git's 0.0.0 back, so the four part number exists only in the
+  dev feed's version.json. The
   feeds are this machine's working copies of what Ship.ps1 publishes,
   %LOCALAPPDATA%\Thornswood\feed\main and ...\feed\dev (Feed-Store.ps1,
   #907), the same from every checkout and worktree; until #907 they were the
@@ -96,12 +98,12 @@ function New-ThornswoodBuildStamp {
     }
   }
 
+  # Main's launcher number for this checkout's sources, worked out from git
+  # (LauncherVersion.ps1, #5179): Updater.cs holds 0.0.0 in git. '' when git
+  # cannot say, such as a shallow checkout.
   $launcher = ''
-  $updater = Join-Path $RepoDir 'launcher\app\Updater.cs'
-  if (Test-Path -LiteralPath $updater) {
-    $m = [regex]::Match([IO.File]::ReadAllText($updater), 'Version\s*=\s*"([^"]+)"')
-    if ($m.Success) { $launcher = $m.Groups[1].Value }
-  }
+  . (Join-Path $PSScriptRoot 'LauncherVersion.ps1')
+  try { $launcher = Get-LauncherVersion -RepoDir $RepoDir } catch { $launcher = '' }
 
   if (-not $FeedDir) {
     # This machine's working copy of the channel's feed (Feed-Store.ps1), the

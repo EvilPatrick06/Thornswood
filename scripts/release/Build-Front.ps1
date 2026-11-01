@@ -77,9 +77,11 @@ function Invoke-Native([string]$What, [scriptblock]$Run) {
     return $said
 }
 
-$pinned = ((& git -C $repo ls-tree HEAD engine/skymp 2>$null) -split '\s+')[2]
+# The pin in the index, which is what a commit takes: HEAD's on a clean
+# checkout, and the moved pin while Update-EnginePin.ps1 makes a pin (#5207).
+$pinned = ((& git -C $repo ls-files -s engine/skymp 2>$null) -split '\s+')[1]
 if (-not $Commit) {
-    if (-not $pinned) { throw 'this checkout pins no engine\skymp commit (git ls-tree HEAD engine/skymp), so there is no front to build. Nothing was written.' }
+    if (-not $pinned) { throw 'this checkout pins no engine\skymp commit (git ls-files -s engine/skymp), so there is no front to build. Nothing was written.' }
     $Commit = $pinned
 }
 if (-not (Test-ThornswoodForkClone $Fork)) {

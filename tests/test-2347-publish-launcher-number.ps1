@@ -102,7 +102,7 @@ function Feed([string]$v, [string]$sha, [string]$inputs) {
     return ([pscustomobject]$o)
 }
 $why = Get-LauncherNumberRefusal (Feed '1.2.3' $X $M) '1.2.3' $Y $D 'main' 'Nothing was sent.'
-Yes ('main: another launcher under the 1.2.3 main offers is refused: ' + $why) ($why -like '1.2.3 is already out on the main feed as a launcher built from other sources than these*nobody on 1.2.3 would ever be offered this one. Nothing was sent.*Bump-Version.ps1*')
+Yes ('main: another launcher under the 1.2.3 main offers is refused: ' + $why) ($why -like '1.2.3 is already out on the main feed as a launcher built from other sources than these*nobody on 1.2.3 would ever be offered this one. Nothing was sent.*LauncherVersion.ps1*history was rewritten*')
 $why = Get-LauncherNumberRefusal (Feed '1.2.3' $X $M) '1.2.3' $Y $D 'dev' 'Nothing was sent.'
 Yes ('dev: the same, with the dev way out: ' + $why) ($why -like '*on the dev feed*Ship without -Version so it takes the next dev number.')
 Yes 'the same sources signed again go on (a new signature, the same launcher)' (-not (Get-LauncherNumberRefusal (Feed '1.2.3' $X $M) '1.2.3' $Y $M 'main' 'x'))

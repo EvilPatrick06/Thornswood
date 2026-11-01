@@ -67,7 +67,7 @@ if (Test-Path -LiteralPath $folder) { $left = @(Get-ChildItem -LiteralPath $fold
 Yes ('there is no ' + $T + ' folder in this checkout' + $(if ($left.Count) { ' (it still holds ' + ($left -join ', ') + ': move them to their homes, see the header)' } else { '' })) (
     -not (Test-Path -LiteralPath $folder))
 
-$stubs = @('Build-Launcher', 'Bump-Version', 'Deploy-DevGamemode', 'Deploy-Docs', 'Deploy-Gamemode',
+$stubs = @('Build-Launcher', 'Deploy-DevGamemode', 'Deploy-Docs', 'Deploy-Gamemode',
            'Deploy-Server', 'Go', 'Install-Bot', 'Install-Runner', 'Install-Voice', 'Ship', 'Vps')
 $areas = @('release', 'deploy', 'vps', 'ops', 'mods', 'dev')
 foreach ($s in $stubs) {
