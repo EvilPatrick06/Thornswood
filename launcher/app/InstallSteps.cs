@@ -312,7 +312,7 @@ namespace Thornswood
             double freeGB = FreeGB(Root);
             Say("  Installing to " + Root);
             Say("  " + Gb1(freeGB) + " GB free on " + dl);
-            if (freeGB < needGB) throw Die("You need about " + needGB + " GB free on " + dl + ". Pick a different drive in this window and press Install again.");
+            if (freeGB < needGB) throw Die("You need about " + needGB + " GB free on " + dl + ". Close this, open Thornswood again and pick a different drive.");
             if (!ownFirst && !madeOwn)
             {
                 // The files land on whichever drive Steam keeps Skyrim on,

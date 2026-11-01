@@ -1,10 +1,10 @@
 <#
   Build-Launcher.ps1
-  Compiles the launcher into a real Thornswood.exe, and the setup program into
-  out\setup-stub.exe.
+  Compiles the launcher into a real Thornswood.exe. The install is inside it
+  (launcher\app\Install*.cs, #4824): there is no setup program of its own to
+  build any more, and Velopack's Setup.exe is made where the launcher is packed.
 
-  It runs MSBuild on the two project files, launcher\app\Thornswood.csproj and
-  installer\setup\Setup.csproj, with the MSBuild of Visual Studio 2022 or its
+  It runs MSBuild on launcher\app\Thornswood.csproj, with the MSBuild of Visual Studio 2022 or its
   free Build Tools (Find-MSBuild.ps1 says whether this machine has it;
   Developer-Guide.md "Setting up a machine" has the one install line). Your
   friends never compile anything - they get the finished exe in the bundle.
@@ -32,7 +32,7 @@
   Pass -Root 'C:\Thornswood' if you genuinely mean the one you play on.
 
   IT BUILDS AND DOES NOTHING ELSE. It writes Thornswood.exe into -OutDir, which
-  is <Root>\Launcher unless told otherwise, and the setup stub into out\. It
+  is <Root>\Launcher unless told otherwise. It
   closes no game and no launcher, and it does not touch the Desktop, the icon
   cache or Explorer. Those are Install-Launcher.ps1, which Ship.ps1 runs after
   a build that worked. Until 24 September this script did both, so every
@@ -50,10 +50,6 @@ param(
     # launcher that is still running from the install.
     [string]$OutDir,
     [switch]$NoPause,
-    # Where the setup program goes, out\setup-stub.exe unless told otherwise.
-    # tests\test-498-msbuild.ps1 builds into scratch so a test build never
-    # replaces the stub a clone's packaging copies from.
-    [string]$StubOut,
     # Leaves the launcher unsigned even on a machine with records\signing\signing.json.
     # For a test build that never ships, so it spends no signing; Ship never
     # passes it, and Ship and Publish-Installer refuse an unsigned exe.
@@ -94,10 +90,7 @@ if (-not $found.MSBuild) { Die 'MSBuild was not found on this machine. The launc
 if (-not $found.RefAssemblies) { Die 'The .NET Framework 4.8.1 reference assemblies are not on this machine. They are the Build Tools component Microsoft.Net.Component.4.8.1.TargetingPack; Developer-Guide.md "Setting up a machine" has the install line.' }
 Say "  $($found.MSBuild)" 'DarkGray'
 $proj = Join-Path $Src 'Thornswood.csproj'
-$stubProj = Join-Path $Here '..\..\installer\setup\Setup.csproj'
-foreach ($p in @($proj, $stubProj)) {
-    if (-not (Test-Path -LiteralPath $p)) { Die "$([IO.Path]::GetFileName($p)) is not at $p. It is in the repository, so the path is wrong; nothing was built." }
-}
+if (-not (Test-Path -LiteralPath $proj)) { Die "Thornswood.csproj is not at $proj. It is in the repository, so the path is wrong; nothing was built." }
 
 # ------------------------------------------- the records compiled into it
 # RecordShape.ps1 (#2180): the records compiled into the launcher must be
@@ -185,43 +178,6 @@ try {
     } else {
         Say '  Thornswood.pdb did not appear beside the exe' 'Yellow'
     }
-
-    # ------------------------------------------------------------ setup stub
-    Head 'Setup stub'
-    # Built under the name it ships as (the project's AssemblyName is
-    # Thornswood-Setup, because Windows reads OriginalFilename and InternalName
-    # from the name it was built as), into a scratch folder, then moved onto
-    # out\setup-stub.exe, which packaging copies from. Deleting the old one up
-    # front meant a failed build left no installer at all, and the only sign of
-    # it was a red STOP an hour before anyone noticed the package had no exe in
-    # it, so a failed build leaves the last working copy. out\ is the build
-    # output, the folder Where.ps1 calls Out, ignored by git.
-    $stub = Join-Path (Join-Path $Here '..\..\out') 'setup-stub.exe'
-    if ($StubOut) { $stub = $StubOut }
-    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $stub) | Out-Null
-    $stubBuild = Join-Path ([IO.Path]::GetTempPath()) 'ThornswoodSetupBuild'
-    if (Test-Path -LiteralPath $stubBuild) { Remove-Item -LiteralPath $stubBuild -Recurse -Force }
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    & $found.MSBuild (Resolve-Path -LiteralPath $stubProj).Path @msbArgs ('-p:OutDir=' + $stubBuild + '\')
-    $rc2 = $LASTEXITCODE
-    $ErrorActionPreference = $old
-    $stubNew = Join-Path $stubBuild 'Thornswood-Setup.exe'
-    if ($rc2 -ne 0 -or -not (Test-Path -LiteralPath $stubNew)) {
-        Write-Host ''
-        Say "  MSBuild exited with $rc2. The installer program did NOT build." 'Red'
-        if (Test-Path $stub) {
-            Die 'setup-stub.exe did not rebuild. The last working copy is still here, but a release must not ship on a failed stub build. Fix the compile error above and run Build-Launcher again.'
-        } else {
-            Die 'There is no setup-stub.exe at all. A package built now would have no installer in it. Fix the compile error above and run Build-Launcher again.'
-        }
-    }
-    if (Test-Path $stub) { Remove-Item $stub -Force }
-    Move-Item -LiteralPath $stubNew -Destination $stub
-    Say ("  setup-stub.exe  {0:n0} KB" -f ((Get-Item $stub).Length / 1KB)) 'Green'
-    $stubPdb = [IO.Path]::ChangeExtension($stub, '.pdb')
-    if (Test-Path -LiteralPath $stubPdb) { Remove-Item -LiteralPath $stubPdb -Force }
-    Move-Item -LiteralPath ([IO.Path]::ChangeExtension($stubNew, '.pdb')) -Destination $stubPdb
-    Remove-Item -LiteralPath $stubBuild -Recurse -Force
 }
 finally {
     # The bytes git holds, exactly, so nothing shows as changed.
@@ -230,20 +186,11 @@ finally {
 
 # ------------------------------------------------------------ signing
 #
-# Sign the launcher here. Do NOT sign setup-stub.exe.
-#
-# Package-Thornswood.ps1 -OneFile copies the stub, appends the payload and a
-# trailer, then signs Thornswood-Setup.exe. Authenticode cannot survive that
-# append: a pre-signed stub makes the combined file un-signable (signtool
-# 0x800700C1). Measured 27 September on Main Package. The stub stays unsigned
-# on disk; Package signs the final Setup after attach, and the two-file path
-# signs the copied Setup the same way. A stranger still gets a signed installer
-# from the site; this machine's out\setup-stub.exe is only a build input.
+# Sign the launcher here.
 #
 # This does nothing at all unless records\signing\signing.json exists, so Djinn's machine
 # and the pull request build carry on exactly as before. See the header of
-# Sign-Artifact.ps1 for what that file holds, and Bootstrap.cs:112-121 for why
-# any of this matters.
+# Sign-Artifact.ps1 for what that file holds.
 $signer = Join-Path $Here 'Sign-Artifact.ps1'
 if ($NoSign) {
     Say '  not signing: -NoSign, a test build that never ships' 'DarkGray'
