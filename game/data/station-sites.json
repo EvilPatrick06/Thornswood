@@ -650,6 +650,31 @@
     -236.0
    ]
   },
+  "study": {
+   "amongPlants": false,
+   "base": "18032:Thornswood-Content.esp",
+   "bounds": [
+    -44,
+    -49,
+    0,
+    44,
+    12,
+    63
+   ],
+   "count": 4,
+   "edid": "ThornswoodActivatorStudyDesk",
+   "flat": 8.0,
+   "name": "study desk",
+   "reach": 900,
+   "rule": "One in each of the four halls of the College of Winterhold, the Hall of the Elements, the Hall of Countenance, the Hall of Attainment and the Arcanaeum, beside the tables, or in the Hall of the Elements the benches, that the site names in that hall: a semester at the College is taken at a study desk in the College halls, not a command (Patrick, 22 October 2026, A on #1387; magic.md).",
+   "setIntoRock": false,
+   "user": [
+    -35.0,
+    -110.0,
+    35.0,
+    -50.0
+   ]
+  },
   "well": {
    "amongPlants": false,
    "base": "18030:Thornswood-Content.esp",
@@ -2269,6 +2294,190 @@
    "turn": 315,
    "where": "Winterhold",
    "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "study-arcanaeum": {
+   "anchor": "77da3:Skyrim.esm",
+   "anchorAngle": 330.84,
+   "anchorAt": [
+    429.7,
+    248.3,
+    -1.0
+   ],
+   "anchorEdid": "NobleTableSquare01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 330.84,
+   "base": "18032:Thornswood-Content.esp",
+   "cell": "13810:Skyrim.esm",
+   "cellCopy": "won by Dawnguard.esm, Bethesda's own",
+   "cellEdid": "WinterholdCollegeArcanaeum",
+   "fromAnchor": 156,
+   "groundUnder": [
+    -0.0,
+    0.4
+   ],
+   "interior": true,
+   "kind": "study",
+   "nearest": {
+    "edid": "NobleChair01",
+    "ref": "77da4:Skyrim.esm",
+    "units": 41
+   },
+   "offset": [
+    156,
+    -4
+   ],
+   "passedOver": [],
+   "pos": [
+    567.9,
+    320.8,
+    -0.0
+   ],
+   "ref": "18150:Thornswood-Content.esp",
+   "space": "13810:Skyrim.esm",
+   "spaceEdid": "WinterholdCollegeArcanaeum",
+   "turn": 0,
+   "where": "the Arcanaeum, the College of Winterhold"
+  },
+  "study-attainment": {
+   "anchor": "83316:Skyrim.esm",
+   "anchorAngle": 339.95,
+   "anchorAt": [
+    -608.9,
+    -165.8,
+    0.5
+   ],
+   "anchorEdid": "NobleTableRound01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 339.95,
+   "base": "18032:Thornswood-Content.esp",
+   "cell": "cab91:Skyrim.esm",
+   "cellCopy": "won by Update.esm, Bethesda's own",
+   "cellEdid": "WinterholdCollegeHallofAttainment",
+   "fromAnchor": 118,
+   "groundUnder": [
+    0.0,
+    0.0
+   ],
+   "interior": true,
+   "kind": "study",
+   "nearest": {
+    "edid": "Barrel02Static",
+    "ref": "838c1:Skyrim.esm",
+    "units": 33
+   },
+   "offset": [
+    -20,
+    -116
+   ],
+   "passedOver": [],
+   "pos": [
+    -587.9,
+    -281.6,
+    0.0
+   ],
+   "ref": "18151:Thornswood-Content.esp",
+   "space": "cab91:Skyrim.esm",
+   "spaceEdid": "WinterholdCollegeHallofAttainment",
+   "turn": 0,
+   "where": "the Hall of Attainment, the College of Winterhold"
+  },
+  "study-countenance": {
+   "anchor": "8661e:Skyrim.esm",
+   "anchorAngle": 225.36,
+   "anchorAt": [
+    363.7,
+    -647.9,
+    -383.7
+   ],
+   "anchorEdid": "NobleTableSquare01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 90.36,
+   "base": "18032:Thornswood-Content.esp",
+   "cell": "1380f:Skyrim.esm",
+   "cellCopy": "won by Update.esm, Bethesda's own",
+   "cellEdid": "WinterholdCollegeHallofCountenance",
+   "fromAnchor": 138,
+   "groundUnder": [
+    -384.0,
+    -384.0
+   ],
+   "interior": true,
+   "kind": "study",
+   "nearest": {
+    "edid": "NobleWallShelf02",
+    "ref": "86622:Skyrim.esm",
+    "units": 39
+   },
+   "offset": [
+    60,
+    124
+   ],
+   "passedOver": [],
+   "pos": [
+    233.3,
+    -692.4,
+    -384.0
+   ],
+   "ref": "18152:Thornswood-Content.esp",
+   "space": "1380f:Skyrim.esm",
+   "spaceEdid": "WinterholdCollegeHallofCountenance",
+   "turn": 225,
+   "where": "the Hall of Countenance, the College of Winterhold"
+  },
+  "study-elements": {
+   "anchor": "10cea6:Skyrim.esm",
+   "anchorAngle": 322.76,
+   "anchorAt": [
+    680.8,
+    -3070.9,
+    0.0
+   ],
+   "anchorEdid": "NobleBench01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 322.76,
+   "base": "18032:Thornswood-Content.esp",
+   "cell": "1380e:Skyrim.esm",
+   "cellCopy": "won by Skyrim.esm, Bethesda's own",
+   "cellEdid": "WinterholdCollegeHallofTheElements",
+   "fromAnchor": 234,
+   "groundUnder": [
+    0.0,
+    0.0
+   ],
+   "interior": true,
+   "kind": "study",
+   "nearest": {
+    "edid": "NobleBench01",
+    "ref": "10cea6:Skyrim.esm",
+    "units": 31
+   },
+   "offset": [
+    188,
+    140
+   ],
+   "passedOver": [],
+   "pos": [
+    745.8,
+    -2845.7,
+    0.0
+   ],
+   "ref": "18153:Thornswood-Content.esp",
+   "space": "1380e:Skyrim.esm",
+   "spaceEdid": "WinterholdCollegeHallofTheElements",
+   "turn": 0,
+   "where": "the Hall of the Elements, the College of Winterhold"
   },
   "well-03": {
    "anchor": "10aaa6:Skyrim.esm",
