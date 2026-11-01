@@ -649,7 +649,7 @@ them in `records\front-build.json` with each text in
 is refused like a build with other bytes. The installer, and every update
 that carries this build.js, put those texts in the `licences` folder beside
 `SOURCE CODE.txt`, which lists them (Source-Notice.ps1,
-Package-Thornswood.ps1). `tests\test-third-party.js` holds this table to the
+Build-SetupFiles.ps1). `tests\test-third-party.js` holds this table to the
 record, row for row. React itself is 18.2.0; the 16.13.1 and 17.0.2 that
 this file named before are react-is.
 
@@ -1519,7 +1519,7 @@ help panel says under Getting help where the source is.
 `tests\test-421-source-offer-ui.js` holds both.
 
 The directions reach people in four places. The installer carries
-`SOURCE CODE.txt`, which Package-Thornswood.ps1 writes from the two build
+`SOURCE CODE.txt`, which Build-SetupFiles.ps1 writes from the two build
 records and the launcher's install (`launcher\app\InstallSteps.cs`) copies
 into the install folder (entry 170).
 The public credits page has them under "Source code", at

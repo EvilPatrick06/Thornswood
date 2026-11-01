@@ -377,7 +377,7 @@ through the gate instead, with `gh` signed in as somebody who may run workflows 
 `pwsh scripts/vps/Box-Run.ps1 -Line '<verb>'` ([E. VPS](#e-vps)). Ships go
 the same way (`Ship-Dev`, `Ship-Main`), so a machine without a key can still
 release; the scripts that ssh to the VPS themselves (`Ship`, `Deploy-*`,
-`Request-Restart`, `Install-Bot`, `Publish-Installer`, `Publish-News`) do not
+`Request-Restart`, `Install-Bot`, `Publish-News`) do not
 run from it, and Ship stops before it builds anything there: the feed and its
 baseline are received from the VPS (#907).
 
@@ -1586,10 +1586,11 @@ The short form of the rules. The same decisions, with the dates they were made, 
   (`records\signing\README.md`). `ExpectedSigner` in `launcher\app\Updater.cs`
   is set, so every launcher from dev 1.1.101.17 on refuses an update that is
   not signed by that certificate. **Only a machine that signs may Ship, dev
-  included.** `Ship.ps1` and `Publish-Installer.ps1` refuse (non-zero exit) when
-  `records\signing\signing.json` is missing or disabled, or when the launcher / Setup tip
-  is not Authenticode Valid under `ExpectedSigner`. Local `Build-Launcher` /
-  `Package -NoPublish` may still print "not signing" and leave an unsigned
+  included.** `Ship.ps1` refuses (non-zero exit) when
+  `records\signing\signing.json` is missing or disabled, or when the launcher
+  is not Authenticode Valid under `ExpectedSigner`; the release workflow signs
+  the launcher, which is also the setup program since #4824, on GitHub. A local
+  `Build-Launcher` may still print "not signing" and leave an unsigned
   intermediate; that soft skip must not reach the site or the feed. The live main launcher,
   1.1.101, predates signing; the next main Ship is the first signed one.
 - Every pull request gets the build check, `.github/workflows/build-pr.yml`,
@@ -1604,11 +1605,14 @@ The short form of the rules. The same decisions, with the dates they were made, 
   issue #752), the names that must stay out, that the engine is one commit and
   the high-risk records, runs the voice service's health harness, checks our
   plugins are clean, that the Python names only what exists (ruff, issue
-  #1343) and the count of silent catches (#5292). The job "Launcher builds",
-  on a Windows runner, checks the launcher window and its UI thread, builds
-  the launcher with MSBuild from its project files, held to its sources
-  (`tests\test-498-msbuild.ps1`, issue #498), and compares the writing check
-  under Windows PowerShell 5.1. A pull request that changes only files under
+  #1343), the count of silent catches (#5292) and that the launcher touches
+  its window only from the UI thread (`scripts\dev\Check-UiThread.py`). The
+  job "Launcher builds", on a Windows runner, publishes the native launcher
+  the way every build does (`scripts\release\Build-Launcher.ps1`, red on a
+  compile error or a trim or native code warning, issue #4823), checks the
+  programs it made for secrets, builds the ship root tool, and compares the
+  writing check under Windows PowerShell 5.1. The window is compiled markup,
+  so a renamed control is a compile error there. A pull request that changes only files under
   `docs`, `site` or `bot` skips it, because nothing it checks reads those
   folders (`scripts\dev\Launcher-Reach.ps1`, #5292). Beside them, the job
   "gate" runs
@@ -1730,8 +1734,7 @@ this is the long form.
   nothing writes `Profile\developer.flag`, which used to let the machine that
   ships keep newer game files instead.
 - **What never leaves a machine** in a pack or an installer is one list,
-  `scripts\release\Ship-Rules.ps1`, read by `Publish-Update.ps1` and
-  `Package-Thornswood.ps1` both: runtime folders, one machine's own files,
+  `scripts\release\Ship-Rules.ps1`, read by `Publish-Update.ps1`: runtime folders, one machine's own files,
   other servers' files, and the SkyMP client's saved sign in
   (`Data\Platform\PluginsNoLoad`). The installer of 16 Sep carried that
   sign in file before the list was shared; the launcher removes that exact
@@ -1915,7 +1918,7 @@ gh workflow run promote-main.yml --ref main -f tag=build-<yyyyMMdd>.<run>
 
 ### A hotfix
 
-A hotfix is the one live release that does not come off `main`. The branch starts from the tag of the release that is live, carries only the fix, and is pushed. Ship runs from a checkout of that branch. When the installer has to be rebuilt for it, `Package-Thornswood.ps1 -OneFile` runs from the same checkout: it and `Publish-Installer.ps1` accept a clean `hotfix/` branch that matches GitHub by the same rule Ship uses (#2436), with no `-AllowStaleCheckout`. The dev feed stays as it is. The fix also goes to `main` through its own pull request, or the next main release loses it. The long form is in [How a release goes out](#how-a-release-goes-out).
+A hotfix is the one live release that does not come off `main`. The branch starts from the tag of the release that is live, carries only the fix, and is pushed. Ship runs from a checkout of that branch, and accepts a clean `hotfix/` branch that matches GitHub (#2436), with no `-AllowStaleCheckout`. The setup program is the launcher itself since #4824, so there is no separate installer to rebuild. The dev feed stays as it is. The fix also goes to `main` through its own pull request, or the next main release loses it. The long form is in [How a release goes out](#how-a-release-goes-out).
 
 ### How a release goes out
 
@@ -1990,7 +1993,7 @@ the channel it shipped, and then the release is announced as it always was:
 
 VirusTotal is no longer part of publish (#802). Code signing covers trust
 (#390). `Publish-VirusTotal.ps1` and `Add-VirusTotalComment.ps1` stay as
-optional manual tools; `Publish-Installer.ps1` and Ship do not call them.
+optional manual tools; Ship and the release workflow do not call them.
 
 There is no third step for the launcher. A launcher updates itself from the feed
 it polls, so the remirror is how a launcher update reaches anybody, and the
@@ -2119,7 +2122,7 @@ folder went:
 
 | File | Where | What it is | Read by |
 | --- | --- | --- | --- |
-| `signing.json` | `records\signing` | Whether this machine signs, and with what. No key in it | Sign-Artifact, Ship, Publish-Installer, Setup-ShipMachine |
+| `signing.json` | `records\signing` | Whether this machine signs, and with what. No key in it | Sign-Artifact, Ship, Setup-ShipMachine |
 | `thornswood-front.zip` | `local` | The front build, made outside the repository | Go |
 | `mod-audit.json` | `local` | What Audit-Mods found last time | Audit-Mods |
 | `backups` | `local` | The backups brought off the VPS, since 5 Oct (`Downloads\Thornswood-Backups` before). Secrets are inside them | Fetch-Backups, Backup-Server, Clean-Everything |
@@ -2180,9 +2183,8 @@ checkout with no `engine\skymp` (a fresh Ship worktree) can still Ship, and
 launcher's Client row on the Play page compares all six with the same record
 (`ClientRuntime`), and `ClientRuntime.Heal` puts back any that is missing or
 not the recorded build.
-`Ship-Rules.ps1` counts one of them as ours, for a pack or the installer, only
-when its sha256 is the recorded one, and `Package-Thornswood.ps1` stops rather
-than build an installer around any other.
+`Ship-Rules.ps1` counts one of them as ours, for a pack, only when its sha256
+is the recorded one.
 
 **Links, not copies.** Big files (archives, textures, meshes, plugins) are hard
 links to Vortex's copies, so a collection is not on the disk twice; this needs
@@ -2226,10 +2228,9 @@ cannot be, the command goes on the clipboard and the log says where to paste.
 
 **Records.** `Profile\OwnGame\files.txt` lists each file brought in, whether it
 was linked or copied and whether Vortex deployed it. Ship-Rules.ps1 reads that
-list (`Get-ShipOwnGameCollection`) so Publish-Update and Package-Thornswood keep
-the collection out of packs and the installer, exactly as they read
-`vortex.deployment.json` when the game is the Steam copy, and both refuse to go
-on if the list is empty. `Profile\OwnGame\plugins.txt` and `loadorder.txt` are
+list (`Get-ShipOwnGameCollection`) so Publish-Update keeps the collection out
+of packs, exactly as it reads `vortex.deployment.json` when the game is the
+Steam copy, and refuses to go on if the list is empty. `Profile\OwnGame\plugins.txt` and `loadorder.txt` are
 the Vortex profile's lists as of the folder's last update, and are the
 reference load order a release carries (`Get-ShipLoadOrderDir`). Ship checks
 the client in `<Root>\Game` against `records\client-build.json`.
@@ -2991,7 +2992,7 @@ says **not enforced** where nothing checks it.
 | VirusTotal API key | the environment variable `VT_API_KEY` on the machine that runs the optional manual upload, and nowhere in this repository: `Publish-VirusTotal.ps1` reads it from there only, so it has no file to be committed in and no parameter to be typed on a command line | Reading and uploading under our VirusTotal account when somebody runs the manual tool. Publish, Package, and Ship do not call it (#802). | Whoever owns the VirusTotal account, in the account's own API key page, then sets the variable on that machine. A machine without it skips a manual run; publish does not need the key. |
 | Nexus Mods API key | `%LOCALAPPDATA%\Thornswood\Nexus\api-key.txt` on One, written by `.\scripts\release\Set-NexusKey.ps1` at a prompt, and the secret `NEXUS_API_KEY` of the GitHub environment `desk` (main only), put there by `Set-NexusKey.ps1 -ToEnvironment desk` and read only by `nexus-run.yml`; a cloud session holds no copy and runs the scripts through `scripts\release\Nexus-Run.ps1` (#2841); nowhere in this repository. `scripts\release\Nexus.ps1` reads it from the file, or from the variable `THORNSWOOD_NEXUS_API_KEY` that nexus-run.yml sets from the secret, and sends it only in the `apikey` header to api.nexusmods.com, never to the upload addresses Nexus hands back (#2914) | Everything Patrick's Nexus account may do through the API: new file versions and description edits on Thornswood Content (192001) and the Thornswood Client Runtime (192762) (`Send-NexusFile.ps1`, `Set-NexusDescription.ps1`), and new and published revisions of the collection `7essxf` (`New-NexusRevision.ps1`). `Set-NexusKey.ps1 -Check` says where the key was found and whether its account owns both mods, without showing it. | Patrick, at https://www.nexusmods.com/settings/api-keys, then `Set-NexusKey.ps1` on One and `Set-NexusKey.ps1 -ToEnvironment desk` there. |
 | Engine pin robot's App key | The secret `PIN_APP_KEY` of the GitHub environment `engine-pin` (main only), beside its client id in the variable `PIN_APP_CLIENT_ID`; the key is the private key of the Thornswood pin robot, a GitHub App of ThornswoodRP installed on Thornswood alone, and is kept nowhere else. Only `.github\workflows\engine-pin.yml` reads it, in the two jobs that push `engine-pin/next` and open its pull request, never in the job that runs the front's npm build (#5256) | Writing contents and pull requests on Thornswood: the pin branch and its pull request. Its push and pull request start the pull request checks like anybody's, which the run's own token does not | Patrick, in the App's settings on GitHub (General, Private keys): generate a new key, put it in `engine-pin` with `gh secret set PIN_APP_KEY --env engine-pin`, then delete the old key there |
-| Code signing | `records\signing\signing.json` on a machine that signs, written from `records\signing\signing.template.json` by `Setup-ShipMachine.ps1`. It names the setup and holds no key: the credential is the `az login` on that machine, as the person who ships from it, with an account of their own that holds the Certificate Profile Signer role on the Artifact Signing profile ([Your own signing sign in](#your-own-signing-sign-in)), or a certificate in that machine's own store | Whether Windows treats the launcher and the installer as ours rather than as an unknown download. | Patrick, in Azure: the signing account and the tenant are his. He makes each person's account, gives it the role, and takes the role away when they stop shipping. Without the file `Sign-Artifact.ps1` signs nothing and a local build carries on unsigned. Ship and Publish-Installer refuse that soft skip before anything reaches the site or the feed. |
+| Code signing | `records\signing\signing.json` on a machine that signs, written from `records\signing\signing.template.json` by `Setup-ShipMachine.ps1`. It names the setup and holds no key: the credential is the `az login` on that machine, as the person who ships from it, with an account of their own that holds the Certificate Profile Signer role on the Artifact Signing profile ([Your own signing sign in](#your-own-signing-sign-in)), or a certificate in that machine's own store | Whether Windows treats the launcher and the installer as ours rather than as an unknown download. | Patrick, in Azure: the signing account and the tenant are his. He makes each person's account, gives it the role, and takes the role away when they stop shipping. Without the file `Sign-Artifact.ps1` signs nothing and a local build carries on unsigned. Ship refuses that soft skip before anything reaches the site or the feed. |
 | The domain, thornswood.net | Registered at Cloudflare, in Patrick's own Cloudflare login, which he signs in to with GitHub (`docs\OWNERSHIP.md` in the private ops repo). Nothing about it is kept on a machine or in this repository | The address everybody reaches the site, the feed and the launcher downloads at. Whoever holds the login can point it anywhere or let it lapse. | Patrick, in that Cloudflare login: renewing, moving or changing the records. Nobody else holds it. |
 
 **The rule for this table.** A control that does not exist is listed as

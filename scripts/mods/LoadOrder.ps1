@@ -326,7 +326,7 @@ function Expand-CollectionJson($Archive) {
     if ($exe) {
         # 7-Zip writes to stderr on a warning, which is a terminating error in
         # the callers that run with ErrorActionPreference Stop, so it is
-        # relaxed around the call the same way Package-Thornswood does it.
+        # relaxed around the call.
         $was = $ErrorActionPreference
         $ErrorActionPreference = 'Continue'
         try { & $exe e -y ('-o' + $cache) $Archive.FullName 'collection.json' -r 2>&1 | Out-Null } catch { }

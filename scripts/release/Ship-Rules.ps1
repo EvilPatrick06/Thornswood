@@ -1,16 +1,16 @@
 <#
   Ship-Rules.ps1
 
-  The one list of what never leaves a machine inside a Thornswood pack or
-  installer. Publish-Update.ps1 (packs) and Package-Thornswood.ps1 (the
-  installer) both dot-source this file, so the two can never disagree about
+  The one list of what never leaves a machine inside a Thornswood pack.
+  Publish-Update.ps1 dot-sources it, and until #4824 the old installer's
+  builder did too, so the two could never disagree about
   which files are the build's and which are one machine's, another server's,
   or somebody's sign in.
 
   It had to become one file the night the installer turned out to carry
   Data\Platform\PluginsNoLoad\auth-data-no-load.js, the SkyMP client's saved
   sign in token from the machine it was built on. Publish-Update had grown a
-  careful list of what to leave out; Package-Thornswood had its own, shorter
+  careful list of what to leave out; the installer's builder had its own, shorter
   one, and the token file fell through the gap. Every rule lives here now.
 
       . (Join-Path $PSScriptRoot 'Ship-Rules.ps1')
@@ -231,15 +231,13 @@ if (Test-Path -LiteralPath $clientRecord) {
 
 # Whether the file at one of the six recorded paths is the recorded build, byte
 # for byte. $full is the file when the caller has it. Without it the file is
-# $rel under $GameDir: Publish-Update and Package-Thornswood both name the
-# folder they scan $GameDir, and dot-sourcing this puts these functions in their
-# scope, so their existing calls, which pass only the path, are answered by the
+# $rel under $GameDir: Publish-Update names the folder it scans $GameDir, and
+# dot-sourcing this puts these functions in its scope, so its existing calls, which pass only the path, are answered by the
 # bytes on disk. With no file and no $GameDir there is nothing to hash, and the
 # answer is no.
 #
-# Hashed with .NET rather than Get-FileHash, for the reason Package-Thornswood
-# gives over its own Get-Sha256: a script started with -NoProfile can find
-# itself without the module Get-FileHash lives in.
+# Hashed with .NET rather than Get-FileHash: a script started with -NoProfile
+# can find itself without the module Get-FileHash lives in.
 function Test-ShipClientRecorded([string]$rel, [string]$full = '') {
     if (-not $ShipClientHashes.ContainsKey($rel)) { return $false }
     if (-not $full) {
@@ -551,8 +549,8 @@ function Test-ShipOtherServer([string]$rel) {
     if ($ShipClientFiles.Contains($rel)) { return (-not (Test-ShipClientRecorded $rel)) }
     # NirnLab UI Platform. SkyrimPlatform will not start on its own browser
     # while this is in the game folder, and it is what brings CEFSubprocess.exe,
-    # the second program Windows Firewall asks about. Package-Thornswood has
-    # kept it out of the installer all along; nothing kept it out of a pack.
+    # the second program Windows Firewall asks about. The old installer kept it
+    # out all along; nothing kept it out of a pack until this.
     if ($rel -match '^Data\\NirnLabUIPlatform($|\\)') { return $true }
     if ((Split-Path $rel -Leaf) -ieq 'NirnLabUIPlugin.dll') { return $true }
     # Other launchers' parking folders inside our own game folder, Djinn, 25
@@ -631,8 +629,8 @@ function Test-ShipOtherServer([string]$rel) {
 # BETHESDA'S OWN FILES, AND OTHER PEOPLE'S FRAMEWORKS AND TOOLS.
 #
 # Never shipped, and never listed as removed. Until 24 September these were
-# two lists, one inside Publish-Update.ps1 and a longer one inside
-# Package-Thornswood.ps1, which is exactly what the header of this file says
+# two lists, one inside Publish-Update.ps1 and a longer one inside the old
+# installer's builder, which is exactly what the header of this file says
 # must not happen, and they had drifted.
 #
 # MEASURED 24 SEPTEMBER over all 30,697 files in C:\Thornswood\Game on the
@@ -1550,7 +1548,7 @@ $ShipHeldForCollection = @(
 )
 
 # The collection revision this release is built against: what the feed's
-# collectionRevision says. Publish-Update and Package-Thornswood set it
+# collectionRevision says. Publish-Update sets it
 # (Get-ShipCollectionRevision); 0 when it is not known, and then everything held
 # above still ships, so nothing leaves before the collection carries it.
 $ShipCollectionRevision = 0
@@ -1957,8 +1955,8 @@ function Get-ShipTravelsWith([string[]]$changed) {
 # it. It is empty today: ElysiumEstateSSE.esp was here from 27 to 29 September,
 # until the servers moved to the collection's ElysiumEstate.esp (#690).
 #
-# Go.ps1, Publish-Update and Package-Thornswood call Ensure-ShipRequiredData so
-# each file here lands at Data\<name> before the pack / installer scan. They are
+# Go.ps1 and Publish-Update call Ensure-ShipRequiredData so each file here
+# lands at Data\<name> before the pack scan. They are
 # not origin V in files.txt, so packs carry them. Take a file out of
 # game\required-data when the collection deploys that same Data\ path.
 function Get-ShipRequiredDataRoot([string]$RepoDir) {
@@ -2021,12 +2019,11 @@ function Ensure-ShipRequiredData([string]$GameDir, [string]$RepoDir) {
 
 # ------------------------------------------------------------ launcher symbols
 #
-# Issue #462. /debug:pdbonly makes Thornswood.pdb (and setup-stub.pdb) beside
-# the built exes. Those files carry absolute source paths from the build
-# machine and method names. They NEVER leave this machine inside a pack, the
-# installer, or a public release asset. Package-Thornswood.ps1 and
-# Publish-Update.ps1 already skip any *.pdb under the game folder; this names
-# the same rule for the launcher and the setup stub.
+# Issue #462. The launcher's publish makes Thornswood.pdb beside the built exe.
+# It carries absolute source paths from the build machine and method names. It
+# NEVER leaves this machine inside a pack or a public release asset.
+# Publish-Update.ps1 already skips any *.pdb under the game folder; this names
+# the same rule for the launcher.
 #
 # Kept per version under Get-ShipSymbolDir so a customer's launcher.log IL
 # offsets (Shell.cs fault handler) can be mapped to a line later. Shipping the
