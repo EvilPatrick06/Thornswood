@@ -61,7 +61,7 @@ function Set-ThornswoodArchiveReadOnly([string]$Path) {
   foreach ($s in @('S-1-5-32-544', [Security.Principal.WindowsIdentity]::GetCurrent().User.Value)) {
     $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($s)), 'ReadAndExecute, WriteAttributes, Synchronize', 'Allow')))
   }
-  (Get-Item -LiteralPath $Path -Force).SetAccessControl($acl)
+  [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo](Get-Item -LiteralPath $Path -Force), $acl)
 }
 '@
 }

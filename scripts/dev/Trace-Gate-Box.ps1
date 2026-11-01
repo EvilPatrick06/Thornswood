@@ -611,7 +611,7 @@ switch ($TraceMode) {
         # name it by its name, from the list of what was running.
         [IO.File]::WriteAllText((Join-Path $probe 'early.txt'), 'e')
         $go = Join-Path $probe 'go'
-        $early = Start-Process -FilePath powershell.exe -ArgumentList @('-NoProfile', '-Command', ("for (`$i = 0; `$i -lt 300 -and -not [IO.File]::Exists('" + $go + "'); `$i++) { Start-Sleep -Milliseconds 100 }; `$null = [IO.File]::ReadAllText('" + (Join-Path $probe 'early.txt') + "')")) -PassThru -WindowStyle Hidden
+        $early = Start-Process -FilePath pwsh.exe -ArgumentList @('-NoProfile', '-Command', ("for (`$i = 0; `$i -lt 300 -and -not [IO.File]::Exists('" + $go + "'); `$i++) { Start-Sleep -Milliseconds 100 }; `$null = [IO.File]::ReadAllText('" + (Join-Path $probe 'early.txt') + "')")) -PassThru -WindowStyle Hidden
         $null = $early.Handle
         Start-TraceSession 'thornswood-trace-selftest' $etl
         Start-Sleep -Seconds 2
@@ -636,7 +636,7 @@ exit 0
 "@
         $probeFile = Join-Path $traceRoot ('probe-' + [Guid]::NewGuid().ToString('N') + '.ps1')
         [IO.File]::WriteAllText($probeFile, $probeScript)
-        $p = Start-Process -FilePath powershell.exe -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $probeFile + '"')) -PassThru -WindowStyle Hidden
+        $p = Start-Process -FilePath pwsh.exe -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $probeFile + '"')) -PassThru -WindowStyle Hidden
         $null = $p.Handle
         [IO.File]::WriteAllText($go, 'go')
         $p.WaitForExit()
@@ -679,7 +679,7 @@ exit 0
         if ($node) { Check '  and so is node' (@($read['probe'].Images) -contains 'node.exe') }
         Check ('what no harness started is named as a stray (' + ($strays -join '; ') + ')') (@($strays | Where-Object { $_ -match ' cmd\.exe other\.txt$' }).Count -ge 1)
         Check 'and not put on the probe' ($got -notcontains 'other.txt')
-        Check ('what was running before the session is named as a stray by its name (powershell.exe early.txt)') (@($strays | Where-Object { $_ -match ' powershell\.exe early\.txt$' }).Count -ge 1)
+        Check ('what was running before the session is named as a stray by its name (pwsh.exe early.txt)') (@($strays | Where-Object { $_ -match ' pwsh\.exe early\.txt$' }).Count -ge 1)
         Remove-Item -LiteralPath $etl, ($etl + '.procs'), $probe, $probeFile -Recurse -Force -ErrorAction SilentlyContinue
         if ($fail) { 'the self-test FAILED: no gate trace from this box can be trusted until it passes'; exit 1 }
         'the self-test passed'
@@ -771,7 +771,7 @@ exit 0
             $root + ': ' + $trace + ' for its asks, ' + $map + ' locked to reading for ' + $w.account
         }
         [IO.File]::WriteAllText((Join-Path $taskDir 'task.json'), ((@{ runners = $kept }) | ConvertTo-Json -Depth 4))
-        $a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -ExecutionPolicy Bypass -File "' + (Join-Path $taskDir 'Trace-Gate-Task.ps1') + '"')
+        $a = New-ScheduledTaskAction -Execute (Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe') -Argument ('-NoProfile -ExecutionPolicy Bypass -File "' + (Join-Path $taskDir 'Trace-Gate-Task.ps1') + '"')
         # At startup and never on a timer: the task's loop holds every fault
         # it meets and writes it to task.log, and a task that is not running
         # shows on every main build ("the trace task did not answer") and in

@@ -375,7 +375,7 @@ function New-PrivateFile([string]$Path) {
         $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($s)), 'FullControl', 'Allow')))
     }
     $item = Get-Item -LiteralPath $Path -Force
-    if ($PSVersionTable.PSEdition -eq 'Core') { [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]$item, $acl) } else { $item.SetAccessControl($acl) }
+    [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]$item, $acl)
     # Read back, not taken from the call: a FileSecurity already written once
     # writes nothing the second time and says nothing (#3034, on the box).
     $got = Get-Acl -LiteralPath $Path

@@ -120,7 +120,7 @@ function Lock-ThornswoodSealFolder([string]$dir) {
     $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($s)), 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow')))
   }
   # Only the access rules are written back (issue #1120).
-  (Get-Item -LiteralPath $dir -Force).SetAccessControl($acl)
+  [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo](Get-Item -LiteralPath $dir -Force), $acl)
 }
 '@
 }

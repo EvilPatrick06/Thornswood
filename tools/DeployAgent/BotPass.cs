@@ -46,17 +46,17 @@ public interface ITasks
     void End(string name);
 }
 
-/// <summary>Task Scheduler through Windows PowerShell's ScheduledTasks
-/// module, the way the installers register the tasks.</summary>
+/// <summary>Task Scheduler through PowerShell 7's ScheduledTasks module,
+/// the way the installers register the tasks.</summary>
 public sealed class WindowsTasks : ITasks
 {
     static string Ps(string command, string task)
     {
-        var ps = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
+        var ps = WindowsServerControl.Pwsh;
         var psi = new ProcessStartInfo(ps, ["-NoProfile", "-NonInteractive", "-Command", "$ErrorActionPreference = 'Stop'; " + command])
         { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
         psi.Environment["TW_TASK"] = task;
-        using var p = Process.Start(psi) ?? throw new InvalidOperationException("Windows PowerShell did not start");
+        using var p = Process.Start(psi) ?? throw new InvalidOperationException("PowerShell 7 did not start");
         var outText = p.StandardOutput.ReadToEnd().Trim();
         var err = p.StandardError.ReadToEnd().Trim();
         p.WaitForExit();
