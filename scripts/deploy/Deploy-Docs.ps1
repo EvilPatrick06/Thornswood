@@ -851,8 +851,7 @@ if (`$own) {
   # account without it (the build runner's) was refused (issue #1120).
   function SetAccess(`$p, `$a) {
     `$item = Get-Item -LiteralPath `$p -Force
-    if (`$PSVersionTable.PSEdition -eq 'Core') { [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]`$item, [Security.AccessControl.DirectorySecurity]`$a) }
-    else { `$item.SetAccessControl(`$a) }
+    [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]`$item, [Security.AccessControl.DirectorySecurity]`$a)
   }
   try {
     `$users = New-Object Security.Principal.SecurityIdentifier('S-1-5-32-545')

@@ -13,8 +13,8 @@
   which wrote no list, is gone, so there is no second path that can drop a
   character without one.
 
-  This runs the real New-Character.ps1 under Windows PowerShell 5.1 (and
-  once under pwsh, which a developer may run it from) against stand-in
+  This runs the real New-Character.ps1 under PowerShell 7, which runs it on
+  the box and wherever a developer runs it from (#5356), against stand-in
   server folders in a scratch folder:
 
     S  it loads the one writer and writes no list of its own; the launcher
@@ -83,11 +83,7 @@ Yes 'S6 SkyMp.Fresh is gone' (-not ([IO.File]::ReadAllText((Join-Path $App 'SkyM
 Yes 'S7 Reset-Character no longer points at a launcher switch that is not there' ($R.text -notmatch 'launcher has a switch for this')
 
 . (Join-Path $PSScriptRoot 'Windows.ps1')
-if (-not $OnWindows) {
-    Write-Host 'SKIP  the runs need Windows PowerShell 5.1; this is not Windows'
-    Done
-}
-$ps51 = Get-WindowsPowerShell
+$boxPs = Get-BoxPowerShell
 
 $T = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-2673-' + [Guid]::NewGuid().ToString('N'))
 $A1 = 4278192641; $A2 = 4278192642; $A9 = 4278192649     # ff000a01, ff000a02, ff000a09
@@ -125,7 +121,7 @@ try {
     # ---- N: a new character ---------------------------------------------------------
     $n1 = Server 'merge' '{"privDir":"private"}'
     Put (Join-Path $n1 'private\deleted-characters.json') ('{"profiles":[6001],"actors":[' + $A9 + '],"done":{"farms":1,"property":2}}')
-    $x = RunNew $ps51 @('-World', (Join-Path $n1 'world\changeForms'))
+    $x = RunNew $boxPs @('-World', (Join-Path $n1 'world\changeForms'))
     $l = ListOf (Join-Path $n1 'private\deleted-characters.json')
     $bins = @(Get-ChildItem -LiteralPath (Join-Path $n1 'world\changeForms') -Directory -Filter '_discarded-*')
     Yes ('N1 it throws the characters away and says it wrote the list (' + (@($x.out | Where-Object { $_ -like '*release list*' }) -join ' / ') + ')') (
@@ -138,7 +134,7 @@ try {
         (Test-Path -LiteralPath (Join-Path $n1 'world\changeForms\13164_JKs Whiterun.esp.json')) -and -not ((Ids $l.actors) -match '(^|,)2561(,|$)'))
 
     $n2 = Server 'fresh' '{"privDir":"secret"}'
-    $x = RunNew $ps51 @('-World', (Join-Path $n2 'world\changeForms'))
+    $x = RunNew $boxPs @('-World', (Join-Path $n2 'world\changeForms'))
     $file = Join-Path $n2 'secret\deleted-characters.json'
     Yes 'N6 with no list there, the list goes in the server''s own privDir' (
         $x.code -eq 0 -and (Test-Path -LiteralPath $file) -and -not (Test-Path -LiteralPath (Join-Path $n2 'private\deleted-characters.json')))
@@ -148,20 +144,20 @@ try {
     $lists.fresh = $got
 
     $n3 = Server 'nobackup' '{}'
-    $x = RunNew $ps51 @('-World', (Join-Path $n3 'world\changeForms'), '-NoBackup')
+    $x = RunNew $boxPs @('-World', (Join-Path $n3 'world\changeForms'), '-NoBackup')
     $l = ListOf (Join-Path $n3 'private\deleted-characters.json')
     Yes 'N8 with -NoBackup the change forms are deleted, with no _discarded folder' (
         $x.code -eq 0 -and (Forms $n3).Count -eq 1 -and @(Get-ChildItem -LiteralPath (Join-Path $n3 'world\changeForms') -Directory).Count -eq 0)
     Yes ('N9 and the list still names them, read before the delete (' + (Ids $l.actors) + ')') ($l -and (Ids $l.actors) -eq "$A1,$A2" -and @($l.profiles).Count -eq 0)
 
     $n4 = Server 'whatif' '{}'
-    $x = RunNew $ps51 @('-World', (Join-Path $n4 'world\changeForms'), '-WhatIf')
+    $x = RunNew $boxPs @('-World', (Join-Path $n4 'world\changeForms'), '-WhatIf')
     Yes 'N10 -WhatIf throws nothing away and writes no list' (
         $x.code -eq 0 -and (Forms $n4).Count -eq 4 -and -not (Test-Path -LiteralPath (Join-Path $n4 'private\deleted-characters.json')))
 
     $n5 = Server 'badlist' '{}'
     Put (Join-Path $n5 'private\deleted-characters.json') '{"profiles":"nobody"}'
-    $x = RunNew $ps51 @('-World', (Join-Path $n5 'world\changeForms'))
+    $x = RunNew $boxPs @('-World', (Join-Path $n5 'world\changeForms'))
     Yes ('N11 a list there that is not one stops it (' + (@($x.out | Where-Object { $_ -like 'STOP*' }) -join ' / ') + ')') (
         $x.code -eq 1 -and @($x.out | Where-Object { $_ -like 'STOP. *not a list of deleted characters, so nothing was thrown away*' }).Count -eq 1)
     Yes 'N12 with nothing moved and the list left as it was' (
@@ -170,37 +166,33 @@ try {
     $n6 = Join-Path $T 'empty'
     Put (Join-Path $n6 'server-settings.json') '{}'
     Put (Join-Path $n6 'world\changeForms\13164_JKs Whiterun.esp.json') '{}'
-    $x = RunNew $ps51 @('-World', (Join-Path $n6 'world\changeForms'))
+    $x = RunNew $boxPs @('-World', (Join-Path $n6 'world\changeForms'))
     Yes 'N13 with nobody to throw away, no list is written' ($x.code -eq 0 -and -not (Test-Path -LiteralPath (Join-Path $n6 'private\deleted-characters.json')))
 
     $n7 = Join-Path $T 'loose\forms'
     Put (Join-Path $n7 '0.json') ('{"formDesc":"a01","profileId":5001}')
-    $x = RunNew $ps51 @('-World', $n7)
+    $x = RunNew $boxPs @('-World', $n7)
     Yes ('N14 a -World that is not a server''s world\changeForms stops it with nothing moved (' + (@($x.out | Where-Object { $_ -like 'STOP*' }) -join ' / ') + ')') (
         $x.code -eq 1 -and (Test-Path -LiteralPath (Join-Path $n7 '0.json')) -and
         @(Get-ChildItem -LiteralPath $T -Recurse -Filter 'deleted-characters.json' | Where-Object { $_.FullName -like (Join-Path $T 'loose*') }).Count -eq 0)
 
-    $pwsh = Get-Command pwsh -ErrorAction SilentlyContinue
-    if (-not $pwsh) { Write-Host 'SKIP  N15 needs pwsh' }
-    else {
-        $n8 = Server 'pwsh' '{"privDir":"secret"}'
-        $x = RunNew $pwsh.Source @('-World', (Join-Path $n8 'world\changeForms'))
-        $f8 = Join-Path $n8 'secret\deleted-characters.json'
-        $g8 = ''; if (Test-Path -LiteralPath $f8) { $g8 = [IO.File]::ReadAllText($f8) }
-        # The same but for the time 'saves' was marked done.
-        $shape = { param($s) $s -replace '"saves":[0-9]+', '"saves":T' }
-        Yes ('N15 under pwsh it writes the same list (' + $g8 + ')') ($x.code -eq 0 -and $g8 -and (& $shape $g8) -eq (& $shape $lists.fresh))
-    }
+    $n8 = Server 'pwsh' '{"privDir":"secret"}'
+    $x = RunNew $boxPs @('-World', (Join-Path $n8 'world\changeForms'))
+    $f8 = Join-Path $n8 'secret\deleted-characters.json'
+    $g8 = ''; if (Test-Path -LiteralPath $f8) { $g8 = [IO.File]::ReadAllText($f8) }
+    # The same but for the time 'saves' was marked done.
+    $shape = { param($s) $s -replace '"saves":[0-9]+', '"saves":T' }
+    Yes ('N15 with its private folder named secret it writes the same list there (' + $g8 + ')') ($x.code -eq 0 -and $g8 -and (& $shape $g8) -eq (& $shape $lists.fresh))
 
     $n9 = Server 'badsettings' '{"privDir": '
-    $x = RunNew $ps51 @('-World', (Join-Path $n9 'world\changeForms'))
+    $x = RunNew $boxPs @('-World', (Join-Path $n9 'world\changeForms'))
     Yes ('N16 a server-settings.json that will not parse stops it: where the list goes is not guessed (' + (@($x.out | Where-Object { $_ -like 'STOP*' }) -join ' / ') + ')') (
         $x.code -eq 1 -and @($x.out | Where-Object { $_ -like 'STOP. *server-settings.json will not parse*Nothing was thrown away.' }).Count -eq 1 -and
         (Forms $n9).Count -eq 4 -and -not (Test-Path -LiteralPath (Join-Path $n9 'private')))
 
     $n10 = Server 'badform' '{}'
     Put (Join-Path $n10 'world\changeForms\3.json') '{"formDesc":"ff000a0'
-    $x = RunNew $ps51 @('-World', (Join-Path $n10 'world\changeForms'))
+    $x = RunNew $boxPs @('-World', (Join-Path $n10 'world\changeForms'))
     $l = ListOf (Join-Path $n10 'private\deleted-characters.json')
     Yes ('N17 a change form that will not parse is named, and the others are still listed (' + (@($x.out | Where-Object { $_ -like '*will not parse*' }) -join ' / ') + ')') (
         $x.code -eq 0 -and @($x.out | Where-Object { $_ -like '*3.json will not parse, so its character, if it is one, is not on the release list' }).Count -eq 1 -and

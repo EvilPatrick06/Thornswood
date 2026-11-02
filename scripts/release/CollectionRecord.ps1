@@ -51,7 +51,7 @@
 
   Mod names are only for people reading the record: nothing compares them.
 
-  Works on PowerShell 7 and Windows PowerShell 5.1. ASCII only.
+  Runs in PowerShell 7. ASCII only.
 #>
 
 $script:CollectionRecordHere = $PSScriptRoot

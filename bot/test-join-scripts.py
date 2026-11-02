@@ -21,8 +21,8 @@ points, in a temporary folder, and nowhere else, so a script only finds it by
 going through bot.py; and its numbers are nothing like the join order, so a
 card with the right number could only have read it.
 
-The backup half runs the real vps-nightly-backup.ps1 under Windows
-PowerShell, the shell the VPS runs it in, with every folder it reads or
+The backup half runs the real vps-nightly-backup.ps1 under PowerShell 7
+(pwsh), the shell the VPS runs it in (#5356), with every folder it reads or
 writes pointed at a temporary one and -Plain, and opens the zip it makes.
 
 Never connects to anything.
@@ -359,10 +359,13 @@ finally:
 
 
 # ------------------------------------------------------ the nightly backup --
-PS = shutil.which('powershell') or shutil.which('powershell.exe')
+# On Windows only: the script reads the box's Windows folders and variables.
+PS = shutil.which('pwsh') if os.name == 'nt' else None
 NIGHTLY = os.path.join(os.path.dirname(HERE), 'scripts', 'vps', 'vps-nightly-backup.ps1')
-if not PS:
-    print('SKIP  the nightly backup half: there is no Windows PowerShell here')
+if os.name != 'nt':
+    print('SKIP  the nightly backup half: it runs in PowerShell 7 on Windows, as on the box, and this is not Windows')
+elif not PS:
+    yes('K0 PowerShell 7 (pwsh), which the box runs the nightly backup in, is on this Windows', False)
 else:
     box = tempfile.mkdtemp(prefix='ts-nightly-')
     try:

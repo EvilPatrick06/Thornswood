@@ -43,13 +43,6 @@ param(
     [string]$ExpectedSigner
 )
 
-# PowerShell 7 cannot write an exe with Add-Type, so this runs under Windows PowerShell.
-if ($PSVersionTable.PSEdition -eq 'Core') {
-    $fwd = @('-Out', $Out); if ($Sign) { $fwd += '-Sign' }; if ($Verify) { $fwd += '-Verify' }
-    if ($ConfigPath) { $fwd += @('-ConfigPath', $ConfigPath) }; if ($ExpectedSigner) { $fwd += @('-ExpectedSigner', $ExpectedSigner) }
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @fwd
-    exit $LASTEXITCODE
-}
 $ErrorActionPreference = 'Stop'
 $Repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 . (Join-Path $PSScriptRoot 'Assert-PublishSigned.ps1')
@@ -71,7 +64,15 @@ if ($Sign) {
     New-Item -ItemType Directory -Force -Path $Out | Out-Null
     Remove-Item -LiteralPath $exe, $sums, $prov -Force -EA SilentlyContinue
     $src = 'public static class SignPilot { public static int Main() { System.Console.WriteLine("Thornswood signing pilot, issue 2163. Not a release."); return 0; } }'
-    Add-Type -TypeDefinition $src -Language CSharp -OutputAssembly $exe -OutputType ConsoleApplication
+    # PowerShell 7's Add-Type writes no exe, so the build's own compiler
+    # (the Roslyn csc MSBuild runs, Find-MSBuild.ps1) makes it (#5356).
+    $msb = & { . (Join-Path $PSScriptRoot 'Find-MSBuild.ps1') -Load; Find-ThornswoodMSBuild }
+    if (-not $msb.Csc) { Write-Host 'No C# compiler: the Build Tools are not on this machine (Developer-Guide.md, Setting up a machine).' -ForegroundColor Red; exit 1 }
+    $srcFile = Join-Path $Out 'pilot.cs'
+    [IO.File]::WriteAllText($srcFile, $src)
+    $said = @(& $msb.Csc /nologo /target:exe ('/out:' + $exe) $srcFile 2>&1 | ForEach-Object { "$_" })
+    Remove-Item -LiteralPath $srcFile -Force
+    if ($LASTEXITCODE -ne 0) { $said | ForEach-Object { Write-Host $_ }; Write-Host 'The compiler refused the test exe; nothing was signed.' -ForegroundColor Red; exit 1 }
     $unsigned = Sha $exe
     Write-Host ("unsigned sha256  " + $unsigned)
     $signArgs = @{ Path = @($exe); Required = $true }

@@ -55,7 +55,6 @@ $Box = P 'scripts', 'vps', 'vps-web-firewall.ps1'
 $Driver = P 'scripts', 'vps', 'Set-WebFirewall.ps1'
 $Outside = P 'scripts', 'vps', 'Watch-Outside.ps1'
 
-. (Join-Path $PSScriptRoot 'Windows.ps1')
 . (P 'scripts', 'vps', 'Vps.ps1')
 # The box's own address, from vps.json through Vps.ps1, never written here.
 $VpsAddr = Get-ThornswoodVpsAddress
@@ -154,14 +153,6 @@ try {
         $e = $null
         $null = [System.Management.Automation.Language.Parser]::ParseInput($t, [ref]$null, [ref]$e)
         Yes ((Split-Path -Leaf $f) + ' parses and is plain ASCII') ((-not $e -or $e.Count -eq 0) -and -not ($t.ToCharArray() | Where-Object { [int]$_ -gt 127 }))
-    }
-    if ($OnWindows) {
-        $ps51 = Get-WindowsPowerShell
-        $chk = "`$e = `$null; `$null = [System.Management.Automation.Language.Parser]::ParseFile('" + $Box.Replace("'", "''") + "', [ref]`$null, [ref]`$e); if (`$e) { 'ERR ' + `$e[0].Message } else { 'OK' }"
-        $said = (& $ps51 -NoProfile -NonInteractive -Command $chk) -join ' '
-        Yes ('  and Windows PowerShell 5.1, which runs it on the box, parses it: ' + $said) ($said -eq 'OK')
-    } else {
-        Write-Host 'NOT RUN  the Windows PowerShell 5.1 parse, which only Windows has'
     }
 
     $layerNames = @('Get-ThornswoodBoxRefusal', 'Get-AllowRules', 'Get-WebRule', 'Set-RuleRemote', 'Get-Profiles', 'Resolve-Name')

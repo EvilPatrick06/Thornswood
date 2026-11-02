@@ -289,9 +289,7 @@ function Get-BackupTaskSid {
 }
 function Write-RecordAcl([string]$Path, $acl) {
     $item = Get-Item -LiteralPath $Path -Force
-    if ($PSVersionTable.PSEdition -eq 'Core') {
-        [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]$item, [Security.AccessControl.DirectorySecurity]$acl)
-    } else { $item.SetAccessControl($acl) }
+    [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]$item, [Security.AccessControl.DirectorySecurity]$acl)
 }
 function Add-BackupRead($acl, [string]$sid) {
     $tree = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'

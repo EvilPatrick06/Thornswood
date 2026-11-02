@@ -11,7 +11,7 @@
   This builds stand-ins of every store scripts\vps\Delete-Person.ps1 knows,
   in a scratch folder under the temp folder, for one person who asked, one
   who did not and a character the two share, and runs the real script under
-  Windows PowerShell 5.1, which is what runs it on the VPS:
+  PowerShell 7, which is what runs it on the VPS since #5356:
 
     - the dry run changes no byte and says, by count, what a real run removes,
       what it keeps and which services take the rest at their next start
@@ -84,10 +84,10 @@ Yes '  and reapplies the record, merged with the backup''s, after the restores a
 
 . (Join-Path $PSScriptRoot 'Windows.ps1')
 if (-not $OnWindows) {
-    Write-Host 'SKIP  the runs need Windows PowerShell 5.1, which runs this on the VPS; this is not Windows'
+    Write-Host 'SKIP  the runs: the script locks the record''s folder with a Windows ACL for the backup task''s account, and asks CIM what the machine is, which only Windows has'
     Done
 }
-$ps51 = Get-WindowsPowerShell
+$boxPs = Get-BoxPowerShell
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     Write-Host 'SKIP  the runs need node, which the script edits the JSON with'
     Done
@@ -97,7 +97,7 @@ $script:last = @()
 function Run([string[]]$argv) {
     $eap = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    try { $script:last = @(& $ps51 -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $Script @argv 2>&1 | ForEach-Object { "$_" }) }
+    try { $script:last = @(& $boxPs -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $Script @argv 2>&1 | ForEach-Object { "$_" }) }
     finally { $ErrorActionPreference = $eap }
     return $LASTEXITCODE
 }

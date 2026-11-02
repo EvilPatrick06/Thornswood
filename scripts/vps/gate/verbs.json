@@ -124,6 +124,31 @@
         "Install": "switch"
       }
     },
+    "Watch-Load": {
+      "script": "scripts/vps/Watch-Load.ps1",
+      "timeoutMinutes": 10,
+      "fixed": ["-NoPause"],
+      "params": {
+        "Install": "switch"
+      }
+    },
+    "Keep-RunnerLogs": {
+      "script": "scripts/vps/Keep-RunnerLogs.ps1",
+      "timeoutMinutes": 10,
+      "fixed": ["-NoPause"],
+      "params": {
+        "Install": "switch"
+      }
+    },
+    "Forecast-Storage": {
+      "script": "scripts/vps/Forecast-Storage.ps1",
+      "timeoutMinutes": 10,
+      "fixed": ["-NoPause"],
+      "params": {
+        "Install": "switch",
+        "Status": "switch"
+      }
+    },
     "Hold-Server": {
       "script": "scripts/vps/Hold-Server.ps1",
       "timeoutMinutes": 5,

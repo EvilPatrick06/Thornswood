@@ -24,7 +24,7 @@
        account owns both mods, and the prompt never runs against a stand-in;
     2. the CRC-64/NVME the multipart upload is bound to, against the
        algorithm's published check value, and the md5;
-    3. a new file version, under pwsh and under Windows PowerShell 5.1: -WhatIf
+    3. a new file version, under pwsh: -WhatIf
        writes nothing; a bad version, a version already there and a file that
        is not the mod's stop before any write; one part with md5 and
        Content-MD5, and many parts with the CRC, each make the version with
@@ -58,8 +58,8 @@
        else, are refused; the real run discards the draft with
        discardRevision and reads back that no draft is waiting.
 
-  Needs node. The collection part needs 7-Zip and says SKIP without it; the
-  5.1 runs say SKIP where there is no Windows PowerShell. Everything it writes
+  Needs node. The collection part needs 7-Zip and says SKIP without it.
+  Everything it writes
   is under its own temp folder, which it removes.
 #>
 [CmdletBinding()]
@@ -99,7 +99,6 @@ Yes 'node is on PATH, for the stand-in Nexus' ($null -ne $node)
 if ($null -eq $node) { Done }
 $pwsh = (Get-Process -Id $PID).Path
 . (Join-Path $PSScriptRoot 'Windows.ps1')
-$winps = if ($OnWindows) { Get-WindowsPowerShell } else { '' }
 $sz = ''
 if ($env:ProgramFiles -and (Test-Path -LiteralPath (Join-Path $env:ProgramFiles '7-Zip\7z.exe'))) { $sz = Join-Path $env:ProgramFiles '7-Zip\7z.exe' }
 if (-not $sz) { foreach ($n in '7z', '7zz', '7za') { $g = Get-Command $n -ErrorAction SilentlyContinue; if ($g) { $sz = $g.Source; break } } }
@@ -140,11 +139,9 @@ $env:THORNSWOOD_SCRATCH_ROOT = (Join-Path $T 'scratch')
 $realAppData = $env:LOCALAPPDATA
 
 $script:outs = New-Object System.Collections.Generic.List[string]
-function Run([string]$name, [string[]]$arguments, [switch]$Win51) {
-    $exe = $pwsh
-    if ($Win51) { $exe = $winps }
+function Run([string]$name, [string[]]$arguments) {
     $psi = New-Object Diagnostics.ProcessStartInfo
-    $psi.FileName = $exe
+    $psi.FileName = $pwsh
     # New-NexusRevision holds every mod to a permission record (#3649): the
     # stand-in's mods are in one of the test's own, never the real one.
     if ($name -eq 'New-NexusRevision.ps1') { $arguments = @($arguments) + @('-Permissions', $script:perm) }
@@ -257,26 +254,16 @@ Yes 'the stand-in has 1.0.0 archived and the changelog' (@($st.files.'file-runti
 
 $env:THORNSWOOD_NEXUS_STANDIN_SINGLE_MAX = '100000'
 $n0 = Count
-if ($winps) { $r = Run 'Send-NexusFile.ps1' @('-Mod', '192762', '-Archive', $archive, '-Version', '1.0.2') -Win51; $shell = 'Windows PowerShell 5.1' }
-else { Skip 'this is not Windows, which is the only place Windows PowerShell 5.1 runs, so the multipart run is under pwsh'; $r = Run 'Send-NexusFile.ps1' @('-Mod', '192762', '-Archive', $archive, '-Version', '1.0.2'); $shell = 'pwsh' }
+$r = Run 'Send-NexusFile.ps1' @('-Mod', '192762', '-Archive', $archive, '-Version', '1.0.2')
 $env:THORNSWOOD_NEXUS_STANDIN_SINGLE_MAX = $null
 $got = @(Since $n0)
-YesR ("many parts, under $shell" + ': the version is made and its file id printed') ($r.Code -eq 0 -and $r.Out -match 'File id\s+812346' -and $r.Out -match ('md5\s+' + $md5)) $r
+YesR 'many parts: the version is made and its file id printed' ($r.Code -eq 0 -and $r.Out -match 'File id\s+812346' -and $r.Out -match ('md5\s+' + $md5)) $r
 $mk = @($got | Where-Object { $_.path -eq '/v3/uploads/multipart' }) | Select-Object -First 1
 $crc = Get-NexusCrc64Nvme $archive
 Yes 'POST /v3/uploads/multipart carries the CRC-64/NVME and no md5' ($null -ne $mk -and $mk.json.crc64nvme -eq $crc -and $null -eq $mk.json.PSObject.Properties['md5'])
 $parts = @($got | Where-Object { $_.path -like '/s3/part/*' })
 $done = @($got | Where-Object { $_.path -like '/s3/complete/*' }) | Select-Object -First 1
 Yes ('the ' + $parts.Count + ' parts and the complete go to storage with no key, and the complete goes to the address bound to the CRC, with no unsigned x-amz header') ($parts.Count -eq 5 -and @($parts | Where-Object { $_.key -ne 'none' }).Count -eq 0 -and $null -ne $done -and $done.key -eq 'none' -and $done.boundCrc -eq $crc -and $done.crc -eq '' -and $done.contentType -eq 'application/xml')
-
-if ($winps) {
-    $n0 = Count
-    $r = Run 'Send-NexusFile.ps1' @('-Mod', '192001', '-Archive', $archive, '-Version', '1.3', '-Category', 'main') -Win51
-    YesR 'one part under Windows PowerShell 5.1 too' ($r.Code -eq 0 -and $r.Out -match 'File id\s+812347') $r
-    $put = @((Since $n0) | Where-Object { $_.path -like '/s3/single/*' }) | Select-Object -First 1
-    Yes 'with the same Content-MD5 and Content-Disposition' ($null -ne $put -and $put.contentMd5 -eq $facts.Md5Base64 -and $put.contentDisposition -eq 'attachment; filename="Thornswood Client Runtime-1.0.1.7z"')
-}
-else { Skip 'one part under Windows PowerShell 5.1: this is not Windows' }
 
 Control @{ unboundComplete = $true }
 $env:THORNSWOOD_NEXUS_STANDIN_SINGLE_MAX = '100000'
@@ -539,8 +526,7 @@ New-Item -ItemType Directory -Force -Path $tcDir | Out-Null
 Put (Join-Path $tcDir 'Thornswood-Content.esp') 'TES4 remade'
 $tcArc = Join-Path $T 'Thornswood Content-next.7z'
 Push-Location $tcDir; & $sz a -t7z -y $tcArc 'Thornswood-Content.esp' | Out-Null; Pop-Location
-# 1.3 is taken when the 5.1 run above made it.
-$tcVer = if ($winps) { '1.4' } else { '1.3' }
+$tcVer = '1.3'
 $r = Run 'Send-NexusFile.ps1' @('-Mod', '192001', '-Archive', $tcArc, '-Version', $tcVer, '-Category', 'main')
 $tcId = [regex]::Match($r.Out, 'File id\s+(\d+)').Groups[1].Value
 YesR ('Thornswood Content ' + $tcVer + ', an archive with the plugin in it, is uploaded') ($r.Code -eq 0 -and $tcId) $r

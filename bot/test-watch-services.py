@@ -79,7 +79,7 @@ TMP = tempfile.mkdtemp(prefix='thornswood-watchalerts-bot-')
 
 # ---------------------------------------------- an outbox the watchdog wrote --
 emitted = os.path.join(TMP, 'emitted.jsonl')
-ps = shutil.which('powershell') or shutil.which('pwsh')
+ps = shutil.which('pwsh')
 real = []
 if ps:
     r = subprocess.run(

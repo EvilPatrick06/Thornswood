@@ -1615,8 +1615,7 @@ The short form of the rules. The same decisions, with the dates they were made, 
   #1343) and the count of silent catches (#5292). The job "Launcher builds",
   on a Windows runner, checks the launcher window and its UI thread, builds
   the launcher with MSBuild from its project files, held to its sources
-  (`tests\test-498-msbuild.ps1`, issue #498), and compares the writing check
-  under Windows PowerShell 5.1. A pull request that changes only files under
+  (`tests\test-498-msbuild.ps1`, issue #498). A pull request that changes only files under
   `docs`, `site` or `bot` skips it, because nothing it checks reads those
   folders (`scripts\dev\Launcher-Reach.ps1`, #5292). Beside them, the job
   "gate" runs
@@ -2496,13 +2495,7 @@ Every nightly and build run starts a PowerShell harness with `pwsh -NoProfile -F
 pwsh -NoProfile -File .\tests\test-install-server.ps1
 ```
 
-From Git Bash too (the shell Claude Code's Bash tool uses on One), never `powershell.exe` straight: Windows PowerShell 5.1 started from there inherits PowerShell 7's `PSModulePath`, finds PowerShell 7's Utility module first and loses `Get-FileHash` (#2460). PowerShell 7 rewrites that path for every 5.1 it starts, so a harness started with `pwsh` that runs 5.1 keeps working. `tests\test-2460-winps-module-path.ps1` holds both halves.
-
-If 5.1 itself is the point, clear the inherited path first:
-
-```bash
-env -u PSModulePath powershell.exe -NoProfile -File ./tests/test-install-server.ps1
-```
+From Git Bash too (the shell Claude Code's Bash tool uses on One), the same line with forward slashes. Nothing here runs in Windows PowerShell 5.1 any more, the box included (#5356): every script, task and harness starts `pwsh`.
 
 #### Learn more about PowerShell
 
