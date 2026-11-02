@@ -18,6 +18,10 @@ It does two jobs with the same code:
   verb. This came first (Patrick, 31 Oct 2026). A rollback is this with the
   Release before.
 - **Apply each new Deployment by itself**, as the Windows service. Dev first.
+  Each environment has its own loop, one Deployment at a time in it, so a
+  site or bot change goes in while dev is still in its bot pass rather than
+  waiting behind it (#5190). The update check waits until no environment is
+  part way through one, so a restart never cuts an apply short.
 
 ## What this first slice does, and what it does not
 

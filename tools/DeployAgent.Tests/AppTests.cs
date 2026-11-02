@@ -129,7 +129,7 @@ public sealed class AppTests : IDisposable
     static string Read(string root, string rel) => File.ReadAllText(Path.Combine([root, .. rel.Split('/')]));
     static bool Has(string root, string rel) => File.Exists(Path.Combine([root, .. rel.Split('/')]));
 
-    sealed record Rig(Agent Agent, FakeGitHub Gh, FakeAppControl Control, EnvConfig Env, string Root, string Store, string Logs);
+    sealed record Rig(Agent Agent, FakeGitHub Gh, FakeAppControl Control, EnvConfig Env, string Root, string Store, string Logs, Config Cfg);
 
     Rig Make(string kind)
     {
@@ -152,7 +152,7 @@ public sealed class AppTests : IDisposable
         var app = new App(env, http, control) { Tick = TimeSpan.FromMilliseconds(5) };
         var gh2 = new GitHub(FakeGitHub.Api, "O/R", new StaticToken("t"), http);
         var a = new Agent(cfg, gh2, new FakeVerifier(), new(), "1.0.0", "", l => { lock (said) said.Add(l); }) { Host = "box", Apps = { [kind] = app } };
-        return new Rig(a, gh, control, env, root, env.Store, env.LogDir);
+        return new Rig(a, gh, control, env, root, env.Store, env.LogDir, cfg);
     }
 
     static string LastSaid(FakeGitHub gh, long id) => (string)gh.Last(id)!["description"]!;
@@ -178,6 +178,38 @@ public sealed class AppTests : IDisposable
         ["data/board.json"] = "{\"typed\":true}",
         ["data/help.md"] = "typed on the site",
     };
+
+    /// <summary>#5190: each environment has its own loop, so a site change
+    /// goes in while another environment's pass is still running (dev's bot
+    /// pass takes up to half an hour). Here the Discord bot's pass is held at
+    /// its first question to GitHub for as long as the test likes; with one
+    /// loop for every environment, discord comes before site and the site
+    /// Deployment would wait behind it (build-20261102.2, 1 Nov).</summary>
+    [Fact]
+    public async Task ASiteDeploymentGoesInWhileAnotherEnvironmentIsStillBusy()
+    {
+        var r = Make(AppKinds.Site);
+        r.Cfg.Environments[AppKinds.Discord] = Config.DefaultDiscord();
+        Put(r.Root, SiteNow);
+        AppRelease(r.Gh, "build-1", "site", Zip(new() { ["server.js"] = "// site v2", ["public/home.css"] = "body{}" }));
+        var held = new TaskCompletionSource();
+        var busy = new TaskCompletionSource();
+        var discordEnv = r.Cfg.Environments[AppKinds.Discord].GitHubEnvironment;
+        r.Gh.BeforeDeployments = e => { if (e != discordEnv) return Task.CompletedTask; busy.TrySetResult(); return held.Task; };
+        var id = r.Gh.AddDeployment("Site", Commit, "{\"release\":\"build-1\",\"part\":\"site\"}");
+        using var cts = new CancellationTokenSource();
+        var run = r.Agent.Run(cts.Token);
+        await busy.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var until = DateTime.UtcNow.AddSeconds(20);
+        while ((string?)r.Gh.Last(id)?["state"] != "success" && DateTime.UtcNow < until) await Task.Delay(20);
+        var stillHeld = !held.Task.IsCompleted;
+        cts.Cancel();
+        held.TrySetResult();
+        await run;
+        Assert.True(stillHeld);
+        States(r, id, "in_progress,success");
+        Assert.Equal("// site v2", Read(r.Root, "server.js"));
+    }
 
     [Fact]
     public async Task ASiteDeploymentSwapsInWhatChangedAndTakesOutWhatLeft()
