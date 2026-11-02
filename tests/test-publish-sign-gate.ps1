@@ -102,9 +102,10 @@ try {
     Yes 'missing tip file is refused' ($missingFile -match 'missing file')
 
     if (-not $OnWindows) {
-        Write-Host 'SKIP  a file Microsoft signed, refused for its signer: Windows PowerShell 5.1 is that file, and only Windows has it'
+        Write-Host 'SKIP  a file Microsoft signed, refused for its signer: only Windows reads a signature'
     } else {
-        $wrong = Get-PublishSignRefusal -Path (Get-WindowsPowerShell) -ExpectedSigner $frag
+        # pwsh.exe, which Microsoft signs.
+        $wrong = Get-PublishSignRefusal -Path (Get-BoxPowerShell) -ExpectedSigner $frag
         Yes 'Valid signature without ExpectedSigner is refused' (
             $wrong -match 'ExpectedSigner' -or $wrong -match 'does not contain')
     }
