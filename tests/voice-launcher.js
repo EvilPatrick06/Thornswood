@@ -78,12 +78,23 @@ function build() {
   const root = path.join(os.tmpdir(), 'thornswood-voice-driver', key);
   const dll = path.join(root, 'out', 'VoiceDriver.dll');
   if (!fs.existsSync(dll)) {
+    // The gate runs several voice harnesses at once, and two builds into one
+    // folder trip over each other's restore ("Cannot create a file when that
+    // file already exists"). So each builds in a folder of its own and only a
+    // finished build is renamed into place; when another harness's finished
+    // build got there first, that one is used and this one is dropped.
+    fs.mkdirSync(path.dirname(root), { recursive: true });
+    const work = root + '.building-' + process.pid + '-' + crypto.randomBytes(4).toString('hex');
     const r = cp.spawnSync(dotnet, ['build', PROJ, '-c', 'Release', '-nologo', '-v', 'q', '--disable-build-servers',
-      '-o', path.join(root, 'out'), '-p:VoiceDriverObj=' + path.join(root, 'obj') + path.sep],
+      '-o', path.join(work, 'out'), '-p:VoiceDriverObj=' + path.join(work, 'obj') + path.sep],
     { encoding: 'utf8', env: Object.assign({}, process.env, { DOTNET_CLI_TELEMETRY_OPTOUT: '1', DOTNET_NOLOGO: '1' }) });
-    if (r.status !== 0 || !fs.existsSync(dll)) {
+    if (r.status !== 0 || !fs.existsSync(path.join(work, 'out', 'VoiceDriver.dll'))) {
+      fs.rmSync(work, { recursive: true, force: true });
       throw new Error('the voice driver did not build:\n' + (r.stdout || '') + (r.stderr || '') + (r.error ? String(r.error) : ''));
     }
+    try { fs.renameSync(work, root); }
+    catch (e) { if (!fs.existsSync(dll)) { throw e; } }
+    fs.rmSync(work, { recursive: true, force: true });
   }
   built = { dotnet: dotnet, dll: dll, root: root };
   return built;

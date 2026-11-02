@@ -351,7 +351,7 @@ try {
         $k = Invoke-Child $ps $inst @('-Root', $root3, '-From', $stage, '-NoPause')
         $held.Close(); $held = $null
         Yes "K1 an install over an exe still open stops (exit $($k.Code)), so Ship stops too" ($k.Code -eq 1)
-        Yes 'K2 and says the old one is still there' ($k.Out -match 'old one is still there')
+        Yes 'K2 and says the old one is still there' ($k.Out -match 'old Thornswood\.exe is still there')
 
         # Without -From the exe is taken as already in place, which is what a
         # hand build with the default -OutDir leaves.
@@ -516,8 +516,11 @@ try {
     }
     $plain = @(Get-ChildItem -LiteralPath $Here -File -Filter '*.cmd' -ErrorAction SilentlyContinue) +
              @(Get-ChildItem -LiteralPath (Join-Path $RepoDir '.github\workflows') -File -ErrorAction SilentlyContinue)
+    # A workflow's comment that names the script runs nothing, so only its
+    # other lines count.
     foreach ($f in $plain) {
-        if ((Get-Content -LiteralPath $f.FullName -Raw) -match 'Install-Launcher\.ps1') { $callers += $f.Name }
+        $run = @(Get-Content -LiteralPath $f.FullName | Where-Object { $_ -notmatch '^\s*(#|::|rem\s)' })
+        if (($run -join "`n") -match 'Install-Launcher\.ps1') { $callers += $f.Name }
     }
     $callers = @($callers | Sort-Object)
     Yes ('W1 only Install-Thornswood.ps1 runs the install (Ship sends no launcher since #4825), found: ' + ($callers -join ', ')) (($callers -join ',') -eq 'Install-Thornswood.ps1')
