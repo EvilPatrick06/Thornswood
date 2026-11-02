@@ -40,7 +40,7 @@
        else: the block, run on this Node, leaves out every emSign root and
        nothing else, and comes before the first request in the file.
 
-  bot\test-3111-trust.py, in the nightly, does A and C again with the real
+  bot\tests\test-3111-trust.py, in the nightly, does A and C again with the real
   certifi the bot pins and the real bot.py import.
 
   Standard library Python only. Nothing leaves the machine; the scratch folder

@@ -55,7 +55,7 @@ Discord is asked, and `site.log` says what was refused and where it said it
 came from. The sign in cookies are still `SameSite=Lax`; this is what holds
 when a browser too old for that sends them on another site's form anyway, or
 a page on another name under thornswood.net does. A GET changes nothing
-another page can choose. `tests\test-1367-cross-site.js` sends every kind of
+another page can choose. `site\tests\test-1367-cross-site.js` sends every kind of
 write the hub makes from another site and from this one.
 
 ## On your machine
@@ -160,7 +160,7 @@ the console and in the log, with the file and the error, and tries again
 every minute rather than on every line. The active file has an emergency
 ceiling of 8 MB (twice the roll size): past it one line says so and the file
 stops growing, with lines going to the console only, until a roll works,
-which is said once too. `tests\test-2189-log-rotation.js` covers it. Disk
+which is said once too. `site\tests\test-2189-log-rotation.js` covers it. Disk
 space for the folder as a whole is a storage alert (#2178), not this.
 
 ## The gallery
@@ -223,8 +223,9 @@ queue and the live list. That page is `LEVEL.uploads: 'staff'` (#742), so the
 roles that may call the doors are the roles that may open the page it is called
 from, and the launcher's Manage on the site button keeps working for them. The
 hub's other three pages stay `'admin'`.
-`tests\test-gallery.js` drives the routes end to end against a copy, and
-`tests\test-hub-staff-gallery.js` drives both gates with a stub standing in for
+`site\tests\test-gallery.js` drives the routes end to end against a copy, and
+`site\tests\test-hub-staff-gallery.js` drives both gates with a stub standing in for
 Discord, so a Loremaster exists without anybody being in a real server.
-Deploy with `.\scripts\deploy\Deploy-Docs.ps1`, which sends `server.js`, the
-public and hub pages, and the empty queue and reports files.
+A merge puts `server.js` and the public and hub pages in through the box
+deploy agent (docs\DEPLOY-AGENT.md); `.\scripts\deploy\Deploy-Docs.ps1` sends
+the empty queue and reports files.

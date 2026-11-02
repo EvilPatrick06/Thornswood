@@ -441,7 +441,7 @@ new Function('fs', 'path', 'putJson', 'DATA', 'UP', 'LINKED', 'RULES_OK', 'ATTEM
         finally { $ErrorActionPreference = $eap; Remove-Item Env:\THORNSWOOD_BOT_DATA, Env:\DISCORD_TOKEN -ErrorAction SilentlyContinue }
         $botRan = $true
         Yes 'the bot took its request as it started, and said so with counts' ($botSaid -match 'join numbers 1, open tickets 1; done' -and -not (Test-Path (Join-Path $Bot 'data\deletion-requests.json')))
-    } else { Write-Host 'SKIP  the bot''s start: no Python 3.11 with discord.py here (bot\test-2758-deletion-requests.py runs it nightly)' }
+    } else { Write-Host 'SKIP  the bot''s start: no Python 3.11 with discord.py here (bot\tests\test-2758-deletion-requests.py runs it nightly)' }
 
     $D = Join-Path $Site 'data'
     $lk = J (Join-Path $D 'linked.json')

@@ -337,7 +337,7 @@ gh auth status
 ```
 
 The bot's libraries go into the Python that `py` starts by default, because
-that is the one the bot harnesses run on: `bot\test-*.py`, and
+that is the one the bot harnesses run on: `bot\tests\test-*.py`, and
 `tests\test-staff-commands.js`, which imports bot.py. On the shipping machine
 the default was 3.12 with no discord.py, so every bot harness stopped on its
 first import with nothing to do with the change being tested (#1008). From
@@ -380,7 +380,7 @@ through the gate instead, with `gh` signed in as somebody who may run workflows 
 `pwsh scripts/vps/Box-Run.ps1 -Line '<verb>'` ([E. VPS](#e-vps)). Ships go
 the same way (`Ship-Dev`, `Ship-Main`), so a machine without a key can still
 release; the scripts that ssh to the VPS themselves (`Ship`, `Deploy-*`,
-`Request-Restart`, `Install-Bot`, `Publish-Installer`, `Publish-News`) do not
+`Request-Restart`, `Install-Bot`, `Publish-Installer`) do not
 run from it, and Ship stops before it builds anything there: the feed and its
 baseline are received from the VPS (#907).
 
@@ -1304,7 +1304,7 @@ from the board, none of these three puts an issue aside:
   taken from Vortex's own mods folder, and nothing else of that folder is
   read. Scan names the folder, Fix and Settings point the launcher at it,
   and with no Steam copy on the machine it refuses (OwnGame.DeploysInto,
-  Gather, tests\test-vortex-folder.ps1). Djinn to agree it in #staff-updates.
+  Gather, launcher\tests\test-vortex-folder.ps1). Djinn to agree it in #staff-updates.
   Decided by Patrick on 29 Sep (#1218, #1226): the Steam copy is the
   person's, to play vanilla at any build with their own mods, and Thornswood
   runs entirely from its own folder. With the own folder chosen in the setup
@@ -1315,7 +1315,7 @@ from the board, none of these three puts an issue aside:
   on and made the next start takes Thornswood's files back out of the Steam
   copy, once (OwnGame.CleanSteamCopy); an existing own folder gets the same
   from its next update. Steam's "Wait until I launch the game" is set only
-  until the folder exists (tests\test-own-folder-first.ps1).
+  until the folder exists (launcher\tests\test-own-folder-first.ps1).
   Decided by Patrick on 29 Sep (#1232): `Thornswood\Game` takes only
   Skyrim's own files (from the Steam copy when it is on the pinned build, or
   the Downgrade's download; for a ship root, also from a folder that holds
@@ -1325,7 +1325,7 @@ from the board, none of these three puts an issue aside:
   `records\skyrim-files.json`, read out of the depot manifests the Downgrade
   uses, never a guess by folder. A mod put into the Steam copy by hand stays
   there, and a folder made before this loses such files at its next refresh,
-  logged (OwnGameKinds.cs, tests\test-own-folder-alone.ps1).
+  logged (OwnGameKinds.cs, launcher\tests\test-own-folder-alone.ps1).
   Decided by Patrick on 29 Sep (#1247) and changed on 27 Oct (#3715): the
   behavior files and the BodySlide bodies are made in Thornswood's own
   folder, never in the Steam copy, and since #3715 by every launcher on its
@@ -1451,7 +1451,11 @@ The short form of the rules. The same decisions, with the dates they were made, 
   on 25 Sep 35 pull requests were merged with their VPS build red and 18 with
   no build at all, and main went red with them, so since 31 Oct (#3683,
   `records/github-repo-settings.json`) the ruleset named main requires
-  `Build check result` and has an empty bypass list. A ruleset holds the
+  `Build check result` and has an empty bypass list. `Test tasks in the
+  pull request` and `Release note` are required beside it, on the pull
+  request and again in the merge queue: on 1 Nov the queue landed a pull
+  request whose Release note check was red, and every merge release after it
+  stopped at its notes. A ruleset holds the
   admin account too, whatever `enforce_admins` says, so GitHub refuses a
   merge past red for everybody. And since 31 Oct auto-merge is on (#5182,
   Patrick's A): turn it on when the pull request opens, with
@@ -1615,11 +1619,12 @@ The short form of the rules. The same decisions, with the dates they were made, 
   #1343) and the count of silent catches (#5292). The job "Launcher builds",
   on a Windows runner, checks the launcher window and its UI thread, builds
   the launcher with MSBuild from its project files, held to its sources
-  (`tests\test-498-msbuild.ps1`, issue #498). A pull request that changes only files under
+  (`launcher\tests\test-498-msbuild.ps1`, issue #498). A pull request that changes only files under
   `docs`, `site` or `bot` skips it, because nothing it checks reads those
   folders (`scripts\dev\Launcher-Reach.ps1`, #5292). Beside them, the job
   "gate" runs
-  the gate harnesses (every `tests\test-*.js` and `tests\test-*.ps1` that
+  the gate harnesses (every `test-*.js` and `test-*.ps1` in `tests` or in a
+  product's own `tests` folder, such as `launcher\tests`, that
   `tests\gate-excluded.txt` does not name, side by side through
   `scripts\dev\Nightly-Harnesses.ps1`, issues #3009 and #3114) in up to five
   shares on hosted Windows runners at once, `Gate harnesses (1 of 5)` to
@@ -1844,8 +1849,8 @@ The machine that runs `Ship.ps1` still has to sign the build. `records\signing\s
 | Dev release | `.\scripts\release\Ship.ps1 -Channel dev` plus the note | Dev feed, dev launcher News tab, dev updates channel in Discord |
 | Main release | `.\scripts\release\Ship.ps1` plus the note | Live feed, launcher News tab, the site news page, Discord #news |
 | Discord news | Ship posts it. To post the current feed again: `.\scripts\ops\Publish-Discord.ps1` or `.\scripts\ops\Publish-Discord.ps1 -Dev` | #news for main, the dev updates channel for dev |
-| Game news | The same note. The launcher News tab reads the feed. The site news page is `.\scripts\ops\Publish-News.ps1`, which a main Ship already runs | Launcher News tab, and https://thornswood.net for main |
-| Docs site | `.\scripts\deploy\Deploy-Docs.ps1` for the app. `.\scripts\deploy\Deploy-Docs.ps1 -Site` for the public pages | https://thornswood.net |
+| Game news | The same note. The launcher News tab reads the feed. The site writes its News page itself from the main feed and its news file (the site's copy or the Release's) within a minute of a new feed (#5187); nothing is run | Launcher News tab, and https://thornswood.net for main |
+| Docs site | The merge's Release, put in by the box deploy agent: the app and the public pages. `.\scripts\deploy\Deploy-Docs.ps1` for the documents, the boards and the password | https://thornswood.net |
 | Dev gamemode | `.\scripts\deploy\Deploy-DevGamemode.ps1` | Dev server only |
 | Live gamemode | `.\scripts\deploy\Deploy-Server.ps1 -GamemodeOnly`, from any machine, needs no server build | Live server |
 | Live server build, or the live settings Deploy-Gamemode writes | `.\scripts\deploy\Deploy-Gamemode.ps1`, then `.\scripts\deploy\Deploy-Server.ps1`, from a machine with the fork built | Live server |
@@ -1862,10 +1867,9 @@ To post the current feed again:
 ```powershell
 .\scripts\ops\Publish-Discord.ps1 -DryRun
 .\scripts\ops\Publish-Discord.ps1 -Dev -DryRun
-.\scripts\ops\Publish-News.ps1 -OutFile news.json
 ```
 
-`-DryRun` and `-OutFile` send nothing. A real post remembers what it already announced and refuses to repeat it. `-Force` is how a deleted post is made again.
+`-DryRun` sends nothing. A real post remembers what it already announced and refuses to repeat it. `-Force` is how a deleted post is made again.
 
 ## 4. How to release to main
 
@@ -2038,7 +2042,7 @@ from that tag (`git checkout -b hotfix/<name> live-<version>`).
 
 Everything else, and which one each change needs, is the list under "After a
 pull request is merged" below: `Deploy-Server.ps1` pushes a server
-build, `Deploy-Server.ps1 -GamemodeOnly` the gamemode from any machine (`Deploy-DevGamemode.ps1` for dev), `Deploy-Docs.ps1` the site, `Install-Bot.ps1` the bot,
+build, `Deploy-Server.ps1 -GamemodeOnly` the gamemode from any machine (`Deploy-DevGamemode.ps1` for dev), the box deploy agent the site and the bot from each merge's Release,
 `Request-Restart.ps1` an announcement. `Rotate-ServerPassword.ps1` changes a
 password nothing checks any more; the secrets table below says why. Every
 script closes the launcher and Skyrim itself when it needs to.
@@ -2059,11 +2063,11 @@ live deploy, which wait for Patrick's word.
 | The gamemode on the dev server | `.\scripts\deploy\Deploy-DevGamemode.ps1` |
 | The gamemode on the live server, `game\gamemode.js` and `game\content\Thornswood-Content.esp` | `.\scripts\deploy\Deploy-Server.ps1 -GamemodeOnly`, from any machine |
 | The live server build, or the live settings Deploy-Gamemode writes | `.\scripts\deploy\Deploy-Gamemode.ps1`, then `.\scripts\deploy\Deploy-Server.ps1`, from a machine with the fork built |
-| The site's app or `site\public` | `.\scripts\deploy\Deploy-Docs.ps1` |
-| The public pages, `site\data\site\*.md` | `.\scripts\deploy\Deploy-Docs.ps1 -Site` |
-| The bot's code or join card art in `bot` | `.\scripts\deploy\Install-Bot.ps1 -CodeOnly` |
+| The site's app or `site\public` | Nothing. The merge's Release carries it and the box deploy agent puts it in within minutes ([docs\DEPLOY-AGENT.md](docs/DEPLOY-AGENT.md)). `Deploy-Docs.ps1` sends no app once the agent has the site; it is for the documents, the boards and the password. |
+| The public pages, `site\data\site\*.md` | Nothing. They ride the same Release, and `Deploy-Docs.ps1 -Site` is refused once the agent has the site. |
+| The bot's code or join card art in `bot` | Nothing. The merge's Release carries it and the deploy agent swaps it in. `Install-Bot.ps1` is for the service, its libraries and its token. |
 | The bot's avatar, `bot\thornswood-bot-*.png` | No script sends it. Upload it by hand in the Discord developer portal. |
-| The voice service, `voice\voice-server.js` or `voice\headlines.js` | `.\scripts\deploy\Install-Voice.ps1` |
+| The voice service, `voice\voice-server.js` or `voice\headlines.js` | Dev voice: nothing, it goes in with the merge's Deployment to Dev. Live voice: `.\scripts\deploy\Install-Voice.ps1` |
 | Scripts that only change how a release is built (Ship.ps1, Publish-Update.ps1, the Deploy scripts) | Nothing more. The pull is the change. |
 
 3. Everybody else, once it is out, from the main folder: `git checkout main`, then
@@ -2170,7 +2174,7 @@ the game itself comes from the Steam copy (`OwnGame.Source`, the one Downgrade
 keeps on the server's build), and the mods are exactly the files Vortex's
 records in that folder list, linked or copied from Vortex's staging folder.
 With no Steam copy on the machine the folder is not made.
-`tests\test-vortex-folder.ps1` proves it.
+`launcher\tests\test-vortex-folder.ps1` proves it.
 
 **The client.** The SkyMP client runtime is built from the fork, the
 `engine\skymp` submodule on `thornswood/engine-changes`: `npx webpack` in
@@ -2610,14 +2614,13 @@ The website is the `site` folder. Public pages are `site\data\site`. On the VPS 
 
 #### Deploy
 
-From your clone, after the pull request that changed the site is merged:
+Nothing to run: the merge's Release carries the app and the public pages, and the box deploy agent puts them in within minutes ([docs\DEPLOY-AGENT.md](docs/DEPLOY-AGENT.md)). An older copy goes back by its tag:
 
 ```powershell
-.\scripts\deploy\Deploy-Docs.ps1
-.\scripts\deploy\Deploy-Docs.ps1 -Site
+pwsh scripts/vps/Box-Run.ps1 -Line 'Deploy-Release -Environment site -Tag <tag>'
 ```
 
-The first command deploys the app. `-Site` deploys the public pages. News for a main release is [section 4](#4-how-to-release-to-main).
+`Deploy-Docs.ps1` is for the documents, the boards and the password, and for a new box before the agent has the site. News for a main release is [section 4](#4-how-to-release-to-main).
 
 #### Learn more about Website
 

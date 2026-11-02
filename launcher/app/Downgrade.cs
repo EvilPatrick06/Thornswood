@@ -57,7 +57,7 @@ namespace Thornswood
         // What follows is only for a launcher that has never had them from the
         // feed. The same numbers are in records\skyrim-pin.json,
         // Config.ExpectedExeBytes and Setup-Thornswood.ps1, and
-        // tests\test-skyrim-pin.ps1 fails when any of them disagree.
+        // launcher\tests\test-skyrim-pin.ps1 fails when any of them disagree.
         //
         // Depot id -> the manifest of that depot at 1.6.1170.
         static readonly string[][] FallbackDepots = {

@@ -213,7 +213,7 @@ namespace Thornswood
                     // Diagnostics, where Scan and Fix are since #607 and which
                     // the rail still shows. It was the Mods page until #982,
                     // which by then had no Fix on it and no rail button back.
-                    // tests\test-refused-play-page.js holds this to the page
+                    // launcher\tests\test-refused-play-page.js holds this to the page
                     // that has BtnFix in ui.xaml.
                     ShowPage(PageDiag);
 

@@ -251,6 +251,25 @@ a copy of dev that nobody plays on:
    next pass, with its own server log at
    `C:\Thornswood-BotPass\run\server\bot-pass-server.log`;
    `Install-DeployAgent -Status` prints the last pass.
+6. A pass that writes no result says where it got to, in the Deployment's
+   log and in `-Status`: what Task Scheduler says of the task at the limit,
+   the pass's own last lines (`run\bot-pass.log`, which Bot-Pass.js writes
+   with the time as each step starts and ends, since the task keeps no
+   output and result.json is written only at the end) and the copy's
+   server's last lines, with addresses taken out. Deployment 7480554210 ran
+   out at 30 minutes and said nothing more, which is why. The task takes one
+   run at a time and Task Scheduler ignores a start while one runs
+   (`IgnoreNew`), so a pass is not started while the task is still running:
+   the Deployment fails saying so, rather than waiting on the older run as
+   if it were its own.
+7. No pass's logs are lost to the next one. Before a pass empties the run
+   folder, the agent copies the last pass's `bot-pass.log`,
+   `bot-pass-server.log` and `result.json` to
+   `C:\Thornswood-BotPass\passes\<when it last wrote>-<its Deployment>`
+   (`run\pass.txt` names the Deployment; a pass from an agent before that is
+   kept as `unnamed`). The newest 30 stay, and of a log past 8 MiB its end.
+   `Install-DeployAgent -Status` lists them and `-Status -Pass <name>` prints
+   one.
 
 The bot pass rides in the gamemode Release as a part of its own, `bot`
 (merge-release.yml, `New-SignedManifest.ps1 -BotFiles`), so the bot that
@@ -311,6 +330,12 @@ install has set it up (the task `Thornswood Docs`, the service
 `ThornswoodBot`, the task `Thornswood Dev Voice`). The site's and the bot's
 Deployment logs go in the dev server's data folder beside dev's. The gate's
 `Deploy-Release -Environment site` or `discord` rolls either back by tag.
+
+Once `agent.json` names the site, `Deploy-Docs.ps1` sends neither the app
+nor the public pages and refuses `-Site`: two senders of the same files
+would each put back what the other put in. It still sends the documents,
+the boards and the password, sets up the task, and sends the app on a new
+box before the agent has the site.
 
 ## Release news
 

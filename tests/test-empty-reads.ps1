@@ -12,7 +12,6 @@
     Restore-Backup.ps1 and vps-nightly-backup.ps1  the passphrase file
     Set-DevNews.ps1 -Check                         bot\dev-channel.txt
     Discord-Hook.ps1 -Check                        the local webhook copy
-    Publish-News.ps1                               news-from.txt (lifted)
     Source-Notice.ps1 Get-SourceNoticeEntries      client-build.json
     Package-Thornswood.ps1 Get-SourceNotice        both build records (lifted)
   Scratch folders and scratch copies only; the VPS is a stub that answers
@@ -65,15 +64,6 @@ try {
     $null = Empty (Join-Path $dh 'bot\dev-webhook.txt')
     $r = Child @((Join-Path $dh 'scripts\ops\Discord-Hook.ps1'), '-Name', 'dev', '-Check', '-RemoteScript', $stub)
     Yes 'Discord-Hook -Check: an empty local copy reads as no webhook' ($r.Code -eq 0 -and $r.Out -match 'no dev webhook on the VPS yet' -and $r.Out -notmatch $null_)
-
-    # ---- Publish-News, its news-from.txt read lifted out --------------------------
-    $pn = [Management.Automation.Language.Parser]::ParseFile((Join-Path $Repo 'scripts\ops\Publish-News.ps1'), [ref]$null, [ref]$null)
-    $ifFrom = $pn.Find({ param($n) $n -is [Management.Automation.Language.IfStatementAst] -and $n.Clauses[0].Item1.Extent.Text -eq '-not $From' }, $true)
-    Yes 'the news-from.txt read lifted out of Publish-News.ps1' ($null -ne $ifFrom)
-    $Here = Join-Path $T 'pn'; $null = Empty (Join-Path $Here ('news-from' + '.txt'))   # built: the file is Publish-News's, not the repository's; $From = ''
-    $threw = ''
-    try { & { $ErrorActionPreference = 'Stop'; . ([scriptblock]::Create($ifFrom.Extent.Text)); $script:gotFrom = $From } } catch { $threw = $_.Exception.Message }
-    Yes ("Publish-News: an empty news-from.txt is no cut-off, not an error ({0})" -f $threw) (-not $threw -and $script:gotFrom -eq '')
 
     # ---- the build records ---------------------------------------------------------
     . (Join-Path $Repo 'scripts\release\Source-Notice.ps1')
