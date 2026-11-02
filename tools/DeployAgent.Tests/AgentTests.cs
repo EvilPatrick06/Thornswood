@@ -31,6 +31,10 @@ sealed class FakeGitHub : HttpMessageHandler
     /// <summary>The answer to a run or approvals read, when not 200 (an App without Actions: read).</summary>
     public HttpStatusCode? RunsAnswer { get; set; }
     public Func<HttpRequestMessage, HttpResponseMessage>? Other { get; set; }
+    /// <summary>Awaited before a list of an environment's Deployments is
+    /// answered, with that environment: a test holds one environment's pass
+    /// here to stand for an apply that takes a long time.</summary>
+    public Func<string, Task>? BeforeDeployments { get; set; }
     /// <summary>What a compare of two commits names; null answers 404.</summary>
     public List<string>? Changed { get; set; } = new();
     public readonly List<string> Compared = new();
@@ -111,6 +115,7 @@ sealed class FakeGitHub : HttpMessageHandler
         var body = r.Content == null ? "" : await r.Content.ReadAsStringAsync(ct);
         var p = r.RequestUri.AbsolutePath;
         var q = System.Web.HttpUtility.ParseQueryString(r.RequestUri.Query);
+        if (r.Method == HttpMethod.Get && p == "/repos/O/R/deployments" && BeforeDeployments is { } before) await before(q["environment"] ?? "");
         lock (gate)
         {
             const string ar = "/repos/O/R/actions/runs/";
@@ -1238,9 +1243,15 @@ public sealed class AgentTests : IDisposable
         var state = Path.Combine(cfg.Home, "state", "working.json");
         Directory.CreateDirectory(Path.GetDirectoryName(state)!);
         File.WriteAllText(state, $"{{\"Deployment\":\"{id}\",\"Env\":\"dev\",\"Started\":\"then\"}}");
+        // And the record an environment's own loop keeps (Run, #5190).
+        var id2 = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-2\"}");
+        var state2 = Path.Combine(cfg.Home, "state", "working-dev.json");
+        File.WriteAllText(state2, $"{{\"Deployment\":\"{id2}\",\"Env\":\"dev\",\"Started\":\"then\"}}");
         await a.Start(default);
         HasStates(gh, s, id, "error", last: true);
+        HasStates(gh, s, id2, "error", last: true);
         Assert.False(File.Exists(state));
+        Assert.False(File.Exists(state2));
     }
 
     // ---- after a dev Deployment: the load order and the parity check -------------
