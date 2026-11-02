@@ -12,8 +12,8 @@
   -FromFeed, the main release, and the gate runs it only when main is at the
   commit -Build names (the build Patrick gave his word for). Neither sends a
   launcher: since #4825 Ship sends none, and the launcher goes out only
-  through Velopack (merge-release.yml, promote-main.yml), so the -ModsOnly
-  these verbs took to keep the feed's launcher went with it.
+  through Velopack (merge-release.yml, promote-main.yml), so the switch these
+  verbs once took to keep the feed's launcher went with it.
 
   WHAT IS DIFFERENT FROM ONE. Nothing in Ship.ps1. Its box steps
   (Publish-Update, Sync-Client, the feed store,

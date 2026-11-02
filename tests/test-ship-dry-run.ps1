@@ -62,17 +62,10 @@
   And the release tag (#444): R pushes release/main/<id> once, after the
   publisher said it sent the feed; D, V and E make no tag at all.
 
-  R also proves the launcher that ships is the one CI built, not one compiled
-  here (issue #457). A real main Ship never calls Build-Launcher.ps1: it finds
-  the tag's draft in GitHub's REST list of releases and downloads each file by
-  its asset id (gh api, issue #2432, since gh release download asks GraphQL),
-  checks the exe against its SHA256SUMS, and only then installs and packs it.
-  The gh stand-in answers the list with a draft for the tag, shaped as
-  release.yml drafts it since #4823, and each asset with a Thornswood.exe, a
-  native library beside it and a matching SHA256SUMS, so the
-  verification passes and the path is exercised. A dev build and a dry run
-  still compile locally, which is why V and D call Build-Launcher and ask
-  nothing of gh.
+  No Ship builds, fetches or publishes a launcher (#4825): the launcher goes
+  out through Velopack (merge-release.yml, promote-main.yml), so every case
+  holds that Build-Launcher.ps1 and Install-Launcher.ps1 are never called and
+  the publisher is given no launcher.
 
   The stand-ins are only worth what the real scripts do, so one of those is
   read as well: Publish-Update.ps1 has no gh or git call that reaches GitHub,
@@ -807,8 +800,8 @@ if ($target -match '^repos/[^/]+/[^/]+/actions/workflows/release\.yml/runs\?') {
         Yes ("L the same folder with node and a check that passes runs to the end (exit {0})" -f $l.Code) ($l.Code -eq 0 -and $l.Out -match 'Dry run finished')
         if ($l.Code -ne 0) { $l.Out -split "`r?`n" | Select-Object -Last 15 | ForEach-Object { Write-Host ("      " + $_) } }
         Yes '  and the check ran once' ((Called $l 'node').Count -eq 1)
-        Yes '  and the release was built and published, told not to upload or push' (
-            (Called $l 'Build-Launcher').Count -eq 1 -and @(Called $l 'Publish-Update' | Where-Object { $_ -match ' -NoPush\b' }).Count -eq 1)
+        Yes '  and the release was published, told not to upload or push, with no launcher built' (
+            (Called $l 'Build-Launcher').Count -eq 0 -and @(Called $l 'Publish-Update' | Where-Object { $_ -match ' -NoPush\b' }).Count -eq 1)
 
         # And a mismatch, exit 2, refuses as it did (#960).
         $env:TS_NODE_EXIT = '2'
