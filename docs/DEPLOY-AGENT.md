@@ -457,7 +457,10 @@ token, what the newest Deployment says, and whether the dev server answers.
   from leaving it alone, a record change moving it, a move that fails
   failing the Deployment and being tried by the next, parity rows that
   cannot be filed or a parity check that fails leaving the Deployment a
-  success, and the gate's pipe read against a stand-in broker.
+  success, and the gate's pipe read against a stand-in broker; and a file
+  replaced while a reader holds it sharing delete (the swap is a POSIX
+  rename on Windows, as Feed-Store.ps1's is, because MoveFileEx is refused
+  while the engine has gamemode.js open, #2727).
   `dotnet test tools/DeployAgent.Tests` runs them.
 - `tests/test-5180-deploy-agent.ps1` checks the manifest script, both gate
   verbs, the scripts they send the box, and both workflows, and runs the C#
