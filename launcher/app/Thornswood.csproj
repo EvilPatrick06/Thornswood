@@ -53,6 +53,14 @@
     <PackageReference Include="Avalonia" Version="12.1.4" />
     <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    <!-- Avalonia brings Avalonia.BuildServices, whose only part is a build
+         step that starts a process to send Avalonia statistics about each
+         build. Nothing of it is used: the launcher sends nothing nobody asked
+         for, and that process outlived the build with its working folder in
+         the build's own folder, which Windows then could not move or remove
+         (the harness builds, 2 Nov 2026). Its version is the one Avalonia
+         names. -->
+    <PackageReference Include="Avalonia.BuildServices" Version="11.3.2" ExcludeAssets="all" PrivateAssets="all" />
     <!-- The menu theme's MP3 decoder (MenuMusic.cs), MIT, THIRD-PARTY.md. -->
     <PackageReference Include="NLayer" Version="3.0.0" />
     <!-- DPAPI for the keys the launcher keeps on this PC (Secrets.cs); on

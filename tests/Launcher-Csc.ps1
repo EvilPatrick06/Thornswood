@@ -129,8 +129,12 @@ $launcherCopied = @(& {
     }
 })
 $launcherPackages = @(& {
+    # Each with the assets it leaves out, as the project says (the project
+    # leaves Avalonia.BuildServices out whole).
     foreach ($ref in $launcherProjXml.SelectNodes('//ItemGroup/PackageReference')) {
-        '    <PackageReference Include="' + [Security.SecurityElement]::Escape($ref.Include) + '" Version="' + [Security.SecurityElement]::Escape($ref.Version) + '" />'
+        $line = '    <PackageReference Include="' + [Security.SecurityElement]::Escape($ref.Include) + '" Version="' + [Security.SecurityElement]::Escape($ref.Version) + '"'
+        foreach ($a in 'ExcludeAssets', 'PrivateAssets') { if ($ref.HasAttribute($a)) { $line += ' ' + $a + '="' + [Security.SecurityElement]::Escape($ref.GetAttribute($a)) + '"' } }
+        $line + ' />'
     }
 })
 # For -Launcher: the project's resources, each as a full path and the name
@@ -254,7 +258,13 @@ function Build-LauncherCode {
             [IO.File]::WriteAllText((Join-Path $work ('source' + $i + '.cs')), $Source[$i], $utf8)
         }
         $bin = Join-Path $work 'bin'
-        $said = & $LauncherDotnet build (Join-Path $work 'launcher-code.csproj') -c Release -o $bin -nologo -v:q '-clp:NoSummary;ErrorsOnly' 2>&1 | Out-String
+        # --disable-build-servers: no MSBuild node or compiler server outlives
+        # the build. One that did kept files under the build's own folder open,
+        # and on Windows that folder could then be neither moved into place
+        # nor removed ("being used by another process", the first Windows run
+        # of these harnesses, 2 Nov 2026), and it was left running after the
+        # harness ended.
+        $said = & $LauncherDotnet build (Join-Path $work 'launcher-code.csproj') -c Release -o $bin -nologo -v:q '-clp:NoSummary;ErrorsOnly' --disable-build-servers 2>&1 | Out-String
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath (Join-Path $bin ($name + '.dll')))) {
             throw ('Build-LauncherCode: the .NET SDK refused it:' + [Environment]::NewLine + $said.Trim())
         }
@@ -299,7 +309,7 @@ function Build-LauncherProject {
     try {
         $bin = Join-Path $work 'bin'
         $sep = [IO.Path]::DirectorySeparatorChar
-        $said = & $LauncherDotnet build $launcherProjPath -c Release -o $bin ('-p:BaseIntermediateOutputPath=' + (Join-Path $work 'obj') + $sep) ('-p:BaseOutputPath=' + (Join-Path $work 'out') + $sep) '-p:CreateHardLinksForCopyLocalIfPossible=true' -nologo -v:q '-clp:NoSummary;ErrorsOnly' 2>&1 | Out-String
+        $said = & $LauncherDotnet build $launcherProjPath -c Release -o $bin ('-p:BaseIntermediateOutputPath=' + (Join-Path $work 'obj') + $sep) ('-p:BaseOutputPath=' + (Join-Path $work 'out') + $sep) '-p:CreateHardLinksForCopyLocalIfPossible=true' -nologo -v:q '-clp:NoSummary;ErrorsOnly' --disable-build-servers 2>&1 | Out-String
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath (Join-Path $bin 'Thornswood.dll'))) {
             throw ('Build-LauncherProject: the .NET SDK refused launcher\app\Thornswood.csproj:' + [Environment]::NewLine + $said.Trim())
         }

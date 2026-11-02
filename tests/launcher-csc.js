@@ -82,8 +82,13 @@ function esc(s) {
 const copied = ['Nullable', 'ImplicitUsings', 'AllowUnsafeBlocks', 'EnableWindowsTargeting', 'AvaloniaUseCompiledBindingsByDefault']
   .filter((n) => prop(n) !== null).map((n) => '    <' + n + '>' + esc(prop(n)) + '</' + n + '>');
 const packages = [];
-for (const m of proj.matchAll(/<PackageReference\s+Include="([^"]+)"\s+Version="([^"]+)"\s*\/>/g)) {
-  packages.push('    <PackageReference Include="' + esc(m[1]) + '" Version="' + esc(m[2]) + '" />');
+// Each with the assets it leaves out, as the project says (the project
+// leaves Avalonia.BuildServices out whole).
+for (const m of proj.matchAll(/<PackageReference\s+([^>]*?)\/>/g)) {
+  const attr = (n) => { const a = new RegExp('\\b' + n + '="([^"]*)"').exec(m[1]); return a ? a[1] : null; };
+  let line = '    <PackageReference Include="' + esc(attr('Include')) + '" Version="' + esc(attr('Version')) + '"';
+  ['ExcludeAssets', 'PrivateAssets'].forEach((a) => { if (attr(a) !== null) line += ' ' + a + '="' + esc(attr(a)) + '"'; });
+  packages.push(line + ' />');
 }
 // The project's resources, each as a full path and the name the code asks
 // for, read from the project the way the packages are.
@@ -201,8 +206,11 @@ function build(opts) {
     fs.writeFileSync(path.join(work, 'launcher-code.csproj'), text);
     sources.forEach((s, i) => fs.writeFileSync(path.join(work, 'source' + i + '.cs'), s));
     const bin = path.join(work, 'bin');
+    // --disable-build-servers: no MSBuild node or compiler server outlives the
+    // build, holding files under its folder open so that on Windows the folder
+    // can be neither moved into place nor removed (tests\Launcher-Csc.ps1).
     const r = cp.spawnSync(dotnet, ['build', path.join(work, 'launcher-code.csproj'), '-c', 'Release', '-o', bin,
-      '-nologo', '-v:q', '-clp:NoSummary;ErrorsOnly'], { encoding: 'utf8' });
+      '-nologo', '-v:q', '-clp:NoSummary;ErrorsOnly', '--disable-build-servers'], { encoding: 'utf8' });
     if (r.status !== 0 || !fs.existsSync(path.join(bin, name + '.dll'))) {
       throw new Error('launcher-csc build: the .NET SDK refused it:\n' + ((r.stdout || '') + (r.stderr || '')).trim());
     }
@@ -251,7 +259,7 @@ function buildProject() {
       '-p:BaseIntermediateOutputPath=' + path.join(work, 'obj') + path.sep,
       '-p:BaseOutputPath=' + path.join(work, 'out') + path.sep,
       '-p:CreateHardLinksForCopyLocalIfPossible=true',
-      '-nologo', '-v:q', '-clp:NoSummary;ErrorsOnly'], { encoding: 'utf8' });
+      '-nologo', '-v:q', '-clp:NoSummary;ErrorsOnly', '--disable-build-servers'], { encoding: 'utf8' });
     if (r.status !== 0 || !fs.existsSync(path.join(bin, 'Thornswood.dll'))) {
       throw new Error('launcher-csc buildProject: the .NET SDK refused launcher/app/Thornswood.csproj:\n' + ((r.stdout || '') + (r.stderr || '')).trim());
     }

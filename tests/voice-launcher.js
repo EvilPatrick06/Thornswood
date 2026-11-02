@@ -78,7 +78,7 @@ function build() {
   const root = path.join(os.tmpdir(), 'thornswood-voice-driver', key);
   const dll = path.join(root, 'out', 'VoiceDriver.dll');
   if (!fs.existsSync(dll)) {
-    const r = cp.spawnSync(dotnet, ['build', PROJ, '-c', 'Release', '-nologo', '-v', 'q',
+    const r = cp.spawnSync(dotnet, ['build', PROJ, '-c', 'Release', '-nologo', '-v', 'q', '--disable-build-servers',
       '-o', path.join(root, 'out'), '-p:VoiceDriverObj=' + path.join(root, 'obj') + path.sep],
     { encoding: 'utf8', env: Object.assign({}, process.env, { DOTNET_CLI_TELEMETRY_OPTOUT: '1', DOTNET_NOLOGO: '1' }) });
     if (r.status !== 0 || !fs.existsSync(dll)) {

@@ -93,7 +93,9 @@ function Build-FrameworkCode {
             [IO.File]::WriteAllText((Join-Path $work ('source' + $i + '.cs')), $Source[$i], $utf8)
         }
         $bin = Join-Path $work 'bin'
-        $said = & $LauncherDotnet build (Join-Path $work 'framework-code.csproj') -c Release -o $bin -nologo -v:q '-clp:NoSummary;ErrorsOnly' 2>&1 | Out-String
+        # --disable-build-servers, as in Launcher-Csc.ps1: nothing of the
+        # build may hold this folder once it is done.
+        $said = & $LauncherDotnet build (Join-Path $work 'framework-code.csproj') -c Release -o $bin -nologo -v:q '-clp:NoSummary;ErrorsOnly' --disable-build-servers 2>&1 | Out-String
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath (Join-Path $bin (Split-Path -Leaf $built)))) {
             throw ('Build-FrameworkCode: the .NET SDK refused it at C# ' + $LangVersion + ' against the .NET Framework:' + [Environment]::NewLine + $said.Trim())
         }

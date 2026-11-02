@@ -343,7 +343,7 @@ else:
 </Project>
 ''')
         write(proj / 'Driver.cs', DRIVER)
-        build = subprocess.run([dotnet, 'build', str(proj), '-c', 'Release', '-o', str(proj / 'bin'), '-nologo', '-v', 'q'],
+        build = subprocess.run([dotnet, 'build', str(proj), '-c', 'Release', '-o', str(proj / 'bin'), '-nologo', '-v', 'q', '--disable-build-servers'],
                                capture_output=True, text=True)
         check('the install steps build on their own with the .NET SDK', build.returncode == 0)
         if build.returncode != 0:
