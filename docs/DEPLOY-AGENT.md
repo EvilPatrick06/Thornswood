@@ -29,20 +29,54 @@ build** (the engine).
 | --- | --- |
 | Dev gamemode | Applied by the agent: a merge that changes `game/gamemode.js` makes a signed Release and a Deployment, and the agent reloads the dev server's gamemode with nobody dropped. The gate's `Deploy-Release` verb puts in any such Release by its tag. |
 | Dev engine (the server build) | Applied by the agent (#5219): every Release carries the server build its commit records, and when dev runs another one the agent stops dev, swaps in the build and the gamemode together and starts it under a hold. So a merged engine pin reaches dev with no Publish-Server and no Deploy-DevGamemode. See "A new server build" below. |
-| Dev plugins, settings | Not yet. Like the engine they need a stop and a swap under a hold, but nothing puts them on a Release yet. Deploy-DevGamemode and Ship still do them. |
+| Dev plugins and load order | Moved by the agent after a dev Deployment (#5180): when the Deployment's commit changed what the order is made from since the agent last moved it (`records/collection-plugins.json`, `records/collection-dropped.json`, `game/data/last-plugin.json` or `.recipe`, `game/content/Thornswood-Content.esp`), the agent asks the gate for `Deploy-DevGamemode -LoadOrder -FromRecord -ShipFollows`, the tested move a person runs with Box-Run. See "After a dev Deployment" below. Settings flags (`-RequirePass`, `-Npcs` and the like) stay a person's Deploy-DevGamemode run. |
 | Main | Applied by the agent once `Install-DeployAgent -Main` has run (#5181): the same Release dev ran, after Patrick approves its promotion on GitHub. See "Main" below. |
 | Site, Discord bot | Applied by the agent (#5190, #5187): a merge that changes either makes a Deployment to **Site** or **Discord bot** with the Release's `site.zip` or `discord.zip`, and the agent swaps it in the way Deploy-Docs and Install-Bot -CodeOnly do. See "The site, the Discord bot and voice" below. |
 | Dev voice | Applied with dev's Deployment (#5187): voice has no Deployment of its own, because the gamemode pushes positions to it. |
 | Release news | After a Deployment goes in, the agent leaves its Release's notes for the bot, which posts them once (#5187). See "Release news" below. |
 | Launcher and game files | Not the agent's job: they reach people through the launcher's feed and a Ship. Since #5179 every Release carries them as well (the signed launcher, the game files and the Velopack packages of both), attested, for the launcher's move to Velopack; the agent logs them as left alone. |
 | Bot pass before each dev Deployment | Once `Install-DeployAgent` has set up its task, every Deployment waits on a bot pass on a throwaway copy of dev with the new gamemode (#5196, below). A FAIL fails the Deployment and dev keeps what it runs. A deploy by tag (the gate's `Deploy-Release`, a rollback) does not wait on one. |
-| Parity check after a deploy | Not yet. The agent is to run `Check-ProdParity.ps1` after each deploy and file what differs as an issue, never putting it back by itself. That needs the parity scripts on the box from a signed Release, and the App to hold Issues write; until then the `Check-ProdParity` gate verb runs it. |
+| Parity check after a dev Deployment | Run by the agent (#5180): once a dev Deployment is in, it asks the gate for `Check-ProdParity` and opens one issue labelled `parity` for each row to review that has no open issue by the same title. It never puts anything back by itself and never changes how the Deployment went. See "After a dev Deployment" below. |
 
 The old way keeps working beside the agent until the agent has proved itself
 on dev. Both take the server folders' turn (#3247), so they never put files
 in at the same time, and the agent's put-back folder has the same shape as
 Deploy-DevGamemode's, so `Deploy-DevGamemode.ps1 -PutBack` puts back what
 the agent put in.
+
+## After a dev Deployment
+
+Two steps run through the deploy gate once the service has put a dev
+Deployment in. The gate runs main's own scripts with the verbs main's
+`verbs.json` allows, one verb at a time, so the agent can ask for nothing a
+person at Box-Run could not, and a verb already running is waited for by the
+connect (up to 50 minutes) rather than tried again. Only the service takes
+these steps: a deploy by tag can itself be running inside a gate verb, and
+would then wait on itself.
+
+**The load order and plugins.** The agent keeps, in
+`C:\Thornswood-Agent\state\load-order-dev.json`, the commit whose records it
+last moved dev's order to. When the Deployment's commit is another one, it
+asks GitHub to compare the two. When the compare names one of the files the
+order is made from, or GitHub cannot say in full (no record yet, a compare
+over 300 files, a commit GitHub does not know), it runs
+`Deploy-DevGamemode -LoadOrder -FromRecord -ShipFollows`: the order from
+`game/data/last-plugin.json`, the collection's plugins from the box's store
+of the revision `records/collection-plugins.json` names, each held to its
+sha256, and a drop only where `records/collection-dropped.json` allows it.
+When that ends with anything but 0, the Deployment fails with the gamemode
+in and says the plugins are not, and the record is not moved, so the next
+Deployment moves them again. The gate runs main as it is then, so when main
+has moved past the Deployment the agent records the commit the gate said it
+ran, and dev has that commit's order and gamemode until its own Deployment.
+
+**The parity check.** After the status is set, the agent asks the gate for
+`Check-ProdParity`, reads each `REVIEW` row and opens an issue labelled
+`parity` for it, unless an open issue has the same title. The token for this
+is minted apart from the service's own, asking only **Issues: write**, so an
+App without it costs only the filing: the log says the rows were not filed
+and the Deployment stays a success. Addresses are taken out of every gate
+line before it reaches the deploy log, which the resources port serves.
 
 ## Deploying a Release by its tag, and rolling back
 
@@ -209,7 +243,11 @@ a copy of dev that nobody plays on:
 The bot pass rides in the gamemode Release as a part of its own, `bot`
 (merge-release.yml, `New-SignedManifest.ps1 -BotFiles`), so the bot that
 checks a gamemode comes from the same commit and is signed with it. A change
-to the bot alone makes a Release too.
+to the bot alone makes a Release too. The agent puts that part into the
+copy's `bot` folder whole, every file the signed manifest lists, and needs
+only `Bot-Pass.js` among them, the file the task runs; a part without it
+fails the Deployment. So a file the bot comes to carry (its relay client and
+the voice service it joins, #5196) needs no change to the agent.
 
 Setting it up is part of `Install-DeployAgent`, once dev's engine has the
 bot client (`createBotClient`, skymp fork #137; the install checks and
@@ -341,7 +379,12 @@ exists with Patrick as its reviewer, and `-NoMain` turns it off.
   an organization (#5184) needs no change here. The App has to hold Deployments first: an owner adds
   **Deployments: Read and write** on the App's permissions page and accepts
   it on the installation. Until then every pass says GitHub gave it no token,
-  and nothing is applied.
+  and nothing is applied. For the parity check's issues it mints a second
+  token asking only **Issues: write** (the App holds it), kept apart so the
+  service's own token never carries it.
+- It asks the deploy gate's broker for two verbs after a dev Deployment
+  (above), over the pipe the broker lets SYSTEM open. The broker holds each
+  line to main's `verbs.json`, as it does a person's.
 - Its folder, `C:\Thornswood-Agent`, takes nothing from `C:\`: SYSTEM and
   Administrators only. `records\runner-isolation.json` keeps every runner
   account out of it.
@@ -414,7 +457,12 @@ token, what the newest Deployment says, and whether the dev server answers.
   stopped, a put back, each refusal, a stop that leaves a process, the bot's
   libraries, voice answering with the old build, the news left after a
   Deployment and not after a failure or a rollback, and two swaps in one
-  second.
+  second; and after a dev Deployment: the first one moving the load order
+  and filing each parity row once, a change to nothing the order is made
+  from leaving it alone, a record change moving it, a move that fails
+  failing the Deployment and being tried by the next, parity rows that
+  cannot be filed or a parity check that fails leaving the Deployment a
+  success, and the gate's pipe read against a stand-in broker.
   `dotnet test tools/DeployAgent.Tests` runs them.
 - `tests/test-5180-deploy-agent.ps1` checks the manifest script, both gate
   verbs, the scripts they send the box, and both workflows, and runs the C#

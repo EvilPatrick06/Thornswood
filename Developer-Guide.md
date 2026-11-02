@@ -201,6 +201,7 @@ winget install --id Git.Git -e --accept-package-agreements --accept-source-agree
 winget install --id GitHub.cli -e --accept-package-agreements --accept-source-agreements
 winget install --id OpenJS.NodeJS.LTS -e --accept-package-agreements --accept-source-agreements
 winget install --id Microsoft.PowerShell -e --accept-package-agreements --accept-source-agreements
+winget install --id Microsoft.DotNet.SDK.10 -e --accept-package-agreements --accept-source-agreements
 winget install --id Microsoft.VisualStudioCode -e --accept-package-agreements --accept-source-agreements
 ```
 
@@ -212,6 +213,7 @@ winget install --id Microsoft.VisualStudioCode -e --accept-package-agreements --
 | GitHub CLI (`gh`) | Pull requests from the terminal. [A. GitHub](#a-github) |
 | Node | The website, voice, and the test command. [J. Node](#j-node) |
 | PowerShell 7 | The terminal the scripts run in. [C. PowerShell](#c-powershell) |
+| .NET 10 SDK (`dotnet`) | Builds and runs the tools written in C#, under `tools`: the release note check `Check-Change.ps1 -Body` runs, and the deploy agent. |
 | Visual Studio Code | The window you edit in. [D. Visual Studio Code](#d-visual-studio-code) |
 
 #### Check that the tools open
@@ -222,6 +224,7 @@ Close that window and open **PowerShell 7** from the Start menu. A new window is
 git --version
 gh --version
 node --version
+dotnet --version
 ssh -V
 code --version
 ```
@@ -845,8 +848,8 @@ Ship, a Deploy-*, Publish-* or Install-* script, a step on the live or dev
 server, a Vortex step) is run by Bramble, from the note the change's pull
 request leaves in the private ops repo's `ops\claude-queue\` folder
 (`ops\README.md` there has the template), once that pull request is merged;
-a main or live run still waits for Patrick's word. Until the switch, the
-Claude Desk runs those notes. Bot branches carry the Bot's name
+a main or live run still waits for Patrick's word. Since 1 Nov the Claude
+Desk neither runs those notes nor merges. Bot branches carry the Bot's name
 (`wisp/3150-what-it-is`). On the shipping machine `C:\Thornswood-Repo` is
 shared and sits detached at `origin/main`: branch work goes in a worktree in
 its ignored `worktrees` folder, removed with its branch once the pull request

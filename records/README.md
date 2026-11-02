@@ -203,6 +203,13 @@ names. No script reads them. `THIRD-PARTY.md` and
   `New-CollectionRecord.ps1`, and its `revision` moves with the records
   that follow a publish.
 - `asset-provenance.json`: the asset provenance register (issue #2177). Every picture, video, sound, font, mesh, texture, interface file and plugin Thornswood hands to people or shows them: where it came from, who made it, its licence or permission, the credit it asks for, who approved it and when, where it is published and its sha256, or which of those is not recorded and who can answer. Files that ship from the game folder but are not in the repository are in it by name, and gallery uploads and the collection's mods are dispositioned. Operator only: nothing that builds a pack, the installer, the launcher or the site reads it. A permission itself is never written in it; an entry says where it is kept. No script writes it: it is changed by hand in the pull request that adds or changes an asset, and `tests	est-asset-provenance.js` fails on a tracked asset with no entry or a changed hash.
+- `cloudflare-tunnel.json`: the Cloudflare Tunnel the site reaches
+  Cloudflare through (#5334): the account, the zone, the tunnel's name, the
+  cloudflared release by SHA-256, the tunnel's routes to Caddy on
+  127.0.0.1:443 and the two DNS names with the box's address.
+  `scripts\deploy\Install-Tunnel.ps1` reads it and makes Cloudflare and the
+  box match it; nothing writes it, and no token is in it. A new cloudflared
+  is its version, URL and SHA-256 changed together, from the release page.
 - `merchant-runtime-provenance.md`: the server module built for merchant
   settlement, and why the six client files kept their e6534129 bytes (fork
   commit a247ef27, 4 October).

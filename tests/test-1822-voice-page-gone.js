@@ -31,7 +31,9 @@
   packs nor sends nor checks for it, making the dev instance copies no page
   from live, the build parses no file there, no harness reads it, and the
   only things that open a socket to the service are the launcher's voice
-  (VoiceSession.cs) and the game's chat overlay.
+  (VoiceSession.cs), the game's chat overlay and the load test's bots
+  (scripts\bot\load-bots.js, #4623), which stand in for the overlay: each
+  gets a join token from /token first, as the overlay does.
 
   VOICE points it at another copy of voice-server.js, which is how it was
   shown to fail on the code before the change. Writes only to a temp folder,
@@ -278,8 +280,9 @@ function get(port, route) {
   const opens = tracked.filter((f) => /\.(js|html)$/.test(f) && !/^(tests|voice|docs|engine|site\/node_modules)\//.test(f) &&
                                f !== 'game/gamemode.js')
     .filter((f) => /new WebSocket\(/.test(read(f)));
-  yes('the only page that opens a socket is the game\'s chat overlay (' + opens.join(', ') + ')',
-      opens.length === 1 && opens[0] === 'game/ui/thornswood-chat.js');
+  const clients = ['game/ui/thornswood-chat.js', 'scripts/bot/load-bots.js'];
+  yes('the only scripts that open a socket are the game\'s chat overlay and the load test\'s bots (' + opens.join(', ') + ')',
+      opens.length === clients.length && clients.every((f) => opens.indexOf(f) >= 0));
   const csOpens = tracked.filter((f) => /^(launcher|installer)\/.*\.cs$/.test(f)).filter((f) => /new ClientWebSocket\(/.test(read(f)));
   yes('and the only C# that opens one is the launcher\'s voice (' + csOpens.join(', ') + ')',
       csOpens.length === 1 && csOpens[0] === 'launcher/app/VoiceSession.cs');

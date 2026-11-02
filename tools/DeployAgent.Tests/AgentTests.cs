@@ -31,6 +31,14 @@ sealed class FakeGitHub : HttpMessageHandler
     /// <summary>The answer to a run or approvals read, when not 200 (an App without Actions: read).</summary>
     public HttpStatusCode? RunsAnswer { get; set; }
     public Func<HttpRequestMessage, HttpResponseMessage>? Other { get; set; }
+    /// <summary>What a compare of two commits names; null answers 404.</summary>
+    public List<string>? Changed { get; set; } = new();
+    public readonly List<string> Compared = new();
+    /// <summary>The repository's issues, as opened.</summary>
+    public readonly List<JsonObject> Issues = new();
+    public readonly List<string> Labels = new();
+    /// <summary>What opening an issue answers, for a token that may not.</summary>
+    public HttpStatusCode IssueAnswer { get; set; } = HttpStatusCode.Created;
 
     public void AddRelease(string tag, Dictionary<string, byte[]> files)
     {
@@ -154,8 +162,53 @@ sealed class FakeGitHub : HttpMessageHandler
                 Downloaded.Add(Names[aid]);
                 return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Files[aid]) };
             }
+            const string cp = "/repos/O/R/compare/";
+            if (p.StartsWith(cp))
+            {
+                Compared.Add(Uri.UnescapeDataString(p[cp.Length..]));
+                return Changed == null ? Json(HttpStatusCode.NotFound, "{\"message\":\"No common ancestor\"}")
+                    : Json(HttpStatusCode.OK, new JsonObject { ["files"] = new JsonArray(Changed.Select(f => (JsonNode)new JsonObject { ["filename"] = f }).ToArray()) }.ToJsonString());
+            }
+            if (p == "/repos/O/R/labels" && r.Method == HttpMethod.Post)
+            {
+                var name = (string)JsonNode.Parse(body)!["name"]!;
+                if (Labels.Contains(name)) return Json(HttpStatusCode.UnprocessableEntity, "{\"message\":\"Validation Failed\"}");
+                Labels.Add(name);
+                return Json(HttpStatusCode.Created, "{}");
+            }
+            if (p == "/repos/O/R/issues" && r.Method == HttpMethod.Get)
+            {
+                var label = q["labels"];
+                return Json(HttpStatusCode.OK, new JsonArray(Issues.Where(i => (string)i["state"]! == q["state"] && i["labels"]!.AsArray().Any(l => (string)l! == label))
+                    .Select(i => i.DeepClone()).ToArray()).ToJsonString());
+            }
+            if (p == "/repos/O/R/issues" && r.Method == HttpMethod.Post)
+            {
+                if (IssueAnswer != HttpStatusCode.Created) return Json(IssueAnswer, "{\"message\":\"Resource not accessible by integration\"}");
+                var i = JsonNode.Parse(body)!.AsObject();
+                i["state"] = "open";
+                Issues.Add(i);
+                return Json(HttpStatusCode.Created, "{}");
+            }
             return Json(HttpStatusCode.NotFound, $"{{\"message\":\"no such path in the stand-in: {p}\"}}");
         }
+    }
+}
+
+// ---- a stand-in gate ----------------------------------------------------------
+
+/// <summary>The deploy gate, answering each verb line with what it was told
+/// to, and keeping the lines it was asked for.</summary>
+sealed class FakeGate : IGate
+{
+    public readonly List<string> Asked = new();
+    public readonly Dictionary<string, GateRun> Answers = new();
+    public Task<GateRun> Run(string line, TimeSpan wait, Action<string> log, CancellationToken ct)
+    {
+        Asked.Add(line);
+        var a = Answers.TryGetValue(line, out var got) ? got : new GateRun(0, []);
+        foreach (var l in a.Lines) log("  gate: " + l);
+        return Task.FromResult(a);
     }
 }
 
@@ -1158,6 +1211,155 @@ public sealed class AgentTests : IDisposable
         Assert.False(File.Exists(state));
     }
 
+    // ---- after a dev Deployment: the load order and the parity check -------------
+
+    const string Before = "fedcba9876543210fedcba9876543210fedcba98";
+    const string Review1 = "REVIEW  firewall Thornswood Dev UDP: expected allow 7787, found missing";
+    const string Review2 = "REVIEW  service Thornswood Voice: expected running on 10.1.2.3, found stopped";
+
+    (Agent a, FakeGitHub gh, FakeServer s, Config cfg, FakeGate gate) MakeAfter(string? movedTo)
+    {
+        var (a, gh, s, _, cfg) = Make();
+        var gate = new FakeGate();
+        a.Gate = gate;
+        a.IssuesGh = new GitHub(FakeGitHub.Api, "O/R", new StaticToken("issues"), new HttpClient(gh));
+        if (movedTo != null)
+        {
+            Directory.CreateDirectory(Path.Combine(cfg.Home, "state"));
+            File.WriteAllText(Path.Combine(cfg.Home, "state", "load-order-dev.json"), $"{{\"Commit\":\"{movedTo}\",\"Moved\":\"then\"}}");
+        }
+        GamemodeRelease(gh, "build-1", "// new gamemode\n");
+        return (a, gh, s, cfg, gate);
+    }
+
+    static string MovedTo(Config cfg) =>
+        JsonNode.Parse(File.ReadAllText(Path.Combine(cfg.Home, "state", "load-order-dev.json")))!["Commit"]!.GetValue<string>();
+
+    [Fact]
+    public async Task TheFirstDevDeploymentMovesTheLoadOrderAndFilesEachParityRowOnce()
+    {
+        var (a, gh, s, cfg, gate) = MakeAfter(null);
+        gate.Answers[Agent.LoadOrderLine] = new GateRun(0, ["gate run x: Deploy-DevGamemode", "main at " + Commit, "the dev server runs the new order"]);
+        gate.Answers["Check-ProdParity"] = new GateRun(0, ["main at " + Commit, Review1, Review2, "40 rows, 2 to review"]);
+        gh.Issues.Add(new JsonObject { ["title"] = "Parity: firewall Thornswood Dev UDP differs on the box", ["state"] = "open", ["labels"] = new JsonArray("parity") });
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        HasStates(gh, s, id, "in_progress,success");
+        Assert.EndsWith("load order moved", (string)gh.Last(id)!["description"]!);
+        Assert.Equal([Agent.LoadOrderLine, "Check-ProdParity"], gate.Asked);
+        Assert.Empty(gh.Compared);
+        Assert.Equal(Commit, MovedTo(cfg));
+        var filed = Assert.Single(gh.Issues.Skip(1));
+        Assert.Equal("Parity: service Thornswood Voice differs on the box", (string)filed["title"]!);
+        Assert.Contains("Expected: running on <address>", (string)filed["body"]!);
+        Assert.Contains("Done when", (string)filed["body"]!);
+        Assert.Equal(["parity"], gh.Labels);
+        var log = File.ReadAllText(Path.Combine(s.Root, "data", $"deploy-{id}.log"));
+        Assert.Contains("parity: already open: Parity: firewall", log);
+        Assert.Contains("parity: filed Parity: service", log);
+        Assert.DoesNotContain("10.1.2.3", log);
+    }
+
+    [Fact]
+    public async Task ADeploymentThatChangesNothingTheOrderIsMadeFromLeavesItAlone()
+    {
+        var (a, gh, s, cfg, gate) = MakeAfter(Before);
+        gh.Changed = ["game/gamemode.js", "docs/GAMEMODE.md"];
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        HasStates(gh, s, id, "in_progress,success");
+        Assert.Equal([Before + "..." + Commit], gh.Compared);
+        Assert.Equal(["Check-ProdParity"], gate.Asked);
+        Assert.Equal(Commit, MovedTo(cfg));
+        Assert.Empty(gh.Issues);
+    }
+
+    [Theory]
+    [InlineData("records/collection-plugins.json")]
+    [InlineData("game/content/Thornswood-Content.esp")]
+    [InlineData(null)]
+    public async Task ARecordChangeMovesTheOrderAndAMoveThatFailsFailsTheDeploymentAndIsTriedByTheNext(string? changed)
+    {
+        var (a, gh, s, cfg, gate) = MakeAfter(Before);
+        gh.Changed = changed == null ? null : ["game/gamemode.js", changed];
+        gate.Answers[Agent.LoadOrderLine] = new GateRun(1, ["main at " + Commit, "the store is not whole and Nexus did not answer"]);
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        HasStates(gh, s, id, "in_progress,failure");
+        Assert.Contains("the plugins are not", (string)gh.Last(id)!["description"]!);
+        Assert.Equal("// new gamemode\n", s.Read("gamemode.js"));
+        Assert.Equal([Agent.LoadOrderLine], gate.Asked);
+        // Not moved, so the next Deployment compares from the last move again.
+        Assert.Equal(Before, MovedTo(cfg));
+    }
+
+    [Fact]
+    public async Task ParityRowsThatCannotBeFiledLeaveTheDeploymentASuccess()
+    {
+        var (a, gh, s, _, gate) = MakeAfter(Commit);
+        gh.IssueAnswer = HttpStatusCode.Forbidden;
+        gate.Answers["Check-ProdParity"] = new GateRun(0, [Review1]);
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        HasStates(gh, s, id, "in_progress,success");
+        Assert.Empty(gh.Compared);
+        Assert.Equal(["Check-ProdParity"], gate.Asked);
+        Assert.Contains("parity: THE ROWS WERE NOT ALL FILED", File.ReadAllText(Path.Combine(s.Root, "data", $"deploy-{id}.log")));
+    }
+
+    [Fact]
+    public async Task AParityCheckThatFailsFilesNothing()
+    {
+        var (a, gh, s, _, gate) = MakeAfter(Commit);
+        gate.Answers["Check-ProdParity"] = new GateRun(1, ["collecting from the VPS failed; nothing compared", Review1]);
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        HasStates(gh, s, id, "in_progress,success");
+        Assert.Empty(gh.Issues);
+        Assert.Empty(gh.Labels);
+    }
+
+    /// <summary>A broker on a pipe of its own: reads one request, answers with
+    /// the lines given, and hands back the request it read.</summary>
+    static async Task<string> Broker(string name, string[] answer)
+    {
+        using var srv = new System.IO.Pipes.NamedPipeServerStream(name, System.IO.Pipes.PipeDirection.InOut, 1, System.IO.Pipes.PipeTransmissionMode.Byte, System.IO.Pipes.PipeOptions.Asynchronous);
+        await srv.WaitForConnectionAsync();
+        var enc = new UTF8Encoding(false);
+        using var r = new StreamReader(srv, enc, false, 4096, true);
+        using var w = new StreamWriter(srv, enc, 4096, true) { NewLine = "\n", AutoFlush = true };
+        var req = await r.ReadLineAsync() ?? "";
+        foreach (var l in answer) await w.WriteLineAsync(l);
+        return req;
+    }
+
+    [Fact]
+    public async Task TheGatePipeSendsTheLineAndReadsTheVerbsLinesAndCode()
+    {
+        var name = "tw-gate-test-" + Guid.NewGuid().ToString("N")[..8];
+        var broker = Broker(name, ["| gate run 1: Check-ProdParity", "| main at " + Commit, "@FILE report.json AAAA", "@FILEEND report.json 00", "| " + Review1, "@END 2"]);
+        var logged = new List<string>();
+        var run = await new GatePipe(name).Run("Check-ProdParity", TimeSpan.FromSeconds(10), logged.Add, default);
+        Assert.Equal("LINE " + Convert.ToBase64String(Encoding.UTF8.GetBytes("Check-ProdParity")), await broker);
+        Assert.Equal(2, run.Code);
+        Assert.Equal(["gate run 1: Check-ProdParity", "main at " + Commit, Review1], run.Lines);
+        Assert.Equal(3, logged.Count);
+    }
+
+    [Fact]
+    public async Task ABrokerThatGoesAwayOrIsNotThereIsCode65()
+    {
+        var name = "tw-gate-test-" + Guid.NewGuid().ToString("N")[..8];
+        var broker = Broker(name, ["| gate run 1: Check-ProdParity"]);
+        var run = await new GatePipe(name).Run("Check-ProdParity", TimeSpan.FromSeconds(10), _ => { }, default);
+        await broker;
+        Assert.Equal(65, run.Code);
+        Assert.Contains("went away", run.Lines[^1]);
+        var none = await new GatePipe(name + "-none").Run("Check-ProdParity", TimeSpan.FromMilliseconds(200), _ => { }, default);
+        Assert.Equal(65, none.Code);
+        Assert.Contains("did not take the request", Assert.Single(none.Lines));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -1380,14 +1582,14 @@ public sealed class AgentTests : IDisposable
         ["Bot-Pass.js"] = B("// the pass"), ["bot.js"] = B("// the bot"), ["character.js"] = B("// the character"),
     };
 
-    static void BotRelease(FakeGitHub gh, string tag, string body, bool withBot = true, Dictionary<string, string>? tables = null)
+    static void BotRelease(FakeGitHub gh, string tag, string body, bool withBot = true, Dictionary<string, string>? tables = null, Dictionary<string, byte[]>? bot = null)
     {
         var parts = new Dictionary<string, Dictionary<string, byte[]>>
         {
             ["gamemode"] = new() { ["gamemode.js"] = B(body), ["thornswood-build.json"] = B("{\"commit\":\"new\"}") },
         };
         if (tables != null) parts["gamemode"][Tables.Zip] = TablesZip(tables);
-        if (withBot) parts["bot"] = BotPart;
+        if (withBot) parts["bot"] = bot ?? BotPart;
         gh.AddRelease(tag, ReleaseFiles(tag, Commit, "", parts));
     }
 
@@ -1546,6 +1748,42 @@ public sealed class AgentTests : IDisposable
         if (how == "face") Assert.Contains("FAIL  face", log);
     }
 
+    /// <summary>The bot part goes into the copy whole: a file the bot carries
+    /// beside the three it began with (its relay client and the voice service
+    /// it joins, #5196) needs no change here. Without Bot-Pass.js, the file
+    /// the task runs, there is no pass, and dev keeps what it runs.</summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task TheCopyTakesTheWholeBotPart(bool withPass)
+    {
+        string? botTree = null;
+        var (a, gh, s, bp) = MakeWithPass(bp =>
+        {
+            botTree = string.Join(",", Directory.GetFiles(bp.BotDir).Select(Path.GetFileName).Order(StringComparer.Ordinal));
+            return WriteResult(bp, true);
+        });
+        var part = new Dictionary<string, byte[]>(BotPart)
+        {
+            ["relay.js"] = B("// the relay client"), ["voice-server.js"] = B("// voice"), ["headlines.js"] = B("// headlines"),
+        };
+        if (!withPass) part.Remove(BotPass.Runs);
+        BotRelease(gh, "build-1", "// new gamemode\n", bot: part);
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        if (withPass)
+        {
+            HasStates(gh, s, id, "in_progress,success");
+            Assert.Equal("Bot-Pass.js,bot.js,character.js,headlines.js,relay.js,voice-server.js", botTree);
+            return;
+        }
+        var last = gh.Last(id)!;
+        Assert.Equal("failure", (string)last["state"]!);
+        Assert.Contains("the Release's bot part has no Bot-Pass.js", (string)last["description"]!);
+        Assert.Null(botTree);
+        Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
+    }
+
     [Fact]
     public async Task TheGateVerbDoesNotWaitOnABotPass()
     {
@@ -1604,19 +1842,19 @@ public sealed class AgentTests : IDisposable
             File.WriteAllBytes(files[n], b);
         }
         var said = new List<string>();
-        Assert.Equal("", bp.Prepare(files, said.Add));
+        Assert.Equal("", bp.Prepare(files, BotPart.Keys, said.Add));
         Assert.Contains(said, l => l.Contains("3 were new or changed on dev"));
         said.Clear();
-        Assert.Equal("", bp.Prepare(files, said.Add));
+        Assert.Equal("", bp.Prepare(files, BotPart.Keys, said.Add));
         Assert.Contains(said, l => l.Contains("0 were new or changed on dev"));
         File.WriteAllText(Path.Combine(s.Root, "data", "Thornswood.esp"), "plugin Thornswood.esp, changed");
         said.Clear();
-        Assert.Equal("", bp.Prepare(files, said.Add));
+        Assert.Equal("", bp.Prepare(files, BotPart.Keys, said.Add));
         Assert.Contains(said, l => l.Contains("1 were new or changed on dev"));
         Assert.Equal("plugin Thornswood.esp, changed", File.ReadAllText(Path.Combine(bp.PluginDir, "Thornswood.esp")));
         // A load order naming a file that is not there stops the copy.
         File.Delete(Path.Combine(s.Root, "data", "Skyrim.esm"));
-        Assert.Throws<InvalidDataException>(() => bp.Prepare(files, said.Add));
+        Assert.Throws<InvalidDataException>(() => bp.Prepare(files, BotPart.Keys, said.Add));
     }
 
     [Fact]
