@@ -205,6 +205,9 @@ link, and the old line goes.
   only by the Discord staff roles; when it is full, people wait in line at
   the main menu. 29 Sep 2026,
   [#481](https://github.com/EvilPatrick06/Thornswood/issues/481).
+  The beta takes 50 plus 5 staff seats, and the release 100 plus 10, after
+  the load test measured 100 people on the server. 1 Nov 2026,
+  [#4623](https://github.com/ThornswoodRP/Thornswood/issues/4623#issuecomment-6564988985).
 - **One Discord account holds one seat**, on main and on dev: a second game
   from an account already in the world is told why and ended. Staff testing
   two-person scenes on dev use a second Discord account. 20 Oct 2026,

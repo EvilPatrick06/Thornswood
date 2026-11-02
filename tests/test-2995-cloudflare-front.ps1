@@ -82,7 +82,8 @@ $cf = [IO.File]::ReadAllText($Caddyfile)
 $tp = [regex]::Match($cf, '(?m)^[ \t]*trusted_proxies static ([^\r\n]+)')
 $trusted = @($tp.Groups[1].Value.Trim() -split '\s+' | Where-Object { $_ })
 Yes 'the Caddyfile trusts a static list' ($tp.Success)
-Yes '  and it is cloudflare-ranges.txt, range for range, in its order' (($trusted -join ' ') -eq ($ranges -join ' '))
+# Then loopback, where cloudflared brings the tunnel's requests in (#5334).
+Yes '  and it is cloudflare-ranges.txt, range for range, in its order, then loopback for the tunnel' (($trusted -join ' ') -eq ((@($ranges) + @('127.0.0.1/32', '::1/128')) -join ' '))
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-2995-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 New-Item -ItemType Directory -Path $tmp -Force | Out-Null
 $utf8 = New-Object Text.UTF8Encoding($false)

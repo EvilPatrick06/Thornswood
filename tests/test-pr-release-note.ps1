@@ -6,9 +6,12 @@
   Each pull request carries its own release note, checked while it is open,
   and a release's note is joined from them (#5179). This drives the pieces:
   Get-PrReleaseNote, Get-PrReleaseNoteProblems and Join-PrReleaseNotes in
-  scripts\release\Note-Rules.ps1, scripts\dev\Check-PrBody.ps1, and
+  scripts\release\Note-Rules.ps1, the check's own command (thornswood-notes
+  in tools\ReleaseNotes, when the .NET SDK is here), and
   scripts\release\Collect-ReleaseNotes.ps1 through -PullsFile, and holds the
   template, the workflow and the guide to the same line.
+  tests\test-note-rules-cases.ps1 holds the two copies of the rules to the
+  same answers.
 
   Read only apart from its own temp folder, which it removes.
 #>
@@ -76,19 +79,31 @@ try {
     Yes 'Dependabot passes with no line' ((Problems "Bumps discord.py from 2.4 to 2.5." 'dependabot[bot]').Count -eq 0)
     Yes 'anyone else with no line is refused' ((Problems "Bumps discord.py from 2.4 to 2.5." 'someone').Count -gt 0)
 
-    # ---- the check script -------------------------------------------------------
-    function Run-Check([string]$body, [string]$author = '') {
-        $f = Join-Path $temp 'body.md'
-        [IO.File]::WriteAllText($f, $body)
-        $out = & $pwsh -NoProfile -File (Join-Path $Repo 'scripts/dev/Check-PrBody.ps1') -BodyFile $f -Author $author 2>&1
-        return [pscustomobject]@{ Code = $LASTEXITCODE; Out = (@($out) -join "`n") }
+    # ---- the check's command -----------------------------------------------------
+    $dotnet = Get-Command dotnet -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $dotnet) { Write-Host 'SKIP  the check''s command: the .NET SDK is not on this machine (the Release note rules workflow runs its tests)' }
+    else {
+        $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'; $env:DOTNET_NOLOGO = '1'
+        $built = Join-Path $temp 'notes'
+        $null = & $dotnet.Source build (Join-Path $Repo 'tools/ReleaseNotes') -c Release -o $built --verbosity quiet 2>&1
+        Yes 'thornswood-notes builds' ($LASTEXITCODE -eq 0)
+        function Run-Check([string]$body, [string]$author = '') {
+            $f = Join-Path $temp 'body.md'
+            [IO.File]::WriteAllText($f, $body)
+            $with = @('pr', '--body-file', $f)
+            if ($author) { $with += @('--author', $author) }
+            $out = & $dotnet.Source (Join-Path $built 'thornswood-notes.dll') @with 2>&1
+            return [pscustomobject]@{ Code = $LASTEXITCODE; Out = (@($out) -join "`n") }
+        }
+        $r = Run-Check $good
+        Yes 'the check passes a good note and shows it' ($r.Code -eq 0 -and $r.Out -match 'The forge shows the price before you pay')
+        $r = Run-Check $none
+        Yes 'the check passes none' ($r.Code -eq 0 -and $r.Out -match 'PASS  release note: none')
+        $r = Run-Check $template
+        Yes 'the check stops the unfilled template and says why' ($r.Code -eq 1 -and $r.Out -match 'STOP  release note')
+        $r = Run-Check "Bumps discord.py from 2.4 to 2.5." 'dependabot[bot]'
+        Yes 'the check passes Dependabot with no line' ($r.Code -eq 0 -and $r.Out -match 'by rule for a Dependabot')
     }
-    $r = Run-Check $good
-    Yes 'Check-PrBody passes a good note and shows it' ($r.Code -eq 0 -and $r.Out -match 'The forge shows the price before you pay')
-    $r = Run-Check $none
-    Yes 'Check-PrBody passes none' ($r.Code -eq 0 -and $r.Out -match 'PASS  release note: none')
-    $r = Run-Check $template
-    Yes 'Check-PrBody stops the unfilled template and says why' ($r.Code -eq 1 -and $r.Out -match 'STOP  release note')
 
     # ---- joining ----------------------------------------------------------------
     $b1 = "Release note: The forge shows the price before you pay`n- The forge window lists each metal a piece takes and how much."
@@ -127,7 +142,7 @@ try {
     $wf = [IO.File]::ReadAllText((Join-Path $Repo '.github/workflows/pr-body.yml'))
     Yes 'the workflow runs on an edited body' ($wf -match 'types: \[[^\]]*\bedited\b')
     Yes 'the workflow passes the body through the environment, not into the script' ($wf -match 'PR_BODY: \$\{\{ github\.event\.pull_request\.body \}\}' -and $wf -notmatch 'run:[^\n]*github\.event\.pull_request\.body')
-    Yes 'the workflow runs Check-PrBody.ps1 with a read-only token' ($wf -match 'Check-PrBody\.ps1' -and $wf -match 'contents: read' -and $wf -notmatch '(?m)^\s+[a-z-]+: write\s*$')
+    Yes 'the workflow runs thornswood-notes from the locked packages with a read-only token' ($wf -match 'thornswood-notes\.dll''\) @with' -and $wf -match 'dotnet restore tools/ReleaseNotes --locked-mode' -and $wf -match 'contents: read' -and $wf -notmatch '(?m)^\s+[a-z-]+: write\s*$')
     $guide = [IO.File]::ReadAllText((Join-Path $Repo 'Developer-Guide.md'))
     Yes 'the guide says how to write the line and how a release gathers it' ($guide -match 'Release note: none' -and $guide -match 'Collect-ReleaseNotes\.ps1')
 } finally {
