@@ -17,7 +17,7 @@
   things it does for this: a queued command says whether its connection was
   proven by a join token, and somebody on the /silenced list reaches nobody.
 
-  PART C checks the bot: moderation_text through python (bot/test-moderation.py
+  PART C checks the bot: moderation_text through python (bot/tests/test-moderation.py
   is the full check of the watcher).
 
   Read only apart from its own temp folder and one loopback port.

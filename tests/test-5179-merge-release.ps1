@@ -217,6 +217,51 @@ try {
     Yes '  in the release environment, on main only, one run at a time' ($wf -match '(?m)^\s+environment: release\s*$' -and $wf.Contains("if: `${{ github.ref == 'refs/heads/main' }}") -and $wf -match '(?m)^\s+cancel-in-progress: false\s*$')
     $notes = $wf.IndexOf('Collect-ReleaseNotes.ps1'); $build = $wf.IndexOf('Build-Launcher.ps1 -Root')
     Yes 'the notes are written before anything is built, and "none" from every pull request is the one line' ($notes -gt 0 -and $build -gt $notes -and $wf.Contains('if ($rc -eq 3)') -and $wf.Contains("NOTHING_TO_TELL: 'Nothing people would notice: every change in this release says none.'"))
+    # The notes step itself, run the way GitHub runs a pwsh step: its text
+    # between "$ErrorActionPreference = 'stop'" and "exit $LASTEXITCODE",
+    # by pwsh -command, over a stand-in Collect-ReleaseNotes.ps1 that answers
+    # each exit code. Run 41362111729 (1 Nov 2026) stopped on exit 3, which
+    # the step had already taken as "nothing to tell".
+    $lines = $wf -split "`r?`n"
+    $at = [array]::IndexOf($lines, ($lines | Where-Object { $_ -match '^\s+- name: Write the notes from the merged pull requests\s*$' } | Select-Object -First 1))
+    $step = @()
+    if ($at -ge 0) {
+        $r = $at; while ($r -lt $lines.Count -and $lines[$r] -notmatch '^\s+run: \|\s*$') { $r++ }
+        $indent = $null
+        for ($i = $r + 1; $i -lt $lines.Count; $i++) {
+            if ($lines[$i] -match '^\s*$') { $step += ''; continue }
+            $lead = $lines[$i].Length - $lines[$i].TrimStart().Length
+            if ($null -eq $indent) { $indent = $lead }
+            if ($lead -lt $indent) { break }
+            $step += $lines[$i].Substring($indent)
+        }
+    }
+    Yes 'the notes step''s script is found in merge-release.yml' ($step.Count -gt 3 -and ($step -join "`n").Contains('Collect-ReleaseNotes.ps1'))
+    $pwsh = (Get-Process -Id $PID).Path
+    $stepEnv = 'RUNNER_TEMP', 'GITHUB_OUTPUT', 'GITHUB_SHA', 'GITHUB_REPOSITORY', 'SINCE', 'NOTHING_TO_TELL'
+    $before = @{}; foreach ($v in $stepEnv) { $before[$v] = [Environment]::GetEnvironmentVariable($v) }
+    foreach ($case in @(@{ Code = 0; Ok = $true; Says = 'a note' }, @{ Code = 3; Ok = $true; Says = 'nothing to tell' }, @{ Code = 2; Ok = $false; Says = 'a pull request with no line' }, @{ Code = 1; Ok = $false; Says = 'GitHub unread' })) {
+        $w = Join-Path $tmp ('notes-step-' + $case.Code)
+        Put (Join-Path $w 'scripts/release/Collect-ReleaseNotes.ps1') ("param([string]`$Since, [string]`$Until, [string]`$Repo, [string]`$OutFile)`nif (`$OutFile -and $($case.Code) -eq 0) { [IO.File]::WriteAllText(`$OutFile, 'a note') }`nexit $($case.Code)`n")
+        $rt = Join-Path $w 'runner-temp'; New-Item -ItemType Directory -Force -Path $rt | Out-Null
+        $out = Join-Path $w 'github-output'; Put $out ''
+        $file = Join-Path $w 'step.ps1'
+        Put $file ("`$ErrorActionPreference = 'stop'`n" + ($step -join "`n") + "`nif ((Test-Path -LiteralPath variable:\LASTEXITCODE)) { exit `$LASTEXITCODE }`n")
+        $env:RUNNER_TEMP = $rt; $env:GITHUB_OUTPUT = $out; $env:GITHUB_SHA = $commit; $env:GITHUB_REPOSITORY = 'ThornswoodRP/Thornswood'; $env:SINCE = ''
+        $env:NOTHING_TO_TELL = 'Nothing people would notice: every change in this release says none.'
+        Push-Location $w
+        try { $null = & $pwsh -NoProfile -command ". '$file'" 2>&1; $code = $LASTEXITCODE } finally { Pop-Location }
+        $said = [IO.File]::ReadAllText($out)
+        $notesFile = Join-Path $rt 'notes.md'
+        if ($case.Ok) {
+            $body = if (Test-Path -LiteralPath $notesFile) { [IO.File]::ReadAllText($notesFile) } else { '' }
+            $want = if ($case.Code -eq 3) { $env:NOTHING_TO_TELL } else { 'a note' }
+            Yes ("  the step goes on after $($case.Says) (exit $($case.Code)), with the notes file named (step exit $code)") ($code -eq 0 -and $said.Contains('file=' + $notesFile) -and $body.StartsWith($want))
+        } else {
+            Yes ("  the step stops on $($case.Says) (exit $($case.Code)) and names no notes file (step exit $code)") ($code -ne 0 -and -not $said.Contains('file='))
+        }
+    }
+    foreach ($v in $stepEnv) { [Environment]::SetEnvironmentVariable($v, $before[$v]) }
     Yes 'the launcher is carried when its number is unchanged, held to the manifest and the signature check' ($wf.Contains('launcherVersion') -and $wf.Contains('Get-PublishSignRefusal') -and $wf.Contains('Build-Launcher.ps1 -Root $root -NoSign -NoPause -Version $ver'))
     Yes '  and signed through Sign-OnRunner.ps1 when built' ($wf.Contains('./scripts/release/Sign-OnRunner.ps1 -Path $exe'))
     Yes 'Velopack is pinned, on the one dev channel, with no installer, and signs its programs only' ($wf -match "VPK_VERSION: '\d+\.\d+\.\d+'" -and $wf.Contains('--channel dev') -and $wf.Contains('--noInst') -and

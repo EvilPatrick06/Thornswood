@@ -150,7 +150,7 @@ this repository's Releases. The addresses a launcher asks do not move.
 - **What it never does.** It never changes a published Release: one that
   lacks a file stops the run. It publishes a Release only after GitHub's own
   digest of every file is right. It runs on GitHub's hosted runner, never on
-  the box. `tests\test-3686-release-files.ps1` and `tests\test-release-copies.js`
+  the box. `tests\test-3686-release-files.ps1` and `site\tests\test-release-copies.js`
   hold both halves.
 
 ### The feed store on the VPS (#907)
@@ -620,8 +620,8 @@ for byte, as before.
   `Copy-ReleaseAssets-ToSite.ps1`. The rest read the launcher fields alone.
 
 Projected from the 19 Oct main feed with the note's title, version.json is
-about 650 bytes. `tests\test-1050-feed-split.js` holds the site to this, and
-`tests\test-1050-feed-split.ps1` the launcher, `Join-FeedSettings`, and (with
+about 650 bytes. `launcher\tests\test-1050-feed-split.js` holds the site to this, and
+`launcher\tests\test-1050-feed-split.ps1` the launcher, `Join-FeedSettings`, and (with
 `-OldSrc`) every older launcher reading the split version.json as a feed that
 is behind and offers only the launcher update.
 

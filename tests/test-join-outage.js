@@ -81,7 +81,7 @@ const jsonFile = (f, def) => (f in files ? JSON.parse(JSON.stringify(files[f])) 
 // The real putJson answers whether the write landed; the check in refuses one that did not (#2180).
 const putJson = (f, v) => { files[f] = v; return true; };
 // standing() reads bans through bansNow() since #2186; this stand-in never
-// reports a broken file (tests/test-bans-broken.js runs that on the real site).
+// reports a broken file (site/tests/test-bans-broken.js runs that on the real site).
 const bansNow = () => ({ table: jsonFile(BANS, {}) || {}, broken: '' });
 const BANS_BROKEN_WHY = '';
 const readTicket = (t) => (String(t || '').startsWith('tk:') ? { d: String(t).slice(3), n: 'From the ticket' } : null);

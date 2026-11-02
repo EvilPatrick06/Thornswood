@@ -20,7 +20,7 @@
     C. SECURITY.md gives the three routes security.txt and it share (the
        Security tab's button, a Discord message to the owner, the site's
        report page; Patrick, 26 Oct, q-3683-report-route A), a reply time, and
-       no head count that goes stale (#3642). tests\test-3216-site-security.js
+       no head count that goes stale (#3642). site\tests\test-3216-site-security.js
        holds security.txt's half.
     E. OpenSSF Scorecard (.github/workflows/scorecard.yml, the redesign's
        part 20) runs weekly and by hand, on GitHub's runner only, in this

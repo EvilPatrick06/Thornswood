@@ -163,7 +163,7 @@ function listening(srv, port) {
   every write to the socket from that port is kept here, in order, and
   answered false, and its writableLength counts what is kept. Told "let go
   <port>", it writes what it kept, in order, and the socket drains. Nothing
-  else about the service changes. voice/test-backpressure.js measures what
+  else about the service changes. voice/tests/test-backpressure.js measures what
   real backpressure does to the service's memory.
 */
 function hold() {

@@ -36,7 +36,7 @@ THE GRAMMAR is done-on-merge.yml's, line for line: a line "Test task for #N:
 emoji (the "Generated with" footer) or the next such line ends it; the rest
 of the block, trimmed, is the steps, and its first line is the Server line.
 The three patterns below are written in that workflow too, and
-bot/test-5199-pr-tasks.py fails when the two stop matching.
+bot/tests/test-5199-pr-tasks.py fails when the two stop matching.
 
     python bot/pr_tasks.py              the pull request PR_NUMBER names, or the
                                         open one whose head is HEAD_REF, read from

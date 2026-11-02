@@ -1237,7 +1237,7 @@ certificate, and has no row here (#3761).
 |---|---|---|---|---|
 | `tests\fixtures\ui-front-build.js` | The 64 asset modules of the shipped `Data\Platform\UI\build.js`, verbatim: the stub webpack writes for each picture, sound and font, with the hashed name it was given and the source path it came from. 53,999 bytes. | First cut on 26 October 2026 (#3761) from the whole development build of `skymp5-front` that was the fixture until then (2,451,499 bytes, sha256 `5e70e4d7de167fac71522416c59ee4e1f7d5274ecfe30161cbedc46d8a4e9ea2`), and cut again the same way on 31 October from the fork's build at `befb8364` (2,444,820 bytes, sha256 `a67a1a146f104891d879d360c06d40e7c9051aac859bd6fd4d207f432be4416f`), the build "SkyMP's interface, built from the fork" describes. The cut leaves out the front's own code and the npm code bundled with it (React, Redux and the rest, under MIT and BSD notices); `tests\fixtures\ui-front-build.assets.txt` names its sha256. | GNU General Public License version 3, `skymp5-front`'s, as the build it was cut from | `tests\fixtures\ui-front.ps1`, `tests\test-ship-rules.ps1` (#1318) |
 | `tests\fixtures\3111-roots.pem` | Eight public root certificates and their comment lines, no key. 223 lines. | Copied from certifi 2026.7.22's `cacert.pem` (#3111): four of eMudhra's emSign roots and the four the bot needs. | Mozilla Public License 2.0, certifi's, as "The Discord bot, on the VPS" gives it | `tests\test-3111-emudhra-trust.js` |
-| `tests\fixtures\webview2-setup-chain.txt` | Three public certificates, no key: the signing certificate and issuer of Microsoft's WebView2 setup program, and the root. | Read out of the Authenticode signature of `MicrosoftEdgeWebview2Setup.exe` as Microsoft handed it out on 5 October 2026, and the root from the address the issuer names (#1330). | None given: they are Microsoft's public certificates, which every copy of that program carries | `tests\test-1330-webview2-signature.js` |
+| `tests\fixtures\webview2-setup-chain.txt` | Three public certificates, no key: the signing certificate and issuer of Microsoft's WebView2 setup program, and the root. | Read out of the Authenticode signature of `MicrosoftEdgeWebview2Setup.exe` as Microsoft handed it out on 5 October 2026, and the root from the address the issuer names (#1330). | None given: they are Microsoft's public certificates, which every copy of that program carries | `launcher\tests\test-1330-webview2-signature.js` |
 
 The whole 2.4 MB build is still in the repository's history until the history
 rewrite takes it out (#3684).
@@ -1365,7 +1365,7 @@ where files are handed out (#421). The launcher's sidebar has Source code
 under its version lines, which opens the fork at the commit the launcher's
 own `client-build.json` names (`ClientRuntime.SourceUrl`), and the game's
 help panel says under Getting help where the source is.
-`tests\test-421-source-offer-ui.js` holds both.
+`launcher\tests\test-421-source-offer-ui.js` holds both.
 
 The directions reach people in four places. The installer carries
 `SOURCE CODE.txt`, which Package-Thornswood.ps1 writes from the two build

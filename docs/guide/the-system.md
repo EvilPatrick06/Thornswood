@@ -97,7 +97,7 @@ the game itself comes from the Steam copy (`OwnGame.Source`, the one Downgrade
 keeps on the server's build), and the mods are exactly the files Vortex's
 records in that folder list, linked or copied from Vortex's staging folder.
 With no Steam copy on the machine the folder is not made.
-`tests\test-vortex-folder.ps1` proves it.
+`launcher\tests\test-vortex-folder.ps1` proves it.
 
 **The client.** The SkyMP client runtime is built from the fork, the
 `engine\skymp` submodule on `thornswood/engine-changes`: `npx webpack` in

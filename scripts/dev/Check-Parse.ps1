@@ -4,7 +4,7 @@
 
 .DESCRIPTION
       pwsh scripts/dev/Check-Parse.ps1                    both kinds
-      pwsh scripts/dev/Check-Parse.ps1 -What PowerShell   scripts, tests, installer *.ps1
+      pwsh scripts/dev/Check-Parse.ps1 -What PowerShell   scripts, tests, installer, <product>/tests *.ps1
       pwsh scripts/dev/Check-Parse.ps1 -What Scripts      the .js the build check parses
       pwsh scripts/dev/Check-Parse.ps1 -Root <folder>     another checkout of the tree
 
@@ -13,11 +13,14 @@
   each with its own list of folders. The pre-push hook (.githooks/pre-push,
   scripts/dev/Check-Push.ps1) runs the same parse before a push, so the list
   lives here and both read it: a second copy of it would drift, and a script
-  the hook passed would fail on GitHub.
+  the hook passed would fail on GitHub. The nightly's parse step runs this
+  too, for the same reason.
 
   WHAT IT PARSES.
-    PowerShell: every *.ps1 under scripts, tests and installer, with
-      PowerShell's own parser, so nothing in them runs.
+    PowerShell: every *.ps1 under scripts, tests and installer, and in each
+      product's own tests folder (launcher/tests, plan line 42, as
+      scripts/dev/Harness-Files.ps1 finds them), with PowerShell's own
+      parser, so nothing in them runs.
     Scripts: every *.js under scripts, the *.js at the top of game, in
       game/plugins and game/ui, and site/server.js and voice/voice-server.js,
       each with node --check, which compiles and runs nothing.
@@ -37,6 +40,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here 'Harness-Files.ps1')
 if (-not $Root) { $Root = Split-Path -Parent (Split-Path -Parent $Here) }
 if (-not (Test-Path -LiteralPath $Root -PathType Container)) { Write-Host ("STOP. {0} is not a folder." -f $Root); exit 2 }
 $Root = (Resolve-Path -LiteralPath $Root).Path
@@ -63,7 +67,8 @@ function Under([string[]]$folders, [string]$filter, [switch]$Deep) {
 $bad = 0
 
 if ($What -in 'All', 'PowerShell') {
-    $ps = @(Under -folders 'scripts', 'tests', 'installer' -filter '*.ps1' -Deep)
+    $beside = @(Get-ProductTestFolders $Root | Where-Object { $_.Product -ne 'installer' } | ForEach-Object { Join-Path $_.Product 'tests' })
+    $ps = @(Under -folders (@('scripts', 'tests', 'installer') + $beside) -filter '*.ps1' -Deep)
     foreach ($f in $ps) {
         $tokens = $null; $errors = $null
         [void][System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$tokens, [ref]$errors)

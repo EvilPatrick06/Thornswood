@@ -228,11 +228,12 @@ The short form of the rules. The same decisions, with the dates they were made, 
   #1343) and the count of silent catches (#5292). The job "Launcher builds",
   on a Windows runner, checks the launcher window and its UI thread, builds
   the launcher with MSBuild from its project files, held to its sources
-  (`tests\test-498-msbuild.ps1`, issue #498). A pull request that changes only files under
+  (`launcher\tests\test-498-msbuild.ps1`, issue #498). A pull request that changes only files under
   `docs`, `site` or `bot` skips it, because nothing it checks reads those
   folders (`scripts\dev\Launcher-Reach.ps1`, #5292). Beside them, the job
   "gate" runs
-  the gate harnesses (every `tests\test-*.js` and `tests\test-*.ps1` that
+  the gate harnesses (every `test-*.js` and `test-*.ps1` in `tests` or in a
+  product's own `tests` folder, such as `launcher\tests`, that
   `tests\gate-excluded.txt` does not name, side by side through
   `scripts\dev\Nightly-Harnesses.ps1`, issues #3009 and #3114) in up to five
   shares on hosted Windows runners at once, `Gate harnesses (1 of 5)` to

@@ -62,7 +62,7 @@ namespace Thornswood
         /// <summary>
         /// The notes in the file the feed names, from memory, from
         /// Profile\news.json when that is the same file, or downloaded. Apart
-        /// from CheckUrl, so tests\test-1050-news-file.ps1 can point it at a
+        /// from CheckUrl, so launcher\tests\test-1050-news-file.ps1 can point it at a
         /// server of its own.
         /// </summary>
         static NewsItem[] NewsFile(Config cfg, NewsRef r)

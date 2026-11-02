@@ -29,7 +29,7 @@ Part of the [Developer Guide](../../Developer-Guide.md), the index of every page
   taken from Vortex's own mods folder, and nothing else of that folder is
   read. Scan names the folder, Fix and Settings point the launcher at it,
   and with no Steam copy on the machine it refuses (OwnGame.DeploysInto,
-  Gather, tests\test-vortex-folder.ps1). Djinn to agree it in #staff-updates.
+  Gather, launcher\tests\test-vortex-folder.ps1). Djinn to agree it in #staff-updates.
   Decided by Patrick on 29 Sep (#1218, #1226): the Steam copy is the
   person's, to play vanilla at any build with their own mods, and Thornswood
   runs entirely from its own folder. With the own folder chosen in the setup
@@ -40,7 +40,7 @@ Part of the [Developer Guide](../../Developer-Guide.md), the index of every page
   on and made the next start takes Thornswood's files back out of the Steam
   copy, once (OwnGame.CleanSteamCopy); an existing own folder gets the same
   from its next update. Steam's "Wait until I launch the game" is set only
-  until the folder exists (tests\test-own-folder-first.ps1).
+  until the folder exists (launcher\tests\test-own-folder-first.ps1).
   Decided by Patrick on 29 Sep (#1232): `Thornswood\Game` takes only
   Skyrim's own files (from the Steam copy when it is on the pinned build, or
   the Downgrade's download; for a ship root, also from a folder that holds
@@ -50,7 +50,7 @@ Part of the [Developer Guide](../../Developer-Guide.md), the index of every page
   `records\skyrim-files.json`, read out of the depot manifests the Downgrade
   uses, never a guess by folder. A mod put into the Steam copy by hand stays
   there, and a folder made before this loses such files at its next refresh,
-  logged (OwnGameKinds.cs, tests\test-own-folder-alone.ps1).
+  logged (OwnGameKinds.cs, launcher\tests\test-own-folder-alone.ps1).
   Decided by Patrick on 29 Sep (#1247) and changed on 27 Oct (#3715): the
   behavior files and the BodySlide bodies are made in Thornswood's own
   folder, never in the Steam copy, and since #3715 by every launcher on its
