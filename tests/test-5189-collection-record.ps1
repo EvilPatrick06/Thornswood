@@ -87,7 +87,11 @@ try {
         $cpNames = @(@($cp.plugins) | Where-Object { -not (Test-CollectionName $script:CollectionGameOwn $_.name) } | ForEach-Object { ([string]$_.name).ToLowerInvariant() } | Sort-Object)
         $rrNames = @(@($rr.plugins) | Where-Object { -not (Test-CollectionName $script:CollectionOurs $_.name) } | ForEach-Object { ([string]$_.name).ToLowerInvariant() } | Sort-Object)
         $dropNames = @(@($rr.dropped) | Where-Object { $_ } | ForEach-Object { ([string]$_.name).ToLowerInvariant() })
-        Yes 'R4 with no change on its way, the plugins it installs are collection-plugins.json''s (dropped names a change on its way)' ($dropNames.Count -or (($cpNames -join '|') -eq ($rrNames -join '|')))
+        # A change on its way (merged, not yet followed by the records)
+        # adds plugins collection-plugins.json does not have yet, and takes
+        # out only the ones its dropped names.
+        $gone = @($cpNames | Where-Object { $rrNames -notcontains $_ -and $dropNames -notcontains $_ })
+        Yes 'R4 every plugin collection-plugins.json has is still installed, or under dropped for the change on its way' (-not $gone.Count) ($gone -join ', ')
     }
 
     # ---------------------------------------------------------------- C ----
