@@ -334,10 +334,15 @@ jobs:
             New-Item -ItemType Directory -Force -Path $built | Out-Null
             ./scripts/release/Build-Launcher.ps1 -Root $root -NoSign -NoPause -Version $env:VERSION
             if ($LASTEXITCODE -ne 0) { Write-Host '::error::Build-Launcher.ps1 failed'; exit 1 }
-            # The programs go out; the symbols, Thornswood.pdb, stay here. Any
-            # other file would be refused by the launcher in its own update
-            # (launcher/app/VeloPackage.cs), so it stops the run here instead.
-            $files = @(Get-ChildItem -LiteralPath $built -File | Where-Object Extension -ne '.pdb')
+            # The programs go out; the symbols, Thornswood.pdb, stay here, and
+            # so do app.ico and app-dev.ico, which Build-Launcher.ps1 puts
+            # beside the exe only for Install-Launcher.ps1 (#887): the
+            # launcher writes its own icon from the copy compiled into it
+            # (launcher/app/Icons.cs, IconFile), so a package never needs
+            # them. Any other file would be refused by the launcher in its
+            # own update (launcher/app/VeloPackage.cs), so it stops the run
+            # here instead.
+            $files = @(Get-ChildItem -LiteralPath $built -File | Where-Object Extension -notin '.pdb', '.ico')
             $other = @($files | Where-Object { $_.Extension -notin '.exe', '.dll' } | ForEach-Object { $_.Name })
             if ($other.Count) { Write-Host ("::error::the launcher's publish left files that are not programs: " + ($other -join ', ')); exit 1 }
             foreach ($f in $files) { Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $dir $f.Name) -Force }
