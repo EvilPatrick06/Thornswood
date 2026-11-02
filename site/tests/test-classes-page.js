@@ -48,8 +48,8 @@ function done() {
 }
 
 const gm = process.env.GAMEMODE
-  ? require('./gamemode-tables.js').joined(fs.readFileSync(process.env.GAMEMODE, 'utf8')).split(CR).join('')
-  : require('./gamemode-tables.js').joined(read(path.join('game', 'gamemode.js')));
+  ? require('../../tests/gamemode-tables.js').joined(fs.readFileSync(process.env.GAMEMODE, 'utf8')).split(CR).join('')
+  : require('../../tests/gamemode-tables.js').joined(read(path.join('game', 'gamemode.js')));
 const page = process.env.CLASSES_MD
   ? fs.readFileSync(process.env.CLASSES_MD, 'utf8').split(CR).join('')
   : read(path.join('site', 'data', 'site', 'classes.md'));
