@@ -3,8 +3,8 @@
 
   The two scripts Run-OnBox.ps1 sends to the box (issue #2899): the keeper,
   which makes the run's folder and removes it, and the run. Kept apart so
-  tests\test-2899-run-on-box.ps1 runs the same text under Windows PowerShell
-  5.1 against a stand-in folder. Defines functions and nothing else.
+  tests\test-2899-run-on-box.ps1 runs the same text under PowerShell 7, as
+  the box does, against a stand-in folder. Defines functions and nothing else.
 
   The keeper's folder is the one way a script here lands files on the box or
   makes them there to bring back (#3035): Open-ThornswoodOnBoxFolder and
