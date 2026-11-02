@@ -1451,7 +1451,11 @@ The short form of the rules. The same decisions, with the dates they were made, 
   on 25 Sep 35 pull requests were merged with their VPS build red and 18 with
   no build at all, and main went red with them, so since 31 Oct (#3683,
   `records/github-repo-settings.json`) the ruleset named main requires
-  `Build check result` and has an empty bypass list. A ruleset holds the
+  `Build check result` and has an empty bypass list. `Test tasks in the
+  pull request` and `Release note` are required beside it, on the pull
+  request and again in the merge queue: on 1 Nov the queue landed a pull
+  request whose Release note check was red, and every merge release after it
+  stopped at its notes. A ruleset holds the
   admin account too, whatever `enforce_admins` says, so GitHub refuses a
   merge past red for everybody. And since 31 Oct auto-merge is on (#5182,
   Patrick's A): turn it on when the pull request opens, with
