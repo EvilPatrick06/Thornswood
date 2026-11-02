@@ -179,7 +179,7 @@ try {
     `$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier(`$s)), 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow')))
   }
   # Only the access rules are written back (issue #1120).
-  (Get-Item -LiteralPath '$Root' -Force).SetAccessControl(`$acl)
+  [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo](Get-Item -LiteralPath '$Root' -Force), `$acl)
   'LOCKED'
 } catch { 'COULD NOT LOCK: ' + `$_.Exception.Message }
 "@
@@ -244,7 +244,7 @@ Head 'Registering the task'
 $sources = @('C:\Thornswood-Server', 'C:\Thornswood-Server-Dev', 'C:\Thornswood-Docs', 'C:\Thornswood-Bot',
              'C:\Thornswood-Caddy', 'C:\Thornswood-Voice', 'C:\Thornswood-Deletions')
 $registered = @(Remote @"
-`$a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -File "$runner"'
+`$a = New-ScheduledTaskAction -Execute (Join-Path `$env:ProgramFiles 'PowerShell\7\pwsh.exe') -Argument '-NoProfile -ExecutionPolicy Bypass -File "$runner"'
 $(Get-ThornswoodServiceAccountScript)
 `$t = New-ScheduledTaskTrigger -Daily -At '$At'
 `$s = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopOnIdleEnd -ExecutionTimeLimit (New-TimeSpan -Hours 1)

@@ -166,6 +166,11 @@ function named(html) {
     yes('and /api/public, which the front page fetches', api.headers['cache-control'] === 'no-cache');
     const hub = await ask(run.port, '/hub');
     yes('the hub, which says who is signed in, stays no-store', hub.headers['cache-control'] === 'no-store');
+    // #5190: Cloudflare's cache rule keeps only what carries this header.
+    yes('Cloudflare keeps the front page and a written page five minutes, by its own header',
+      home.headers['cloudflare-cdn-cache-control'] === 'max-age=300' && rules.headers['cloudflare-cdn-cache-control'] === 'max-age=300');
+    yes('and never the hub or /api/public', hub.headers['cloudflare-cdn-cache-control'] === undefined &&
+      api.headers['cloudflare-cdn-cache-control'] === undefined);
 
     const refs = named(home.body).filter((r) => fs.existsSync(path.join(PUBLIC, r.split('?')[0].slice(1))));
     yes('the front page names files of public/ (' + refs.length + ')', refs.length >= 8);

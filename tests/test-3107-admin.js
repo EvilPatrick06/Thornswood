@@ -1072,8 +1072,8 @@ function start(stateDir, ghPort, more) {
     const unesc = s => s.replace(/&quot;/g, '"').replace(/&#39;/g, '\'').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
     yes('the armed page, through Caddy, posts the manifest to GitHub with the state', r.status === 200 && form && unesc(form[1]) === 'http://127.0.0.1:' + ghPort + '/web/settings/apps/new?state=' + st);
     const mf = form ? JSON.parse(unesc(form[2])) : {};
-    yes('  the manifest: private, administration write, contents read, secrets read, environments write for a box key (ops-access.js), variables read, Actions write for the Ship verbs (#2841), Issues write for the Discord bot (#5184), no webhook, back to /github-app/setup/done',
-      mf.public === false && JSON.stringify(mf.default_permissions) === '{"administration":"write","contents":"read","secrets":"read","actions_variables":"read","environments":"write","actions":"write","issues":"write"}' && mf.hook_attributes.active === false &&
+    yes('  the manifest: private, administration write, contents read, secrets read, environments write for a box key (ops-access.js), variables read, Actions write for the Ship verbs (#2841), Issues write for the Discord bot (#5184), Deployments write for the deploy agent (#5180), no webhook, back to /github-app/setup/done',
+      mf.public === false && JSON.stringify(mf.default_permissions) === '{"administration":"write","contents":"read","secrets":"read","actions_variables":"read","environments":"write","actions":"write","issues":"write","deployments":"write"}' && mf.hook_attributes.active === false &&
       mf.redirect_url === 'https://thornswood.net/github-app/setup/done' && (mf.default_events || []).length === 0);
     yes('  and it asks for exactly what records/github-apps.json gives the box admin App (part 20)', (() => {
       const rec = JSON.parse(fs.readFileSync(path.join(REPO, 'records', 'github-apps.json'), 'utf8')).apps.find(a => a.slug === 'thornswood-box-admin');
@@ -1140,7 +1140,11 @@ function start(stateDir, ghPort, more) {
       const asked = gh.calls.filter(c => /access_tokens$/.test(c.path));
       yes('  asked of GitHub with only that', asked.length > 0 && asked.every(c => JSON.stringify(c.body) === '{"repositories":["Thornswood"],"permissions":{"issues":"write"}}'));
       yes('  and made again on the clock', await waitFor(() => gh.calls.filter(c => /access_tokens$/.test(c.path)).length >= 2, 5000));
-      yes('  no half-written file is left beside it', !fs.existsSync(file + '.part'));
+      // Every second the service writes github-token.json.part and renames it
+      // over the file, so a look at one instant can land inside that write
+      // (it did on GitHub's Windows runner, 1 Nov 2026). What must hold is
+      // that the part file goes: one that a failed rename left stays for good.
+      yes('  no half-written file is left beside it', await waitFor(() => !fs.existsSync(file + '.part'), 5000));
       yes('  the log says it once and never holds the token', (botSvc.log().match(/bot token: made for ThornswoodRP\/Thornswood issues/g) || []).length === 1 && !botSvc.log().includes(gh.botToken));
       gh.botGranted = false;
       fs.writeFileSync(file, JSON.stringify({ token: 'old', expires_at: '2026-11-01T04:00:00Z' }));

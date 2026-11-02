@@ -380,7 +380,7 @@ through the gate instead, with `gh` signed in as somebody who may run workflows 
 `pwsh scripts/vps/Box-Run.ps1 -Line '<verb>'` ([E. VPS](#e-vps)). Ships go
 the same way (`Ship-Dev`, `Ship-Main`), so a machine without a key can still
 release; the scripts that ssh to the VPS themselves (`Ship`, `Deploy-*`,
-`Request-Restart`, `Install-Bot`, `Publish-Installer`, `Publish-News`) do not
+`Request-Restart`, `Install-Bot`, `Publish-Installer`) do not
 run from it, and Ship stops before it builds anything there: the feed and its
 baseline are received from the VPS (#907).
 
@@ -1615,8 +1615,7 @@ The short form of the rules. The same decisions, with the dates they were made, 
   #1343) and the count of silent catches (#5292). The job "Launcher builds",
   on a Windows runner, checks the launcher window and its UI thread, builds
   the launcher with MSBuild from its project files, held to its sources
-  (`tests\test-498-msbuild.ps1`, issue #498), and compares the writing check
-  under Windows PowerShell 5.1. A pull request that changes only files under
+  (`tests\test-498-msbuild.ps1`, issue #498). A pull request that changes only files under
   `docs`, `site` or `bot` skips it, because nothing it checks reads those
   folders (`scripts\dev\Launcher-Reach.ps1`, #5292). Beside them, the job
   "gate" runs
@@ -1845,8 +1844,8 @@ The machine that runs `Ship.ps1` still has to sign the build. `records\signing\s
 | Dev release | `.\scripts\release\Ship.ps1 -Channel dev` plus the note | Dev feed, dev launcher News tab, dev updates channel in Discord |
 | Main release | `.\scripts\release\Ship.ps1` plus the note | Live feed, launcher News tab, the site news page, Discord #news |
 | Discord news | Ship posts it. To post the current feed again: `.\scripts\ops\Publish-Discord.ps1` or `.\scripts\ops\Publish-Discord.ps1 -Dev` | #news for main, the dev updates channel for dev |
-| Game news | The same note. The launcher News tab reads the feed. The site news page is `.\scripts\ops\Publish-News.ps1`, which a main Ship already runs | Launcher News tab, and https://thornswood.net for main |
-| Docs site | `.\scripts\deploy\Deploy-Docs.ps1` for the app. `.\scripts\deploy\Deploy-Docs.ps1 -Site` for the public pages | https://thornswood.net |
+| Game news | The same note. The launcher News tab reads the feed. The site writes its News page itself from the main feed and its news file (the site's copy or the Release's) within a minute of a new feed (#5187); nothing is run | Launcher News tab, and https://thornswood.net for main |
+| Docs site | The merge's Release, put in by the box deploy agent: the app and the public pages. `.\scripts\deploy\Deploy-Docs.ps1` for the documents, the boards and the password | https://thornswood.net |
 | Dev gamemode | `.\scripts\deploy\Deploy-DevGamemode.ps1` | Dev server only |
 | Live gamemode | `.\scripts\deploy\Deploy-Server.ps1 -GamemodeOnly`, from any machine, needs no server build | Live server |
 | Live server build, or the live settings Deploy-Gamemode writes | `.\scripts\deploy\Deploy-Gamemode.ps1`, then `.\scripts\deploy\Deploy-Server.ps1`, from a machine with the fork built | Live server |
@@ -1863,10 +1862,9 @@ To post the current feed again:
 ```powershell
 .\scripts\ops\Publish-Discord.ps1 -DryRun
 .\scripts\ops\Publish-Discord.ps1 -Dev -DryRun
-.\scripts\ops\Publish-News.ps1 -OutFile news.json
 ```
 
-`-DryRun` and `-OutFile` send nothing. A real post remembers what it already announced and refuses to repeat it. `-Force` is how a deleted post is made again.
+`-DryRun` sends nothing. A real post remembers what it already announced and refuses to repeat it. `-Force` is how a deleted post is made again.
 
 ## 4. How to release to main
 
@@ -2039,7 +2037,7 @@ from that tag (`git checkout -b hotfix/<name> live-<version>`).
 
 Everything else, and which one each change needs, is the list under "After a
 pull request is merged" below: `Deploy-Server.ps1` pushes a server
-build, `Deploy-Server.ps1 -GamemodeOnly` the gamemode from any machine (`Deploy-DevGamemode.ps1` for dev), `Deploy-Docs.ps1` the site, `Install-Bot.ps1` the bot,
+build, `Deploy-Server.ps1 -GamemodeOnly` the gamemode from any machine (`Deploy-DevGamemode.ps1` for dev), the box deploy agent the site and the bot from each merge's Release,
 `Request-Restart.ps1` an announcement. `Rotate-ServerPassword.ps1` changes a
 password nothing checks any more; the secrets table below says why. Every
 script closes the launcher and Skyrim itself when it needs to.
@@ -2060,11 +2058,11 @@ live deploy, which wait for Patrick's word.
 | The gamemode on the dev server | `.\scripts\deploy\Deploy-DevGamemode.ps1` |
 | The gamemode on the live server, `game\gamemode.js` and `game\content\Thornswood-Content.esp` | `.\scripts\deploy\Deploy-Server.ps1 -GamemodeOnly`, from any machine |
 | The live server build, or the live settings Deploy-Gamemode writes | `.\scripts\deploy\Deploy-Gamemode.ps1`, then `.\scripts\deploy\Deploy-Server.ps1`, from a machine with the fork built |
-| The site's app or `site\public` | `.\scripts\deploy\Deploy-Docs.ps1` |
-| The public pages, `site\data\site\*.md` | `.\scripts\deploy\Deploy-Docs.ps1 -Site` |
-| The bot's code or join card art in `bot` | `.\scripts\deploy\Install-Bot.ps1 -CodeOnly` |
+| The site's app or `site\public` | Nothing. The merge's Release carries it and the box deploy agent puts it in within minutes ([docs\DEPLOY-AGENT.md](docs/DEPLOY-AGENT.md)). `Deploy-Docs.ps1` sends no app once the agent has the site; it is for the documents, the boards and the password. |
+| The public pages, `site\data\site\*.md` | Nothing. They ride the same Release, and `Deploy-Docs.ps1 -Site` is refused once the agent has the site. |
+| The bot's code or join card art in `bot` | Nothing. The merge's Release carries it and the deploy agent swaps it in. `Install-Bot.ps1` is for the service, its libraries and its token. |
 | The bot's avatar, `bot\thornswood-bot-*.png` | No script sends it. Upload it by hand in the Discord developer portal. |
-| The voice service, `voice\voice-server.js` or `voice\headlines.js` | `.\scripts\deploy\Install-Voice.ps1` |
+| The voice service, `voice\voice-server.js` or `voice\headlines.js` | Dev voice: nothing, it goes in with the merge's Deployment to Dev. Live voice: `.\scripts\deploy\Install-Voice.ps1` |
 | Scripts that only change how a release is built (Ship.ps1, Publish-Update.ps1, the Deploy scripts) | Nothing more. The pull is the change. |
 
 3. Everybody else, once it is out, from the main folder: `git checkout main`, then
@@ -2496,13 +2494,7 @@ Every nightly and build run starts a PowerShell harness with `pwsh -NoProfile -F
 pwsh -NoProfile -File .\tests\test-install-server.ps1
 ```
 
-From Git Bash too (the shell Claude Code's Bash tool uses on One), never `powershell.exe` straight: Windows PowerShell 5.1 started from there inherits PowerShell 7's `PSModulePath`, finds PowerShell 7's Utility module first and loses `Get-FileHash` (#2460). PowerShell 7 rewrites that path for every 5.1 it starts, so a harness started with `pwsh` that runs 5.1 keeps working. `tests\test-2460-winps-module-path.ps1` holds both halves.
-
-If 5.1 itself is the point, clear the inherited path first:
-
-```bash
-env -u PSModulePath powershell.exe -NoProfile -File ./tests/test-install-server.ps1
-```
+From Git Bash too (the shell Claude Code's Bash tool uses on One), the same line with forward slashes. Nothing here runs in Windows PowerShell 5.1 any more, the box included (#5356): every script, task and harness starts `pwsh`.
 
 #### Learn more about PowerShell
 
@@ -2617,14 +2609,13 @@ The website is the `site` folder. Public pages are `site\data\site`. On the VPS 
 
 #### Deploy
 
-From your clone, after the pull request that changed the site is merged:
+Nothing to run: the merge's Release carries the app and the public pages, and the box deploy agent puts them in within minutes ([docs\DEPLOY-AGENT.md](docs/DEPLOY-AGENT.md)). An older copy goes back by its tag:
 
 ```powershell
-.\scripts\deploy\Deploy-Docs.ps1
-.\scripts\deploy\Deploy-Docs.ps1 -Site
+pwsh scripts/vps/Box-Run.ps1 -Line 'Deploy-Release -Environment site -Tag <tag>'
 ```
 
-The first command deploys the app. `-Site` deploys the public pages. News for a main release is [section 4](#4-how-to-release-to-main).
+`Deploy-Docs.ps1` is for the documents, the boards and the password, and for a new box before the agent has the site. News for a main release is [section 4](#4-how-to-release-to-main).
 
 #### Learn more about Website
 

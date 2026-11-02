@@ -1163,7 +1163,7 @@ try {
 }
 "@
   $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($put))
-  $out = $url | Invoke-ThornswoodNative { $input | & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $e" } 2>&1
+  $out = $url | Invoke-ThornswoodNative { $input | & ssh @ssh "$User@$Vps" "pwsh -NoProfile -EncodedCommand $e" } 2>&1
   $url = $null
   foreach ($l in $out) {
     $c = 'Gray'
@@ -1204,7 +1204,7 @@ $(Get-ThornswoodLockedFolderScript $Root)
 # whole time timed out, and staff were told the dev server and the site were
 # down (6:43 and 6:57 PM). No time limit, and IgnoreNew so a slow run is not
 # joined by a second one.
-`$a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -File $Root\watch.ps1'
+`$a = New-ScheduledTaskAction -Execute (Join-Path `$env:ProgramFiles 'PowerShell\7\pwsh.exe') -Argument '-NoProfile -ExecutionPolicy Bypass -File $Root\watch.ps1'
 `$tr = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Days 3650)
 `$s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable -MultipleInstances IgnoreNew -Priority 4
 `$p = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
