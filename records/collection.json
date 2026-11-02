@@ -225,9 +225,9 @@
     { "name": "Water for ENB - Patch - Generic Landscape Patch.esp", "master": false, "light": true, "masters": ["Skyrim.esm", "Update.esm", "Dawnguard.esm", "HearthFires.esm", "Dragonborn.esm", "Water for ENB.esm", "Water for ENB (Shades of Skyrim).esp"], "after": [] },
     { "name": "Playable Rieklings.esp", "master": false, "light": false, "masters": ["Skyrim.esm", "Update.esm", "Dawnguard.esm", "Dragonborn.esm", "RaceCompatibility.esm"], "after": ["Water for ENB (Shades of Skyrim).esp"] },
     { "name": "KS_Hairdo's_Lite_NoNPCs.esp", "master": false, "light": false, "masters": ["Skyrim.esm", "Update.esm", "Dragonborn.esm", "Dawnguard.esm"], "after": ["Playable Rieklings.esp"] },
+    { "name": "Improved Eyes Skyrim.esp", "master": false, "light": false, "masters": ["Skyrim.esm"], "after": ["KS_Hairdo's_Lite_NoNPCs.esp", "RaceMenuMorphsCBBE.esp"] },
     { "name": "CBBE.esp", "enabled": false, "master": false, "light": false, "masters": ["Skyrim.esm", "Update.esm", "Dawnguard.esm", "Dragonborn.esm"], "after": [] },
-    { "name": "RaceMenuMorphsCBBE.esp", "enabled": false, "master": false, "light": false, "masters": ["Skyrim.esm"], "after": ["RaceMenuPlugin.esp"] },
-    { "name": "Improved Eyes Skyrim.esp", "master": false, "light": false, "masters": ["Skyrim.esm"], "after": ["KS_Hairdo's_Lite_NoNPCs.esp", "RaceMenuMorphsCBBE.esp"] }
+    { "name": "RaceMenuMorphsCBBE.esp", "enabled": false, "master": false, "light": false, "masters": ["Skyrim.esm"], "after": ["RaceMenuPlugin.esp"] }
   ],
   "dropped": []
 }
