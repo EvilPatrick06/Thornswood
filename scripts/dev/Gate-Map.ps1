@@ -9,7 +9,8 @@
 
   .github\workflows\gate-map.yml traces the whole gate every night on
   GitHub's hosted Windows runner and keeps latest.json, <key>.map.json and
-  <key>.tree.gz as an artifact named gate-map. This reads the newest finished
+  <key>.tree.gz as an artifact named gate-map, and since #5293
+  <key>.platforms.json, which harnesses its Linux run ran as fully. This reads the newest finished
   runs of that workflow, newest first, and from the first that is main's own
   (gate-map.yml on main, from the schedule, a push to main or a run by hand, of this
   repository) and still holds a gate-map artifact, writes those three files
@@ -117,6 +118,11 @@ foreach ($run in $runs) {
     if (Test-Path -LiteralPath $Fetch) { Remove-Item -LiteralPath $Fetch -Recurse -Force }
     $null = New-Item -ItemType Directory -Force -Path $Fetch
     foreach ($f in 'latest.json', ($key + '.map.json'), ($key + '.tree.gz')) { Copy-Item -LiteralPath (Join-Path $into $f) -Destination (Join-Path $Fetch $f) }
+    # Which harnesses Linux runs as fully as Windows (#5293), when that
+    # night's Linux run finished; without it every harness runs on Windows.
+    $pf = $key + '.platforms.json'
+    if (Test-Path -LiteralPath (Join-Path $into $pf)) { Copy-Item -LiteralPath (Join-Path $into $pf) -Destination (Join-Path $Fetch $pf) }
+    else { Say ('It holds no ' + $pf + ', so every harness runs on Windows.') }
     Remove-Item -LiteralPath $zip, $into -Recurse -Force -ErrorAction SilentlyContinue
     Say ('The map of ' + $what + ': the gate traced on main ' + $commit.Substring(0, 8) + ', read ' + $m.read + '.')
     exit 0

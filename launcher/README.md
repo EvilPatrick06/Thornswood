@@ -48,7 +48,7 @@ It needs Visual Studio 2022 Build Tools with MSBuild and the .NET Framework
 4.8.1 targeting pack (`scripts\release\Find-MSBuild.ps1 -Report` says
 whether a machine has them; Developer-Guide.md "Setting up a machine" has the
 install line). A resource added to the launcher goes into Thornswood.csproj
-and into the list in `tests\test-498-msbuild.ps1`, which checks every
+and into the list in `launcher\tests\test-498-msbuild.ps1`, which checks every
 resource in the built exe against its file byte for byte.
 
 What the launcher does is written to its own log, `Profile\launcher.log`,

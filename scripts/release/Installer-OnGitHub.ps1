@@ -31,7 +31,7 @@
   THROWS, saying why, wherever installer.yml has to stop; the workflow prints
   the message as its error.
 
-  Keep it ASCII and Windows PowerShell 5.1.
+  Keep it ASCII. It runs in PowerShell 7.
 #>
 
 . (Join-Path $PSScriptRoot 'Feed-Store.ps1')

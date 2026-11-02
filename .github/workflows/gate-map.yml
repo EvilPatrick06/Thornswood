@@ -42,6 +42,16 @@
 # The push paths below are FORCE's, as GitHub's filter writes them, and
 # tests/test-4009-gate-map.ps1 holds the two the same file by file.
 #
+# WHERE EACH HARNESS RUNS (#5293). The job "linux" runs the whole gate on
+# GitHub's ubuntu-latest beside the trace, and the job "platforms" compares
+# the two runs (Affected-Harnesses.js platforms) into <key>.platforms.json in
+# the same map: a harness that passed on both, said no SKIP or NOT RUN line
+# on Linux it did not say on Windows, and printed as many passing lines on
+# Linux, runs in a pull request's Linux shares; every other runs on Windows.
+# A harness failing on Linux is not a fault of this run: it stays on
+# Windows, and the job's log names it and why. With no Linux run, or no map,
+# no platforms file is kept and every harness runs on Windows.
+#
 # A gate harness that fails still leaves its paths in the map (Affected-
 # Harnesses.js runs one that did not pass every time), so the map is kept
 # whatever the gate did, and the job is red after if the gate was. A trace
@@ -97,6 +107,7 @@ on:
       - scripts/dev/Trace-Gate-Here.ps1
       - scripts/dev/Trace-Gate-Box.ps1
       - scripts/dev/Affected-Harnesses.js
+      - scripts/dev/Nightly-Harnesses.ps1
 permissions:
   contents: read
 concurrency:
@@ -184,6 +195,17 @@ jobs:
           [ordered]@{ commit = $commit; key = $env:RUN_KEY; read = [DateTime]::UtcNow.ToString('yyyy-MM-dd HH:mm') + ' UTC' } |
             ConvertTo-Json -Compress | Set-Content -LiteralPath (Join-Path $out 'latest.json') -Encoding utf8NoBOM
 
+      # Which harness passed and what each said, for the job "platforms"
+      # (#5293). Names, exit codes, seconds and SKIP lines, no file contents.
+      - name: Keep what each harness said
+        if: always() && steps.gate.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: gate-starts-windows
+          path: ${{ runner.temp }}/gate-trace/starts.jsonl
+          retention-days: 1
+          if-no-files-found: error
+
       # Main's map, which Gate-Map.ps1 -Fetch reads, only from main's own
       # schedule, a push to main or a run by hand on main.
       - name: Keep the map
@@ -211,3 +233,110 @@ jobs:
         run: |
           if ("$env:CODE" -ne '0') { Write-Host "::error::the gate failed under the trace (exit $env:CODE); the map was kept, and a harness that failed always runs"; exit 1 }
           Write-Host 'the gate passed under the trace, and its map is kept'
+
+  # The whole gate on Linux, beside the trace (#5293). Nothing is traced: it
+  # only says which harnesses passed and what each said, for the job below.
+  linux:
+    name: Run the whole gate on Linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Run the whole gate, saying what each harness said
+        id: gate
+        shell: pwsh
+        run: |
+          # A harness that fails here stays on Windows; that is what this run
+          # is for, so it does not make the job red. Only a run that left no
+          # line for any harness does, below.
+          $keep = Join-Path $env:RUNNER_TEMP 'gate-linux'
+          $null = New-Item -ItemType Directory -Force -Path $keep
+          ./scripts/dev/Run-Gate.ps1 -Throttle 6 -BudgetSeconds 2700 -StartLog (Join-Path $keep 'starts.jsonl')
+          Write-Host ('The gate on Linux ended with exit ' + $LASTEXITCODE + '; the job "platforms" says which harnesses that keeps on Windows.')
+          if (-not (Test-Path -LiteralPath (Join-Path $keep 'starts.jsonl'))) { Write-Host '::error::the gate on Linux wrote no line for any harness'; exit 1 }
+          exit 0
+
+      - name: Keep what each harness said
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: gate-starts-linux
+          path: ${{ runner.temp }}/gate-linux/starts.jsonl
+          retention-days: 1
+          if-no-files-found: error
+
+  # Which harnesses run on Linux in a pull request's checks (#5293), added to
+  # the map the trace kept, under the same name, so a map is read whole or
+  # not at all: Gate-Map.ps1 -Fetch reads only a run that has ended.
+  platforms:
+    name: Say which harnesses run on Linux
+    needs: [trace, linux]
+    if: ${{ !cancelled() && needs.trace.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Fetch the map and both runs' lines
+        id: fetch
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: ${{ runner.temp }}/parts
+
+      - name: Compare the two runs into the map
+        id: compare
+        shell: pwsh
+        env:
+          MAP_NAME: ${{ github.event_name == 'pull_request' && 'gate-map-trial' || 'gate-map' }}
+        run: |
+          $parts = Join-Path $env:RUNNER_TEMP 'parts'
+          $map = Join-Path $parts $env:MAP_NAME
+          $win = Join-Path (Join-Path $parts 'gate-starts-windows') 'starts.jsonl'
+          $lin = Join-Path (Join-Path $parts 'gate-starts-linux') 'starts.jsonl'
+          $latest = Join-Path $map 'latest.json'
+          foreach ($need in @(@{ F = $latest; W = 'the trace kept no map' }, @{ F = $win; W = 'the trace kept no Windows run' }, @{ F = $lin; W = 'the Linux run kept nothing' })) {
+            if (-not (Test-Path -LiteralPath $need.F)) {
+              Write-Host ('No platforms file: ' + $need.W + ', so every gate harness runs on Windows until a night when both runs end.')
+              Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value 'keep=false'
+              exit 0
+            }
+          }
+          $l = Get-Content -Raw -LiteralPath $latest | ConvertFrom-Json
+          node scripts/dev/Affected-Harnesses.js platforms $win $lin (Join-Path $map ([string]$l.key + '.platforms.json')) ([string]$l.commit)
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value 'keep=true'
+
+      - name: Keep the map with it
+        if: steps.compare.outputs.keep == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: gate-map
+          path: ${{ runner.temp }}/parts/gate-map
+          retention-days: 14
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Keep the trial map with it
+        if: steps.compare.outputs.keep == 'true' && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: gate-map-trial
+          path: ${{ runner.temp }}/parts/gate-map-trial
+          retention-days: 3
+          if-no-files-found: error
+          overwrite: true

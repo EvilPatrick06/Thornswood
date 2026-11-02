@@ -4,8 +4,7 @@
 # and settings. Nothing reaches the VPS.
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Windows.ps1')
-if (-not $OnWindows) { Write-Host 'NOT RUN  the parity check and its collector run only on the box, under Windows PowerShell 5.1'; exit 0 }
-$ps51 = Get-WindowsPowerShell
+$boxPs = Get-BoxPowerShell
 $repo = Split-Path -Parent $PSScriptRoot
 $check = Join-Path $repo 'scripts\vps\Check-ProdParity.ps1'
 $collector = Join-Path $repo 'scripts\vps\Get-ProdFacts.ps1'
@@ -85,7 +84,7 @@ function Run($facts, [string]$record) {
     $facts | ConvertTo-Json -Depth 6 | Set-Content $fp -Encoding utf8
     $a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $check, '-Facts', $fp, '-Report', $rp, '-Now', '2026-10-11T12:00:00Z', '-Strict')
     if ($record) { $a += @('-Record', $record) }
-    $o = & $ps51 @a 2>&1 | Out-String
+    $o = & $boxPs @a 2>&1 | Out-String
     @{ Code = $LASTEXITCODE; Out = $o; Report = $(if (Test-Path $rp) { Get-Content $rp -Raw } else { '' }) }
 }
 try {
@@ -99,7 +98,7 @@ try {
     $od = Join-Path $scratch 'out'
     New-Item -ItemType Directory -Path $od | Out-Null
     Copy-Item (Join-Path $scratch 'facts.json') (Join-Path $od 'prod-facts.json')
-    $o = & $ps51 -NoProfile -ExecutionPolicy Bypass -File $check -Out $od -Now '2026-10-11T12:00:00Z' 2>&1 | Out-String
+    $o = & $boxPs -NoProfile -ExecutionPolicy Bypass -File $check -Out $od -Now '2026-10-11T12:00:00Z' 2>&1 | Out-String
     T ($LASTEXITCODE -eq 0 -and (Test-Path (Join-Path $od 'prod-parity.md'))) '-Out reads prod-facts.json from the folder and writes prod-parity.md beside it'
 
     $b = Facts

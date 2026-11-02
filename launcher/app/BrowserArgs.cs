@@ -12,7 +12,7 @@ namespace Thornswood
     /// through here and lands inside the one switch that is already there.
     ///
     /// No dependencies on the rest of the launcher, so a test can compile this
-    /// file by itself (tests\test-browser-args.ps1).
+    /// file by itself (launcher\tests\test-browser-args.ps1).
     /// </summary>
     public static class BrowserArgs
     {

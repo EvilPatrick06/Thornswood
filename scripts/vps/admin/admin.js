@@ -125,7 +125,8 @@
   values, Environments write for an environment's secret, which only
   ops-access.js keys asks for (Renew-BoxKey.ps1), Issues write for the
   Discord bot's token (#5260), and since #2841's Ship verbs Actions write,
-  which only ship-access.js asks for; records/github-apps.json is the list
+  which only ship-access.js asks for, and Deployments write, which only the
+  deploy agent asks for (tools/DeployAgent, #5180); records/github-apps.json is the list
   and the nightly checks the App against it); Patrick creates
   it, GitHub sends him back to /setup/done with a one-time code, and this
   trades the code for the App's key straight from GitHub. The key goes into
@@ -1176,7 +1177,7 @@ function manifest() {
     hook_attributes: { url: 'https://thornswood.net/github-app/hook', active: false },
     redirect_url: 'https://thornswood.net/github-app/setup/done',
     public: false,
-    default_permissions: { administration: 'write', contents: 'read', secrets: 'read', actions_variables: 'read', environments: 'write', actions: 'write', issues: 'write' },
+    default_permissions: { administration: 'write', contents: 'read', secrets: 'read', actions_variables: 'read', environments: 'write', actions: 'write', issues: 'write', deployments: 'write' },
     default_events: [],
   };
 }

@@ -81,10 +81,14 @@ on:
     paths:
       - 'game/**'
       - 'launcher/**'
+      # Not its harnesses (plan line 42): a change to a check is no new
+      # launcher, as LauncherVersion.ps1 says.
+      - '!launcher/tests/**'
       - 'records/**'
       - 'scripts/bot/Bot-Pass.js'
       - 'scripts/bot/bot.js'
       - 'scripts/bot/character.js'
+      - 'scripts/bot/relay.js'
       # What App-Part.ps1 puts in the site, the Discord bot and voice.
       - 'site/server.js'
       - 'site/public/**'
@@ -151,8 +155,25 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           . ./scripts/release/MergeRelease.ps1
-          $n = New-MergeReleaseNames -Utc (Get-Date).ToUniversalTime() -Run ([int]$env:GITHUB_RUN_NUMBER)
-          try { $prev = Get-MergeReleasePrevious }
+          $now = (Get-Date).ToUniversalTime()
+          # Every name the day already uses, tags and Releases (drafts too).
+          $refs = gh api "repos/$($env:GITHUB_REPOSITORY)/git/matching-refs/tags/build-$($now.ToString('yyyyMMdd'))." --jq '.[].ref'
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::GitHub did not list the build tags'; exit 1 }
+          $rels = gh api "repos/$($env:GITHUB_REPOSITORY)/releases?per_page=100" --jq '.[].tag_name'
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::GitHub did not list the Releases'; exit 1 }
+          $taken = @($refs | ForEach-Object { $_ -replace '^refs/tags/', '' }) + @($rels)
+          $n = New-MergeReleaseNames -Utc $now -Taken $taken
+          try {
+            $prev = Get-MergeReleasePrevious
+            $since = if ($prev) {
+              Resolve-MergeReleaseSince -Commit $prev.Commit -Subject {
+                param($c)
+                $m = gh api "repos/$($env:GITHUB_REPOSITORY)/commits/$c" --jq '.commit.message'
+                if ($LASTEXITCODE -ne 0) { throw "GitHub did not hand over commit $c" }
+                @($m)[0]
+              }
+            } else { '' }
+          }
           catch { Write-Host ('::error::' + $_.Exception.Message); exit 1 }
           $prevFile = Join-Path $env:RUNNER_TEMP 'previous-manifest.json'
           if ($prev) {
@@ -163,7 +184,8 @@ jobs:
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("tag=" + $n.Tag)
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("velopack=" + $n.Velopack)
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("previous=" + $(if ($prev) { $prev.Tag } else { '' }))
-          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("since=" + $(if ($prev) { $prev.Commit } else { '' }))
+          if ($prev -and $since -ne $prev.Commit) { Write-Host "its commit is not in this history (rewritten, #5231); the same merge here is $since" }
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("since=" + $since)
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("previous_manifest=" + $(if ($prev) { $prevFile } else { '' }))
 
       # Before anything is built: a missing Release note line stops the run
@@ -183,6 +205,10 @@ jobs:
           if ($rc -eq 3) { [IO.File]::WriteAllText($file, $env:NOTHING_TO_TELL + "`n"); $rc = 0 }
           if ($rc -ne 0) { Write-Host "::error::the notes could not be written (Collect-ReleaseNotes.ps1 exit $rc); the lines above say why, and nothing was built"; exit 1 }
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("file=" + $file)
+          # Exit 3 is an answer, not a failure, but GitHub's pwsh step ends
+          # with "exit $LASTEXITCODE", which still holds the script's 3: the
+          # step says how it went itself (run 41362111729 stopped here).
+          exit 0
 
       - name: Fetch CI's server build of the pin
         id: server
@@ -305,7 +331,7 @@ jobs:
           $stamp = Join-Path $out 'thornswood-build.json'
           $s = Save-ThornswoodBuildStamp -Gamemode $gm -Channel dev -RepoDir . -Path $stamp
           Write-Host (Format-ThornswoodBuildStamp $s)
-          $bot = @('Bot-Pass.js', 'bot.js', 'character.js') | ForEach-Object { Join-Path 'scripts\bot' $_ }
+          $bot = @(@('Bot-Pass.js', 'bot.js', 'character.js', 'relay.js') | ForEach-Object { Join-Path 'scripts\bot' $_ }) + @(@('voice-server.js', 'headlines.js') | ForEach-Object { Join-Path 'voice' $_ })
           $adds = @("launcher=$($env:LAUNCHER_EXE)", "game=$($env:GAME_ZIP)", "game=$($env:GAME_LIST)",
                     "site=$($env:SITE_ZIP)", "discord=$($env:DISCORD_ZIP)", "voice=$($env:VOICE_ZIP)")
           Set-Content -LiteralPath (Join-Path $env:RUNNER_TEMP 'parts.txt') -Value $adds
@@ -397,7 +423,7 @@ jobs:
           STAMP: ${{ steps.changed.outputs.stamp }}
         run: |
           $rel = Join-Path $env:RUNNER_TEMP 'merge-release'
-          $bot = @('Bot-Pass.js', 'bot.js', 'character.js') | ForEach-Object { Join-Path 'scripts\bot' $_ }
+          $bot = @(@('Bot-Pass.js', 'bot.js', 'character.js', 'relay.js') | ForEach-Object { Join-Path 'scripts\bot' $_ }) + @(@('voice-server.js', 'headlines.js') | ForEach-Object { Join-Path 'voice' $_ })
           $adds = @(Get-Content -LiteralPath (Join-Path $env:RUNNER_TEMP 'parts.txt'))
           $vp = Join-Path $env:RUNNER_TEMP 'velopack.txt'
           if (Test-Path -LiteralPath $vp) { $adds += @(Get-Content -LiteralPath $vp) }

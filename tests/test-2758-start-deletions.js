@@ -32,7 +32,7 @@
       sent a book without them
     - server-log.js's RELEASE_PARTS is the gamemode's PARTS
 
-  The bot's start step is tested by bot\test-2758-deletion-requests.py.
+  The bot's start step is tested by bot\tests\test-2758-deletion-requests.py.
   Nothing leaves this machine.
 */
 const fs = require('fs');

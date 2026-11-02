@@ -140,7 +140,9 @@ $whereFull = [IO.Path]::GetFullPath($where)
 $files = @()
 foreach ($top in 'scripts', 'installer', 'launcher', 'bot', 'voice', 'site') {
     $dir = Join-Path $Repo $top
-    if (Test-Path -LiteralPath $dir) { $files += @(Get-ChildItem -LiteralPath $dir -Recurse -File -Filter '*.ps1' | Where-Object { $_.FullName -notmatch '[\\/]node_modules[\\/]' }) }
+    # Not a product's harnesses in its tests folder (plan line 42): their
+    # folders are made up, as tests' are.
+    if (Test-Path -LiteralPath $dir) { $files += @(Get-ChildItem -LiteralPath $dir -Recurse -File -Filter '*.ps1' | Where-Object { $_.FullName -notmatch '[\\/]node_modules[\\/]' -and $_.FullName.Substring($dir.Length) -notmatch '^[\\/]tests[\\/]' }) }
 }
 Yes ("there are scripts to read ({0})" -f $files.Count) ($files.Count -gt 100)
 $copies = @()
