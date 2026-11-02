@@ -167,7 +167,7 @@ for words in ['I am 18 or over. Thornswood is an adult server.',
               'I have read and agree to the Rules']:
     check('the box "' + words + '" is there', words in agree)
 check('the three pages are terms, privacy and rules on the site',
-      '"terms", "privacy", "rules"' in agree and 'https://thornswood.net' in agree)
+      '"terms", "privacy", "rules"' in agree and re.search(r'"https://thornswood\.net"', agree) is not None)
 check('every box starts unticked', 'IsChecked = false' in win)
 check('Install starts switched off', re.search(r'Content = "Install", IsEnabled = false', win) is not None)
 check('each box looks at the gate again on every tick and untick',

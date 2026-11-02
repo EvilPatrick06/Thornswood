@@ -110,7 +110,11 @@ namespace Thornswood
                                    name.EndsWith(".dll", StringComparison.OrdinalIgnoreCase);
                     if (program)
                     {
-                        string tmp = Path.Combine(Path.GetTempPath(), "thornswood-velo-" + Guid.NewGuid().ToString("N") + Path.GetExtension(name));
+                        // The copy is named here, never from the entry: only
+                        // its kind (.exe or .dll, which the check above
+                        // settled) comes from the package.
+                        string ext = name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? ".exe" : ".dll";
+                        string tmp = Path.Combine(Path.GetTempPath(), "thornswood-velo-" + Guid.NewGuid().ToString("N") + ext);
                         try
                         {
                             e.ExtractToFile(tmp, true);
