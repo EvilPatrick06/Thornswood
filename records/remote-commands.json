@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  79,
-    "callCount":  318,
+    "scriptCount":  80,
+    "callCount":  324,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -1058,6 +1058,60 @@
                       "does":  "install-time or outside-the-gate work",
                       "class":  "admin",
                       "reason":  "sends lockAll"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Tunnel.ps1",
+                      "scope":  "Remote",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "function Remote($script) { return Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $script }",
+                      "does":  "sends a script for its caller",
+                      "class":  "transport",
+                      "reason":  "carries what its caller hands it; each caller is mapped"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Tunnel.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "if (`$t) { `$i = Get-ScheduledTaskInfo -TaskName `$task;",
+                      "does":  "reads the tunnel task, cloudflared\u0027s version, /ready and its counters, whether token.txt is there and which way the names point",
+                      "class":  "read-status",
+                      "reason":  "reads only; the gate runs it as Install-Tunnel -Status"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Tunnel.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "if ((Get-State) -eq \u0027switched\u0027) { \u0027the names are on the tunnel, so taking it off",
+                      "does":  "stops and unregisters the tunnel task and deletes cloudflared and its token from the box",
+                      "class":  "admin",
+                      "reason":  "unregisters a task and deletes a secret; never a gate word"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Tunnel.ps1",
+                      "scope":  "Get-BoxSealKey",
+                      "via":  "Remote",
+                      "anchor":  "(Get-ThornswoodSealKeyBlock)",
+                      "does":  "makes the box\u0027s seal key in C:\\Thornswood-Seal if it has none, locks the folder, prints the public half",
+                      "class":  "admin",
+                      "reason":  "writes a private key and an ACL; the gate runs it as Install-Tunnel -SealKey"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Tunnel.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$out = @(Remote ($common + $opened + $cfApi + @\"",
+                      "does":  "opens the sealed API token with the box\u0027s key and moves thornswood.net and www onto the tunnel or back, checking they answer through it",
+                      "class":  "admin",
+                      "reason":  "reads a private key and changes DNS at Cloudflare; the gate runs it as Install-Tunnel -Switch or -Back"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Tunnel.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$out = @(Remote $install | ForEach-Object { Say \"  $_\"; \"$_\".Trim() })",
+                      "does":  "opens the sealed API token, makes the tunnel and its routes, writes its token to a locked token.txt, installs the recorded cloudflared and registers and starts its task as LOCAL SERVICE",
+                      "class":  "admin",
+                      "reason":  "installs a program, writes a secret and an ACL, registers a task; the gate runs it as Install-Tunnel"
                   },
                   {
                       "script":  "scripts/deploy/Install-Voice.ps1",
