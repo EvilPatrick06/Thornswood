@@ -198,7 +198,9 @@ try {
         Yes "   and keep it for the run as $art-<share>, a day" ($y -match ('(?s)uses: actions/upload-artifact@[0-9a-f]{40} # v\d+\s+with:\s+name: ' + $art + '-\$\{\{ matrix\.shard \}\}\s+path: \$\{\{ runner\.temp \}\}/' + $art + '/share\.xml.*?retention-days: 1\b'))
         $jb = [regex]::Match($y, '(?s)(?m)^  ' + [regex]::Escape($job) + ':\s*$(.*?)(?=^  [A-Za-z0-9_-]+:\s*$|\z)').Groups[1].Value
         Yes "   the job ""$name"" downloads them all and merges them onto the run's page" ($jb -match ('name: ' + [regex]::Escape($name)) -and $jb -match ('pattern: ' + [regex]::Escape($art) + '-\*') -and $jb -match 'Merge-HarnessReports\.ps1 -Path \$in -Expect ' -and $jb -match [regex]::Escape($expect))
-        Yes '   running whenever the shares ran, red or green, never with always()' ($jb -match "if: \`$\{\{ !cancelled\(\) && needs\.[a-z]+\.result != 'skipped' \}\}" -and $jb -notmatch 'always\(\)')
+        # In the builds, whenever either the Windows or the Linux shares (#5293) ran.
+        Yes '   running whenever the shares ran, red or green, never with always()' (($jb -match "if: \`$\{\{ !cancelled\(\) && needs\.[a-z]+\.result != 'skipped' \}\}" -or
+            $jb -match [regex]::Escape("if: `${{ !cancelled() && (needs.gate.result != 'skipped' || needs['gate-linux'].result != 'skipped') }}")) -and $jb -notmatch 'always\(\)')
     }
     $y = [IO.File]::ReadAllText((Join-Path $wf 'harnesses.yml'))
     Yes "8. harnesses.yml, one job, hands the run's page to -Summary" ($y -match '(?m)^\s+\.\\scripts\\dev\\Nightly-Harnesses\.ps1 -Only .* -Summary \$env:GITHUB_STEP_SUMMARY\s*$')

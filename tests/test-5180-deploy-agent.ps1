@@ -16,7 +16,9 @@
       the Release.
     - The gate has the verbs Deploy-Release (-Tag build-<...> and
       -Environment dev, site or discord only) and Install-DeployAgent
-      (-Status, -Tag, -NoBotPass and -EndHung only).
+      (-Status, -Tag, -NoBotPass, -EndHung, -Main and -NoMain only). -Main
+      has agent.json name main (#5181) and -NoMain takes it off; with
+      neither it is kept.
     - Deploy-Release.ps1 and Install-DeployAgent.ps1 send the box scripts that
       parse; the install one carries the signer read from Updater.cs, the
       launcher's own Signature.cs and the repository it was given, and no
@@ -36,6 +38,11 @@
       then; -NoBotPass leaves it off; New-SignedManifest.ps1 -BotFiles adds
       the bot part merge-release.yml puts in every Release, with
       the same files the agent asks for.
+    - After a dev Deployment (#5180): the load order line and Check-ProdParity
+      are lines main's gate takes, the load order verb fits the agent's wait,
+      the REVIEW rows are printed as the agent reads them, each file the
+      agent watches is one Deploy-DevGamemode -LoadOrder -FromRecord reads,
+      and only the service takes these steps.
     - dotnet test on tools/DeployAgent.Tests, from the locked packages, when
       dotnet is on PATH; SKIP otherwise (the Deploy agent workflow runs them
       on every pull request that touches it).
@@ -115,7 +122,8 @@ try {
     Yes '  -Tag takes build-<...> and nothing else' (('build-20261101.12' -match $d.params.Tag) -and -not ('build-1; rm' -match $d.params.Tag) -and -not ('agent-v1.0.1' -match $d.params.Tag))
     $v = $verbs.verbs.'Install-DeployAgent'
     Yes 'the gate has Install-DeployAgent' ($null -ne $v -and $v.script -eq 'scripts/deploy/Install-DeployAgent.ps1')
-    Yes '  with -Status, -Tag, -NoBotPass and -EndHung only, and -NoPause fixed' ((@($v.params.PSObject.Properties.Name) -join ',') -eq 'Status,Tag,NoBotPass,EndHung' -and (@($v.fixed) -join ',') -eq '-NoPause' -and $v.params.NoBotPass -eq 'switch' -and $v.params.EndHung -eq 'switch')
+    Yes '  with -Status, -Tag, -NoBotPass, -EndHung, -Main and -NoMain only, and -NoPause fixed' ((@($v.params.PSObject.Properties.Name) -join ',') -eq 'Status,Tag,NoBotPass,EndHung,Main,NoMain' -and (@($v.fixed) -join ',') -eq '-NoPause' -and
+        $v.params.NoBotPass -eq 'switch' -and $v.params.EndHung -eq 'switch' -and $v.params.Main -eq 'switch' -and $v.params.NoMain -eq 'switch')
     Yes '  -Tag takes agent-v<a.b.c> and nothing else' (('agent-v1.0.12' -match $v.params.Tag) -and -not ('agent-v1.0.12; rm' -match $v.params.Tag) -and -not ('build-1' -match $v.params.Tag))
 
     # ---- the scripts they send the box ---------------------------------------------
@@ -168,6 +176,11 @@ try {
             Yes '  and names the folder in agent.json only once the task is set up' ($t.Contains('-NotePropertyName botPassRoot') -and $t.Contains('$noPass = [bool]0'))
             $off = Probe 'Install-DeployAgent.ps1' 'INSTALLED: probe' @('-Repo', 'O/R', '-NoBotPass')
             Yes '  -NoBotPass sends a script that parses and leaves the bot pass off' ($null -ne $off -and $off.Parses -and $off.Text.Contains('$noPass = [bool]1'))
+            Yes '  without -Main or -NoMain, main in agent.json is kept as it is' ($t.Contains('if ([bool]0) {') -and $t.Contains('elseif ([bool]0) {') -and $t.Contains("'main: kept, as agent.json said'"))
+            $mn = Probe 'Install-DeployAgent.ps1' 'INSTALLED: probe' @('-Repo', 'O/R', '-Main')
+            Yes '  -Main has agent.json name main, with the live server''s resources port for its logs' ($null -ne $mn -and $mn.Parses -and $mn.Text.Contains('if ([bool]1) {') -and $mn.Text -match "-NotePropertyName main -NotePropertyValue \(\[pscustomobject\]@\{ logBase = 'http://[A-Za-z0-9.-]+:3000/' \}\)")
+            $nm = Probe 'Install-DeployAgent.ps1' 'INSTALLED: probe' @('-Repo', 'O/R', '-NoMain')
+            Yes '  -NoMain takes it off' ($null -ne $nm -and $nm.Parses -and $nm.Text.Contains('elseif ([bool]1) {') -and $nm.Text.Contains("Properties.Remove('main')"))
             # How it picks the Release, run against a stand-in GitHub that hands
             # each JSON array back as one object, the way Invoke-RestMethod does:
             # the box once refused agent-v1.0.6 because the list was read whole.
@@ -205,7 +218,7 @@ $h = @{}; $want = ''
     $wf = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\merge-release.yml'))
     Yes 'merge-release.yml puts the bot pass in every Release' ($wf.Contains('-BotFiles $bot') -and $wf.Contains("@('Bot-Pass.js', 'bot.js', 'character.js')") -and $wf.Contains("- 'scripts/bot/Bot-Pass.js'"))
     $cs = [IO.File]::ReadAllText((Join-Path $Repo 'tools\DeployAgent\BotPass.cs'))
-    Yes '  the same three files the agent asks the bot part for' ($cs.Contains('BotFiles = ["Bot-Pass.js", "bot.js", "character.js"]'))
+    Yes '  and the agent takes that part whole, needing only the file the task runs' ($cs.Contains('public const string Runs = "Bot-Pass.js";') -and $cs.Contains('foreach (var n in bot) Files.Copy(files[n], Path.Combine(BotDir, n));') -and -not $cs.Contains('BotFiles ='))
     $r = Probe 'Deploy-Release.ps1' 'DEPLOYED: probe' @('-Tag', 'build-20261101.3')
     Yes 'Deploy-Release.ps1: the script it sends the box parses and runs the agent''s deploy for dev' ($null -ne $r -and $r.Parses -and $r.Code -eq 0 -and $r.Text.Contains("deploy --environment 'dev' --tag 'build-20261101.3'"))
     $r = Probe 'Deploy-Release.ps1' 'DEPLOYED: probe' @('-Tag', 'v1.2.3')
@@ -232,6 +245,28 @@ $h = @{}; $want = ''
     }
     $iso = Get-Content -Raw (Join-Path $Repo 'records\runner-isolation.json') | ConvertFrom-Json
     Yes 'runner-isolation.json keeps every runner account out of C:\Thornswood-Agent' (@($iso.noReach) -contains 'C:\Thornswood-Agent')
+
+    # ---- what the agent asks the gate for after a dev Deployment ------------------
+    . (Join-Path $Repo 'scripts\vps\gate\GateRules.ps1')
+    $agentCs = [IO.File]::ReadAllText((Join-Path $Repo 'tools\DeployAgent\Agent.cs'))
+    $verbs = Read-ThornswoodGateVerbs (Join-Path $Repo 'scripts\vps\gate\verbs.json')
+    $lo = [regex]::Match($agentCs, 'LoadOrderLine = "([^"]+)"').Groups[1].Value
+    # The rules read verbs.json the way the broker does, which is not strict.
+    function Ask([string]$line) { Set-StrictMode -Off; Test-ThornswoodGateRequest -Line $line -Verbs $verbs }
+    $req = Ask $lo
+    Yes "the agent's load order line is one the gate takes: $lo" ($lo -ne '' -and $req.Ok -and $req.Verb -eq 'Deploy-DevGamemode' -and -not $req.Build)
+    Yes '  and it runs no longer than the 50 minutes the agent waits for the gate' ($req.Minutes -le 50 -and $agentCs.Contains('Gate!.Run(LoadOrderLine, TimeSpan.FromMinutes(50)'))
+    $req = Ask 'Check-ProdParity'
+    Yes 'the gate takes the parity line the agent sends, Check-ProdParity' ($req.Ok -and $agentCs.Contains('Gate!.Run("Check-ProdParity"'))
+    $parity = [IO.File]::ReadAllText((Join-Path $Repo 'scripts\vps\Check-ProdParity.ps1'))
+    Yes '  and it prints the REVIEW rows the agent reads' ($parity.Contains('"REVIEW  {0} {1}: expected {2}, found {3}"') -and $agentCs.Contains('^REVIEW  (\S+) (.+?): expected (.*?), found (.*)$'))
+    $dg = [IO.File]::ReadAllText((Join-Path $Repo 'scripts\deploy\Deploy-DevGamemode.ps1'))
+    foreach ($f in 'records/collection-plugins.json', 'records/collection-dropped.json', 'game/data/last-plugin.json', 'game/data/last-plugin.recipe', 'game/content/Thornswood-Content.esp') {
+        $win = $f.Replace('/', '\')
+        Yes "  the agent moves the order when $f changes, a file -LoadOrder -FromRecord reads" ($agentCs.Contains('"' + $f + '"') -and ($dg.Contains($f) -or $dg.Contains($win) -or $dg.Contains("'" + (Split-Path -Leaf $win) + "'")))
+    }
+    $prog = [IO.File]::ReadAllText((Join-Path $Repo 'tools\DeployAgent\Program.cs'))
+    Yes 'only the service takes the gate steps, never a deploy by tag inside a gate verb' ($prog -match '(?s)if \(verb == "service"\)\s*\{\s*agent\.Gate = new GatePipe\(\);')
 
     # ---- the C# code ----------------------------------------------------------------
     $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue

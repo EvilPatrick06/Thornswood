@@ -107,7 +107,28 @@ public sealed class Config
         "dev" => DefaultDev(),
         AppKinds.Site => DefaultSite(),
         AppKinds.Discord => DefaultDiscord(),
+        "main" => DefaultMain(),
         _ => new EnvConfig(),
+    };
+
+    /// <summary>The live server (#5181). It takes only a Release dev ran, and
+    /// only once Patrick has approved its Deployment on GitHub
+    /// (promote-main.yml); no bot pass, which ran on dev.</summary>
+    public static EnvConfig DefaultMain() => new()
+    {
+        GitHubEnvironment = "Main",
+        Root = @"C:\Thornswood-Server",
+        Turn = @"C:\Thornswood-Backup",
+        Store = @"C:\Thornswood-Deploys",
+        Health = "http://127.0.0.1:3000/api/servers/thornswood/manifest.json",
+        LogBase = "",
+        LoadSeconds = 300,
+        TurnSeconds = 1200,
+        RequirePort = 7777,
+        Task = "Thornswood Server",
+        Watch = @"C:\Thornswood-Watch",
+        StartSeconds = 170,
+        Approved = true,
     };
 
     static readonly Regex RepoShape = new(@"^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$");
@@ -155,11 +176,20 @@ public sealed class Config
         if (Environments.Count == 0) throw new ConfigException("no environment is named, so there is nothing to look after");
         foreach (var (name, e) in Environments)
         {
-            // Dev, the site and the Discord bot. Main waits on the Main
-            // environment with Patrick's approval (#5181).
-            if (name is not ("dev" or AppKinds.Site or AppKinds.Discord)) throw new ConfigException($"environment \"{name}\": this agent applies dev, site and discord only so far (#5180, #5190, #5187)");
-            if (e.GitHubEnvironment is "" or "Main")
+            // Dev, the site, the Discord bot, and the live server once Patrick
+            // approves (#5181).
+            if (name is not ("dev" or "main" or AppKinds.Site or AppKinds.Discord)) throw new ConfigException($"environment \"{name}\": this agent applies dev, main, site and discord only so far (#5180, #5181, #5190, #5187)");
+            if (name != "main" && e.GitHubEnvironment is "" or "Main")
                 throw new ConfigException($"environment {name}: githubEnvironment \"{e.GitHubEnvironment}\" must be named, and not Main, whose Deployments wait on Patrick's approval (#5181)");
+            if (name == "main")
+            {
+                // Main is the one environment whose Deployments the agent
+                // holds to an approval, so none of that can be written away.
+                if (e.GitHubEnvironment != "Main" || !e.Approved || e.Kind != EnvConfig.ServerKind) throw new ConfigException("environment main: it applies the Main environment's Deployments to the live server, each held to Patrick's approval, and agent.json cannot change that");
+                if (e.RequirePort == 0 || e.LivePort != 0) throw new ConfigException("environment main: it must name the live server's port (requirePort) and refuses none (livePort)");
+                if (e.BotPassRoot != "") throw new ConfigException("environment main: no bot pass; the Release passed one on dev");
+            }
+            else if (e.Approved) throw new ConfigException($"environment {name}: only main is held to an approval");
             if (e.Root == "" || !(Path.IsPathRooted(e.Root) || e.Root.Contains(@":\"))) throw new ConfigException($"environment {name}: root \"{e.Root}\" is not a full path");
             if (e.Kind != EnvConfig.ServerKind)
             {
@@ -187,6 +217,9 @@ public sealed class Config
                 if (e.BotPassSeconds < 60) throw new ConfigException($"environment {name}: botPassSeconds must be 60 or more");
             }
         }
+        if (Environments.TryGetValue("dev", out var d) && Environments.TryGetValue("main", out var mn) &&
+            string.Equals(d.Root.TrimEnd('\\', '/'), mn.Root.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase))
+            throw new ConfigException("dev and main name the same server folder");
     }
 }
 
@@ -230,6 +263,13 @@ public sealed class EnvConfig
     public int TurnSeconds { get; set; }
     /// <summary>The live server's port: a root whose settings name it is refused.</summary>
     public int LivePort { get; set; }
+    /// <summary>The port this server's settings must name, so a main pointed at
+    /// another folder is refused (#5181). 0 asks for none.</summary>
+    public int RequirePort { get; set; }
+    /// <summary>Each Deployment is held to Patrick's approval of the
+    /// promote-main.yml run that made it (#5181). Set by DefaultMain only,
+    /// never read from agent.json.</summary>
+    public bool Approved { get; set; }
     /// <summary>The bot pass's folder (#5196, BotPass.cs). "" until
     /// Install-DeployAgent.ps1 has registered its task and made the folder;
     /// from then on every Deployment waits on a bot pass.</summary>
@@ -262,6 +302,7 @@ public sealed class EnvConfig
         LoadSeconds = I("loadSeconds", LoadSeconds);
         TurnSeconds = I("turnSeconds", TurnSeconds);
         LivePort = I("livePort", LivePort);
+        RequirePort = I("requirePort", RequirePort);
         BotPassRoot = S("botPassRoot", BotPassRoot);
         BotPassTask = S("botPassTask", BotPassTask);
         BotPassSeconds = I("botPassSeconds", BotPassSeconds);

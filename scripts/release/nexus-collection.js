@@ -68,7 +68,9 @@
 //
 // ADDING A MOD (#2969). An entry with "add": true is a mod the revision does
 // not carry yet, written the way Vortex writes a mod it installed with its
-// basic installer (no installer answers, no file hashes, no patches):
+// basic installer (no installer answers, no file hashes, no patches), or with
+// its FOMOD installer when "choices" gives the answers (#5189), which the
+// entry carries after its source as Vortex writes them:
 //   { "add": true, "modId": "1932", "fileId": "8662", "version": "1.3",
 //     "md5": "<32 hex>", "fileSize": 52221104,
 //     "logicalFilename": "KS Hairdos Lite SE NoNPCs",
@@ -342,7 +344,8 @@ function applyAdd(collection, add, lines) {
     for (const a of after) if (!known.has(String(a).toLowerCase())) stop(p.name + ' is to load after ' + a + ', which the plugin list does not name.');
     known.add(low);
   }
-  collection.mods.push({
+  if (add.choices !== undefined && add.choices !== null) checkChoices(add);
+  const entry = {
     name: String(add.name),
     version: String(add.version),
     optional: false,
@@ -357,15 +360,34 @@ function applyAdd(collection, add, lines) {
       updatePolicy: 'exact',
       tag: add.tag ? String(add.tag) : newTag(),
     },
-    author: String(add.author),
-    details: { category: String(add.category), type: '' },
-    phase: 0,
-  });
+  };
+  // A FOMOD's answers go after the source, where Vortex writes them, so it
+  // runs the script with them and shows no dialog.
+  if (add.choices !== undefined && add.choices !== null) entry.choices = add.choices;
+  entry.author = String(add.author);
+  entry.details = { category: String(add.category), type: '' };
+  entry.phase = 0;
+  collection.mods.push(entry);
   lines.push([String(add.name), 'added', '', 'file ' + add.fileId].join('\t'));
   for (const p of plugins) {
     collection.plugins.push({ name: String(p.name), enabled: true });
     collection.pluginRules.plugins.push({ name: String(p.name).toLowerCase(), after: p.after.map(a => String(a).toLowerCase()) });
     lines.push([String(p.name), 'plugin', '', 'after ' + p.after.join(', ')].join('\t'));
+  }
+}
+
+// The choices of a mod added with a FOMOD installer, as Vortex writes them:
+// { type: 'fomod', options: [{ name, groups: [{ name, choices: [{ name, idx }] }] }] }.
+function checkChoices(add) {
+  const c = add.choices;
+  const bad = () => stop('The choices for mod ' + add.modId + ' are not { type: "fomod", options: [steps of { name, groups: [{ name, choices: [{ name, idx }] }] }] }.');
+  if (!c || typeof c !== 'object' || c.type !== 'fomod' || !Array.isArray(c.options) || !c.options.length) bad();
+  for (const st of c.options) {
+    if (!st || typeof st.name !== 'string' || !Array.isArray(st.groups)) bad();
+    for (const g of st.groups) {
+      if (!g || typeof g.name !== 'string' || !Array.isArray(g.choices)) bad();
+      for (const ch of g.choices) if (!ch || typeof ch.name !== 'string' || !Number.isInteger(ch.idx) || ch.idx < 0) bad();
+    }
   }
 }
 

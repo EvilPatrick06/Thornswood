@@ -80,13 +80,15 @@ function run(id, extra) {
 }
 // The jobs of run <id>: <name> with job id <id>0, its last step the note
 // unless stepConclusion is null, the gate's five shares (all passed unless
-// shares is given), and the check that reads their results.
-function jobs(id, name, conclusion, stepConclusion, shares) {
+// shares is given), the Tree checks job (#5292, passed unless tree is given)
+// and the check that reads their results.
+function jobs(id, name, conclusion, stepConclusion, shares, tree) {
   const steps = [{ name: 'Lint (warnings only)', conclusion: 'success' }];
   if (stepConclusion !== null) { steps.push({ name: T.STEP, conclusion: stepConclusion || 'success' }); }
   const gate = shares || [1, 2, 3, 4, 5].map(n => ({ name: 'Gate harnesses (' + n + ' of 5)', conclusion: 'success' }));
   return [{ id: id * 10, name: name, conclusion: conclusion, steps: steps }].concat(
     gate.map((g, i) => Object.assign({ id: id * 100 + i, steps: [{ name: 'Run the gate harnesses', conclusion: g.conclusion }] }, g)),
+    tree === null ? [] : [{ id: id * 1000, name: 'Tree checks', conclusion: tree || 'success', steps: [{ name: 'Lint (warnings only)', conclusion: 'success' }] }],
     [{ id: 1, name: 'Build check result', conclusion: conclusion, steps: [] }]);
 }
 function shares(fix) { return [1, 2, 3, 4, 5].map(n => ({ name: 'Gate harnesses (' + n + ' of 5)', conclusion: 'success' })).map(fix); }
@@ -165,6 +167,35 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   // reach, and say so in their names; main then runs the whole gate.
   r = await ask(world(21, null, { jobs: { 21: jobs(21, 'Launcher builds', 'success', 'success', shares(g => Object.assign(g, { name: g.name.replace(')', ', what the change reaches)') }))) } }));
   yes('nor one whose shares ran only what its change reaches: ' + r.why, r.run === '' && /only what its change can reach/.test(r.why));
+  // #5292: the tree checks run in a job of their own on Linux.
+  r = await ask({ pulls: [pull()], runs: [run(17)], jobs: { 17: jobs(17, 'Launcher builds', 'success', 'success', null, 'failure') }, logs: { 170: jobLog(TREE) } });
+  yes('nor one whose Tree checks failed (#5292): ' + r.why, r.run === '' && /its Tree checks job did not pass/.test(r.why));
+  r = await ask({ pulls: [pull()], runs: [run(18)], jobs: { 18: jobs(18, 'Launcher builds', 'success', 'success', null, null) }, logs: { 180: jobLog(TREE) } });
+  yes('nor one with no Tree checks job at all: ' + r.why, r.run === '' && /its Tree checks job did not pass/.test(r.why));
+  // #5293: the harnesses that need nothing from Windows run in shares on
+  // Linux, counted as the Windows ones are, and the run's Build check result
+  // has to have passed, since it is what says no share was skipped for a
+  // reason the pick did not give.
+  const lin = (fix) => [1, 2, 3, 4].map(n => ({ name: 'Gate harnesses on Linux (' + n + ' of 4)', conclusion: 'success' })).map(fix || (g => g));
+  const both = (w, l) => ({ pulls: [pull()], runs: [run(22)], jobs: { 22: jobs(22, 'Launcher builds', 'success', 'success', w.concat(l)) }, logs: { 220: jobLog(TREE) } });
+  r = await ask(both(shares(g => g), lin()));
+  yes('a run whose Windows and Linux shares all passed counts (#5293): ' + r.why, r.run.endsWith('/22'));
+  r = await ask(both(shares(g => g), lin((g, i) => i === 1 ? Object.assign(g, { conclusion: 'failure' }) : g)));
+  yes('  not one whose Linux share failed: ' + r.why, r.run === '' && /gate share 2 of 4 on Linux did not pass/.test(r.why));
+  r = await ask(both(shares(g => g), lin().slice(1)));
+  yes('  nor one missing a Linux share: ' + r.why, r.run === '' && /gate share 1 of 4 on Linux is not in it/.test(r.why));
+  r = await ask(both(shares(g => g), lin(g => Object.assign(g, { name: g.name.replace(')', ', what the change reaches)') }))));
+  yes('  nor one whose Linux shares ran only what its change reaches: ' + r.why, r.run === '' && /only what its change can reach/.test(r.why));
+  r = await ask(both([], lin()));
+  yes('  a run of Linux shares alone counts, the Windows ones being none: ' + r.why, r.run.endsWith('/22'));
+  const noResult = both(shares(g => g), lin());
+  noResult.jobs[22] = noResult.jobs[22].map(x => x.name === T.RESULT ? Object.assign({}, x, { conclusion: 'failure' }) : x);
+  r = await ask(noResult);
+  yes('  nor one whose Build check result failed: ' + r.why, r.run === '' && /its Build check result job did not pass/.test(r.why));
+  noResult.jobs[22] = noResult.jobs[22].filter(x => x.name !== T.RESULT);
+  r = await ask(noResult);
+  yes('  nor one with no Build check result: ' + r.why, r.run === '' && /its Build check result job did not pass/.test(r.why));
+  yes('  the Linux shares are read by the name build.yml gives them', T.GATE_LINUX.test('Gate harnesses on Linux (3 of 4)') && !T.GATE.test('Gate harnesses on Linux (3 of 4)') && !T.GATE_LINUX.test('Gate harnesses (3 of 4)'));
   r = await ask({ pulls: [pull()], runs: [run(16), run(11)], jobs: { 16: jobs(16, 'Launcher builds', 'failure'), 11: good.jobs[11] }, logs: good.logs });
   yes('a failed build of the head beside a green one: the green one counts', r.run.endsWith('/11'));
   r = await ask({ pulls: [pull()], runs: [run(11), run(20)], jobs: { 11: good.jobs[11], 20: jobs(20, 'Launcher builds', 'success') }, logs: { 110: jobLog(TREE), 200: jobLog(OTHER) } });
@@ -238,19 +269,27 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   yes('  on a push only, so a manual run always builds', /\n    if: \$\{\{ github\.event_name == 'push' \}\}\n/.test(tj));
   // #3551: the build waits for this answer, so it asks on GitHub's runner.
   const runsOn = (/\n    runs-on: ([^\n]*)\n/.exec(tj) || ['', ''])[1];
-  yes('  on GitHub\'s hosted runner, not the box (#3551): ' + runsOn, runsOn === 'ubuntu-24.04-arm' && !/self-hosted|thornswood-/.test(runsOn));
+  yes('  on GitHub\'s hosted runner, not the box (#3551): ' + runsOn, runsOn === 'ubuntu-latest' && !/self-hosted|thornswood-/.test(runsOn));
   yes('  with no fallback on the box (#4983)', build.indexOf('\n  tested-vps:\n') < 0 && build.indexOf('\n  launcher-vps:\n') < 0);
   yes('  with only actions, contents and pull-requests read', /\n    permissions:\n      actions: read\n      contents: read\n      pull-requests: read\n    outputs:/.test(tj));
   yes('  and no secrets', !/secrets\./.test(tj));
   yes('  its output is the script\'s', /\n      run: \$\{\{ steps\.look\.outputs\.run \}\}\n/.test(tj) && /id: look\n/.test(tj) &&
       /node scripts\/dev\/Tested-Tree\.js --tree \$tree --commit \$env:GITHUB_SHA --repo \$env:GITHUB_REPOSITORY\n/.test(tj) && /git rev-parse 'HEAD\^\{tree\}'/.test(tj));
   yes('the build waits for the answer and builds only when it found nothing',
-      /\n  launcher:\n    name: Launcher builds\n    needs: tested\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' \}\}\n/.test(build));
-  // The checks are the launcher job's steps, each without the comments that
-  // stand before the next one.
+      /\n  launcher:\n    name: Launcher builds\n    needs: \[tested, pick\]\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && needs\.pick\.outputs\.launcher != 'false' \}\}\n/.test(build) &&
+      /\n  checks:\n    name: Tree checks\n    needs: tested\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' \}\}\n/.test(build));
+  // The checks are the launcher job's steps and, since #5292, the Tree
+  // checks job's, each without the comments that stand before the next one.
+  // The launcher job is the last job; Tree checks is the one before it.
   const lj = build.indexOf('\n  launcher:\n');
+  const cj = build.indexOf('\n  checks:\n');
+  const stepsOf = (t) => t.split(/\n(?=      - )/).filter(s => /^      - /.test(s)).map(s => s.replace(/(\n *#[^\n]*|\n *)+$/, '\n'));
   const checks = lj < 0 ? '' : build.slice(build.indexOf('\n    steps:\n', lj) + '\n    steps:\n'.length);
-  const steps = checks.split(/\n(?=      - )/).filter(s => /^      - /.test(s)).map(s => s.replace(/(\n *#[^\n]*|\n *)+$/, '\n'));
+  const steps = stepsOf(checks);
+  const treeJob = cj < 0 || cj > lj ? '' : build.slice(cj, lj);
+  const treeSteps = stepsOf(treeJob.slice(treeJob.indexOf('\n    steps:\n') + '\n    steps:\n'.length));
+  yes('the Tree checks job is the one before the launcher job, on Linux (#5292)', cj > 0 && cj < lj && /\n    runs-on: ubuntu-latest\n/.test(treeJob) && treeSteps.length > 10);
+  yes('  and the script counts the note only beside its success (' + T.CHECKS + ')', T.CHECKS === 'Tree checks' && treeJob.indexOf('\n    name: ' + T.CHECKS + '\n') >= 0);
   const note = steps[steps.length - 1] || '';
   yes('the note is the last step of the checks, under the name the script looks for', note.indexOf('- name: ' + T.STEP + '\n') === 6);
   // #3874 wrote it only on GitHub's hosted runner, so a VPS build left main
@@ -264,7 +303,9 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   const gj = build.indexOf('\n  gate:\n');
   const pj = build.indexOf('\n  pick:\n');
   const pickJob = pj < 0 ? '' : build.slice(pj, gj > pj ? gj : undefined);
-  const gateJob = gj < 0 ? '' : build.slice(gj, lj > gj ? lj : undefined);
+  const glj = build.indexOf('\n  gate-linux:\n');
+  const gateJob = gj < 0 ? '' : build.slice(gj, glj > gj ? glj : (cj > gj ? cj : undefined));
+  const linuxJob = glj < 0 ? '' : build.slice(glj, cj > glj ? cj : undefined);
   const gateStep = (gateJob.split(/\n(?=      - )/).find(x => /^      - name: Run the gate harnesses\n/.test(x)) || '');
   const rg = read(path.join(REPO, 'scripts', 'dev', 'Run-Gate.ps1'));
   const part = "${{ needs.pick.outputs.whole != 'true' && ', what the change reaches' || '' }}";
@@ -273,15 +314,29 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
       T.GATE.test('Gate harnesses (1 of 5)') && T.GATE.exec('Gate harnesses (1 of 5, what the change reaches)')[3] && /\n      fail-fast: false\n/.test(gateJob));
   yes('  the pick waits for "tested" as the launcher job does, and the shares for both', pj > 0 && pj < gj &&
       /\n    needs: tested\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' \}\}\n/.test(pickJob) &&
-      /\n    needs: \[tested, pick\]\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && needs\.pick\.result == 'success' \}\}\n/.test(gateJob));
-  yes('  the pick runs Run-Gate.ps1 -Pick on GitHub\'s arm64 Linux runner, with the token, and hands on its plan',
-      /\n    runs-on: ubuntu-24\.04-arm\n/.test(pickJob) && /\.\/scripts\/dev\/Run-Gate\.ps1 -Pick \(\[int\]\$env:SHARES\)\n/.test(pickJob) &&
+      /\n    needs: \[tested, pick\]\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && needs\.pick\.result == 'success' && needs\.pick\.outputs\.shares != '\[\]' \}\}\n/.test(gateJob));
+  yes('  the pick runs Run-Gate.ps1 -Pick on Linux, with the token, and hands on its plan',
+      /\n    runs-on: ubuntu-latest\n/.test(pickJob) && /\.\/scripts\/dev\/Run-Gate\.ps1 -Pick \(\[int\]\$env:SHARES\) -LinuxShares \(\[int\]\$env:LINUX_SHARES\)\n/.test(pickJob) &&
       /\n          GATE_MAP_TOKEN: \$\{\{ github\.token \}\}\n/.test(pickJob) && /\n      whole: \$\{\{ steps\.pick\.outputs\.whole \}\}\n/.test(pickJob));
   yes('the gate step is "gate", and runs its share of the plan through Run-Gate.ps1', /\n        id: gate\n/.test(gateStep) &&
       /\.\\scripts\\dev\\Run-Gate\.ps1 -Shard \$env:SHARD -Of \$env:OF /.test(gateStep) &&
       /\n          SHARD: \$\{\{ matrix\.shard \}\}\n          OF: \$\{\{ strategy\.job-total \}\}\n          GATE_PLAN: \$\{\{ needs\.pick\.outputs\.plan \}\}\n/.test(gateStep) &&
       /\n        shard: \$\{\{ fromJSON\(needs\.pick\.outputs\.shares\) \}\}\n/.test(gateJob));
   yes('  with no token: a share fetches no map', !/GATE_MAP_TOKEN|github\.token/.test(gateJob));
+  const linuxStep = (linuxJob.split(/\n(?=      - )/).find(x => /^      - name: Run the gate harnesses\n/.test(x)) || '');
+  yes('the Linux shares are the job "gate-linux" after it, on Linux, named as the script reads them (#5293)',
+      glj > gj && glj < cj && /\n    runs-on: ubuntu-latest\n/.test(linuxJob) &&
+      linuxJob.indexOf('\n    name: Gate harnesses on Linux (${{ matrix.shard }} of ${{ strategy.job-total }}' + part + ')\n') >= 0 &&
+      /\n      fail-fast: false\n/.test(linuxJob) && /\n          LINUX_SHARES: '\d+'\n/.test(pickJob) &&
+      /\n      linux_shares: \$\{\{ steps\.pick\.outputs\.linux_shares \}\}\n/.test(pickJob));
+  yes('  waiting as the Windows shares do, skipped when the pick gave none',
+      /\n    needs: \[tested, pick\]\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && needs\.pick\.result == 'success' && needs\.pick\.outputs\.linux_shares != '\[\]' \}\}\n/.test(linuxJob) &&
+      /\n        shard: \$\{\{ fromJSON\(needs\.pick\.outputs\.linux_shares\) \}\}\n/.test(linuxJob));
+  yes('  and running its part of the same plan through Run-Gate.ps1 -Platform Linux, with no token',
+      /\.\/scripts\/dev\/Run-Gate\.ps1 -Shard \$env:SHARD -Of \$env:OF -Platform Linux /.test(linuxStep) &&
+      /\n          SHARD: \$\{\{ matrix\.shard \}\}\n          OF: \$\{\{ strategy\.job-total \}\}\n          GATE_PLAN: \$\{\{ needs\.pick\.outputs\.plan \}\}\n/.test(linuxStep) &&
+      !/GATE_MAP_TOKEN|github\.token/.test(linuxJob));
+
   yes('  and the plan says whole only when it holds every gate harness',
       (rg.match(/Set-StepOutput 'whole'/g) || []).length === 2 && /\nif \(\$whole\) \{ Set-StepOutput 'whole' 'true' \}\n/.test(rg) &&
       /Set-StepOutput 'whole' \$\(if \(\$whole\) \{ 'true' \} else \{ 'false' \}\)/.test(rg) &&
@@ -294,25 +349,29 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
       !/\$\{\{/.test(note.split('        run: |')[1] || ''));
   yes('the pull request build has the same note step', pr.indexOf(note) >= 0);
   // The gate's reports are the one artifact a build keeps (#5295, public
-  // since 30 Oct 2026); the note is never one (#3399).
+  // since 30 Oct 2026): the Windows shares', the Linux shares' (#5293) and
+  // the merged one. The note is never one (#3399).
   const uploads = (y) => (y.replace(/^\s*#.*$/gm, '').match(/uses: actions\/upload-artifact@[\s\S]*?\n\s+name: (.+)/g) || []).map(m => m.replace(/[\s\S]*name: /, ''));
-  const onlyReports = (y) => uploads(y).every(n => /^gate-report(-\$\{\{ matrix\.shard \}\})?$/.test(n));
-  yes('no step of either build uploads an artifact but the gate\'s reports, and the note is never one (#3399, #5295)', onlyReports(build) && onlyReports(pr) && uploads(build).length === 2 && !/tested-tree/i.test(uploads(build).join(' ')));
+  const onlyReports = (y) => uploads(y).every(n => /^gate-report(-(linux-)?\$\{\{ matrix\.shard \}\})?$/.test(n));
+  yes('no step of either build uploads an artifact but the gate\'s reports, and the note is never one (#3399, #5295)', onlyReports(build) && onlyReports(pr) && uploads(build).length === 3 && !/tested-tree/i.test(uploads(build).join(' ')));
   for (const n of T.JOBS) { yes('the script\'s job name "' + n + '" is a job in build-pr.yml', pr.indexOf('\n    name: ' + n + '\n') >= 0); }
   yes('the script\'s workflow is the pull request build', fs.existsSync(path.join(REPO, T.WORKFLOW)) && /\non:\n  pull_request:\n/.test(pr));
   yes('  and runs in the merge queue, whose run the script reads first (#5182)', /\non:\n  pull_request:\n  merge_group:\n    types: \[checks_requested\]\n/.test(pr));
 
   // ---- 3. why the tree is enough ---------------------------------------------
   const checkout = steps[0] || '';
-  yes('the checks check out one commit, with no history on either build', /^      - uses: actions\/checkout@[0-9a-f]{40} # v\d+\n/.test(checkout + '\n') && !/^\s+with:/m.test(checkout));
+  const treeCheckout = treeSteps[0] || '';
+  yes('the checks check out one commit, with no history on either build, in both jobs', /^      - uses: actions\/checkout@[0-9a-f]{40} # v\d+\n/.test(checkout + '\n') && !/^\s+with:/m.test(checkout) &&
+      /^      - uses: actions\/checkout@[0-9a-f]{40} # v\d+\n/.test(treeCheckout + '\n') && !/^\s+with:/m.test(treeCheckout));
   // The lint step is the one step that reads the event and fetches the
   // base (#3185): it reports warnings and cannot fail a build, and it is the
-  // last before the note, so no check runs after its fetch.
-  const lint = steps[steps.length - 2] || '';
-  yes('the step before the note is the lint, which cannot fail a build', /^      - name: Lint \(warnings only\)\n/.test(lint) &&
-      /\n        continue-on-error: true\n/.test(lint) && /\n          \.\\scripts\\dev\\Lint\.ps1 -All\n          exit 0\n/.test(lint) &&
+  // last step of the Tree checks job (#5292), so no check runs after its
+  // fetch.
+  const lint = treeSteps[treeSteps.length - 1] || '';
+  yes('the last tree check is the lint, which cannot fail a build', /^      - name: Lint \(warnings only\)\n/.test(lint) &&
+      /\n        continue-on-error: true\n/.test(lint) && /\n          \.\/scripts\/dev\/Lint\.ps1 -All\n          exit 0\n/.test(lint) &&
       /\nexit 0\s*$/.test(read(path.join(REPO, 'scripts', 'dev', 'Lint.ps1'))));
-  const before = steps.slice(0, -2).join('\n').replace(/^\s*#.*$/gm, '');
+  const before = steps.slice(0, -1).concat(treeSteps.slice(0, -1)).join('\n').replace(/^\s*#.*$/gm, '');
   const EVENT = /github\.(event|ref|ref_name|sha|head_ref|base_ref|run_id|run_number|actor)\b|GITHUB_(EVENT_NAME|EVENT_PATH|REF|REF_NAME|REF_TYPE|SHA|HEAD_REF|BASE_REF|RUN_ID|RUN_NUMBER|ACTOR)\b/;
   yes('no check step reads the event, the ref or the commit', !EVENT.test(before));
   yes('no check step fetches more history', !/git(\.exe)?\s+fetch|fetch-depth/.test(before));
@@ -322,9 +381,12 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
     'tests/test-release-workflow.ps1': 'reads release.yml\'s text for the names its tag push hands to main\'s run (#3930); runs nothing',
     'tests/test-release-tag.ps1': 'reads release.yml\'s text for those names; sets them for Resolve-ReleaseTag.ps1 in a scratch process',
     'tests/test-3412-installer-on-github.ps1': 'reads installer.yml\'s text for those names; installer.yml is started by hand on main and is no check of a build (#3412)',
+    'tests/test-5181-promote-main.ps1': 'reads promote-main.yml\'s text for the run id its Deployment names; promote-main.yml is started by hand on main and is no check of a build (#5181)',
     'scripts/dev/Run-Gate.ps1': 'the gate step: the event chooses only how much of the gate runs (#3114), and a build that ran less than all of it keeps no note, held above',
     'tests/test-3114-run-gate.ps1': 'sets those names for Run-Gate.ps1 in scratch processes, to hold what it does on each event',
-    'scripts/release/Sign-OnRunner.ps1': 'signs in the release workflows only, never in a check of a build: it reads the ref to refuse signing on any branch but main (#3930)'
+    'scripts/release/Sign-OnRunner.ps1': 'signs in the release workflows only, never in a check of a build: it reads the ref to refuse signing on any branch but main (#3930)',
+    'scripts/dev/Launcher-Reach.ps1': 'the pick\'s path rule (#5292): the event chooses only whether the launcher job runs, and a pull request build that skipped it keeps no note, so main builds',
+    'tests/test-5292-path-rule.ps1': 'sets those names for Launcher-Reach.ps1 in scratch processes, to hold what it says on each event'
   };
   const ENVREAD = /\b(GITHUB_(EVENT_NAME|EVENT_PATH|REF|REF_NAME|REF_TYPE|SHA|HEAD_REF|BASE_REF|RUN_ID|RUN_NUMBER|ACTOR))\b/;
   const found = [];

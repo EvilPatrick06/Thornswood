@@ -201,6 +201,7 @@ winget install --id Git.Git -e --accept-package-agreements --accept-source-agree
 winget install --id GitHub.cli -e --accept-package-agreements --accept-source-agreements
 winget install --id OpenJS.NodeJS.LTS -e --accept-package-agreements --accept-source-agreements
 winget install --id Microsoft.PowerShell -e --accept-package-agreements --accept-source-agreements
+winget install --id Microsoft.DotNet.SDK.10 -e --accept-package-agreements --accept-source-agreements
 winget install --id Microsoft.VisualStudioCode -e --accept-package-agreements --accept-source-agreements
 ```
 
@@ -212,6 +213,7 @@ winget install --id Microsoft.VisualStudioCode -e --accept-package-agreements --
 | GitHub CLI (`gh`) | Pull requests from the terminal. [A. GitHub](#a-github) |
 | Node | The website, voice, and the test command. [J. Node](#j-node) |
 | PowerShell 7 | The terminal the scripts run in. [C. PowerShell](#c-powershell) |
+| .NET 10 SDK (`dotnet`) | Builds and runs the tools written in C#, under `tools`: the release note check `Check-Change.ps1 -Body` runs, and the deploy agent. |
 | Visual Studio Code | The window you edit in. [D. Visual Studio Code](#d-visual-studio-code) |
 
 #### Check that the tools open
@@ -222,6 +224,7 @@ Close that window and open **PowerShell 7** from the Start menu. A new window is
 git --version
 gh --version
 node --version
+dotnet --version
 ssh -V
 code --version
 ```
@@ -283,6 +286,14 @@ git status
 ```
 
 `git status` should say you are on `main` and the working tree is clean. If the clone asks for a login and then fails, you are not a collaborator yet. Stop and say so in Discord.
+
+Then turn on the checks that run before every push:
+
+```powershell
+git config core.hooksPath .githooks
+```
+
+It prints nothing. From then on `git push` first checks that every script parses and that the writing rules hold in what you are pushing, in about twenty seconds (#5291). When one fails, the push stops and names the file and line; fix it, commit, and push again. A cloud session turns this on by itself.
 
 From here on, the commands assume PowerShell is inside your clone. If you used another folder, `cd` there first.
 
@@ -362,13 +373,16 @@ Then in `Thornswood-Repo`:
 ```
 
 which makes a key for the VPS, points ssh at it through the bridge, and
-prints the public line. Send that line to Patrick; he runs
-`.\scripts\vps\Grant-BoxAccess.ps1 -Name <you> -FromClipboard` on One and
-sends you a token, which you paste when the same script asks
-(`docs\BOX-ACCESS.md` in the private ops repo). `.\scripts\vps\Setup-SshKey.ps1 -Test` proves it. Until then the scripts that talk to the VPS (`Ship`, `Deploy-*`,
-`Request-Restart`, `Install-Bot`, `Publish-Installer`, `Publish-News`) cannot
-reach it, and Ship stops before it builds anything: the feed and its baseline
-are received from the VPS (#907).
+prints the public line. That is for a machine that already holds a key: since
+31 Oct 2026 no key is made for a new person or machine (Patrick's answer A
+on q-retire-box-keys, #2862), and the keys there are changed only by Patrick (the workflows' two with the deploy gate's Renew-BoxKey verb). Box work from a new machine goes
+through the gate instead, with `gh` signed in as somebody who may run workflows in the private ops repository, and no key:
+`pwsh scripts/vps/Box-Run.ps1 -Line '<verb>'` ([E. VPS](#e-vps)). Ships go
+the same way (`Ship-Dev`, `Ship-Main`), so a machine without a key can still
+release; the scripts that ssh to the VPS themselves (`Ship`, `Deploy-*`,
+`Request-Restart`, `Install-Bot`, `Publish-Installer`, `Publish-News`) do not
+run from it, and Ship stops before it builds anything there: the feed and its
+baseline are received from the VPS (#907).
 
 Every Ship, dev included, checks the SkyMP client against the record, so
 this machine builds the engine once (Visual Studio 2022 Build Tools with
@@ -441,8 +455,12 @@ says so and carries on.
 ### Shipping from another machine
 
 Issue #458: if One (Patrick's machine) dies, the release process has to
-survive it. Measured on One on 29 September, this is everything a dev Ship
-reads that is not in a fresh clone, where it is on One, and where a second
+survive it. Since 31 Oct 2026 it does without any machine of ours: a Ship
+runs on the box through the deploy gate (`Box-Run.ps1 -Line 'Ship-Dev ...'`,
+`Ship-Main`), signs on GitHub's runner, and the box installs, backups, reads
+and deletion requests are gate verbs too (#2862). The table below is for a
+Ship run from a machine of one's own instead. Measured on One on 29 September, it is everything a dev Ship
+reads that is not in a fresh clone, where it was on One, and where a second
 machine gets it or how it is rebuilt. Nothing in this list is copied from One
 by hand, and no secret is written into the repository.
 
@@ -451,14 +469,14 @@ by hand, and no secret is written into the repository.
 | The source | the shared clone | `git clone https://github.com/ThornswoodRP/Thornswood.git` and `gh auth login` as a collaborator |
 | The feed, its baseline, the launcher list and history | the VPS store, with a working copy in `%LOCALAPPDATA%\Thornswood\feed\<channel>` | Nothing to copy: every Ship receives them from the VPS first (`scripts\release\Feed-Store.ps1`, #907). The working copy is made on the first Ship |
 | The release webhooks, dev and #news | the VPS, `C:\Thornswood-Bot\webhooks`; One has no local copy | Nothing to copy: Ship reads them over ssh (`scripts\ops\Discord-Hook.ps1`) |
-| VPS access | One's own key, `.ssh\thornswood_ed25519`, and its own bridge token, `.ssh\thornswood-box-token` | Its own key and token: `.\scripts\vps\Setup-SshKey.ps1`, and somebody the VPS already knows runs `.\scripts\vps\Grant-BoxAccess.ps1 -Name <machine> -FromClipboard` with the line it prints (`docs\BOX-ACCESS.md` in the private ops repo). With no such machine left, the BisectHosting panel is the way in (`docs\IT-IS-DOWN.md` in the private ops repo) |
+| VPS access | One's own key, `.ssh\thornswood_ed25519`, and its own bridge token, `.ssh\thornswood-box-token` | None: no new key is made (Patrick's A on q-retire-box-keys, 31 Oct 2026), and a Ship from the gate needs none. Box work goes through `scripts\vps\Box-Run.ps1`, with `gh` signed in as somebody who may run workflows in the private ops repository. With the gate down too, the BisectHosting panel is the way in (`docs\IT-IS-DOWN.md` in the private ops repo) |
 | Signing: `records\signing\signing.json` | written from the template like any other machine's since 5 Oct, when `C:\tools` (an older copy of `metadata.json`) was removed. Never copy one machine's to another | `.\scripts\release\Setup-ShipMachine.ps1` writes one from `records\signing\signing.template.json` (paths and "enabled": true, no key or password) |
 | Signing: Microsoft's signing client | `records\signing\client`, ignored by git | The same script fetches `Microsoft.ArtifactSigning.Client` 1.0.128 from nuget.org and refuses it unless its sha256 is the pinned one, which is the package One has |
 | Signing: the Azure sign in | `az login` on One, as Patrick | `az login` on the new machine, as the person who ships from it, with an account of their own in the signing tenant that holds the Certificate Profile Signer role on the ThornswoodSigning account's profile ThornswoodRelease (Patrick, 4 Oct; #1740). Patrick makes the account and gives the role once: [Your own signing sign in](#your-own-signing-sign-in). The script asks the signing service with that sign in and checks the profile answers with the identity the launcher pins |
 | The client runtime `records\client-build.json` names | only in the dev game folder, `C:\Thornswood-DevBuild\Game`. The build copies in `Downloads\Thornswood-ClientBuild-<commit>` are older builds, and the shared clone's `engine\skymp\build` does not match the record | Setup-ShipMachine records CI's build of the pin as the machine's engine build (`-EngineBuild ci`, which it does by itself on a machine with no engine build), and `Get-EngineArtifact.ps1` fetches the public fork's build of the pin, `thornswood-engine-<fork commit>` from ThornswoodRP/skymp (#3540), and holds every file to both records. A build made on the machine is not the recorded bytes (engine\README.md, "A Ship machine takes CI's build") |
 | The game folder the Ship packs, `<root>-DevBuild\Game` | built by the dev launcher from what Vortex deployed | Skyrim Special Edition on Steam, Vortex with a profile named Thornswood and the Thornswood collection installed and deployed, the launcher from thornswood.net, then the dev build and its own game folder (Setting up a machine, above). A person does this; it needs a Nexus account, not Patrick's |
 | The collection itself | Nexus collection `7essxf`, curated from Patrick's Nexus account in his Vortex | Any machine installs it. Only publishing a new revision needs his account (`docs\OWNERSHIP.md` in the private ops repo) |
-| Backups | the originals on the VPS, `C:\Thornswood-Backup`, and copies fetched to `local\backups` in One's repository folder (`.\scripts\release\Where.ps1 Backups`); the passphrase on the VPS and in One's Documents | Not needed to Ship. `.\scripts\vps\Fetch-Backups.ps1` brings them down to any machine the VPS knows |
+| Backups | the originals on the VPS, `C:\Thornswood-Backup`; the copy off the box goes to the Oracle VM and on to Google Drive (`Send-Backups.ps1`, #2862), not to One; the passphrase on the VPS and in Patrick's keeping | Not needed to Ship. `pwsh scripts/vps/Box-Run.ps1 -Line 'Send-Backups -Status'` says what went off the box |
 
 #### Your own signing sign in
 
@@ -788,7 +806,7 @@ If the stop was a rebase rather than a merge, the last step is `git rebase --con
 
 #### Merge your own pull request
 
-Wait until the check named `Build check result` is green on the commit you are merging. It passes only when `Launcher builds` and the five `Gate harnesses (n of 5)` checks all passed (on a pull request their names end in ", what the change reaches" when they ran only that). Main also requires `Test tasks in the pull request`, which holds the test tasks in the body to the bot's rules; when it is red, fix the body, and the edit runs it again. Pending means it is still running. A red check means the branch is not ready. Fix it on the same branch and push again.
+Wait until the check named `Build check result` is green on the commit you are merging. It passes only when `Tree checks`, `Launcher builds` and every `Gate harnesses (n of N)` and `Gate harnesses on Linux (n of N)` check passed, or was skipped because the pick said the change gave it nothing to check (on a pull request the gate's names end in ", what the change reaches" when they ran only that). Main also requires `Test tasks in the pull request`, which holds the test tasks in the body to the bot's rules; when it is red, fix the body, and the edit runs it again. Pending means it is still running. A red check means the branch is not ready. Fix it on the same branch and push again.
 
 ```powershell
 gh pr merge --auto --squash
@@ -836,8 +854,8 @@ Ship, a Deploy-*, Publish-* or Install-* script, a step on the live or dev
 server, a Vortex step) is run by Bramble, from the note the change's pull
 request leaves in the private ops repo's `ops\claude-queue\` folder
 (`ops\README.md` there has the template), once that pull request is merged;
-a main or live run still waits for Patrick's word. Until the switch, the
-Claude Desk runs those notes. Bot branches carry the Bot's name
+a main or live run still waits for Patrick's word. Since 1 Nov the Claude
+Desk neither runs those notes nor merges. Bot branches carry the Bot's name
 (`wisp/3150-what-it-is`). On the shipping machine `C:\Thornswood-Repo` is
 shared and sits detached at `origin/main`: branch work goes in a worktree in
 its ignored `worktrees` folder, removed with its branch once the pull request
@@ -1586,32 +1604,45 @@ The short form of the rules. The same decisions, with the dates they were made, 
   and every push to main gets the same steps from
   `.github/workflows/build.yml`. build-pr.yml is generated from build.yml:
   change build.yml, then run `node scripts/dev/Build-PrWorkflow.js`
-  (`tests\test-1306-pr-workflow.js` fails while the two differ). It is one job
-  of named steps beside the gate's five shares, and it builds only; nothing is
-  published. It scans for
+  (`tests\test-1306-pr-workflow.js` fails while the two differ). It builds
+  only; nothing is published. The job "Tree checks", on GitHub's Linux
+  runner, scans for
   secrets, parses every PowerShell script and game script, checks the
   writing rules (see Words), the ownership page (`tests\test-ownership.js`,
   issue #752), the names that must stay out, that the engine is one commit and
-  the high-risk records, runs the voice service's health harness, checks our plugins are clean, the launcher
-  window and its UI thread, that the Python names only what exists (ruff,
-  issue #1343) and the count of silent catches, and builds the launcher with
-  MSBuild from its project files, held to its sources
-  (`tests\test-498-msbuild.ps1`, issue #498). Beside it, the job "gate" runs
+  the high-risk records, runs the voice service's health harness, checks our
+  plugins are clean, that the Python names only what exists (ruff, issue
+  #1343) and the count of silent catches (#5292). The job "Launcher builds",
+  on a Windows runner, checks the launcher window and its UI thread, builds
+  the launcher with MSBuild from its project files, held to its sources
+  (`tests\test-498-msbuild.ps1`, issue #498), and compares the writing check
+  under Windows PowerShell 5.1. A pull request that changes only files under
+  `docs`, `site` or `bot` skips it, because nothing it checks reads those
+  folders (`scripts\dev\Launcher-Reach.ps1`, #5292). Beside them, the job
+  "gate" runs
   the gate harnesses (every `tests\test-*.js` and `tests\test-*.ps1` that
   `tests\gate-excluded.txt` does not name, side by side through
-  `scripts\dev\Nightly-Harnesses.ps1`, issues #3009 and #3114) in five shares
-  on five hosted runners at once, `Gate harnesses (1 of 5)` to `(5 of 5)`,
-  so a pull request's checks take under ten minutes. First the job "Pick the
+  `scripts\dev\Nightly-Harnesses.ps1`, issues #3009 and #3114) in up to five
+  shares on hosted Windows runners at once, `Gate harnesses (1 of 5)` to
+  `(5 of 5)`, and the job "gate-linux" runs those that need nothing from
+  Windows in up to four shares on Linux, `Gate harnesses on Linux (1 of 4)`
+  and on (#5293), so a pull request's checks take under ten minutes. A
+  harness goes to Linux only when the nightly trace ran it on both, it passed
+  on both, and it skipped nothing on Linux that it ran on Windows; with no
+  such record for the map's commit, every harness runs on Windows. First the
+  job "Pick the
   gate harnesses" says what each share runs (#5183): on a pull request only
   the harnesses its change can reach, from the map main's nightly trace keeps
   (`.github\workflows\gate-map.yml`), and then the shares' names end in
   ", what the change reaches"; on main the whole gate. It splits them by the
   seconds each took when traced, so the shares end together, and its log
-  says why each one runs. Main runs the whole gate after a pull request that
+  says why each one runs. A change that reaches no harness on a platform
+  starts no runner there. Main runs the whole gate after a pull request that
   ran less.
-- The checks are **Launcher builds** and the five **Gate harnesses**, on
-  GitHub's hosted Windows runners, and on a pull request **Build check
-  result** passes only when all of them did (#3683).
+- The checks are **Tree checks**, **Launcher builds** and the shares of the
+  **Gate harnesses** on Windows and on Linux, and on a pull request **Build
+  check result** passes only when all of them did, or were skipped because
+  the pick said they had nothing to check (#3683, #5292, #5293).
   The repository is public since 30 Oct 2026, so hosted minutes are free, and
   nothing builds on the VPS any more: no fallback job and no `BUILD_RUNNER`
   switch (#4983). A push
@@ -1883,6 +1914,12 @@ A new server build, or a change to the live settings, from a machine with the fo
 ```
 
 The gamemode command, then the server command, is the live pair. `-GamemodeOnly` refuses, with nothing sent, when the live server runs another server build than the one your commit records; then the live pair is the way. What each one sends is in [What any developer may do](#what-any-developer-may-do). The full list, including the site, the bot, and voice, is [After a pull request is merged](#after-a-pull-request-is-merged).
+
+Once the box deploy agent looks after main (`Install-DeployAgent -Main`, docs/DEPLOY-AGENT.md "Main"), the gamemode and the server build reach the live server another way: the Release dev ran is promoted, and goes out when Patrick approves it on GitHub, which is his word for that exact build (#5181):
+
+```powershell
+gh workflow run promote-main.yml --ref main -f tag=build-<yyyyMMdd>.<run>
+```
 
 ### A hotfix
 
@@ -2545,36 +2582,28 @@ For the whole repository, `Ctrl+Shift+F` is the search to use.
 
 ### E. VPS
 
-The VPS is the remote Windows machine. The site, the bot, voice, and both game servers run there. You do not get the server password. Your PC has a key and a token of its own, and the scripts connect through the bridge at `wss://thornswood.net/box/` with them. The whole guide, with what to do when it stops working, is `docs\BOX-ACCESS.md` in the private ops repo.
+The VPS is the remote Windows machine. The site, the bot, voice, and both game servers run there. You do not get the server password, and since 31 Oct 2026 you do not get a key to it either (Patrick's answer A on q-retire-box-keys, #2862): every job on the box is a verb of the deploy gate, which runs main's script there and hands what it printed back to you alone. `scripts\vps\gate\verbs.json` is the whole list, with what each verb takes.
 
-#### Make a key and test it
+#### Run a verb
 
-```powershell
-.\scripts\vps\Setup-SshKey.ps1
-```
-
-Copy the whole `ssh-ed25519` line into Discord, and press Enter when it asks for the token. On One, Patrick runs:
+From the repository folder, with `gh` signed in as somebody who may run workflows in the private ops repository:
 
 ```powershell
-.\scripts\vps\Grant-BoxAccess.ps1 -Name <you> -FromClipboard
+pwsh scripts/vps/Box-Run.ps1 -Line 'ping'
 ```
 
-and sends you the token. Then, on your machine, run `Setup-SshKey.ps1` again, paste the token, and check:
-
-```powershell
-.\scripts\vps\Setup-SshKey.ps1 -Test
-```
-
-A good answer is that ssh to the box works. `Host key verification failed` means `known_hosts` holds a key for the server that is not the pinned one: stop and ask.
+A good answer says `ENDED 0`. It starts `box-run.yml` in the private ops repository, which asks the gate on the box over its own ssh, and nothing reaches the box from your machine.
 
 #### Two reads
 
 ```powershell
-.\scripts\vps\Check-Site.ps1
-.\scripts\vps\Get-Logs.ps1
+pwsh scripts/vps/Box-Run.ps1 -Line 'Check-Site'
+pwsh scripts/vps/Box-Run.ps1 -Line 'Get-Logs -Lines 300'
 ```
 
-`Check-Site.ps1` says whether the website answers. `Get-Logs.ps1` copies the tail of the site, bot, game server, and voice logs onto your machine and prints the folder. `-Lines 40000` pulls more.
+`Check-Site` says whether the website answers. `Get-Logs` brings the tail of the site, bot, game server, and voice logs back to your machine and prints the folder. `-Lines 40000` pulls more.
+
+The machines that hold a key from before 31 Oct keep it; `docs\BOX-ACCESS.md` in the private ops repo has those, and the secrets table below says how one is changed.
 
 #### Learn more about VPS
 
@@ -2967,7 +2996,7 @@ says **not enforced** where nothing checks it.
 | TURN relay key, not in use yet | `turn-key.txt` in `C:\Thornswood-Voice` on the VPS, put there by hand, and its own in `C:\Thornswood-Voice-Dev`, put there by hand too; `vps-dev-instance.ps1` never copies the live one (#1083). Neither is there yet: no relay has been stood up, so the service offers STUN only | Nothing yet. Once a relay is up, the voice service makes each browser a credential from it, and a credential lets whoever holds it send traffic through the relay until it expires. **Not enforced** as to who gets one: `/ice` answers anybody who asks. | Whoever runs the relay changes its shared secret there, puts the same value in `turn-key.txt`, and runs `Install-Voice.ps1 -Restart`. Credentials already handed out stop working at once. |
 | Backup passphrase | `C:\Thornswood-Backup\key.txt` on the VPS and `Documents\thornswood-backup-key.txt` on Patrick's machine, one copy in each on purpose | The nightly backups, which hold the site's `config.json`, `bot.env.json` and the live game server's `private` folder: every VPS secret above except the voice service's files. | `Install-Backup.ps1` sends the Documents copy up when the box has no `key.txt` (a new box, issue #454), makes one when neither has it, and copies it down when the Documents copy is missing. Keep the old one until the backups made with it have aged out. |
 | GitHub access | your own `gh auth login`, kept in Windows' credential store | Pushing branches and opening pull requests here, and a main Ship's download of the launcher CI built. Releases go to the VPS, not GitHub, since #897 and #907. | You: `gh auth logout`, then `gh auth login`, or revoke it on GitHub under Settings, Applications. Collaborator access to the source repo is Patrick's to give or take away. |
-| VPS access | your own key, `.ssh\thornswood_ed25519` in your profile, made by `Setup-SshKey.ps1`, with its public half in `C:\ProgramData\ssh\administrators_authorized_keys` on the VPS, taken only through the bridge; and your own bridge token, `.ssh\thornswood-box-token`, whose SHA-256 is in a file named for you in `C:\Thornswood-Bridge\tokens` on the VPS. Made on One, it waits in `box-access\<you>\box-token.txt` in the scratch folder (the path Grant-BoxAccess.ps1 prints) until it is sent to you, and that file is then deleted (`docs\BOX-ACCESS.md` in the private ops repo) | Administrator on the VPS, and so every VPS row in this table: the site, the bot, both game servers, voice and the backups. Neither half alone gets a shell. None of the scripts needs the Administrator password. | Patrick, one name at a time, with `Grant-BoxAccess.ps1` on One: `-Name <you> -Remove` takes your key and token off and leaves everybody else's. For a new pair, move the old key aside (rename both `.ssh\thornswood_ed25519` and its `.pub`, say by adding `.old`) and delete `.ssh\thornswood-box-token`, then run `Setup-SshKey.ps1`, which makes a new key and prints its line. Patrick runs `Grant-BoxAccess.ps1 -Name <you> -FromClipboard` with it, which replaces your old key and token on the box, and sends you the new token to paste. Delete the `.old` pair once `Setup-SshKey.ps1 -Test` passes. |
+| VPS access | your own key, `.ssh\thornswood_ed25519` in your profile, made by `Setup-SshKey.ps1`, with its public half in `C:\ProgramData\ssh\administrators_authorized_keys` on the VPS, taken only through the bridge; and your own bridge token, `.ssh\thornswood-box-token`, whose SHA-256 is in a file named for you in `C:\Thornswood-Bridge\tokens` on the VPS. Made on One, it waits in `box-access\<you>\box-token.txt` in the scratch folder (the path Grant-BoxAccess.ps1 prints) until it is sent to you, and that file is then deleted (`docs\BOX-ACCESS.md` in the private ops repo) | Administrator on the VPS, and so every VPS row in this table: the site, the bot, both game servers, voice and the backups. Neither half alone gets a shell. None of the scripts needs the Administrator password. | No key is made for a new person or machine since 31 Oct 2026 (Patrick's answer A on q-retire-box-keys, #2862): box work goes through the deploy gate (`Box-Run.ps1`), which needs none, and the workflows' two keys are renewed from the cloud (`Renew-BoxKey`). A key already given is changed by Patrick, one name at a time, with `Grant-BoxAccess.ps1` from a machine that holds one: `-Name <you> -Remove` takes your key and token off and leaves everybody else's. For a new pair, move the old key aside (rename both `.ssh\thornswood_ed25519` and its `.pub`, say by adding `.old`) and delete `.ssh\thornswood-box-token`, then run `Setup-SshKey.ps1`, which makes a new key and prints its line. Patrick runs `Grant-BoxAccess.ps1 -Name <you> -FromClipboard` with it, which replaces your old key and token on the box, and sends you the new token to paste. Delete the `.old` pair once `Setup-SshKey.ps1 -Test` passes. |
 | VirusTotal API key | the environment variable `VT_API_KEY` on the machine that runs the optional manual upload, and nowhere in this repository: `Publish-VirusTotal.ps1` reads it from there only, so it has no file to be committed in and no parameter to be typed on a command line | Reading and uploading under our VirusTotal account when somebody runs the manual tool. Publish, Package, and Ship do not call it (#802). | Whoever owns the VirusTotal account, in the account's own API key page, then sets the variable on that machine. A machine without it skips a manual run; publish does not need the key. |
 | Nexus Mods API key | `%LOCALAPPDATA%\Thornswood\Nexus\api-key.txt` on One, written by `.\scripts\release\Set-NexusKey.ps1` at a prompt, and the secret `NEXUS_API_KEY` of the GitHub environment `desk` (main only), put there by `Set-NexusKey.ps1 -ToEnvironment desk` and read only by `nexus-run.yml`; a cloud session holds no copy and runs the scripts through `scripts\release\Nexus-Run.ps1` (#2841); nowhere in this repository. `scripts\release\Nexus.ps1` reads it from the file, or from the variable `THORNSWOOD_NEXUS_API_KEY` that nexus-run.yml sets from the secret, and sends it only in the `apikey` header to api.nexusmods.com, never to the upload addresses Nexus hands back (#2914) | Everything Patrick's Nexus account may do through the API: new file versions and description edits on Thornswood Content (192001) and the Thornswood Client Runtime (192762) (`Send-NexusFile.ps1`, `Set-NexusDescription.ps1`), and new and published revisions of the collection `7essxf` (`New-NexusRevision.ps1`). `Set-NexusKey.ps1 -Check` says where the key was found and whether its account owns both mods, without showing it. | Patrick, at https://www.nexusmods.com/settings/api-keys, then `Set-NexusKey.ps1` on One and `Set-NexusKey.ps1 -ToEnvironment desk` there. |
 | Engine pin robot's App key | The secret `PIN_APP_KEY` of the GitHub environment `engine-pin` (main only), beside its client id in the variable `PIN_APP_CLIENT_ID`; the key is the private key of the Thornswood pin robot, a GitHub App of ThornswoodRP installed on Thornswood alone, and is kept nowhere else. Only `.github\workflows\engine-pin.yml` reads it, in the two jobs that push `engine-pin/next` and open its pull request, never in the job that runs the front's npm build (#5256) | Writing contents and pull requests on Thornswood: the pin branch and its pull request. Its push and pull request start the pull request checks like anybody's, which the run's own token does not | Patrick, in the App's settings on GitHub (General, Private keys): generate a new key, put it in `engine-pin` with `gh secret set PIN_APP_KEY --env engine-pin`, then delete the old key there |
@@ -2998,9 +3027,9 @@ does not know a listed profile id and not somebody who does.
 of the feed on every publish, so those copies keep whatever they last read. It
 opens nothing either way.
 
-**Copies.** The nightly backups, on the box and in `local\backups` in the
-repository folder once `Fetch-Backups.ps1` has brought them down, are encrypted with the
-passphrase. `Backup-Server.ps1`, the whole-server copy taken by hand,
+**Copies.** The nightly backups, on the box, on the Oracle VM and on Google
+Drive once `Send-Backups.ps1` has sent them (#2862), are encrypted with the
+passphrase, which never leaves the box but in Patrick's own keeping. `Backup-Server.ps1`, the whole-server copy taken by hand,
 encrypts its zip on the box with the same passphrase and brings down only
 `thornswood-backup-<stamp>.zip.enc` (the site's config, the bot and voice
 folders whole, voice chat included, and every game server's `private`

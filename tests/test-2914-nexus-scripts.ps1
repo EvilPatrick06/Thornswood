@@ -657,10 +657,72 @@ $x4 = Join-Path $T 'unpacked4'
 Yes 'its entry has the archive''s md5 and size, a new tag, and the plugin switched on' ($LASTEXITCODE -eq 0)
 AddFile $hairArc ''
 $r = Run 'New-NexusRevision.ps1' @('-Add', $addJson, '-WhatIf')
-YesR 'an archive whose plugins are not the ones named is refused' ($r.Code -eq 1 -and $r.Out -match 'are not the ones its archive holds') $r
+YesR 'an archive whose plugins are not the ones named is refused' ($r.Code -eq 1 -and $r.Out -match 'are not the ones the basic installer puts in Data') $r
 AddFile (Join-Path $T 'fomod.7z') $hair
 $r = Run 'New-NexusRevision.ps1' @('-Add', $addJson, '-WhatIf')
-YesR 'an archive with a FOMOD installer is refused' ($r.Code -eq 1 -and $r.Out -match 'has a FOMOD installer') $r
+YesR 'an archive with a FOMOD installer and no choices is refused, naming Read-NexusFile' ($r.Code -eq 1 -and $r.Out -match 'has a FOMOD installer and mod 1932' -and $r.Out -match 'Read-NexusFile\.ps1 -Mod 1932 -FileId 8662') $r
+# Issue #5189: an archive with a FOMOD installer goes in with its choices.
+# The script is run with them as the layout runs it, and only the plugins it
+# puts in Data may be named; the entry carries the choices after its source.
+$fx = Join-Path $T 'fomodreal'
+foreach ($k in 'fomod', 'core', 'dg', 'serana') { New-Item -ItemType Directory -Force -Path (Join-Path $fx $k) | Out-Null }
+Put (Join-Path $fx 'fomod\ModuleConfig.xml') @'
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://qconsulting.ca/fo3/ModConfig5.0.xsd">
+  <moduleName>Eyes</moduleName>
+  <requiredInstallFiles><folder source="core" destination="" /></requiredInstallFiles>
+  <installSteps order="Explicit">
+    <installStep name="Options">
+      <optionalFileGroups order="Explicit">
+        <group name="Add-ons" type="SelectAny">
+          <plugins order="Explicit">
+            <plugin name="Dawnguard"><description>d</description><files><folder source="dg" destination="" /></files><typeDescriptor><type name="Optional"/></typeDescriptor></plugin>
+            <plugin name="Serana"><description>s</description><files><folder source="serana" destination="" /></files><typeDescriptor><type name="Optional"/></typeDescriptor></plugin>
+          </plugins>
+        </group>
+      </optionalFileGroups>
+    </installStep>
+  </installSteps>
+</config>
+'@
+Put (Join-Path $fx 'core\Eyes.esp') 'TES4'; Put (Join-Path $fx 'dg\EyesDG.esp') 'TES4'; Put (Join-Path $fx 'serana\EyesSerana.esp') 'TES4'
+$eyesArc = Join-Path $T 'eyes.7z'
+Push-Location $fx; & $sz a -t7z -y $eyesArc '*' | Out-Null; Pop-Location
+$dgChoice = '{"type":"fomod","options":[{"name":"Options","groups":[{"name":"Add-ons","choices":[{"name":"Dawnguard","idx":0}]}]}]}'
+function AddEyes([string[]]$plugins, [string]$choices) {
+    $p = '[' + ((@($plugins) | ForEach-Object { '{"name":"' + $_ + '","after":["Dragonborn.esm"]}' }) -join ',') + ']'
+    Put $addJson ('[{"modId":1932,"fileId":8662,"archive":' + (ConvertTo-Json $eyesArc) + ',"plugins":' + $p + $(if ($choices) { ',"choices":' + $choices } else { '' }) + '}]')
+}
+AddEyes @('Eyes.esp', 'EyesDG.esp') $dgChoice
+$r = Run 'New-NexusRevision.ps1' @('-Add', $addJson, '-WhatIf')
+YesR 'a FOMOD archive with choices is added: its script runs with them and puts in Data the plugins named' ($r.Code -eq 0 -and $r.Out -match '2 plugin\(s\) by FOMOD, with the choices given' -and $r.Out -match 'which makes revision 4 a draft') $r
+$x4f = Join-Path $T 'unpacked4f'
+& $sz x -y ('-o' + $x4f) $built4 | Out-Null
+& $node.Source -e "const fs=require('fs');const b=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));const e=b.mods.find(m=>m.source.fileId===8662);const k=Object.keys(e);process.exit(e.choices&&e.choices.type==='fomod'&&e.choices.options[0].groups[0].choices[0].name==='Dawnguard'&&k.indexOf('choices')===k.indexOf('source')+1&&b.plugins.some(p=>p.name==='EyesDG.esp')&&!b.plugins.some(p=>p.name==='EyesSerana.esp')?0:1)" (Join-Path $x4f 'collection.json')
+Yes 'its entry carries the choices straight after its source, where Vortex writes them' ($LASTEXITCODE -eq 0)
+AddEyes @('Eyes.esp', 'EyesDG.esp', 'EyesSerana.esp') $dgChoice
+$r = Run 'New-NexusRevision.ps1' @('-Add', $addJson, '-WhatIf')
+YesR 'a plugin named that the choices do not put in Data is refused' ($r.Code -eq 1 -and $r.Out -match 'named only: EyesSerana\.esp') $r
+AddEyes @('Eyes.esp', 'EyesDG.esp') '{"type":"fomod","options":[{"name":"Options","groups":[{"name":"Add-ons","choices":[{"name":"Dawnguard"}]}]}]}'
+$r = Run 'New-NexusRevision.ps1' @('-Add', $addJson, '-WhatIf')
+YesR 'choices not shaped as Vortex writes them are refused' ($r.Code -eq 1 -and $r.Out -match 'not as Vortex writes them') $r
+AddFile $hairArc $hair
+$h = Get-Content -Raw -LiteralPath $addJson
+Put $addJson ($h.TrimEnd().TrimEnd(']').TrimEnd('}') + ',"choices":' + $dgChoice + '}]')
+$r = Run 'New-NexusRevision.ps1' @('-Add', $addJson, '-WhatIf')
+YesR 'choices for an archive with no FOMOD installer are refused' ($r.Code -eq 1 -and $r.Out -match 'has no FOMOD installer to give them to') $r
+# Read-NexusFile (#5189): the file downloaded with the key, its FOMOD's
+# questions in Vortex's order with each idx, every plugin in it, and nothing
+# of it left behind.
+Control @{ serve = @{ '8662' = @{ path = $eyesArc; name = (Split-Path -Leaf $eyesArc) } } }
+$n0 = Count
+$r = Run 'Read-NexusFile.ps1' @('-Mod', '1932', '-FileId', '8662')
+$got = @(Since $n0)
+YesR 'Read-NexusFile downloads the file with the key and prints its FOMOD''s steps, groups and options with each idx and the files each installs' ($r.Code -eq 0 -and $r.Out -match 'a FOMOD script' -and $r.Out -match 'step "Options"' -and $r.Out -match 'group "Add-ons", SelectAny' -and $r.Out -match 'option "Serana", idx 1, Optional' -and $r.Out -match 'folder dg -> \(the mod''s top\)' -and @($got | Where-Object { $_.path -eq '/v3/games/skyrimspecialedition/mod-file-versions/8662/download-link' -and $_.key -eq 'right' }).Count -eq 1 -and @(Writes $got).Count -eq 0) $r
+YesR '  and every plugin in the archive, where it sits' ($r.Out -match 'core[\\/]Eyes\.esp' -and $r.Out -match 'serana[\\/]EyesSerana\.esp') $r
+Yes '  and keeps nothing of the archive' (-not @(Get-ChildItem -LiteralPath (Join-Path $T 'scratch') -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match 'nexus-file-1932' }).Count)
+$r = Run 'Read-NexusFile.ps1' @('-Mod', '1932', '-FileId', '12x')
+YesR '  a file id that is not a number is refused' ($r.Code -eq 1 -and $r.Out -match '-FileId 12x is not a file id') $r
 AddFile $hairArc $hair
 Perm @{ 1111 = 'allowed'; 47618 = 'not stated'; 192001 = 'ours'; 192762 = 'ours' }
 $r = Run 'New-NexusRevision.ps1' @('-Add', $addJson, '-WhatIf')
