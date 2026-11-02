@@ -1,52 +1,60 @@
-// test-3683-webview2-advisories.js
+// test-3683-launcher-advisories.js
 //
-//     node tests\test-3683-webview2-advisories.js
+//     node tests\test-3683-launcher-advisories.js
 //
-// The launcher's WebView2 files have no published security advisory (#3683).
-// The three files in launcher\lib\webview2 are copied in from Microsoft's
-// NuGet package Microsoft.Web.WebView2 rather than restored by a package
-// manager, by design (#498), so Dependabot has no manifest to read and never
-// sees them. Patrick, 26 Oct 2026 (report page, q-3683-webview2-watch, A): a
-// nightly check asks for advisories on the version we ship, and a red night
+// The libraries the launcher ships have no published security advisory
+// (#3683). Patrick, 26 Oct 2026 (report page, q-3683-webview2-watch, A): a
+// nightly check asks for advisories on the versions we ship, and a red night
 // opens the board issue by itself. Red only when there is a real hole, not on
-// every new Microsoft release.
+// every new release of a library.
 //
-// The version is read from THIRD-PARTY.md's WebView2 section, the one place
-// it is written ("Version 1.0.2903.40, the file version all three carry"),
-// and asked of GitHub's advisory database, where NuGet's advisories are kept:
-//   GET https://api.github.com/advisories?ecosystem=nuget&affects=Microsoft.Web.WebView2@<v>
+// It began for WebView2, whose three files were copied into launcher\lib from
+// Microsoft's NuGet package rather than restored, so nothing else watched
+// them. Since #4823 the launcher carries no WebView2 file: it is an SDK
+// project whose libraries are PackageReference lines in
+// launcher\app\Thornswood.csproj, restored from nuget.org (Avalonia, NLayer,
+// ProtectedData, Concentus, SharpSRTP, BouncyCastle, Velopack). Dependabot
+// has no nuget entry in .github\dependabot.yml, so this is still what asks.
+// Each PackageReference, by the exact version the project names, is asked of
+// GitHub's advisory database, where NuGet's advisories are kept:
+//   GET https://api.github.com/advisories?ecosystem=nuget&affects=<package>@<v>
+// The libraries those pull in (SkiaSharp, HarfBuzzSharp, MicroCom, Tmds.DBus
+// and the rest) are not named in the project, so they are not asked here: the
+// project restores without a lock file, and their versions are whatever the
+// named packages ask for.
 // The nightly runs on the box, whose runner account reaches GitHub and
 // nothing else on the internet (Install-Runner.ps1's Set-RunnerFirewall), so
 // GitHub is the one it can ask (#4092). It asks with no token: GitHub answers
-// this path to anybody, sixty an hour from one address, and the harness step
-// is given no token on purpose, since every harness in the share would hold
-// it.
+// this path to anybody, sixty an hour from one address, one request for each
+// package, and the harness step is given no token on purpose, since every
+// harness in the share would hold it.
 //
-// Only when GitHub gives no answer does it ask osv.dev, which carries the
-// same GitHub advisories for NuGet:
+// Only when GitHub gives no answer for a package does it ask osv.dev, which
+// carries the same GitHub advisories for NuGet:
 //   POST https://api.osv.dev/v1/query
-//   {"package":{"name":"Microsoft.Web.WebView2","ecosystem":"NuGet"},"version":"<v>"}
+//   {"package":{"name":"<package>","ecosystem":"NuGet"},"version":"<v>"}
 // That is the path from a cloud session, whose proxy refuses
 // api.github.com/advisories. Either answer with no advisory is a pass. Any
-// advisory fails, naming each id and its summary; moving off it is taking
-// the fixed package from nuget.org and rewriting that section, files, sha256
-// and version together. One withdrawn by GitHub is not a hole.
+// advisory fails, naming each id and its summary; moving off it is taking the
+// fixed version in the project, with its section of THIRD-PARTY.md, the
+// credits page and its text in installer\licences in the same pull request.
+// One withdrawn by GitHub is not a hole.
 // No answer from either is a fail, not a skip: a check that did not happen is
 // the failure this exists to stop. It needs the network, so it runs in the
 // nightly checks and not in the build check on every pull request
 // (tests\gate-excluded.txt).
 //
 // THORNSWOOD_GHSA_JSON and THORNSWOOD_OSV_JSON, each a path to a saved
-// answer, stand in for the network so the verdict can be checked by hand.
-// The verdict is also driven over planted answers, so a reader that finds
-// nothing cannot pass by accident. Read only.
+// answer, stand in for the network for every package so the verdict can be
+// checked by hand. The verdict is also driven over planted answers, so a
+// reader that finds nothing cannot pass by accident. Read only.
 'use strict';
 const fs = require('fs');
 const https = require('https');
 const path = require('path');
 
 const REPO = path.resolve(__dirname, '..');
-const PACKAGE = 'Microsoft.Web.WebView2';
+const PROJECT = path.join('launcher', 'app', 'Thornswood.csproj');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -54,16 +62,22 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
-// The version THIRD-PARTY.md says the three files are, or '' when the section
-// or its version line is not there.
-function shippedVersion(text) {
-  const at = text.indexOf('## Microsoft WebView2 SDK, inside the launcher');
-  if (at < 0) { return ''; }
-  const rest = text.slice(at + 3);
-  const next = rest.indexOf('\n## ');
-  const section = next < 0 ? rest : rest.slice(0, next);
-  const m = /Version (\d+\.\d+\.\d+\.\d+), the file version all three carry/.exec(section);
-  return m ? m[1] : '';
+// The PackageReference lines of a project, as [{ name, version }], in the
+// order written. A reference with no exact version (a range, a floating *, or
+// none) is returned with version '' so the caller can say so.
+function packages(text) {
+  const out = [];
+  const noComments = text.replace(/<!--[\s\S]*?-->/g, '');
+  const re = /<PackageReference\b([^>]*?)\/?>/g;
+  let m;
+  while ((m = re.exec(noComments)) !== null) {
+    const name = /\bInclude="([^"]+)"/.exec(m[1]);
+    const ver = /\bVersion="([^"]+)"/.exec(m[1]);
+    if (!name) { continue; }
+    const v = ver ? ver[1] : '';
+    out.push({ name: name[1], version: /^\d+(\.\d+){1,3}(-[0-9A-Za-z.-]+)?$/.test(v) ? v : '' });
+  }
+  return out;
 }
 
 // The advisories in an answer, as [{ id, summary }], or a string saying why
@@ -107,16 +121,16 @@ function request(who, options, body) {
   });
 }
 
-function askGitHub(version) {
+function askGitHub(pkg) {
   return request('GitHub', {
     host: 'api.github.com', method: 'GET',
-    headers: { 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'thornswood-webview2-advisories' },
-    path: '/advisories?ecosystem=nuget&per_page=100&affects=' + encodeURIComponent(PACKAGE + '@' + version)
+    headers: { 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'thornswood-launcher-advisories' },
+    path: '/advisories?ecosystem=nuget&per_page=100&affects=' + encodeURIComponent(pkg.name + '@' + pkg.version)
   });
 }
 
-function askOsv(version) {
-  const body = JSON.stringify({ package: { name: PACKAGE, ecosystem: 'NuGet' }, version: version });
+function askOsv(pkg) {
+  const body = JSON.stringify({ package: { name: pkg.name, ecosystem: 'NuGet' }, version: pkg.version });
   return request('osv.dev', {
     host: 'api.osv.dev', path: '/v1/query', method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
@@ -132,10 +146,13 @@ function saved(name) {
 
 (async function () {
   // ---- the readers, over planted text --------------------------------------
-  yes('the version reader finds a planted section\'s version',
-      shippedVersion('## Microsoft WebView2 SDK, inside the launcher\n\nVersion 1.2.3.4, the file version all three carry.\n\n## Next\n') === '1.2.3.4');
-  yes('  and not one written under the next section',
-      shippedVersion('## Microsoft WebView2 SDK, inside the launcher\n\nNo version here.\n\n## Next\n\nVersion 1.2.3.4, the file version all three carry.\n') === '');
+  const planted = packages('<Project>\n  <ItemGroup>\n    <PackageReference Include="A.B" Version="1.2.3" />\n' +
+    '    <!-- <PackageReference Include="Commented" Version="9.9.9" /> -->\n' +
+    '    <PackageReference Include="C" Version="[1.0,2.0)" />\n    <PackageReference Version="4.5.6" Include="D"></PackageReference>\n  </ItemGroup>\n</Project>\n');
+  yes('the project reader finds each planted PackageReference and its version, in either attribute order',
+      planted.length === 3 && planted[0].name === 'A.B' && planted[0].version === '1.2.3' && planted[2].name === 'D' && planted[2].version === '4.5.6');
+  yes('  and not one in a comment', !planted.some(function (p) { return p.name === 'Commented'; }));
+  yes('  and a version that is not exact reads as none', planted[1].name === 'C' && planted[1].version === '');
   yes('GitHub answering an empty list passes', verdict(fromGitHub([])).ok === true);
   const gh = verdict(fromGitHub([{ ghsa_id: 'GHSA-xxxx-yyyy-zzzz', summary: 'A hole\nmore', withdrawn_at: null }]));
   yes('  an advisory from GitHub fails and names it', gh.ok === false && gh.why.indexOf('GHSA-xxxx-yyyy-zzzz A hole') >= 0 && gh.why.indexOf('more') < 0);
@@ -147,24 +164,29 @@ function saved(name) {
   yes('  and an answer in another shape fails', verdict(fromOsv({ vulns: 'x' })).ok === false && verdict(fromOsv([])).ok === false);
   yes('no answer from either fails', verdict(null).ok === false);
 
-  // ---- the real version ----------------------------------------------------
-  const version = shippedVersion(fs.readFileSync(path.join(REPO, 'THIRD-PARTY.md'), 'utf8').split('\r').join(''));
-  yes('THIRD-PARTY.md says which ' + PACKAGE + ' version the launcher ships (' + (version || 'none found') + ')', !!version);
-  if (version) {
+  // ---- the real packages ---------------------------------------------------
+  const projectPath = path.join(REPO, PROJECT);
+  const shipped = fs.existsSync(projectPath) ? packages(fs.readFileSync(projectPath, 'utf8')) : [];
+  yes(PROJECT + ' names the packages the launcher ships (' +
+      (shipped.map(function (p) { return p.name + ' ' + (p.version || '?'); }).join(', ') || 'none found') + ')', shipped.length > 0);
+  const loose = shipped.filter(function (p) { return !p.version; });
+  yes('  each by one exact version, so the advisory asked is for what ships' +
+      (loose.length ? ', not: ' + loose.map(function (p) { return p.name; }).join(', ') : ''), loose.length === 0);
+  for (const pkg of shipped.filter(function (p) { return p.version; })) {
     let found = null;
     let answer = saved('THORNSWOOD_GHSA_JSON');
-    if (answer === undefined && !process.env.THORNSWOOD_OSV_JSON) { answer = await askGitHub(version); }
+    if (answer === undefined && !process.env.THORNSWOOD_OSV_JSON) { answer = await askGitHub(pkg); }
     if (answer) {
-      console.log('  GitHub\'s advisory database answered');
+      console.log('  GitHub\'s advisory database answered for ' + pkg.name);
       found = fromGitHub(answer);
     } else {
-      console.log('  no answer from GitHub, so osv.dev is asked');
+      console.log('  no answer from GitHub for ' + pkg.name + ', so osv.dev is asked');
       answer = saved('THORNSWOOD_OSV_JSON');
-      if (answer === undefined) { answer = await askOsv(version); }
+      if (answer === undefined) { answer = await askOsv(pkg); }
       if (answer) { console.log('  osv.dev answered'); found = fromOsv(answer); }
     }
     const v = verdict(found);
-    yes(PACKAGE + ' ' + version + ': ' + v.why, v.ok);
+    yes(pkg.name + ' ' + pkg.version + ': ' + v.why, v.ok);
   }
 
   console.log('');

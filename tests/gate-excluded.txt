@@ -43,7 +43,7 @@ test-2473-look-prompt.js  not sorted yet, runs in the nightly (#2513)
 test-2474-heads.js  not sorted yet, runs in the nightly (#2513)
 test-2483-kept-npcs.js  needs the engine\skymp checkout, which a pull request build never has, so on the gate it only said SKIP; the nightly runs it in a step of its own (#3114)
 test-2932-ssh-proxy-speed.ps1  a measurement for #2932, not a check: it starts a throwaway sshd and times eight copies by scp; run it by name with harnesses.yml
-test-3683-webview2-advisories.js  needs the network to ask GitHub's advisory database or osv.dev, so it runs in the nightly checks only (#3683, #4092)
+test-3683-launcher-advisories.js  needs the network to ask GitHub's advisory database or osv.dev, so it runs in the nightly checks only (#3683, #4092)
 test-481-voice-most.ps1  not sorted yet, runs in the nightly (#2513)
 test-611-miner-pickaxe-restore.js  not sorted yet, runs in the nightly (#2513)
 test-613-dwarven-ingot-collapse.js  not sorted yet, runs in the nightly (#2513)
