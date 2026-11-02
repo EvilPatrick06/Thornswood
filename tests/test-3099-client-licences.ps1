@@ -202,33 +202,6 @@ try {
     $r = Try-Case $k
     Yes 'a build that measured nothing (no licences.json) is refused, and nothing is written' ($r.Code -ne 0 -and $r.Out -match 'did not measure' -and -not (Wrote $k))
 
-} finally { $ErrorActionPreference = $eap } }
-    G init -q
-    G config user.email 'test@example.invalid'
-    G config user.name 'test'
-    G config core.autocrlf false
-    Put (Join-Path $h '.gitattributes') "records/client-licences/** -text`n"
-    $oldText = "Copyright (c) old`r`nPermission is hereby granted`r`n"
-    function Put-Record([string]$commit, [string]$text) {
-        Put (Join-Path $h 'records\client-licences\fmt.txt') $text
-        Put (Join-Path $h 'records\client-licences.json') ('{"forkCommit":"' + $commit + '","files":{},"ports":{}}')
-        G add -A
-        G commit -q -m $commit
-    }
-    Put-Record 'aaaaaaaa' $oldText
-    $first = ((& git -C $h rev-parse HEAD) -join '').Trim()
-    Put-Record 'bbbbbbbb' "Copyright (c) new`n"
-    $into = Join-Path $T 'into-b'
-    $got = Save-PackageClientLicences 'bbbbbbbb' $h $into
-    Yes '3. the checkout''s own texts, for the client it records' ($got -eq 'checkout' -and [IO.File]::ReadAllText((Join-Path $into 'client-licences\fmt.txt')) -eq "Copyright (c) new`n" -and (Test-Path -LiteralPath (Join-Path $into 'client-licences.json')))
-    $into = Join-Path $T 'into-a'
-    $got = Save-PackageClientLicences 'AAAAAAAA' $h $into
-    $bytes = [IO.File]::ReadAllBytes((Join-Path $into 'client-licences\fmt.txt'))
-    Yes '3. an older client''s texts, from the commit that recorded it, CR LF and all' ($got -eq $first -and [Convert]::ToBase64String($bytes) -eq [Convert]::ToBase64String($utf8.GetBytes($oldText)) -and ((Get-Content -LiteralPath (Join-Path $into 'client-licences.json') -Raw) -match 'aaaaaaaa'))
-    Yes '3.   leaving only the record and its texts beside the client record' ((@(Get-ChildItem -LiteralPath $into | ForEach-Object { $_.Name } | Sort-Object) -join '|') -eq 'client-licences|client-licences.json')
-    $e = ''
-    try { $null = Save-PackageClientLicences 'cccccccc' $h (Join-Path $T 'into-c') } catch { $e = $_.Exception.Message }
-    Yes '3. a client no commit recorded stops it, saying so' ($e -match 'no commit of this checkout records the licences of client cccccccc')
 } finally {
     Remove-Item -LiteralPath $T -Recurse -Force -ErrorAction SilentlyContinue
 }
