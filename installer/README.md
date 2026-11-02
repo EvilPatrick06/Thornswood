@@ -26,9 +26,15 @@ script is what antivirus reads hardest, and the install was written in two
 languages for one job, so the script, both batch files and the setup program
 are gone, and nothing falls back to them.
 
-This folder keeps `READ ME FIRST.txt`, the page a person reads, and
-`licences\`, the GPL, AGPL and WebView2 texts handed over with the files
-(#421; `licences\README.txt` says where each comes from).
+This folder keeps `licences\`, the GPL and AGPL texts and the licence texts
+of every library built into the launcher or shipped with it, handed over with
+the files (#421, #4823; `licences\README.txt` says where each comes from).
+It no longer keeps a read me: `READ ME FIRST.txt` told people which of
+`Setup.bat` and `Install.bat` to run, and Velopack's Setup.exe carries no
+loose page, it opens the launcher, whose install window says each step. What
+a person reads before installing is the join guide on the site
+(`https://thornswood.net/join`, `site\data\site\join.md`), which that file
+already called the one that is right.
 
 ## On your machine
 

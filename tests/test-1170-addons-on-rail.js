@@ -167,7 +167,7 @@ yes('Publish-Pack no longer sends anybody to the Mods page', !/Mods page/.test(p
 yes('the scripts index says the same', read('scripts', 'README.md').indexOf('under Add-ons on its ' + pageTitle + ' page') > 0);
 yes('the feed doc names DrawAddons for the optional list', /Add-ons on the Diagnostics page \(`ShellPacks\.cs DrawAddons`/.test(read('docs', 'FEED.md')));
 
-[['site', 'data', 'site', 'join.md'], ['site', 'data', 'help.md'], ['installer', 'READ ME FIRST.txt']].forEach(function (f) {
+[['site', 'data', 'site', 'join.md'], ['site', 'data', 'help.md']].forEach(function (f) {
   const text = read.apply(null, f).replace(/\s+/g, ' ');
   const name = f.join('/');
   yes(name + ' puts the collection link on the launcher\'s ' + pageTitle + ' page',

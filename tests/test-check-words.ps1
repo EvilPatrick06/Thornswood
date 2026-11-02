@@ -160,7 +160,7 @@ try {
     Put $tmp 'site/public/index.html' @('<p>Players Report; only staff Accept.</p>')
     # #428: the world is open by application, so a closed playtest is a hit,
     # in either spelling, while a plain playtest and the role stay allowed.
-    Put $tmp 'installer/READ ME FIRST.txt' @('A server in alpha.', 'Still a Closed Playtest here.', 'An alpha playtester, and a playtest.', 'A closed-playtest one.')
+    Put $tmp 'site/data/site/c.md' @('A server in alpha.', 'Still a Closed Playtest here.', 'An alpha playtester, and a playtest.', 'A closed-playtest one.')
     Put $tmp 'installer/README.md' @('# Setup', 'Decided by Djinn on 28 Sep.', 'Decided on 28 Sep.')
     Put $tmp 'docs/NEW.md' @('FIXME later.')
     # Not read: in-world writing, dated snapshots, and code.
@@ -186,7 +186,7 @@ try {
         'site/data/help.md:2:placeholder',
         'site/public/home.html:3:em-dash',
         'site/public/index.html:1:banned-word',
-        'installer/READ ME FIRST.txt:2:open-alpha', 'installer/READ ME FIRST.txt:4:open-alpha',
+        'site/data/site/c.md:2:open-alpha', 'site/data/site/c.md:4:open-alpha',
         'installer/README.md:2:names-person',
         'docs/NEW.md:1:placeholder',
         'scripts/dev/Check-Words.allow.txt:3:allow', 'scripts/dev/Check-Words.allow.txt:4:allow', 'scripts/dev/Check-Words.allow.txt:5:allow'
@@ -214,7 +214,7 @@ try {
     Yes 'a public page other than home is read (site index.html)' ($s.Hits -contains 'site/public/index.html:1:banned-word')
     Yes 'lore, the archive and code files are not read' (@($s.Hits | Where-Object { $_ -like 'lore/*' -or $_ -like 'docs/archive/*' -or $_ -like 'game/*' }).Count -eq 0)
     Yes 'a name is a hit in a component README and README.md, and not on other pages (SECURITY.md:6)' (($s.Hits -contains 'installer/README.md:2:names-person') -and ($s.Hits -contains 'README.md:8:names-person') -and ($s.Hits -notcontains 'SECURITY.md:6:names-person'))
-    Yes 'closed playtest is a hit in any case, space or hyphen, an alpha playtester is not (#428)' (($s.Hits -contains 'installer/READ ME FIRST.txt:2:open-alpha') -and ($s.Hits -contains 'installer/READ ME FIRST.txt:4:open-alpha') -and ($s.Hits -notcontains 'installer/READ ME FIRST.txt:3:open-alpha'))
+    Yes 'closed playtest is a hit in any case, space or hyphen, an alpha playtester is not (#428)' (($s.Hits -contains 'site/data/site/c.md:2:open-alpha') -and ($s.Hits -contains 'site/data/site/c.md:4:open-alpha') -and ($s.Hits -notcontains 'site/data/site/c.md:3:open-alpha'))
     Yes 'an allowance covers its own line and not another in the same file' (($s.Hits -notcontains 'CONTRIBUTING.md:1:banned-word') -and ($s.Hits -contains 'CONTRIBUTING.md:2:banned-word'))
     Yes 'a stale allowance, an unknown rule and a missing part are each a hit on the allow file' (@($s.Hits | Where-Object { $_ -like 'scripts/dev/Check-Words.allow.txt:*' }).Count -eq 3)
 
@@ -250,7 +250,7 @@ try {
     Put $tmp 'site/data/help.md' @('Fine.')
     Put $tmp 'site/public/home.html' @('<p>one, two</p>')
     Put $tmp 'site/public/index.html' @('<p>Anyone can Report; only staff Accept.</p>')
-    Put $tmp 'installer/READ ME FIRST.txt' @('A server in alpha, open by application.')
+    Put $tmp 'site/data/site/c.md' @('A server in alpha, open by application.')
     Put $tmp 'installer/README.md' @('# Setup', 'Decided on 28 Sep.')
     Put $tmp 'docs/NEW.md' @('Written.')
     Put $tmp 'scripts/dev/Check-Words.allow.txt' @('# seeded allowances', 'CONTRIBUTING.md | banned-word | the rule names its word | Never "player".')

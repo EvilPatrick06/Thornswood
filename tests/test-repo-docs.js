@@ -97,10 +97,12 @@ if (readme !== null) {
 }
 
 // ------------------------------------------------------ READ ME FIRST.txt
-// Rewritten and never deleted. The old installer's Package-Thornswood.ps1
-// copied it into every installer until #4824; Velopack's Setup.exe does not
-// carry it (Build-SetupFiles.ps1 says why), so it is a page in the
-// repository that the words below still hold to.
+// Kept while it shipped: the old installer's Package-Thornswood.ps1 copied it
+// into every installer until #4824. Velopack's Setup.exe carries no loose
+// page and opens the launcher, whose install window says each step, so it
+// went with the batch files it named, and a copy of the join guide that
+// nothing ships cannot drift from it. installer\README.md says so and points
+// at the join guide, which is what a person reads now.
 const RMF = 'installer/READ ME FIRST.txt';
 
 let tracked = null;
@@ -110,24 +112,11 @@ try {
 } catch (e) {
   console.log('SKIP  git ls-files did not answer, so the tracked-file checks are left out: ' + e.message);
 }
-if (tracked) yes(RMF + ' is tracked', tracked.indexOf(RMF) >= 0);
-
-const rmf = read(RMF);
-yes(RMF + ' is there', rmf !== null);
-if (rmf !== null) {
-  clean(RMF, rmf);
-  // Since #4824 the install is the launcher's first start, after Velopack's
-  // setup: the launcher asks for the drive and the four yeses.
-  yes(RMF + ' says the launcher asks for the drive and the four yeses before it installs (#4824)',
-      /opens the launcher/.test(rmf) && /drive/.test(rmf) && /age box, the terms, the privacy policy and the rules/.test(rmf.replace(/\s+/g, ' ')));
-  yes(RMF + ' says the collection comes through Vortex, as join.md does',
-      /Vortex/.test(rmf) && /collection/i.test(rmf));
-  yes(RMF + ' names build 1.6.1170 and the launcher\'s Downgrade button',
-      /1\.6\.1170/.test(rmf) && /Downgrade/.test(rmf));
-  yes(RMF + ' points at the join guide on the site', /https:\/\/thornswood\.net\/join/.test(rmf));
-  yes(RMF + ' does not tell anybody to ask for a password' + where(rmf, /ask[^.]*password/i),
-      !/ask[^.]*password/i.test(rmf));
-}
+if (tracked) yes(RMF + ' is not tracked (#4824)', tracked.indexOf(RMF) < 0);
+yes(RMF + ' is gone', read(RMF) === null);
+const instReadme = read('installer/README.md') || '';
+yes('installer/README.md says what a person reads is the join guide on the site',
+    instReadme.indexOf('https://thornswood.net/join') >= 0 && instReadme.indexOf('site\\data\\site\\join.md') >= 0);
 
 // ------------------------------------------------------ config.example.json
 // Either gone or the same as what the launcher defaults to. Config.cs is the

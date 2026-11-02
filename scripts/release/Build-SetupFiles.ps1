@@ -50,8 +50,10 @@
   dev's last release, so the record checked and the load order are dev's for
   both.
 
-  READ ME FIRST.txt is not carried: it told people which of Setup.bat and
-  Install.bat to run, and both retired with #4824.
+  No read me is carried: READ ME FIRST.txt told people which of Setup.bat
+  and Install.bat to run, both retired with #4824, and it went with them.
+  The install window says each step, and the join guide on the site is the
+  long form (installer\README.md).
 
   WHAT IT REFUSES. A -GameRoot New-FeedRoot did not stage (no record), a dev
   feed whose record is not the one staged there (a Ship published between the

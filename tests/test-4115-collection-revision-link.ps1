@@ -25,7 +25,8 @@
       card, and a press that slips in opens nothing;
     - the stale and not-installed labels and the button name the revision;
     - the update log and Play's own refusal say which case holds updates;
-    - READ ME FIRST says to install the revision the launcher opens;
+    - the join guide says to install the revision the launcher opens (the
+      installer's READ ME FIRST.txt said it until #4824);
     - Publish-News links the feed's revision for the Downloads page, the
       site's public answer carries the number, and the Downloads button,
       join.md and help.md name it, help.md with a section for a copy ahead.
@@ -110,9 +111,11 @@ Yes 'the update log no longer says not installed for every case' (-not $update.C
 Yes 'all three update log lines ask CollectionWait' (([regex]::Matches($update, '= CollectionWait\(\);')).Count -eq 3)
 Yes 'Play''s own refusal asks it too' ($play.Contains('if (collectionBarUp) { Log(CollectionHeldLine()); return; }') -and (Method $shell 'static string CollectionHeldLine()').Contains('CollectionWait()[0]') -and -not $play.Contains('Log("The collection is not installed yet. Open it'))
 
-# ---- what the installer tells people ---------------------------------------
-$rmf = [IO.File]::ReadAllText((Join-Path $repo 'installer\READ ME FIRST.txt')) -replace '\s+', ' '
-Yes 'READ ME FIRST says to install the revision the launcher opens' ($rmf.Contains('opens the revision the server was built against') -and $rmf.Contains('not a newer one Nexus may show first'))
+# ---- what the guide tells people before they install ------------------------
+# The installer carried READ ME FIRST.txt until #4824; the join guide on the
+# site is what a person reads now (installer\README.md).
+$joinFirst = [IO.File]::ReadAllText((Join-Path $repo 'site\data\site\join.md')) -replace '\s+', ' '
+Yes 'the join guide says to install the revision the launcher opens, not a newer one' ($joinFirst.Contains('opens the revision of the collection the server was built against') -and $joinFirst.Contains('not a newer one Nexus may show first'))
 
 # ---- the site ---------------------------------------------------------------
 # Publish-News run for real over two small feeds, written to a file and sent

@@ -347,9 +347,11 @@ SIX.forEach(function (d) {
   const bl = read('scripts/release/Build-Launcher.ps1') || '';
   const place = read('launcher/app/InstallPlace.cs') || '';
   const held = files('installer').filter(function (f) { return f !== 'README.md'; });
-  yes('installer: holds READ ME FIRST.txt and licences, and nothing to compile or run (' + held.join(', ') + ')',
-      held.length === 1 && held[0] === 'READ ME FIRST.txt' && exists('installer/licences/README.txt') &&
-      !exists('installer/setup') && t.indexOf('`READ ME FIRST.txt`') >= 0 && t.indexOf('`licences' + BS + '`') >= 0);
+  // READ ME FIRST.txt went with #4824: Velopack's Setup.exe carries no loose
+  // page, and the join guide on the site is what a person reads.
+  yes('installer: holds licences and nothing else, nothing to compile or run (' + held.join(', ') + ')',
+      held.length === 0 && exists('installer/licences/README.txt') && !exists('installer/READ ME FIRST.txt') &&
+      !exists('installer/setup') && t.indexOf('`licences' + BS + '`') >= 0 && t.indexOf('https://thornswood.net/join') >= 0);
   yes('installer: the README names where the install is, and those files are there',
       ['InstallWindow.cs', 'InstallSteps.cs', 'InstallPlace.cs'].every(function (f) {
         return exists('launcher/app/' + f) && t.indexOf('launcher' + BS + 'app' + BS + f) >= 0;
