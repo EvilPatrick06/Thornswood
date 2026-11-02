@@ -70,11 +70,10 @@ $bl = [IO.File]::ReadAllText((Join-Path $Repo 'scripts\release\Build-Launcher.ps
 Yes '  Build-Launcher.ps1 gives the compile the number as -p:Version, worked out here unless given' (
     $bl.Contains('"-p:Version=$Version"') -and $bl.Contains('Get-LauncherVersion -RepoDir'))
 $pub = [IO.File]::ReadAllText((Join-Path $Repo 'scripts\release\Publish-Update.ps1'))
-Yes '  and Publish-Update.ps1 records the number it is given, reading no source file for it' (
-    $pub.Contains('$launcherVersion = $VersionOverride') -and -not $pub.Contains("launcher\app\Updater.cs'"))
+Yes '  and Publish-Update.ps1 records no launcher number and reads no source file for one (#4825)' (
+    -not $pub.Contains('$VersionOverride') -and -not $pub.Contains("launcher\app\Updater.cs'"))
 $ship = [IO.File]::ReadAllText((Join-Path $Repo 'scripts\release\Ship.ps1'))
-Yes 'Ship.ps1 loads LauncherVersion.ps1' ($ship -match "\. \(Join-Path \`$Here 'LauncherVersion\.ps1'\)")
-Yes '  and fingerprints the files outside launcher\ from its list, so the two cannot drift' ($ship -match '\$script:LauncherInputFiles')
+Yes 'Ship.ps1 works out no launcher number: a Ship sends no launcher (#4825)' ($ship -notmatch 'LauncherVersion\.ps1' -and $ship -notmatch 'Get-LauncherVersion')
 
 # ---- 7. the parts fit a file version ------------------------------------------
 $last = Format-LauncherVersion ([DateTime]::new(2099, 12, 31, 23, 59, 0, [DateTimeKind]::Utc))

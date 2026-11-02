@@ -17,7 +17,7 @@
 
   This lifts FetchToken, JsonEscape and the HttpClient FetchToken sends with
   (TokenHttp) out of the shipped Voice.cs by name and brace match, the same
-  way test-dev-version.ps1 lifts the version block out of Ship.ps1, compiles
+  way test-ship-gate.ps1 lifts the Git gate out of Ship.ps1, compiles
   them against a stub Discord and Config with the .NET 10 SDK the launcher
   builds with (Add-LauncherType, tests\Launcher-Csc.ps1), which runs on any
   machine, and points them at a socket on loopback that records every byte

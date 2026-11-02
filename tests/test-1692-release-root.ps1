@@ -138,15 +138,13 @@ try {
     $ship = $texts['Ship.ps1']
     $vortex = $ship.IndexOf("Test-Path -LiteralPath (Join-Path `$Root 'Game\Data\vortex.deployment.json')")
     Yes 'Ship refuses a folder Vortex deploys into' ($vortex -gt 0)
-    # The version section starts where Ship reads the launcher's number
-    # (#5179); until #4825 it was Unbump, which wrote it into Updater.cs.
-    $version = $ship.IndexOf('try { $current = Get-LauncherVersion -RepoDir $RepoDir }')
-    Yes '  before the version is worked out and before anything is built' (
-        $vortex -gt 0 -and $version -gt 0 -and $vortex -lt $version -and $vortex -lt $ship.IndexOf("'Build-Launcher.ps1') -Root"))
+    # Before anything is built or published: the first thing put in place is
+    # the front (Build-Front.ps1); a Ship builds no launcher since #4825.
+    $front = $ship.IndexOf("Head 'The front'")
+    Yes '  before anything is built or published' ($vortex -gt 0 -and $front -gt 0 -and $vortex -lt $front)
     $gen = $ship.IndexOf("Head 'Animation and body files'")
-    Yes 'Ship asks whether the collection builds the animation and body files before the launcher is built or installed' (
-        $gen -gt 0 -and $gen -lt $ship.IndexOf("'Build-Launcher.ps1') -Root") -and $gen -lt $ship.IndexOf("'Install-Launcher.ps1')") -and
-        $gen -lt $ship.IndexOf('Get-ReleaseLauncher $srcRepo'))
+    Yes 'Ship asks whether the collection builds the animation and body files before anything is put in place or published' (
+        $gen -gt 0 -and $gen -lt $front -and $gen -lt $ship.IndexOf("Head 'Publishing'"))
     Yes 'Check-ShipReady and Setup-ShipMachine take -Root' (
         $texts['Check-ShipReady.ps1'] -match '\[string\]\$Root = ''''' -and $texts['Setup-ShipMachine.ps1'] -match '\[string\]\$Root = ''''')
     Yes 'Setup-ShipMachine hands -Root to Check-ShipReady' ($texts['Setup-ShipMachine.ps1'] -match "if \(\`$Root\) \{ \`$readyArgs\['Root'\] = \`$Root \}")

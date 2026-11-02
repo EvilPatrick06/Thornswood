@@ -29,7 +29,7 @@
   missing one and an empty source folder each have to stop it.
 
   Both are lifted out of the shipped Ship.ps1 by the parser, the way
-  test-dev-version.ps1 lifts its version block, so this drives the real code
+  test-ship-gate.ps1 lifts the Git gate, so this drives the real code
   and not a copy of it. If a block moves, this says so rather than quietly
   testing nothing.
 

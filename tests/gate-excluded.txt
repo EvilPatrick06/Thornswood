@@ -282,8 +282,6 @@ test-setup-discord-empty-hook.ps1  not sorted yet, runs in the nightly (#2513)
 test-setup-domain-caddyfile.ps1  not sorted yet, runs in the nightly (#2513)
 test-setup-domain-taskonly.ps1  not sorted yet, runs in the nightly (#2513)
 test-ship-check-words.ps1  own step in build.yml, "Check the writing rules"
-test-ship-ci-launcher.ps1  not sorted yet, runs in the nightly (#2513)
-test-ship-ci-sign.ps1  not sorted yet, runs in the nightly (#2513)
 test-ship-gate.ps1  not sorted yet, runs in the nightly (#2513)
 test-ship-guards.ps1  not sorted yet, runs in the nightly (#2513)
 test-ship-launcher-temps.ps1  not sorted yet, runs in the nightly (#2513)

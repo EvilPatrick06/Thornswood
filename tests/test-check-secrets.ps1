@@ -364,9 +364,12 @@ try {
     $chunks = @([pscustomobject]@{ Path = $good })
     $d = Invoke-Hook $pub $pubFrom $pubTo
     yes 'and lets a clean pack through' ($d -eq '')
+    # No launcher is published here since #4825 (it goes out through Velopack,
+    # whose workflow scans what it publishes, below), so a launcher left
+    # beside the release is not read: nothing sends it.
     $Launcher = $true; $exePath = $prog
     $d = Invoke-Hook $pub $pubFrom $pubTo
-    yes 'and stops on a launcher with a webhook in it' ($d -match 'Nothing was uploaded')
+    yes 'and reads no launcher, which a publish no longer sends (#4825)' ($d -eq '')
     $Launcher = $false; $exePath = ''
     $clientRel = [pscustomobject]@{ path = $signin }
     $d = Invoke-Hook $pub $pubFrom $pubTo

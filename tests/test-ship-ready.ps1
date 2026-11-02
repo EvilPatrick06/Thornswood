@@ -30,7 +30,7 @@
        the recorded client, NOT READY when it does not.
     5. The main-only row (the server build, issue #932): none on dev, WARN
        on main, and never a change to the verdict. The setup stub is not a
-       row: a main Ship takes the one CI built (test-ship-ci-launcher.ps1).
+       row: a Ship builds no installer and sends no launcher (#4825).
     6. The script's own text: no row asks for the fork, stale plugins and
        required-data in the game folder are notes (Ship's Go.ps1 step copies
        them in before it checks), and the main-only rows are asked only when
