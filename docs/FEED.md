@@ -330,9 +330,9 @@ saved fields that come from elsewhere, as their rows say.
 
 | Field | Type | Written by | Read by | If wrong or missing |
 | --- | --- | --- | --- | --- |
-| `launcherVersion` | string, dotted numbers | `Publish-Update.ps1:Set-Prop $doc 'launcherVersion' $launcherVersion`, the number Ship built the exe with (`-VersionOverride`) | The site's join pass (`site/server.js:feedLaunchers`, with `minLauncher`), main's number for a dev launcher (`MainVersion.cs:MainLauncherVersion`), the news and Discord posts. Not the launcher's own update since #4825: a launcher takes that from its Velopack channel (`VeloUpdate.cs:CheckLauncher`), and Scan goes by the same answer (`Upkeep.cs:LauncherWaiting`) | Wrong: the site refuses join passes from launchers it should let in, or lets in ones it should not. Not saved. |
-| `launcherUrl` | string, https | `Publish-Update.ps1`: since #897 the site address `/feed[-dev]/assets/<sha256>` | `Ship.ps1:Get-FeedLauncher` (a Ship that puts the feed's launcher out again), `Watch-Outside.ps1` and `Check-Outside.ps1`. No launcher downloads it since #4825 | Empty: a Ship that keeps the feed's launcher stops. Must pass the host list below. |
-| `launcherSha256` | string, 64 hex | `Publish-Update.ps1:Set-Prop $doc 'launcherSha256' $nowSha` | `Ship.ps1:Get-FeedLauncher`, and the launcher's manifest check (`FeedManifest.cs:"launcher " + v.launcherVersion, v.launcherSha256`) | Empty: Ship refuses the feed's launcher. Mismatch: the download is deleted and Ship stops. |
+| `launcherVersion` | string, dotted numbers | Nothing since #4825: it stays at the last launcher from before Velopack, so that launcher is never offered the native one as a self-update. A launcher goes out only on its channel's Velopack Releases (`merge-release.yml`, `promote-main.yml`) | The site's join pass for a launcher from before Velopack while its channel has no Velopack setup program (`site/server.js:feedLaunchers`, with `minLauncher`); a Velopack launcher's number is checked against its Release instead (`site/server.js:nativePublished`). Main's number for a dev launcher (`MainVersion.cs:MainLauncherVersion`, #5385). Not the launcher's own update: a launcher takes that from its Velopack channel (`VeloUpdate.cs:CheckLauncher`), and Scan goes by the same answer (`Upkeep.cs:LauncherWaiting`) | Not saved. Nothing writes it, so it cannot go wrong by a release. |
+| `launcherUrl` | string, https | Nothing since #4825 but the url move of `Feed-Rules.ps1` (#5385); it names the last launcher from before Velopack on the site, `/feed[-dev]/assets/<sha256>` (#897) | `Watch-Outside.ps1` and `Check-Outside.ps1`. No launcher downloads it since #4825 | Must pass the host list below. |
+| `launcherSha256` | string, 64 hex | Nothing since #4825; it stays the last launcher from before Velopack's | The launcher's manifest check (`FeedManifest.cs:"launcher " + v.launcherVersion, v.launcherSha256`), which holds the feed to its signed release record | Mismatch: the manifest check refuses the feed. |
 | `serverAddress` | string | `Publish-Update.ps1:@('ServerAddress', 'serverAddress')` from config `ServerAddress`; `Set-Server.ps1:@('serverAddress', $Address)`. Not `Set-Vps.ps1`, which moves the launcher's built-in address and leaves the feed to `Set-Server.ps1` (`Set-Vps.ps1:What it does NOT do, because Set-Server.ps1 already does it properly`) | `ShellUpdate.cs:v.serverAddress != cfg.ServerAddress` | Saved, unless the config points at a server on this machine (`SkyMp.IsLocal`: 127.0.0.1, localhost, ::1), which keeps its own address, `serverPort` and `voicePort` (#5020: a restore rehearsal or a developer's own server). A change stops Ship unless `-MoveServer` (`Publish-Update.ps1:-not $MoveServer -and -not $Dev`); the dev channel skips that check. Wrong: everybody connects to the wrong box. |
 | `serverPort` | string | as above, `ServerPort` | `ShellUpdate.cs:OnVersionDoc` | Saved. Must be a string; the launcher field is a string. |
 | `maxOnline` | number | `Publish-Update.ps1`, from `records\most-online.json` by way of `scripts\deploy\MaxOnline.ps1` (#481): the channel's seats, people and staff seats together (30 on main, 5 on dev from its `dev` numbers; Patrick, 12 Oct) | `ShellUpdate.cs:v.maxOnline > 0` | Saved when above 0. Written as a number because a quoted `"30"` reads as 0. It is the M of "N of M awake". The Play page prefers the number the running server announces as `max` in its `online.json` (`Online.cs`), which is the same seats. |
@@ -700,18 +700,10 @@ reads a feed that is not split the same as before, so the site can go first.
   Ship. It is also what `Set-Server.ps1`, `Set-Collection.ps1` and
   `Publish-Pack.ps1` edit.
 - **dev** is written by `Ship.ps1 -Channel dev` from any branch on any
-  developer's machine; the last dev Ship wins. Its launcher version is main's
-  published number plus a fourth part, `.1`, `.2`, past every dev number
-  already out (`Ship.ps1:Separate Dev work uses the main version with a fourth number`).
-  Main's own launcher takes main's number itself: a dev Ship of exactly what
-  origin/main holds, with nothing uncommitted, whose launcher fingerprint is
-  the `launcherInputs` main's feed recorded for that number, or main's next
-  number before main has shipped it. A clean checkout of origin/main with a
-  launcher change since main's release takes the fourth part like any other,
-  and a case Ship cannot tell stops before anything is built (#2347,
-  `Ship.ps1:Get-DevLauncherLine`). A number either feed already offers with a
-  launcher built from other sources is refused before the build
-  (`Ship.ps1:Assert-DevVersionSelection`).
+  developer's machine; the last dev Ship wins. No Ship of either channel
+  carries a launcher since #4825: the launcher's number is its Velopack
+  version, `<yyyy>.<M*100+d>.<n>`, given by the build Release it goes out on
+  (`MergeRelease.ps1`, New-MergeReleaseNames).
 - **After a main Ship**, the Dev feed, baseline, release identity and history
   stay unchanged. Dev advances through its own Ship and keeps its own server
   and voice addresses. Publish the same source to both channels when both
