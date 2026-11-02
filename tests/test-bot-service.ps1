@@ -801,7 +801,7 @@ if ($OnWindows) {
             [pscustomobject]@{ Name = 'cmd.exe'; ProcessId = 103; CommandLine = 'cmd /c "python ""' + $root + '\bot.py"" >> ""' + $root + '\bot.log"" 2>&1"' },
             [pscustomobject]@{ Name = 'python.exe'; ProcessId = 104; CommandLine = 'python C:\somewhere-else\tool.py' },
             [pscustomobject]@{ Name = 'node.exe'; ProcessId = 105; CommandLine = 'node ' + $root + '\not-the-bot.js' },
-            [pscustomobject]@{ Name = 'powershell.exe'; ProcessId = $PID; CommandLine = 'powershell -File ' + $root + '\this-install.ps1' })
+            [pscustomobject]@{ Name = 'pwsh.exe'; ProcessId = $PID; CommandLine = 'pwsh -File ' + $root + '\this-install.ps1' })
         return $root
     }
     function At([string]$rx) { for ($i = 0; $i -lt $script:calls.Count; $i++) { if ($script:calls[$i] -match $rx) { return $i } }; return -1 }

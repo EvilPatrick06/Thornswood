@@ -143,7 +143,7 @@ Set-Content -LiteralPath (Join-Path $pulled 'voice.log.1') -Value 'an older voic
 
 # The stand-in ssh. It takes the question the script would send the box,
 # moves its C: paths into the stand-in box, and runs it in a PowerShell of
-# its own, as powershell -EncodedCommand on the box would: what that prints
+# its own, as pwsh -EncodedCommand on the box would: what that prints
 # on stdout is the answer, what it prints on stderr stays stderr, and its
 # exit code is ssh's. Every connection also says the post-quantum warning on
 # stderr, as the box's OpenSSH did from 28 September (#941).
