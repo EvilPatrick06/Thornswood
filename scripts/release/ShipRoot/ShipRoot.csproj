@@ -106,7 +106,6 @@
     <Compile Include="$(ThornswoodApp)DevBuild.cs" />
     <Compile Include="$(ThornswoodApp)Downgrade.cs" />
     <Compile Include="$(ThornswoodApp)FeedManifest.cs" />
-    <Compile Include="$(ThornswoodApp)FeedNews.cs" />
     <Compile Include="$(ThornswoodApp)FeedSettings.cs" />
     <Compile Include="$(ThornswoodApp)FromGameArchive.cs" />
     <Compile Include="$(ThornswoodApp)Http.cs" />
