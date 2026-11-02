@@ -118,9 +118,16 @@ on:
 permissions:
   contents: read
 
+# The newest merge is the one released (#5398). GitHub refuses the run's own
+# token any tag on a commit whose workflow files differ from main's (it asks
+# for workflows: write, which that token can never hold), so a merge main
+# has moved past with a workflow change can never be tagged. A newer merge
+# cancels the run of the one before it, and its Release carries every part
+# and the notes of every pull request since the Release before, so nothing
+# a superseded merge changed is left out.
 concurrency:
   group: merge-release
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   NOTHING_TO_TELL: 'Nothing people would notice: every change in this release says none.'
@@ -455,8 +462,24 @@ jobs:
         with:
           subject-path: ${{ steps.files.outputs.subjects }}
 
-      - name: Publish the Release
+      # Main may have moved on while this was built; the newer merge's run
+      # releases this one's changes too (concurrency, above).
+      - name: Is this still main's newest merge
+        id: newest
         if: ${{ steps.changed.outputs.release == 'yes' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $head = gh api "repos/$($env:GITHUB_REPOSITORY)/commits/main" --jq .sha
+          if ($LASTEXITCODE -ne 0 -or -not $head) { Write-Host '::error::GitHub did not say what main is'; exit 1 }
+          if ([string]$head -eq $env:GITHUB_SHA) { Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value 'release=yes'; exit 0 }
+          Write-Host "main is $head now, past this merge; that merge's run releases this one's changes with its own"
+          Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value "Main moved on to $head while this was built, so its run releases these changes; nothing was released here."
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value 'release=no'
+
+      - name: Publish the Release
+        if: ${{ steps.newest.outputs.release == 'yes' }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -473,7 +496,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { Write-Host "::error::the draft $($env:TAG) could not be published"; exit 1 }
 
       - name: Ask the dev server for it (a Deployment to Dev)
-        if: ${{ steps.changed.outputs.release == 'yes' && steps.changed.outputs.dev == 'yes' }}
+        if: ${{ steps.newest.outputs.release == 'yes' && steps.changed.outputs.dev == 'yes' }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -505,7 +528,7 @@ jobs:
       # the bot posts the Release's news once, in the dev updates channel,
       # however many places it reached.
       - name: Ask the site and the Discord bot for it (Deployments to Site and Discord bot)
-        if: ${{ steps.changed.outputs.release == 'yes' && steps.changed.outputs.apps != '' }}
+        if: ${{ steps.newest.outputs.release == 'yes' && steps.changed.outputs.apps != '' }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
