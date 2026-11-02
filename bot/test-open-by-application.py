@@ -40,7 +40,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 os.environ.setdefault('DISCORD_TOKEN', 'not-a-real-token')
 
-import bot  # noqa: E402
+import harness_bot  # noqa: E402
+
+bot = harness_bot.whole()
 import content  # noqa: E402
 
 PASS = []

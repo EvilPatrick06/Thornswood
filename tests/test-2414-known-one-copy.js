@@ -37,7 +37,7 @@ function read(rel) { try { return fs.readFileSync(path.join(ROOT, rel), 'utf8').
 const server = read('site/server.js') || '';
 const hub = read('site/public/hub.js') || '';
 const deploy = read('scripts/deploy/Deploy-Docs.ps1') || '';
-const bot = read('bot/bot.py') || '';
+const bot = require('./bot-files').source().replace(/\r\n/g, '\n');
 const service = read('scripts/vps/Bot-Service.ps1') || '';
 const install = read('scripts/deploy/Install-Bot.ps1') || '';
 const board = JSON.parse(read('site/data/board.json') || '{}');

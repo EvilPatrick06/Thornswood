@@ -30,7 +30,11 @@ import pathlib
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-SRC = (ROOT / 'bot' / 'bot.py').read_text(encoding='utf-8')
+# All of the bot's code, bot.py and its modules (#5357), read without
+# importing it, so no discord.py is needed.
+sys.path.insert(0, str(ROOT / 'bot'))
+import harness_bot  # noqa: E402
+SRC = harness_bot.source()
 TREE = ast.parse(SRC)
 
 PASS, FAIL = [], []
