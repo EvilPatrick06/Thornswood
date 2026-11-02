@@ -18,8 +18,9 @@
   em dash as a regex escape; the tool that wrote the file turned the escape
   into the character itself, and Windows PowerShell 5.1, which reads a script
   with no byte order mark as ANSI, then found none of the six em dashes that
-  were there, while PowerShell 7 found all of them. So this runs the check
-  under both, on the same seeded files, and asks for the same answer.
+  were there, while PowerShell 7 found all of them. So this ran the check
+  under both and asked for the same answer, until #5356: nothing runs it
+  under 5.1 now. The check's own source is still held to plain ASCII below.
 
   What it proves:
     - the repository as it stands passes;
@@ -223,20 +224,6 @@ try {
     $same = ($before.Count -eq $after.Count)
     foreach ($k in $before.Keys) { if ($after[$k] -ne $before[$k]) { $same = $false } }
     Yes 'the check wrote nothing: the same files, byte for byte' $same
-
-    # The other PowerShell. Windows PowerShell 5.1 is the one that reads a file
-    # with no byte order mark as ANSI, which is where an em dash typed into the
-    # check would have gone missing.
-    $other = $null
-    . (Join-Path $PSScriptRoot 'Windows.ps1')
-    if ($PSVersionTable.PSEdition -eq 'Desktop') { $c = Get-Command pwsh -ErrorAction SilentlyContinue; if ($c) { $other = $c.Source } }
-    elseif ($OnWindows) { $other = Get-WindowsPowerShell }
-    if ($other) {
-        $o = Invoke-Check $other $tmp
-        Yes ('the other PowerShell (' + (Split-Path -Leaf $other) + ') reports exactly the same hits and exit code') (($o.Code -eq $s.Code) -and (($o.Hits -join ' ') -eq ($s.Hits -join ' ')))
-    } else {
-        Write-Host $(if ($PSVersionTable.PSEdition -eq 'Desktop') { 'SKIP  no pwsh on this machine to compare with' } else { 'SKIP  no Windows PowerShell 5.1 to compare with: this is not Windows' })
-    }
 
     # Clean the seeded breaks away and the same tree passes, the one good
     # allowance still covering its line.

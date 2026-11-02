@@ -18,7 +18,7 @@ namespace Thornswood
     /// while the launcher already had this rule) until #4824 retired that
     /// program, which is why it uses nothing else from launcher\app. It compares text and resolves neither
     /// side, so every caller passes a path from Path.GetFullPath.
-    /// tests\test-updater.ps1 and tests\test-3561-setup-unpack-fence.ps1 run it.
+    /// tests\test-updater.ps1 and installer\tests\test-3561-setup-unpack-fence.ps1 run it.
     /// </summary>
     static class PathFence
     {

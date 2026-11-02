@@ -322,7 +322,7 @@ namespace Thornswood
         /// <summary>
         /// ReleaseCopy's reader, with $at the folder the record and its files
         /// are in (checked by the caller). The record is read once, on the
-        /// first plugin asked for. tests\test-2627-scan-fix.ps1 calls
+        /// first plugin asked for. launcher\tests\test-2627-scan-fix.ps1 calls
         /// this with a copy of the site on this machine.
         /// </summary>
         internal static Func<string, byte[]> ReleaseCopyAt(string at, RecordRef r)

@@ -593,11 +593,11 @@ $GateScript = 'C:\Thornswood-Gate\Gate.ps1'
 $SayStaff = 'C:\Thornswood-Watch\say-staff.ps1'
 $bare = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKk0ZXN0a2V5Zm9ydGhlZ2F0ZXRlc3QwMDAwMDAwMDAw'
 $line = Get-BoxKeyLine $bare 'desk' $false $true
-Yes 'a deploy key''s line: from the box only, restricted, forced to Gate.ps1' ($line -eq ('from="127.0.0.1",restrict,command="powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\Thornswood-Gate\Gate.ps1" ' + $bare + ' thornswood-desk'))
+Yes 'a deploy key''s line: from the box only, restricted, forced to Gate.ps1' ($line -eq ('from="127.0.0.1",restrict,command="pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\Thornswood-Gate\Gate.ps1" ' + $bare + ' thornswood-desk'))
 $parts = Read-BoxKeyLine $line
 Yes '  and its reader sees the bridge and the gate in it, and no notices command' ($parts.Bridge -and $parts.Gate -and -not $parts.Notices -and $parts.Key -eq $bare)
 Yes 'a plain key''s line is unchanged' ((Get-BoxKeyLine $bare 'one' $false) -eq ('from="127.0.0.1" ' + $bare + ' thornswood-one'))
-Yes 'a notices key''s line is unchanged' ((Get-BoxKeyLine $bare 'claude' $true) -like 'from="127.0.0.1",restrict,command="powershell.exe * -File C:\Thornswood-Watch\say-staff.ps1 -From claude" *')
+Yes 'a notices key''s line is forced to say-staff.ps1 through pwsh' ((Get-BoxKeyLine $bare 'claude' $true) -like 'from="127.0.0.1",restrict,command="pwsh * -File C:\Thornswood-Watch\say-staff.ps1 -From claude" *')
 $grant = Text 'scripts/vps/Grant-BoxAccess.ps1'
 Yes 'a deploy key goes into the gate account''s authorized_keys, and stops without the account' ($grant.Contains("Run scripts\deploy\Install-Gate.ps1 first") -and $grant.Contains("ProfileImagePath '.ssh\authorized_keys'"))
 Yes 'its proof needs a refused command and GATE READY' ($grant.Contains("@('echo THORNSWOOD_OK', 'ping')") -and $grant.Contains("'^\| GATE READY'") -and $grant.Contains('($NoticesOnly -or $Deploy) -and @($proof | Where-Object { $_ -match ''THORNSWOOD_OK'' }).Count'))

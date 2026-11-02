@@ -19,7 +19,7 @@
     Deploy-Server.ps1 and Deploy-DevGamemode.ps1    sent from the repo, held by sha256
     CollectionPlugins.ps1    never held to records\collection-plugins.json (#2019)
   game\gamemode.js serves the same names (OURS, #1180), and
-  tests\test-1180-own-plugins.js holds that list to $ShipOursFiles.
+  launcher\tests\test-1180-own-plugins.js holds that list to $ShipOursFiles.
 
   Until #2486 each of those places named Thornswood-Content.esp alone, so
   Thornswood-Last.esp, built here too, fell through to "the collection's" in

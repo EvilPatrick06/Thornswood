@@ -29,10 +29,11 @@
       put in the root (#2661), went with -Package (#4824).
     - Ship runs the helper once, inside a block a dry run never
       reaches, so a dry run cannot touch the VPS or the site.
-    - The remirror call sits after the publisher and before the site news, in the order
-      the website lane pinned: the remirror, then the news, the
-      Discord post and the server countdown, because those three tell people to
-      update and the feed has to be serving the release before that.
+    - The remirror call sits after the publisher and before the Discord post,
+      in the order the website lane pinned: the remirror, then the Discord
+      post and the server countdown, because those tell people to update and
+      the feed has to be serving the release before that. (The site's News
+      page is not sent: the site writes it from the feed, #5187.)
     - Nothing after the tip can fail the release. A script another lane has not
       landed is a line, a remirror that refuses is a line, and Ship still exits
       0: "Exit 1 = refused publish (do not fail the release)".
@@ -215,7 +216,7 @@ Yes ("  and one writing the Dev test tasks it carries, dev only, never on a dry 
     $devTaskCall[0].Extent.Text -match 'Commit = \$tagged\.Commit' -and $devTaskCall[0].Extent.Text -match 'Build = \$devName' -and
     $devTaskCall[0].Extent.StartOffset -gt $shipSrc.IndexOf('$tagged = Add-ReleaseTag'))
 $atPublish = $shipSrc.IndexOf("& (Join-Path `$Here 'Publish-Update.ps1') @pubArgs")
-$atNews = $shipSrc.IndexOf("'..\ops\Publish-News.ps1'")
+$atNews = $shipSrc.IndexOf("'..\ops\Publish-Discord.ps1'")
 $atAnnounce = $shipSrc.IndexOf("'..\vps\Request-Restart.ps1'")
 $mirrorCall = @($calls | Where-Object { $_.Extent.Text -match "Only = 'Remirror'" })
 $vtCall = @($calls | Where-Object { $_.Extent.Text -match "Only = 'VirusTotal'" })
@@ -235,13 +236,12 @@ Yes '  and no clone, because the remirror works its own out from the channel' (
     $shipSrc -notmatch '\$postArgs = @\{[^\r\n]*ReleaseDir')
 
 # The order on screen is the order it happens in, and it is the one the website
-# lane pinned: the remirror, then the news, the Discord post and
-# the countdown, because those three send people to fetch a release the feed has
+# lane pinned: the remirror, then the Discord post and the countdown, because those three send people to fetch a release the feed has
 # to be serving.
 if ($mirrorCall.Count -eq 1) {
     Yes 'the remirror follows the publisher' ($atPublish -gt 0 -and $mirrorCall[0].Extent.StartOffset -gt $atPublish)
     Yes '  and no VirusTotal Invoke-PostShip' ($vtCall.Count -eq 0)
-    Yes '  and the remirror comes before the site news, the Discord post and the countdown' (
+    Yes '  and the remirror comes before the Discord post and the countdown' (
         $atNews -gt 0 -and $atAnnounce -gt $atNews -and $mirrorCall[0].Extent.StartOffset -lt $atNews)
 }
 

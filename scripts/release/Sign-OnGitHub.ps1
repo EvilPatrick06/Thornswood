@@ -57,7 +57,7 @@
   It talks to GitHub through gh, and to the box through Send-Script.ps1. A
   harness passes its own gh (-Gh) and box (-Box).
 
-  Keep it ASCII and Windows PowerShell 5.1.
+  Keep it ASCII. It runs in PowerShell 7.
 #>
 
 . (Join-Path $PSScriptRoot 'Assert-PublishSigned.ps1')

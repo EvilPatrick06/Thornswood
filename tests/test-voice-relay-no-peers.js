@@ -208,7 +208,9 @@ const OFFER = { t: 'sdp', from: 2, sdp: { type: 'offer', sdp: 'v=0' } };
   function sources(dir, out) {
     fs.readdirSync(dir, { withFileTypes: true }).forEach(function (d) {
       const full = path.join(dir, d.name);
-      if (d.isDirectory()) { sources(full, out); }
+      // Not the product's harnesses (launcher/tests, plan line 42), which
+      // name the words they look for.
+      if (d.isDirectory()) { if (d.name !== 'tests') { sources(full, out); } }
       else if (/\.(cs|ps1|axaml)$/i.test(d.name)) { out.push(full); }
     });
     return out;

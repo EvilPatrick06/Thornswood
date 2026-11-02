@@ -28,8 +28,47 @@ has a line there too, "own step in build.yml", so the gate does not run it
 twice. The "not sorted yet" lines are minutes together, which is why they
 come onto the gate a few at a time.
 
-The voice service's own harnesses stay beside it in `voice\`, and the bot's in
-`bot\`, because they are run from there.
+The voice service's own harnesses are beside it in `voice\tests\`, and the
+bot's Python ones in `bot\`, because they are run from there.
+
+## Beside their product
+
+The repository's folders are being grouped by product, with each product's
+harnesses beside its code (plan line 42, 1 Nov 2026), one product at a time.
+A product's harnesses go in a `tests` folder of its own, one folder below the
+top: `launcher\tests\`, `site\tests\`. This folder keeps the checks that are
+about the whole repository (the gate, the words, the secrets, the scripts'
+paths), the shared helpers (`Windows.ps1`, `Launcher-Csc.ps1`,
+`launcher-csc.js`, `fork-git.js` and the rest) and `fixtures\`, and every
+harness whose product has not moved yet. Moved on 1 Nov 2026: the launcher's
+(`launcher\tests\`), voice's (`voice\tests\`), the setup program's
+(`installer\tests\`) and the site's (`site\tests\`). Its harnesses are no part of the launcher:
+`LauncherVersion.ps1` and Ship's launcher fingerprint leave that folder out,
+so a change to one gives no launcher a new number.
+
+The gate and the nightly find both kinds through one list,
+`scripts\dev\Harness-Files.ps1`. A harness here goes by its file name, as
+before; one beside its product goes by its path from the repository with
+forward slashes, `launcher/tests/test-498-msbuild.ps1`, in the gate's report,
+in a pull request's pick, in `gate-excluded.txt` and in
+`Nightly-Harnesses.ps1 -Only`. A shared helper stays here. A `.ps1` harness
+beside its product reaches it from the repository folder, the shape
+`test-2957-windows-one-way.ps1` looks for, and a `.js` one two folders up:
+
+```
+. (Join-Path (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'tests') 'Launcher-Csc.ps1')
+const lc = require('../../tests/launcher-csc');
+```
+
+A check that reads a whole product folder for something its code must never
+do leaves that folder's `tests` out, since a harness names the very thing it
+looks for (`test-browser-args.ps1`, `test-3003-one-install-rule.ps1`).
+
+Moving a product's harnesses is one pull request for that product, and only
+while no open pull request changes any of them: a moved file and an edit to
+it in another pull request conflict. The move changes, in that same pull
+request, every line that names a moved harness by its old path, here, in the
+workflows, in the scripts' comments and in the docs.
 
 ## Where they look
 
@@ -38,6 +77,8 @@ They moved here from `tools\` on 25 September (issue #440, phase 5), and
 folder from here, one folder up: a `.js` harness through `REPO_DIR`, declared at
 its top as `path.join(__dirname, '..')`, and a `.ps1` harness through the line
 after its `$Here = $PSScriptRoot` that points `$Here` at the repository folder.
+One beside its product is two folders below the top, so its `REPO_DIR` is
+`path.join(__dirname, '..', '..')` and its `$Here` goes up twice.
 A new harness does the same; copying the top of an existing one is the easy way.
 
 ## Running them
@@ -48,6 +89,9 @@ From the repository folder:
 node tests\test-farming.js
 pwsh -NoProfile -File tests\test-ship-rules.ps1
 ```
+
+and one beside its product by its path, `pwsh -NoProfile -File
+launcher\tests\test-498-msbuild.ps1`.
 
 Each prints a PASS or FAIL line per check and ends on `N passed, M failed`,
 and exits 1 when anything failed. A harness that reads something only one
@@ -191,7 +235,7 @@ child's output up to that line, and so does any stand-in it starts on a port
 it let go (the GitHub stand-in in `test-site-assets.ps1`, the game server in
 `test-record-sync.ps1`); before #1755 five of them drained the output unread
 and polled the port. `test-1703-test-ports.js` fails on any `.js` harness here
-or in `voice\` that names a fixed port, or on any `.js` or `.ps1` harness that
+or in a product's tests folder that names a fixed port, or on any `.js` or `.ps1` harness that
 starts the site without waiting for that line.
 
 ## A harness that runs the launcher's voice

@@ -458,7 +458,7 @@ namespace Thornswood
         /// What the handover script deletes once the launcher has exited, and
         /// nothing else: Begin has done everything that needs the launcher
         /// running by the time this is asked. Deletes nothing itself, so
-        /// tests\test-3679-local-keep.ps1 runs it against a scratch install.
+        /// launcher\tests\test-3679-local-keep.ps1 runs it against a scratch install.
         /// </summary>
         public static string[] Targets(bool keepSaves, bool deleteMods)
         {

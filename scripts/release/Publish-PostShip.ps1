@@ -35,7 +35,7 @@
   404, and that is a line too. Both are said in full, with the command that puts
   them right, and the release stays out and stays announced. Asked for by the
   website lane on 27 September: "Exit 1 = refused publish (do not fail the
-  release)", the same spirit as Ship's own try/catch around Publish-News.
+  release)", the same spirit as Ship's own try/catch around Publish-Discord.
 
   THERE IS NO THIRD STEP FOR THE LAUNCHER, and that is the launcher lane's
   answer rather than an omission. A launcher polls the feed and updates itself,

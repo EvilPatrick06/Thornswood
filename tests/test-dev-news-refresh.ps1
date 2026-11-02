@@ -24,8 +24,8 @@
   WHAT THIS DRIVES, all offline: a folder stands in for the site and the VPS
   store (-SiteDir, the same script the VPS runs, Feed-Store.ps1), a scratch git
   repository stands in for the clone whose history proves what main has, and
-  stand-in scripts stand in for the Discord post, the site news, the remirror
-  and the server notice.
+  stand-in scripts stand in for the Discord post, the remirror and the
+  server notice. (The site's News page is not sent since #5187.)
 
     1. Update-DevFeedMarks (Dev-News.ps1) on the 27-mark shape: 3 notes with a
        sourceCommit (one on main by ancestry, one squash merged, one main never
@@ -497,7 +497,7 @@ try {
     $stand = Join-Path $Scratch 'ship'
     $calls = Join-Path $Scratch 'calls.txt'
     $standIn = "Add-Content -LiteralPath " + (Q $calls) + " -Value '{0}'; if (`$env:TS_FAIL -eq '{0}') {{ exit 1 }}; exit 0"
-    foreach ($s in @(@('release\Publish-PostShip.ps1', 'remirror'), @('release\Refresh-DevNews.ps1', 'refresh'), @('ops\Publish-News.ps1', 'site news'),
+    foreach ($s in @(@('release\Publish-PostShip.ps1', 'remirror'), @('release\Refresh-DevNews.ps1', 'refresh'),
                      @('ops\Publish-Discord.ps1', 'discord'), @('vps\Request-Restart.ps1', 'server'))) {
         Put (Join-Path $stand $s[0]) ($standIn -f $s[1])
     }
@@ -561,11 +561,11 @@ $published = $LASTEXITCODE
 
         $s = ShipRun 'main' 0 '20261005-235125' ''
         YesR ("main, released: the dev marks follow at once, after the remirror and before anybody is told ({0})" -f ($s.Calls -join ', ')) (
-            ($s.Calls -join ',') -eq 'remirror,refresh,site news,discord,server,tag') $s
+            ($s.Calls -join ',') -eq 'remirror,refresh,discord,server,tag') $s
 
         $s = ShipRun 'main' 0 '20261005-235125' '' 'refresh'
         YesR ("  a refresh that fails does not fail the release (exit {0}, called: {1})" -f $s.Code, ($s.Calls -join ', ')) (
-            $s.Code -eq 0 -and ($s.Calls -join ',') -eq 'remirror,refresh,site news,discord,server,tag') $s
+            $s.Code -eq 0 -and ($s.Calls -join ',') -eq 'remirror,refresh,discord,server,tag') $s
         Yes '  and Done names it with the command that does it again' ($s.Out -match "the dev feed's DEV marks" -and $s.Out -match [regex]::Escape('.\scripts\release\Refresh-DevNews.ps1'))
 
         $s = ShipRun 'dev' 0 '20261006-110000-dev' ''

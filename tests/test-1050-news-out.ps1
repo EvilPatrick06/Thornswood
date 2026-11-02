@@ -27,8 +27,8 @@
     - a file the site does not hold, or a newsFile of another shape, stops a
       script rather than letting it write back a list without its older notes
     - Dev-News's marks read every note through it
-    - Publish-News, which copies the notes to the site's News page, reads a
-      feed that keeps them as a file
+    - (the site's News page, which reads the news file itself since #5187,
+      is tests\test-5187-site-news.js)
     - Publish-Update, Rollback-Feed, Publish-Server, Publish-Discord and
       Remirror-Site-Feed go through it (read from their source)
 #>
@@ -140,24 +140,6 @@ try {
     $marks = Set-DevFeedMarks $dev $main $Repo $site
     Yes 'Dev-News''s marks read every note out of the file, and leave the whole list in "news" for the sender' (
         [int]$marks.Notes -eq 3 -and (Titles $dev.news) -eq 'Third,Second,First' -and -not $dev.PSObject.Properties['newsFile'] -and [string]$dev.mainVersion -eq '1.2.4')
-
-    $rel = Join-Path $T 'rel'
-    New-Item -ItemType Directory -Force -Path $rel | Out-Null
-    $pub = Feed '1.2.4' @()
-    [void](Set-FeedNewsList $pub @((Note '10-12-2026 1:00 AM' 'Keys open their own doors'), (Note '10-11-2026 5:51 PM' 'Worn gear updates at once')) 'main' '1.2.4' (Join-Path $T 'w8') $site)
-    [IO.File]::WriteAllText((Join-Path $rel 'version.json'), ($pub | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
-    $out = Join-Path $T 'news-page.json'
-    $was = $env:THORNSWOOD_TEST_SITE_DIR
-    $env:THORNSWOOD_TEST_SITE_DIR = $site
-    $why = ''
-    try {
-        & (Join-Path $Repo 'scripts\ops\Publish-News.ps1') -ReleaseDir $rel -OutFile $out -From '2026-09-01' -Vps 'nowhere.invalid' -User 'nobody' -Root 'C:/nowhere' -Quiet *>&1 | Out-Null
-    } catch { $why = $_.Exception.Message }
-    finally { $env:THORNSWOOD_TEST_SITE_DIR = $was }
-    $page = if (Test-Path -LiteralPath $out) { (([IO.File]::ReadAllText($out)).TrimStart([char]0xFEFF)) | ConvertFrom-Json } else { $null }
-    $pageTitles = if ($null -ne $page) { @($page.news | ForEach-Object { [string]$_.title }) } else { @() }
-    Yes ('Publish-News reads a feed that keeps its notes as a file' + $(if ($why) { ': ' + $why } else { '' })) (
-        $null -ne $page -and $pageTitles -contains 'Keys open their own doors' -and $pageTitles -contains 'Worn gear updates at once')
 
     $src = @{}
     foreach ($f in 'scripts\release\Publish-Update.ps1', 'scripts\release\Rollback-Feed.ps1', 'scripts\release\Publish-Server.ps1', 'scripts\ops\Publish-Discord.ps1', 'scripts\deploy\Remirror-Site-Feed.ps1', 'scripts\release\Dev-News.ps1') {

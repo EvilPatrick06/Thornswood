@@ -50,7 +50,7 @@
 
       & (Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1') -Dev:$Dev
 
-  in a try/catch, the way Ship calls Publish-News.ps1. It exits 1 when it
+  in a try/catch, the way Ship calls Publish-Discord.ps1. It exits 1 when it
   refused to publish the feed, which is a line on screen for whoever shipped
   rather than a reason to fail a release that is already out.
 
@@ -323,7 +323,7 @@ function RemoteLines($script) {
 
 # ConvertFrom-Json gives back an object with only the properties the file had,
 # and reaching for one that is not there throws under strict mode. The same two
-# readers Publish-News.ps1 carries, for the same reason.
+# readers Publish-Discord.ps1 carries, for the same reason.
 function Prop($obj, $name) {
   if ($null -eq $obj) { return '' }
   $p = $obj.PSObject.Properties[$name]

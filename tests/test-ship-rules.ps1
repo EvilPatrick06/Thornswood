@@ -478,7 +478,7 @@ Yes 'the theme is not held back from main any more' (-not (Test-ShipDevOnly 'Dat
 # path alone made a file ours, and the two landed an hour apart and turned
 # main red. So each file is asked twice here: with bytes the record is told to
 # expect, under a made up $GameDir, and with nothing there.
-# tests\test-client-by-hash.ps1 asks the same of this machine's real bundle.
+# launcher\tests\test-client-by-hash.ps1 asks the same of this machine's real bundle.
 Yes 'client-build.json names the six client files' ($clientFiles.Count -eq 6)
 $fakeGame = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-ship-rules-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 try {

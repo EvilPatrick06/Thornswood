@@ -535,7 +535,7 @@ namespace Thornswood
         // ------------------------------------------------------------ writing
         //
         // Declared here rather than borrowed from OwnGame.WriteRecord, because
-        // tests\test-steam-updates.ps1 compiles this file on its own. The same
+        // launcher\tests\test-steam-updates.ps1 compiles this file on its own. The same
         // call: a file flushed to the disk, then one rename over the manifest.
 
         /// <summary>The bytes into path, flushed to the disk before it returns.</summary>

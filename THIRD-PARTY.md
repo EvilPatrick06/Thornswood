@@ -1568,7 +1568,7 @@ where files are handed out (#421). The launcher's sidebar has Source code
 under its version lines, which opens the fork at the commit the launcher's
 own `client-build.json` names (`ClientRuntime.SourceUrl`), and the game's
 help panel says under Getting help where the source is.
-`tests\test-421-source-offer-ui.js` holds both.
+`launcher\tests\test-421-source-offer-ui.js` holds both.
 
 The directions reach people in four places. The installer carries
 `SOURCE CODE.txt`, which Build-SetupFiles.ps1 writes from the two build

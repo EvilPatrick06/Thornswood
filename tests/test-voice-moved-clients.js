@@ -14,7 +14,7 @@
 // (tests\voice-launcher.js), and what it plays is read back: somebody
 // standing still is still heard after a 'moved' that leaves them out. The
 // plain browser page the service once served was a third, until it went
-// (#1822). voice/test-moved.js checks the same thing against the real
+// (#1822). voice/tests/test-moved.js checks the same thing against the real
 // service. Read only, but for the voice driver's build in the temp folder.
 const fs = require('fs');
 const path = require('path');

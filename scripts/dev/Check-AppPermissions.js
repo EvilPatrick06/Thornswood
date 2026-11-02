@@ -144,7 +144,7 @@ async function main(argv) {
     }
     if (r.status !== 200 || !r.body) {
       const said = (r.body && r.body.message) ? ': ' + r.body.message : '';
-      console.log('FAIL  ' + rec.slug + ': GitHub answered ' + r.status + said + (r.status === 404 ? ' (no App by that name, or a private App this run may not read)' : ''));
+      console.log('FAIL  ' + rec.slug + ': GitHub answered ' + r.status + said + (r.status === 404 ? ' (no App by that name)' : r.status === 403 ? ' (a private App: a run\'s own token reads only a public one, measured 1 Nov 2026; it is made public on its Advanced settings page, as bramble, workers and the box admin App are)' : ''));
       failed++;
       continue;
     }

@@ -195,7 +195,7 @@ function Stub([string]$name, [string]$params, [string]$body) {
     # Each in its own area under scripts\ since phase 8 of issue #440, where Ship.ps1
     # in scripts\release calls it.
     $area = 'release'
-    if ($name -in 'Publish-News', 'Publish-Discord') { $area = 'ops' }
+    if ($name -eq 'Publish-Discord') { $area = 'ops' }
     if ($name -eq 'Request-Restart') { $area = 'vps' }
     $dir = Join-Path $repo ('scripts\' + $area)
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
@@ -413,7 +413,6 @@ if (-not $NoPush) {
 }
 '@
     # The real one's last step, which the static check above holds it to.
-    Stub 'Publish-News' '' ''
     Stub 'Publish-Discord' '[switch]$Dev' ''
     Stub 'Request-Restart' '[double]$Minutes, [string]$Mode, [string]$Why, [string]$Data' ''
     # What follows a tip: the host feed remirror. The real one reaches the VPS
@@ -515,7 +514,7 @@ if ($target -match '^repos/[^/]+/[^/]+/actions/workflows/release\.yml/runs\?') {
     Yes ("D a main -DryRun runs to the end (exit {0})" -f $d.Code) ($d.Code -eq 0 -and $d.Out -match 'Dry run finished')
     $pub = Called $d 'Publish-Update'
     Yes 'D the publisher ran, told not to upload and not to push' ($pub.Count -eq 1 -and $pub[0] -match ' -NoUpload\b' -and $pub[0] -match ' -NoPush\b')
-    foreach ($n in 'Publish-News', 'Publish-Discord', 'Request-Restart', 'Publish-PostShip') {
+    foreach ($n in 'Publish-Discord', 'Request-Restart', 'Publish-PostShip') {
         Yes "D $n.ps1 is not called" ((Called $d $n).Count -eq 0)
     }
     $gone = Away $d
@@ -538,7 +537,7 @@ if ($target -match '^repos/[^/]+/[^/]+/actions/workflows/release\.yml/runs\?') {
     Yes 'V no launcher is built or installed' ((Called $v 'Build-Launcher').Count -eq 0 -and (Called $v 'Install-Launcher').Count -eq 0)
     Yes '  and the publisher is given no launcher, number or fingerprint' (
         $pub.Count -eq 1 -and $pub[0] -notmatch ' -(Launcher|VersionOverride|LauncherInputs)\b')
-    foreach ($n in 'Publish-News', 'Publish-Discord', 'Request-Restart', 'Publish-PostShip') {
+    foreach ($n in 'Publish-Discord', 'Request-Restart', 'Publish-PostShip') {
         Yes "V $n.ps1 is not called" ((Called $v $n).Count -eq 0)
     }
     $gone = Away $v
@@ -560,7 +559,7 @@ if ($target -match '^repos/[^/]+/[^/]+/actions/workflows/release\.yml/runs\?') {
     if ($r.Code -ne 0) { $r.Out -split "`r?`n" | Select-Object -Last 25 | ForEach-Object { Write-Host ("      " + $_) }; $r.Calls | ForEach-Object { Write-Host ("      call: " + $_) } }
     $pub = Called $r 'Publish-Update'
     Yes 'R the publisher ran, and was not told to hold anything back' ($pub.Count -eq 1 -and $pub[0] -notmatch ' -NoUpload\b' -and $pub[0] -notmatch ' -NoPush\b')
-    foreach ($n in 'Publish-News', 'Publish-Discord', 'Request-Restart') {
+    foreach ($n in 'Publish-Discord', 'Request-Restart') {
         Yes "R $n.ps1 is called" ((Called $r $n).Count -eq 1)
     }
     # What follows the tip: one call per half, on the main channel, each with the
@@ -641,7 +640,7 @@ if ($target -match '^repos/[^/]+/[^/]+/actions/workflows/release\.yml/runs\?') {
     } finally { $env:TS_PUB_FAIL = '' }
     Yes ("F a Ship whose feed did not send stops, NOTHING was published (exit {0})" -f $f.Code) (
         $f.Code -eq 1 -and (Called $f 'Publish-Update').Count -eq 1 -and $f.Out -match 'NOTHING was published')
-    foreach ($n in 'Publish-News', 'Publish-Discord', 'Request-Restart', 'Publish-PostShip') {
+    foreach ($n in 'Publish-Discord', 'Request-Restart', 'Publish-PostShip') {
         Yes "F $n.ps1 is not called" ((Called $f $n).Count -eq 0)
     }
     $pushes = @(Away $f | Where-Object { $_ -match '^git .*\b(push|tag)\b' })
@@ -708,7 +707,7 @@ if ($target -match '^repos/[^/]+/[^/]+/actions/workflows/release\.yml/runs\?') {
         $nr.Code -eq 1 -and $nr.Out -match 'is not current: Update-ShipRoot\.ps1 says why above\. Nothing was built or published\.')
     Yes '  before the launcher is built or installed, and before anything is published or told' (
         (Called $nr 'Build-Launcher').Count -eq 0 -and (Called $nr 'Install-Launcher').Count -eq 0 -and (Called $nr 'Publish-Update').Count -eq 0 -and
-        (Called $nr 'Publish-News').Count -eq 0 -and (Called $nr 'Publish-Discord').Count -eq 0 -and (Called $nr 'Request-Restart').Count -eq 0)
+        (Called $nr 'Publish-Discord').Count -eq 0 -and (Called $nr 'Request-Restart').Count -eq 0)
     Yes '  and nothing left the machine' (@(Away $nr | Where-Object { $_ -notmatch '^git ' }).Count -eq 0 -and @(Away $nr | Where-Object { $_ -match '\b(push|tag)\b' }).Count -eq 0)
     Yes '  and the launcher''s source is as it was: no file holds the number' ((Hash $updaterCs) -eq $updaterWas)
 

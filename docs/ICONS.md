@@ -45,7 +45,7 @@ website tab to match the launcher. Djinn, 27 Oct 2026: the tab and the
 launcher are the same badge, with TW at the small sizes or no lettering
 where none can be read. The Dev icon stays the TF monogram.
 
-`tests/test-launcher-icons.js` fails if a favicon frame is not app.ico's
+`launcher/tests/test-launcher-icons.js` fails if a favicon frame is not app.ico's
 frame of the same size, or if `app.ico` and `app-dev.ico` share a frame.
 
 The Main icon reaches the installed launcher only after a launcher

@@ -61,8 +61,11 @@ Yes 'the voice binds its UDP socket to the address the machine reaches the inter
 $manifest = Get-Content -LiteralPath (Join-Path $app 'Thornswood.manifest') -Raw
 Yes 'the launcher asks for asInvoker' ($manifest -match 'requestedExecutionLevel\s+level="asInvoker"')
 $files = @()
+# Not the products' own harnesses (launcher\tests and the like, #5341),
+# which name the words they look for.
 foreach ($dir in 'launcher', 'installer', 'game\plugins', 'game\ui') {
-    $files += @(Get-ChildItem -LiteralPath (Join-Path $root $dir) -Recurse -File -Include *.cs, *.ps1, *.js, *.xaml, *.axaml, *.html, *.manifest)
+    $files += @(Get-ChildItem -LiteralPath (Join-Path $root $dir) -Recurse -File -Include *.cs, *.ps1, *.js, *.xaml, *.axaml, *.html, *.manifest |
+        Where-Object { @($_.FullName.Substring($root.Length).Split([char[]]@('\', '/')) | Where-Object { $_ -eq 'tests' }).Count -eq 0 })
 }
 $asks = @($files | Where-Object {
     (Get-Content -LiteralPath $_.FullName -Raw) -match '"runas"|-Verb\s+RunAs|advfirewall|NetFirewallRule|HNetCfg\.FwPolicy|requireAdministrator|highestAvailable'

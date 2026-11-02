@@ -360,7 +360,7 @@ namespace Thornswood
 
         /// <summary>
         /// The long-poll request itself, apart from CheckUrl so a test can
-        /// point it at a server of its own (tests\test-2636-feed-watch-quiet.ps1),
+        /// point it at a server of its own (launcher\tests\test-2636-feed-watch-quiet.ps1),
         /// the way Conditional is apart from FromSite.
         ///
         /// The site answers 200 when the feed moved and 204 when its wait ran
@@ -409,7 +409,7 @@ namespace Thornswood
 
         /// <summary>
         /// The conditional request itself, apart from CheckUrl so a test can
-        /// point it at a server of its own (tests\test-feed-conditional.ps1).
+        /// point it at a server of its own (launcher\tests\test-feed-conditional.ps1).
         /// Asks with the ETag, and with Last-Modified when the server gave one,
         /// of the copy in memory, or on the first check of a session the copy
         /// in Profile (#443), so a restart is a 304 too.

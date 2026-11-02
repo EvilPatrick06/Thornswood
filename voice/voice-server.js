@@ -431,7 +431,7 @@ function chatWrite(kind, peerId, me, text, via) {
    only ever leaves out a line that is a report by its shape, which the game
    server takes the same way whoever sent it. A report shape typed into the
    chat box comes with no press, so it is written: somebody typed it.
-   tests\test-2723-plugin-reports.js holds this list to the plugin's own
+   voice\tests\test-2723-plugin-reports.js holds this list to the plugin's own
    send sites, so a report added there without a shape here fails the build.
 
    A report is still queued for the game server like every other line: this
@@ -1224,7 +1224,7 @@ class Sock {
         frames after that belong to somebody onclose has already taken out
         of the room: they used to be handled anyway, and chat from them went
         past the chat limit to the room and the log as profile 0 with no
-        name. voice/test-backpressure.js sends exactly that.
+        name. voice/tests/test-backpressure.js sends exactly that.
       */
       if (this.closed) return;
       if (this.buf.length < 2) return;
@@ -1237,7 +1237,7 @@ class Sock {
         upon receiving a frame that is not masked", and it may say why with
         1002, a protocol error. This used to read such a frame as it was.
         Every browser masks every frame, and so do the harnesses that write
-        their own (voice/test-backpressure.js, voice/test-keepalive.js), so
+        their own (voice/tests/test-backpressure.js, voice/tests/test-keepalive.js), so
         nothing that talks to this service sends one.
       */
       if (!masked) {
@@ -1584,7 +1584,7 @@ function snapshot() {
   faults in one, and it is entry 282 on the To Do List. Anybody holding a
   socket learned where everybody in the world was standing. And the traffic
   grew with the square of the room, against a box that measured 93 Mbit/s and
-  an 8 TB monthly cap. voice/test-cull.js measures it on the wire with
+  an 8 TB monthly cap. voice/tests/test-cull.js measures it on the wire with
   two hundred people across ten cells: 5,284,000 bytes a tick, 26 MB a
   second, 380 GB over a four hour evening, sent whole; 492,203 bytes a tick,
   2.5 MB a second, culled. Nine of those ten cells are interiors where all
@@ -1614,7 +1614,7 @@ function snapshot() {
   has is the overlay's yell at 85 metres (thornswood-voice.js MODES).
   HEAR_UNITS is 100 metres, so a yell fading out at its edge is never cut
   before the client's own falloff reaches nothing. Raise this before raising
-  a range there: voice/test-cull.js reads the client range tables and
+  a range there: voice/tests/test-cull.js reads the client range tables and
   fails when one outgrows it.
 */
 const UNITS_PER_METRE = 70;
@@ -1690,7 +1690,7 @@ function viewsOf(snap) {
 
   A tick skipped for a backed socket (sendLossy) leaves that peer holding
   something older than this side thinks, so its record is dropped and the
-  next tick it is sent is the whole view again. voice/test-moved.js measures
+  next tick it is sent is the whole view again. voice/tests/test-moved.js measures
   the bill before and after on the wire.
 
   A quiet socket is no longer sent something five times a second, which is
@@ -2170,7 +2170,7 @@ const TURN_URL = String(process.env.THORNSWOOD_TURN_URL || '').trim();
   No file, which is every box today, changes nothing: nothing is logged, /ice
   answers the same bytes, and /health the same fields, with only the build name
   moved so an install can tell this copy is the one running.
-  voice/test-turn-key.js holds it to that. The key itself is never logged,
+  voice/tests/test-turn-key.js holds it to that. The key itself is never logged,
   only where it was read from.
 
   Written by hand on Windows, so it may arrive as UTF-16 with a byte order
@@ -2589,7 +2589,7 @@ const server = http.createServer((req, res) => {
                             closedBacklogged: closedBacklogged,
                             closedSilent: closedSilent,
                             chatRetention: { overdueDays: chatOverdue, pruneError: chatPruneError },
-                            // Last: /health's fields only ever go on the end (voice/test-turn-key.js).
+                            // Last: /health's fields only ever go on the end (voice/tests/test-turn-key.js).
                             captions: { on: CAPTIONS, sent: captionCounts.sent, dropped: captionCounts.dropped,
                                         tailMs: CAPTION_TAIL_MS, burst: CAPTION_BURST, refillMs: CAPTION_REFILL_MS,
                                         reach: CAPTION_REACH || 'voice', textMute: CAPTION_TEXT_MUTE },

@@ -88,6 +88,8 @@ function standIn(apps) {
     seen.push({ url: req.url, auth: req.headers.authorization || '' });
     const m = /^\/apps\/([a-z0-9-]+)$/.exec(req.url);
     const a = m && apps[m[1]];
+    // a slug set to 403 stands for a private App, which GitHub keeps from a run's token
+    if (a === 403) { res.writeHead(403, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ message: 'Resource not accessible by integration' })); return; }
     res.writeHead(a ? 200 : 404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(a || { message: 'Not Found' }));
   });
@@ -123,11 +125,13 @@ function asGitHub(record) {
   const gh = asGitHub(real);
   gh['thornswood-workers'].permissions.workflows = 'write';
   delete gh['thornswood-watch'];
+  gh['thornswood-board'] = 403;
   s = await standIn(gh);
   r = await run(s.url, real);
   yes('an App holding more fails, exit 1, and names it', r.code === 1 && /FAIL  thornswood-workers holds workflows write, which the record does not give it/.test(r.out));
   yes('an App GitHub will not show fails with its answer', /FAIL  thornswood-watch: GitHub answered 404: Not Found/.test(r.out));
-  yes('  the others still pass', /PASS  thornswood-bramble /.test(r.out) && /2 of 6 apps differ/.test(r.out));
+  yes('  a private App says so, and how it is made readable', /FAIL  thornswood-board: GitHub answered 403: Resource not accessible by integration \(a private App: .*made public on its Advanced settings page/.test(r.out));
+  yes('  the others still pass', /PASS  thornswood-bramble /.test(r.out) && /3 of 6 apps differ/.test(r.out));
   s.server.close();
 
   const broken = clone(real); delete broken.apps[1].why.contents;

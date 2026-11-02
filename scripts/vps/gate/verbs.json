@@ -85,6 +85,7 @@
       "fixed": ["-NoPause"],
       "params": {
         "Status": "switch",
+        "Pass": "^[0-9]{8}-[0-9]{6}-[A-Za-z0-9-]{1,64}$",
         "Tag": "^agent-v[0-9]{1,4}\\.[0-9]{1,4}\\.[0-9]{1,6}$",
         "NoBotPass": "switch",
         "EndHung": "switch",
@@ -122,6 +123,31 @@
       "fixed": ["-NoPause"],
       "params": {
         "Install": "switch"
+      }
+    },
+    "Watch-Load": {
+      "script": "scripts/vps/Watch-Load.ps1",
+      "timeoutMinutes": 10,
+      "fixed": ["-NoPause"],
+      "params": {
+        "Install": "switch"
+      }
+    },
+    "Keep-RunnerLogs": {
+      "script": "scripts/vps/Keep-RunnerLogs.ps1",
+      "timeoutMinutes": 10,
+      "fixed": ["-NoPause"],
+      "params": {
+        "Install": "switch"
+      }
+    },
+    "Forecast-Storage": {
+      "script": "scripts/vps/Forecast-Storage.ps1",
+      "timeoutMinutes": 10,
+      "fixed": ["-NoPause"],
+      "params": {
+        "Install": "switch",
+        "Status": "switch"
       }
     },
     "Hold-Server": {

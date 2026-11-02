@@ -23,7 +23,7 @@ namespace Thornswood
     /// The setup program compiled this file as well until #4824 retired it,
     /// which is why it uses nothing else from launcher\app (no Swallow, no
     /// Paths). Callers wrap it in their own try and log the way they log.
-    /// tests\test-app-manifest.ps1 runs Clamp at 100 to 200 percent.
+    /// launcher\tests\test-app-manifest.ps1 runs Clamp at 100 to 200 percent.
     /// </summary>
     static class WindowFit
     {

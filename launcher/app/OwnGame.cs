@@ -157,7 +157,7 @@ namespace Thornswood
         /// all. Measured 16 Oct on One: a writer swapping a 3 MB record in a
         /// loop, killed 150 times, left files.txt missing 4 times through
         /// File.Replace and whole all 150 times through MoveFileEx
-        /// (tests\test-2586-atomic-records.ps1 holds it to that).
+        /// (launcher\tests\test-2586-atomic-records.ps1 holds it to that).
         ///
         /// Internal, and the one way the launcher writes a record it keeps
         /// in its Profile (#2591): Updater's release.txt and

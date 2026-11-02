@@ -35,8 +35,8 @@
 
   Every script that adds a note, marks one or reads them goes through these:
   Publish-Update, Rollback-Feed, Publish-Server's news entry, Dev-News's DEV
-  marks, Publish-News and Publish-Discord. A feed written by a publisher from
-  before this carries its newest note in "news" beside an older file, and the
+  marks and Publish-Discord (the site reads the news file itself, #5187). A
+  feed written by a publisher from before this carries its newest note in "news" beside an older file, and the
   list is the two together, so no note is lost.
 
   $FeedNewsFileLauncher is the first launcher number with FeedNews.cs: 1.2.4,

@@ -282,8 +282,7 @@ jobs:
           # or in Run-Gate.ps1: a name there is a second list
           # (test-gate-list.ps1 fails on one).
           # It began as six that sat red on main unseen (#875) and grew from
-          # there (#1088, #1273, #2513). pwsh on purpose: test-script-index.ps1
-          # starts Windows PowerShell 5.1 itself to compare what the two write.
+          # there (#1088, #1273, #2513).
           # On 21 Oct 2026 the 550 then on the gate took 26 minutes of a 28
           # minute build one at a time, in a foreach here (#3114). They run
           # through scripts\dev\Nightly-Harnesses.ps1 now, -Throttle at once:
@@ -633,14 +632,14 @@ jobs:
       - name: Run the voice service's /health harness
         shell: pwsh
         run: |
-          # Issue #2475. voice\test-turn-key.js checks /health's fields, in
+          # Issue #2475. voice\tests\test-turn-key.js checks /health's fields, in
           # order, and #2677 broke it while this build stayed green, because
           # the harness list above runs only tests\ and voice\test-*.js ran
           # only at night. It starts the real service on a port of its own
           # (#1703), a few seconds.
-          & node voice/test-turn-key.js
+          & node voice/tests/test-turn-key.js
           if ($LASTEXITCODE -ne 0) {
-            Write-Host '::error file=voice/test-turn-key.js::the voice /health harness failed, the FAIL lines above say what'
+            Write-Host '::error file=voice/tests/test-turn-key.js::the voice /health harness failed, the FAIL lines above say what'
             exit 1
           }
 
@@ -796,10 +795,9 @@ jobs:
   # only docs, the site or the bot cannot change what this job checks: the
   # launcher's project and the ship root tool read none of those folders
   # (the installer is the launcher's own code since #4824, and its window
-  # compiled markup since #4823), and the writing check's
-  # harness, run here for its Windows PowerShell 5.1 comparison, runs in
-  # "Tree checks" for every change too (tests\test-5292-path-rule.ps1 holds
-  # all of that). The pick says
+  # compiled markup since #4823), and the writing check's harness runs in
+  # "Tree checks" for every change (tests\test-5292-path-rule.ps1 holds all
+  # of that). The pick says
   # so (scripts\dev\Launcher-Reach.ps1), and this job is skipped; Build check
   # result counts a skip as passed only then. Main and a run by hand always
   # build. A pick that failed or said nothing builds too.
@@ -882,18 +880,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "the ship root tool did not build (dotnet build exit $LASTEXITCODE)" }
           if (-not (Test-Path -LiteralPath (Join-Path $out 'Thornswood-ShipRoot.exe'))) { throw 'the ship root tool did not build: no Thornswood-ShipRoot.exe' }
 
-      - name: Check Windows PowerShell 5.1 reads the writing check as PowerShell 7 does
-        shell: pwsh
-        run: |
-          # tests\test-check-words.ps1 runs in the job "Tree checks" on Linux,
-          # where its one comparison with Windows PowerShell 5.1 says SKIP:
-          # 5.1 reads a script with no byte order mark as ANSI, and an em dash
-          # typed into the check went missing there and nowhere else (its
-          # header says how). That comparison runs here, so it runs for every
-          # change this job checks, and a change this job skips (#5292: only
-          # docs, the site or the bot) cannot change the check's script.
-          & pwsh -NoProfile -File tests\test-check-words.ps1
-          if ($LASTEXITCODE -ne 0) { Write-Host '::error file=tests/test-check-words.ps1::the writing check reads differently under Windows PowerShell 5.1, or a planted break got through; the FAIL lines above say which'; exit 1 }
 
       # The note main's build looks for (#3182, the job "tested" at the top
       # of build.yml): the tree every step before this one passed on, one

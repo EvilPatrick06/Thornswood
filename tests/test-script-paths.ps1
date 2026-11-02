@@ -88,6 +88,10 @@ $repoFull = (Get-Item -LiteralPath $repo).FullName.TrimEnd('\', '/')
 # scripts\oneoff is parked history: its scripts name the layout they ran in.
 if (Test-Path -LiteralPath $scriptsDir) { $scan += @(Get-ChildItem -LiteralPath $scriptsDir -Filter *.ps1 -File -Recurse | Where-Object { $_.FullName -notmatch '[\\/]oneoff[\\/]' }) }
 if (Test-Path -LiteralPath $testsDir) { $scan += @(Get-ChildItem -LiteralPath $testsDir -Filter *.ps1 -File) }
+# And the harnesses beside their product, in <product>\tests\ (plan line 42),
+# where $Here is pointed at the repository folder the same way.
+. (Join-Path (Join-Path (Join-Path $repo 'scripts') 'dev') 'Harness-Files.ps1')
+foreach ($p in @(Get-ProductTestFolders $repo)) { $scan += @(Get-ChildItem -LiteralPath $p.Path -Filter *.ps1 -File) }
 foreach ($f in $scan) {
     $inTests = ((Split-Path -Leaf (Split-Path -Parent $f.FullName)) -eq 'tests')
     $text = [IO.File]::ReadAllText($f.FullName)

@@ -14,7 +14,7 @@
        tests\Launcher-Csc.ps1, #2821, #4823) and asked: for every picture and
        recording in tests\fixtures\media-3648.js, MediaStrip.Clean gives
        exactly the bytes the site keeps (the same fixture's clean bytes,
-       which tests\test-3648-media-metadata.js holds the site to), so what the
+       which site\tests\test-3648-media-metadata.js holds the site to), so what the
        launcher sends and what the site keeps cannot drift apart; none of
        them holds a GPS block or XMP; a clean file comes back as the same
        array; one whose blocks cannot be walked comes back null; and the

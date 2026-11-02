@@ -391,7 +391,7 @@
     {
       "path": "launcher/app.ico",
       "sha256": "be99a5cd8ef3c1d025702ac3fb9a73824928f3320b8b0d75bd2e428d50526e60",
-      "what": "The launcher's icon, the badge at every size: Thornswood at 128 and 256, TW at 32 to 64, the crest and scene alone at 16 and 24 (Djinn, 27 Oct, #3319; tests\\test-launcher-icons.js).",
+      "what": "The launcher's icon, the badge at every size: Thornswood at 128 and 256, TW at 32 to 64, the crest and scene alone at 16 and 24 (Djinn, 27 Oct, #3319; launcher\\tests\\test-launcher-icons.js).",
       "published": "The launcher and its shortcuts",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
