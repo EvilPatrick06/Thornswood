@@ -265,7 +265,12 @@ a copy of dev that nobody plays on:
    run at a time and Task Scheduler ignores a start while one runs
    (`IgnoreNew`), so a pass is not started while the task is still running:
    the Deployment fails saying so, rather than waiting on the older run as
-   if it were its own.
+   if it were its own. A pass has ended when Task Scheduler shows a run
+   newer than the one it showed before the start and the task is not
+   running: its own record against its own record. Set against the agent's
+   clock it never held, since Task Scheduler writes a run down 13 to 15 s
+   before the agent's reading of the time just before it starts it, and
+   every pass was waited on for the whole 30 minutes (#5380).
 7. No pass's logs are lost to the next one. Before a pass empties the run
    folder, the agent copies the last pass's `bot-pass.log`,
    `bot-pass-server.log` and `result.json` to
