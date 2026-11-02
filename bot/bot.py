@@ -2614,7 +2614,7 @@ def panel_is_current(msg, desk=None):
     True when the posted panel already says what it should, text and options.
 
     Its own function so it can be run without a Discord to run it against:
-    bot/test-ready.py drives it with a made up message. The decision
+    bot/tests/test-ready.py drives it with a made up message. The decision
     is the part worth pinning, because getting it wrong in either direction is
     a real fault: too eager and the panel is edited on every reconnect, too
     lazy and a ticket kind added later never appears for anybody.

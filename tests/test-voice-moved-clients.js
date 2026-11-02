@@ -10,7 +10,7 @@
 // overlay (whose table the party strip reads too). Each has the shared helper
 // run, and each has to route 'moved' to it rather than to the replace. The
 // plain browser page the service once served was a third, until it went
-// (#1822). voice/test-moved.js checks the same thing against the real
+// (#1822). voice/tests/test-moved.js checks the same thing against the real
 // service. Read only.
 const fs = require('fs');
 const path = require('path');

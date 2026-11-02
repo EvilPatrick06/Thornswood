@@ -42,8 +42,10 @@
 
 # The launcher's sources as git pathspecs, from the top of the repository.
 # Ship.ps1's Get-LauncherInputHash reads the same files off the working tree.
+# Not its harnesses in launcher\tests (plan line 42): a change to a check is no
+# new launcher, and would otherwise give every launcher a new number.
 $script:LauncherInputFiles = @('records/client-build.json', 'records/ui-gone.json', 'records/generated.json', 'scripts/release/Build-Launcher.ps1')
-$script:LauncherInputPathspec = @(':(top)launcher', ':(top,exclude,glob)launcher/**/*.md') + @($script:LauncherInputFiles | ForEach-Object { ':(top)' + $_ })
+$script:LauncherInputPathspec = @(':(top)launcher', ':(top,exclude,glob)launcher/**/*.md', ':(top,exclude)launcher/tests') + @($script:LauncherInputFiles | ForEach-Object { ':(top)' + $_ })
 
 # The number Updater.cs holds in git. The build writes the real one in for
 # the compile (Build-Launcher.ps1) and puts this back.

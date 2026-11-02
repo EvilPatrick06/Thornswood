@@ -411,8 +411,8 @@ try {
     $t = $yml.IndexOf('name: Scan the tree for secrets')
     yes 'the build check scans the tree' ($t -ge 0)
     # Since #3114 the launcher and setup program are built and scanned once,
-    # inside tests\test-498-msbuild.ps1, which a step of the build runs.
-    $t498 = [IO.File]::ReadAllText((Join-Path $repo 'tests\test-498-msbuild.ps1'))
+    # inside launcher\tests\test-498-msbuild.ps1, which a step of the build runs.
+    $t498 = [IO.File]::ReadAllText((Join-Path $repo 'launcher\tests\test-498-msbuild.ps1'))
     $built = $t498.IndexOf('-File $blPath -Root $root -StubOut $stub')
     $scan = $t498.IndexOf("scripts\dev\Check-Secrets.ps1') -Binary @(`$exe, `$stub)")
     yes 'and the launcher and setup program it built, after building them' ($yml -match 'tests\\test-498-msbuild\.ps1 -RequireMSBuild' -and $built -gt 0 -and $scan -gt $built)

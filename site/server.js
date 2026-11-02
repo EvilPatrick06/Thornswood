@@ -884,7 +884,7 @@ function pageMarkdown(name) {
 // them. The front page's lore line comes out of it as the page is served,
 // and /api/public hands the lot out, which is where the Discord bot reads its
 // status lines. The file's own comment says its rules, and
-// tests\test-3147-lines.js holds them, so nothing here checks a line again.
+// site\tests\test-3147-lines.js holds them, so nothing here checks a line again.
 // ==== thornswood lines ====
 function parseLines(md) {
   const out = { hints: [], lore: [] };
@@ -1136,7 +1136,7 @@ function readJsonQuiet(file) {
    not there yet is asked about again RELEASE_LOOK_MS later, never sooner,
    which keeps the site inside GitHub's sixty unsigned calls an hour. The
    lookup never holds a download: the request that starts it is served from
-   here. tests/test-release-copies.js drives this block. */
+   here. site/tests/test-release-copies.js drives this block. */
 const RELEASE_REPO = 'ThornswoodRP/Thornswood';
 const RELEASE_DOWNLOAD = 'https://github.com/' + RELEASE_REPO + '/releases/download/';
 const RELEASE_LOOK_MS = 10 * 60 * 1000;
@@ -3821,7 +3821,7 @@ const setCookie = (req, name, value, days) =>
   GET changes nothing here that a page elsewhere can choose: /auth/discord
   starts a sign in tied to this browser, its callback finishes only the
   attempt this browser began (ATTEMPT below), and /api/signins drops rows
-  past their age. tests/test-1367-cross-site.js holds every write route to
+  past their age. site/tests/test-1367-cross-site.js holds every write route to
   this.
 
   Answers '' when the request may go on, or which of the three it failed:
@@ -5101,7 +5101,7 @@ function pruneSessionLogs() {
 // log keeps one: a row or a line with no usable time is a corrupt one, and
 // deleting a ban because its date would not parse is the wrong way to be
 // wrong. These are pure functions over what was read, so the harness drives
-// them on their own (tests\test-2353-keeping-times.js); the sweeps after the
+// them on their own (site\tests\test-2353-keeping-times.js); the sweeps after the
 // block do the reading and writing, at start and every hour, and the writes
 // and the hub's reads go through the same functions.
 const STAFF_DAYS = 365;
@@ -6584,7 +6584,7 @@ function readTicket(t) {
   body is base64url JSON: p the profile number, s the server ("main" or "dev"),
   v the launcher version, d the Discord id, i when it was issued and x when it
   runs out, both unix milliseconds. mac is base64url HMAC-SHA256 over "jp1." and
-  the body, keyed on cfg.passKey. tests\test-join-pass-site.js and
+  the body, keyed on cfg.passKey. site\tests\test-join-pass-site.js and
   tests\test-join-pass-game.js hold one pass in common, so the two ends cannot
   drift apart. Ten minutes, though the game server lets a pass prove one
   session only, and start one only in the minute and a half after i (#1320),

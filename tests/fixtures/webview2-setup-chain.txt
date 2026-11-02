@@ -2,7 +2,7 @@ The certificate chain of MicrosoftEdgeWebview2Setup.exe as https://go.microsoft.
 handed it out on 5 Oct 2026 (1,850,576 bytes, SHA-256 aa38a8cfce6179b87181609b1c730a29eaf26138fc833af5759e67576770f3a3):
 the signing certificate and its issuer, read out of the file's Authenticode signature, then the root,
 from the address the issuer names (http://www.microsoft.com/pki/certs/MicRooCerAut2011_2011_03_22.crt).
-Public certificates, no keys. tests/test-1330-webview2-signature.js reads them (issue #1330).
+Public certificates, no keys. launcher/tests/test-1330-webview2-signature.js reads them (issue #1330).
 
 Microsoft Corporation, issued by Microsoft Code Signing PCA 2024
 -----BEGIN CERTIFICATE-----

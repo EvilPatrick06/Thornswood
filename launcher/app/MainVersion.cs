@@ -41,7 +41,7 @@ namespace Thornswood
 
         /// <summary>
         /// The read itself, apart from CheckUrl so
-        /// tests\test-2434-main-version-live.ps1 can point it at a server of
+        /// launcher\tests\test-2434-main-version-live.ps1 can point it at a server of
         /// its own.
         /// </summary>
         static string MainVersionAt(Config cfg, string url)
