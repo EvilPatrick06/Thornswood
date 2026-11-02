@@ -73,7 +73,7 @@ function Done {
 $boxName = [string](Get-ThornswoodVpsAddress)
 . (Join-Path $PSScriptRoot 'Windows.ps1')
 $thisShell = (Get-Process -Id $PID).Path
-if ($OnWindows) { $boxShell = Get-WindowsPowerShell } else { $boxShell = $thisShell }
+$boxShell = Get-BoxPowerShell
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-5334-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $work -Force | Out-Null
@@ -105,7 +105,6 @@ function Run-Box([string]$t, [string]$stdin = '') {
     $psi.RedirectStandardInput = $true
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
-    if ([IO.Path]::GetFileNameWithoutExtension($boxShell) -eq 'powershell') { $psi.EnvironmentVariables.Remove('PSModulePath') }
     $p = [Diagnostics.Process]::Start($psi)
     $p.StandardInput.Write($stdin)
     $p.StandardInput.Close()

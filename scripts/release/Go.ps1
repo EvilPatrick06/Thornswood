@@ -684,7 +684,7 @@ try { (Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:7778/health' -T
 catch { 'voice did not answer its own health check' }
 '@
       $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($restart))
-      $r = Invoke-ThornswoodNative { & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$User@$Vps" "powershell -NoProfile -EncodedCommand $e" } 2>&1
+      $r = Invoke-ThornswoodNative { & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$User@$Vps" "pwsh -NoProfile -EncodedCommand $e" } 2>&1
       Note ("voice: " + (($r | Where-Object { $_ }) -join ' '))
     } else {
       Bad 'could not copy the voice service to the VPS over ssh'
@@ -701,7 +701,7 @@ if (Test-Path 'C:\Thornswood-Server\server.log') {
 }
 '@
   $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($remote))
-  $out = Invoke-ThornswoodNative { & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" } 2>&1
+  $out = Invoke-ThornswoodNative { & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$User@$Vps" "pwsh -NoProfile -EncodedCommand $enc" } 2>&1
   $out | ForEach-Object { Note $_ }
 }
 

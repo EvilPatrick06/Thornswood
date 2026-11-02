@@ -222,16 +222,28 @@ a copy of dev that nobody plays on:
    `C:\Thornswood-BotPass` only, at below normal priority, the way the game
    servers run (ServiceAccount.ps1). The agent never runs node or loads the
    engine itself; it reads the result the task writes.
-4. Bot-Pass.js starts the copy, waits for it to say this gamemode loaded,
-   and has a bot log in the way the game does as a profile nobody has. It
-   checks, a line each: **loads**, **login**, **new** (the character comes
-   with the race menu open and creation already open, at the face),
-   **face** (a face is sent and creation moves on to choosing a home),
-   **saved** (the world on disk holds the character by name), **restart**
+4. Bot-Pass.js starts a copy of the voice service in `run\voice` on the
+   copy's voice port (the Release's own `voice-server.js` and
+   `headlines.js`, which the bot part carries), with a site of its own on
+   loopback that owns the bot's profile for its one ticket, and gives the
+   copy a join pass key of its own in its empty private folder. Then it
+   starts the copy, waits for it to say this gamemode loaded, and has a bot
+   log in the way the game does as a profile nobody has. It checks, a line
+   each: **loads**, **login**, **relay** (the bot joins the voice service
+   with a join token from its `/token`, the way the game's chat page does,
+   and the gamemode takes the join pass it sends over it), **new** (the
+   character comes with the race menu open and creation already open, at
+   the face), **face** (a face is sent and creation moves on to choosing a
+   home), **home** (a home picked over the relay, as the K panel picks one,
+   ends creation, and the welcome comes back over the relay), **needs**
+   (`/needs` over the relay is answered with the needs line), **saved**
+   (the world on disk holds the character by name), **restart**
    (the copy is stopped and started again and loads again) and **loads
    back** (a second bot logs in as the same profile and gets the same
-   character, where it was saved, with no race menu). A FAIL at new, face
-   or saved ends with what the gamemode's creation said about the bot.
+   character, where it was saved, with no race menu). A FAIL at new, face,
+   home or saved ends with what the gamemode's creation said about the bot,
+   and one at relay with what the gamemode said of the pass and the voice
+   service's last lines (its log is `run\voice\bot-pass-voice.log`).
 5. Every line goes in the Deployment's log. All PASS and the gamemode goes
    in as below. One FAIL, a pass that does not end within 30 minutes
    (`botPassSeconds`), or no result, and the Deployment says **failure**
@@ -259,9 +271,10 @@ without a pass, each log saying so.
 `pwsh scripts/vps/Box-Run.ps1 -Line 'Install-DeployAgent -NoBotPass'` takes
 it off.
 
-What the bot cannot reach yet: stations, claims and keys, needs, merchants
-and jail go over the voice relay, which the copy does not start, so they
-wait on a relay client for the bot (#5196).
+The bot reaches the world's commands through the relay client
+([relay.js](../scripts/bot/relay.js)), so each system that answers over the
+relay (stations, claims and keys, merchants, the jail) can be a line of its
+own in the pass; home and needs are the first two.
 
 ## The site, the Discord bot and voice
 
@@ -298,6 +311,12 @@ install has set it up (the task `Thornswood Docs`, the service
 `ThornswoodBot`, the task `Thornswood Dev Voice`). The site's and the bot's
 Deployment logs go in the dev server's data folder beside dev's. The gate's
 `Deploy-Release -Environment site` or `discord` rolls either back by tag.
+
+Once `agent.json` names the site, `Deploy-Docs.ps1` sends neither the app
+nor the public pages and refuses `-Site`: two senders of the same files
+would each put back what the other put in. It still sends the documents,
+the boards and the password, sets up the task, and sends the app on a new
+box before the agent has the site.
 
 ## Release news
 
@@ -457,7 +476,10 @@ token, what the newest Deployment says, and whether the dev server answers.
   from leaving it alone, a record change moving it, a move that fails
   failing the Deployment and being tried by the next, parity rows that
   cannot be filed or a parity check that fails leaving the Deployment a
-  success, and the gate's pipe read against a stand-in broker.
+  success, and the gate's pipe read against a stand-in broker; and a file
+  replaced while a reader holds it sharing delete (the swap is a POSIX
+  rename on Windows, as Feed-Store.ps1's is, because MoveFileEx is refused
+  while the engine has gamemode.js open, #2727).
   `dotnet test tools/DeployAgent.Tests` runs them.
 - `tests/test-5180-deploy-agent.ps1` checks the manifest script, both gate
   verbs, the scripts they send the box, and both workflows, and runs the C#

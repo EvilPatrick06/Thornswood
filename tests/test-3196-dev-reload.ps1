@@ -8,8 +8,8 @@
 
   HOW. The block is taken out of Reload.ps1 the way Deploy-DevGamemode.ps1
   takes it, given its values by ReloadVars, and run against a scratch server
-  folder: by Windows PowerShell 5.1 on Windows, which is what runs it on the
-  box, and by pwsh elsewhere. The engine is a node stand-in that does what
+  folder: by PowerShell 7, which is what runs it on the box since #5356. The
+  engine is a node stand-in that does what
   skymp5-server does with a gamemode (ts/index.ts and ts/gamemodeLoad.ts in
   Thornswood's fork): it loads gamemode.js again when its bytes or its write
   time change, and says in server.log what the gamemode says as it loads
@@ -68,8 +68,7 @@ function Done {
 }
 
 if (-not (Get-Command node -EA SilentlyContinue)) { Write-Host 'NOT RUN  the stand-in engine is node, and node is not on this machine'; exit 0 }
-$ps = 'pwsh'
-if ($OnWindows) { $ps = Get-WindowsPowerShell }
+$ps = Get-BoxPowerShell
 
 . (Join-Path $repo 'scripts\deploy\Swap.ps1')
 . (Join-Path $repo 'scripts\deploy\Reload.ps1')
@@ -250,7 +249,7 @@ try {
   $srv = New-Server @{ 'gamemode.js' = $oldGm; 'thornswood-build.json' = '{"commit":"newer"}' }
   # Whether it waited is read from what it printed: a reload that waits says
   # "waiting up to N seconds" first (Reload.ps1). A clock round the call also
-  # timed starting Windows PowerShell, which a busy runner can take longer
+  # timed starting PowerShell, which a busy runner can take longer
   # than any wait to do (#4766).
   $out = Invoke-Reload $srv 30
   Yes 'the gamemode it already runs, with a new stamp: RELOAD OK, the stamp moved' ($out -contains 'RELOAD OK' -and (Read-At $srv 'thornswood-build.json') -eq '{"commit":"newer"}')

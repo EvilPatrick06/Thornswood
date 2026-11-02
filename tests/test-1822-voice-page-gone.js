@@ -277,8 +277,10 @@ function get(port, route) {
   const opens = tracked.filter((f) => /\.(js|html)$/.test(f) && !/^(tests|voice|docs|engine|site\/node_modules)\//.test(f) &&
                                f !== 'game/gamemode.js')
     .filter((f) => /new WebSocket\(/.test(read(f)));
-  const clients = ['game/ui/thornswood-chat.js', 'launcher/voice-host.html', 'scripts/bot/load-bots.js'];
-  yes('the only files that open a socket are the launcher\'s voice page, the game\'s chat overlay and the load test\'s bots (' + opens.join(', ') + ')',
+  // And the bot pass's relay client (#5196), which joins a copy of the
+  // service of its own the way the chat overlay does, from node, with no Origin.
+  const clients = ['game/ui/thornswood-chat.js', 'launcher/voice-host.html', 'scripts/bot/load-bots.js', 'scripts/bot/relay.js'];
+  yes('the only files that open a socket are the launcher\'s voice page, the game\'s chat overlay, the load test\'s bots and the bot pass\'s relay client (' + opens.join(', ') + ')',
       opens.length === clients.length && clients.every((f) => opens.indexOf(f) >= 0));
 
   // ------------------------------------------------------- the service

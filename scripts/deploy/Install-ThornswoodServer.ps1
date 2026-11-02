@@ -361,10 +361,8 @@ function Test-ThornswoodServiceCannotReach {
 function Set-ThornswoodServiceAcl {
     param([string]$Path, $Acl)
     $item = Get-Item -LiteralPath $Path -Force
-    if ($PSVersionTable.PSEdition -eq 'Core') {
-        if ($item -is [IO.DirectoryInfo]) { [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]$item, [Security.AccessControl.DirectorySecurity]$Acl) }
-        else { [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]$item, [Security.AccessControl.FileSecurity]$Acl) }
-    } else { $item.SetAccessControl($Acl) }
+    if ($item -is [IO.DirectoryInfo]) { [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]$item, [Security.AccessControl.DirectorySecurity]$Acl) }
+    else { [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]$item, [Security.AccessControl.FileSecurity]$Acl) }
 }
 function Grant-ThornswoodServiceFolder {
     param([string]$Root, [string]$Sid, [string[]]$Writable = @(), [string[]]$Files = @())
@@ -619,11 +617,8 @@ public static class ThornswoodRestorePrivilege
 function Get-ThornswoodServiceItemAcl {
     param($Item)
     $s = [Security.AccessControl.AccessControlSections]'Owner, Access'
-    if ($PSVersionTable.PSEdition -eq 'Core') {
-        if ($Item -is [IO.DirectoryInfo]) { return [IO.FileSystemAclExtensions]::GetAccessControl([IO.DirectoryInfo]$Item, $s) }
-        return [IO.FileSystemAclExtensions]::GetAccessControl([IO.FileInfo]$Item, $s)
-    }
-    return $Item.GetAccessControl($s)
+    if ($Item -is [IO.DirectoryInfo]) { return [IO.FileSystemAclExtensions]::GetAccessControl([IO.DirectoryInfo]$Item, $s) }
+    return [IO.FileSystemAclExtensions]::GetAccessControl([IO.FileInfo]$Item, $s)
 }
 function Repair-ThornswoodServiceOwner {
     param([string]$Root, [string]$Sid)
@@ -2358,10 +2353,8 @@ function Lock-ServerDir([string]$dir, [string]$from, [string[]]$readers = @()) {
     # part, which needs a privilege the build runner's account does not have
     # (issue #1120, Set-ThornswoodAclAccess in Bot-Service.ps1).
     $item = Get-Item -LiteralPath $dir -Force
-    if ($PSVersionTable.PSEdition -eq 'Core') {
-        if ($item -is [IO.DirectoryInfo]) { [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]$item, [Security.AccessControl.DirectorySecurity]$acl) }
-        else { [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]$item, [Security.AccessControl.FileSecurity]$acl) }
-    } else { $item.SetAccessControl($acl) }
+    if ($item -is [IO.DirectoryInfo]) { [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]$item, [Security.AccessControl.DirectorySecurity]$acl) }
+    else { [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]$item, [Security.AccessControl.FileSecurity]$acl) }
 }
 function Lock-ServerRoot([string]$dir, [string]$from, [string]$botSid = '') {
     try {
