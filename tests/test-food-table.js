@@ -296,9 +296,8 @@ function rig() {
   const clock = { now: 1000000000000 };
   const g = {};
   const Fake = {
-    getOnlinePlayers: function () { return Object.keys(store).map(Number); },
     makeProperty: function () { },
-    get: function (id, key) {
+    get: function (id, key) { if (id === 0 && key === 'onlinePlayers') { return Object.keys(store).map(Number); }
       if (key === 'worldOrCellDesc') { return 'cell:X.esm'; }
       return store[id] ? store[id].v : undefined;
     },

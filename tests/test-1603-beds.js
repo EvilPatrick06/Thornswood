@@ -248,9 +248,8 @@ function needsRig() {
   const store = {};
   const g = {};
   const fake = {
-    getOnlinePlayers: function () { return online.slice(); },
     makeProperty: function () { },
-    get: function (id, key) {
+    get: function (id, key) { if (id === 0 && key === 'onlinePlayers') { return online.slice(); }
       if (key === 'worldOrCellDesc') { return refs[id] ? refs[id].worldOrCellDesc : ''; }
       return store[id];
     },

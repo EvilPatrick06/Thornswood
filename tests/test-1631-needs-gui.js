@@ -202,9 +202,9 @@ function needsRig() {
   const g = {};
   const timers = [];
   const fake = {
-    getOnlinePlayers: function () { return online.slice(); },
     makeProperty: function () { },
     get: function (id, key) {
+      if (id === 0 && key === 'onlinePlayers') { return online.slice(); }
       if (key === 'thornswoodNeeds') { return refs[id] ? refs[id].needs : undefined; }
       if (!refs[id]) { throw new Error('no reference ' + id); }
       const v = refs[id][key];

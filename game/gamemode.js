@@ -3399,7 +3399,7 @@ function mining(actorId) { return !!MINE_SESSION[actorId]; }
 */
 function miningGone(actorId) {
   try {
-    const on = mp.getOnlinePlayers() || [];
+    const on = mp.get(0, 'onlinePlayers') || [];
     return on.indexOf(actorId) < 0;
   } catch (e) { return false; }
 }
@@ -65579,7 +65579,7 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     var ang = ((Number(me.rot && me.rot[2]) || 0) / 180) * Math.PI;
     var fx = Math.sin(ang), fy = Math.cos(ang);
     var on = [];
-    try { on = mp.getOnlinePlayers() || []; } catch (e) { on = []; }
+    try { on = mp.get(0, 'onlinePlayers') || []; } catch (e) { on = []; }
     var best = 0, bestD = REACH * REACH;
     for (var i = 0; i < on.length; i++) {
       var id = on[i];
@@ -65759,7 +65759,7 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     pid = Number(pid) || 0;
     if (!pid) { return false; }
     var on = [];
-    try { on = mp.getOnlinePlayers() || []; } catch (e) { clog('could not list who is online for the pass of profile', pid + ':', e); return false; }
+    try { on = mp.get(0, 'onlinePlayers') || []; } catch (e) { clog('could not list who is online for the pass of profile', pid + ':', e); return false; }
     for (var i = 0; i < on.length; i++) {
       if (pidOf(on[i]) === pid) { return issue(on[i]); }
     }
@@ -70112,14 +70112,14 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var already = {};
     // No list at all is a cold start, and nobody is online at a cold start.
     var on = [];
-    try { on = mp.getOnlinePlayers() || []; } catch (e) { on = []; }
+    try { on = mp.get(0, 'onlinePlayers') || []; } catch (e) { on = []; }
     for (var oi = 0; oi < on.length; oi++) { already[on[oi]] = true; }
     g.__thornswoodNeedsHere = already;
   }
   var here = g.__thornswoodNeedsHere;
 
   function onlineNow(actorId) {
-    try { return (mp.getOnlinePlayers() || []).indexOf(actorId) !== -1; } catch (e) { return false; }
+    try { return (mp.get(0, 'onlinePlayers') || []).indexOf(actorId) !== -1; } catch (e) { return false; }
   }
 
   /*
@@ -70510,7 +70510,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (perkHeld(actorId, 'mastercarver')) { return true; }
     var reach = NEEDS.fire.reach || 1;
     var online = [];
-    try { online = mp.getOnlinePlayers() || []; } catch (e) { return false; }
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return false; }
     if (online.length < 2) { return false; }
     var here = null, cell = '';
     try {
@@ -72296,7 +72296,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   function tick() {
     var online = [];
-    try { online = mp.getOnlinePlayers() || []; } catch (e) { return; }
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
     // Whoever has left arrives again at their next settle (#1606).
     for (var h in here) {
       if (Object.prototype.hasOwnProperty.call(here, h) && online.indexOf(Number(h)) === -1) {
@@ -72743,7 +72743,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (!alight.length) { return; }
 
     var online = [];
-    try { online = mp.getOnlinePlayers() || []; } catch (e) { return; }
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
     if (online.length < 2) { return; }
 
     var reach = NEEDS.burn.spread * NEEDS.burn.spread;
@@ -74233,7 +74233,7 @@ module.exports = {
   */
   function tick() {
     var online = [];
-    try { online = mp.getOnlinePlayers() || []; } catch (e) { return; }
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
     var now = Date.now();
     for (var i = 0; i < online.length; i++) {
       var who = online[i];
@@ -74271,7 +74271,7 @@ module.exports = {
 
   function bleedTick() {
     var online = [];
-    try { online = mp.getOnlinePlayers() || []; } catch (e) { return; }
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
     for (var i = 0; i < online.length; i++) {
       var who = online[i];
       var dead = false;

@@ -66,10 +66,9 @@ function rig() {
   M.random = function () { return dice.next.length ? dice.next.shift() : 0.999; };
   const made = {};
   const mp = {
-    getOnlinePlayers: function () { return Object.keys(extra).map(Number); },
     makeProperty: function (name, opts) { made[name] = opts; },
     getDescFromId: function (id) { return id.toString(16) + ':Skyrim.esm'; },
-    get: function (id, key) {
+    get: function (id, key) { if (id === 0 && key === 'onlinePlayers') { return Object.keys(extra).map(Number); }
       const e = extra[id] || {};
       if (key === 'profileId') { return e.pid || 0; }
       if (key === 'isDead') { return false; }

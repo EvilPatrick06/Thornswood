@@ -77,7 +77,6 @@ function rig() {
     return ids[desc];
   }
   const Fake = {
-    getOnlinePlayers: function () { return Object.keys(store).map(Number); },
     makeProperty: function () { },
     // The real one turns a form id back into its descriptor. The rig knows
     // both halves already, because it is what hands out the ids.
@@ -88,6 +87,7 @@ function rig() {
       return '';
     },
     get: function (id, key) {
+      if (id === 0 && key === 'onlinePlayers') { return Object.keys(store).map(Number); }
       if (key === 'worldOrCellDesc') { return cells[id] || 'cell:X.esm'; }
       if (key === 'inventory') { return { entries: worn[id] || [] }; }
       if (key === 'equipment') {

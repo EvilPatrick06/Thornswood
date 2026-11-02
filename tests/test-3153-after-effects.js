@@ -46,9 +46,10 @@ function rig() {
   const said = [];
   const cared = [];
   const mp = {
-    getOnlinePlayers: function () { return online.slice(); }, makeProperty: function () { },
+    makeProperty: function () { },
     getDescFromId: function () { return ''; },
-    get: function (id, key) { if (key === 'worldOrCellDesc') { return 'cell:X.esm'; } if (key === 'pos') { return null; } return store[id]; },
+    get: function (id, key) {
+      if (id === 0 && key === 'onlinePlayers') { return online.slice(); } if (key === 'worldOrCellDesc') { return 'cell:X.esm'; } if (key === 'pos') { return null; } return store[id]; },
     set: function (id, key, v) { store[id] = JSON.parse(JSON.stringify(v)); }
   };
   const g = { __thornswoodHurt: { exposed: function () { return false; }, careChanged: function (id) { cared.push(id); } } };

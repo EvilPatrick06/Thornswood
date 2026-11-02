@@ -104,10 +104,9 @@ function rig(opts) {
   const bases = {};
   bases[FORGE_REF] = FORGE_BASE; bases[POT_REF] = POT_BASE; bases[KILN_REF] = KILN_BASE;
   const mp = {
-    getOnlinePlayers: function () { return [ME]; },
     makeProperty: function () { },
     getDescFromId: function (id) { return 'ff' + id.toString(16) + ':Runtime'; },
-    get: function (id, key) {
+    get: function (id, key) { if (id === 0 && key === 'onlinePlayers') { return [ME]; }
       if (key === 'baseDesc') { return bases[id] || ''; }
       if (key === 'worldOrCellDesc') { return '3c:Skyrim.esm'; }
       if (key === 'profileId') { return 202; }

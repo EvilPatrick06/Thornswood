@@ -194,12 +194,12 @@ function rig() {
   const made = {};
   function ex(id) { return (extra[id] = extra[id] || { pack: [], health: 1, pos: [0, 0, 0], cell: '3c:Skyrim.esm' }); }
   const mp = {
-    getOnlinePlayers: function () { return Object.keys(extra).map(Number).filter(function (id) { return extra[id].pid; }); },
     makeProperty: function (name, opts) { made[name] = opts; },
     getDescFromId: function (id) { return 'ff' + id.toString(16) + ':Runtime'; },
     getIdFromDesc: function (desc) { return parseInt(String(desc), 16) || 0; },
     lookupEspmRecordById: function (id) { return RECORDS[id] || null; },
     get: function (id, key) {
+      if (id === 0 && key === 'onlinePlayers') { return Object.keys(extra).map(Number).filter(function (id) { return extra[id].pid; }); }
       const e = ex(id);
       if (key === 'profileId') { return e.pid || 0; }
       if (key === 'isDead') { return !!e.dead; }

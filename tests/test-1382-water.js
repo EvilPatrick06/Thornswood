@@ -50,9 +50,8 @@ function rig() {
   const clock = { now: Date.UTC(2026, 9, 12, 17, 0, 0) };
   const store = {}, inv = {}, said = [], fouled = [];
   const mp = {
-    getOnlinePlayers: function () { return []; },
     makeProperty: function () { },
-    get: function (id, key) { if (key === 'worldOrCellDesc' || key === 'pos') { return null; } return store[id]; },
+    get: function (id, key) { if (id === 0 && key === 'onlinePlayers') { return []; } if (key === 'worldOrCellDesc' || key === 'pos') { return null; } return store[id]; },
     set: function (id, key, v) { store[id] = JSON.parse(JSON.stringify(v)); }
   };
   function count(id, b) { return (inv[id] && inv[id][b]) || 0; }
