@@ -7,7 +7,7 @@
 .DESCRIPTION
   Not run by hand. scripts\dev\Trace-Gate.ps1 sends this to the box with the
   mode it wants set in $TraceMode at the top, the way Install-Runner.ps1
-  sends its scripts, and Windows PowerShell 5.1 runs it there.
+  sends its scripts, and PowerShell 7 runs it there.
 
     selftest  starts a session, runs a probe whose file work is known, stops
               the session and reads it back. Every line says PASS or FAIL;
@@ -76,7 +76,9 @@ $taskName = 'Thornswood Gate Trace'
 $taskLog = Join-Path $traceRoot 'task.log'
 $taskFolders = @('task', 'main')
 
-Add-Type -ReferencedAssemblies System.Core -TypeDefinition @'
+# PowerShell 7 builds against only the assemblies named here, so each one the
+# C# uses is named (#5356).
+Add-Type -ReferencedAssemblies System.Runtime, System.Collections, System.Text.RegularExpressions, System.Diagnostics.EventLog, System.Runtime.InteropServices -TypeDefinition @'
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
