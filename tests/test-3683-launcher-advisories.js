@@ -67,7 +67,10 @@ function yes(what, cond) {
 // none) is returned with version '' so the caller can say so.
 function packages(text) {
   const out = [];
-  const noComments = text.replace(/<!--[\s\S]*?-->/g, '');
+  // A comment is cut until none is left, so one written inside another
+  // cannot leave a reference that is not really there.
+  let noComments = text, before;
+  do { before = noComments; noComments = noComments.replace(/<!--[\s\S]*?-->/g, ''); } while (noComments !== before);
   const re = /<PackageReference\b([^>]*?)\/?>/g;
   let m;
   while ((m = re.exec(noComments)) !== null) {

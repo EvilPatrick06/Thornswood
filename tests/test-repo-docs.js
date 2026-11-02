@@ -116,7 +116,7 @@ if (tracked) yes(RMF + ' is not tracked (#4824)', tracked.indexOf(RMF) < 0);
 yes(RMF + ' is gone', read(RMF) === null);
 const instReadme = read('installer/README.md') || '';
 yes('installer/README.md says what a person reads is the join guide on the site',
-    instReadme.indexOf('https://thornswood.net/join') >= 0 && instReadme.indexOf('site\\data\\site\\join.md') >= 0);
+    /\bhttps:\/\/thornswood\.net\/join\b/.test(instReadme) && instReadme.indexOf('site\\data\\site\\join.md') >= 0);
 
 // ------------------------------------------------------ config.example.json
 // Either gone or the same as what the launcher defaults to. Config.cs is the
