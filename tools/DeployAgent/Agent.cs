@@ -25,6 +25,30 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
     /// <summary>Each server's voice service, by the server's environment
     /// (#5187): a Release's voice part goes in with that server's Deployment.</summary>
     public Dictionary<string, App> Voices { get; set; } = new();
+    /// <summary>The deploy gate on this box (#2841), which the steps after a
+    /// dev Deployment go through: the load order and plugins its records name,
+    /// and the parity check. null leaves both out (a test, a deploy by tag).</summary>
+    public IGate? Gate { get; set; }
+    /// <summary>GitHub with a token that may open issues, for the parity
+    /// check's rows; minted apart from the service's own (AppTokens.IssuesWrite).</summary>
+    public GitHub? IssuesGh { get; set; }
+    /// <summary>The environment the steps after a Deployment run for: the dev
+    /// server, the one Deploy-DevGamemode.ps1 deploys to.</summary>
+    public const string DevEnv = "dev";
+    /// <summary>The files a dev server's load order and plugins are made from
+    /// (Deploy-DevGamemode.ps1 -LoadOrder -FromRecord, #4069). A Deployment
+    /// whose commit changes one of them moves dev's order and plugins too.</summary>
+    public static readonly string[] LoadOrderPaths =
+    [
+        "records/collection-plugins.json",
+        "records/collection-dropped.json",
+        "game/data/last-plugin.json",
+        "game/data/last-plugin.recipe",
+        "game/content/Thornswood-Content.esp",
+    ];
+    public const string LoadOrderLine = "Deploy-DevGamemode -LoadOrder -FromRecord -ShipFollows";
+    static readonly Regex ReviewRow = new(@"^REVIEW  (\S+) (.+?): expected (.*?), found (.*)$");
+    static readonly Regex MainAt = new(@"^main at ([0-9a-f]{40})$");
     string StatePath => Path.Combine(cfg.Home, "state", "working.json");
     static readonly Regex BuildTag = new(@"^build-[A-Za-z0-9._-]{1,80}$");
     static readonly Regex AgentTag = new(@"^agent-v(\d+)\.(\d+)\.(\d+)$");
@@ -106,7 +130,7 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
             {
                 logf(swapZip == null ? "the bot pass first, on a throwaway copy of the server with this gamemode (#5196)"
                                      : "the bot pass first, on a throwaway copy of the server with this gamemode and the new server build (#5196)");
-                var bp = await (MakeBotPass?.Invoke(srv.Env) ?? new BotPass(srv.Env, Tasks)).Run(f.Files, logf, ct, swapZip);
+                var bp = await (MakeBotPass?.Invoke(srv.Env) ?? new BotPass(srv.Env, Tasks)).Run(f.Files, m.Parts["bot"].Select(x => x.Name).ToList(), logf, ct, swapZip);
                 if (bp.State != "success") return bp;
                 logf(bp.Summary);
             }
@@ -347,7 +371,11 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
                     if (Apps.TryGetValue(env, out var app) && part != "" && part != AppKinds.Part(app.Env.Kind))
                         outc = new Outcome("failure", $"not applied: the Deployment asks for the {part} part, and {env} takes {AppKinds.Part(app.Env.Kind)}");
                     else if (refused != "") outc = new Outcome("failure", "not applied: " + refused);
-                    else outc = await ApplyRelease(env, tag, d.Sha, $"deployment-{d.Id}", Logf, ct, botPass: !approved);
+                    else
+                    {
+                        outc = await ApplyRelease(env, tag, d.Sha, $"deployment-{d.Id}", Logf, ct, botPass: !approved);
+                        if (outc.State == "success" && env == DevEnv && Gate != null) outc = await LoadOrder(env, d.Sha, outc, Logf, ct);
+                    }
                 }
                 catch (Exception e) when (e is InvalidDataException or JsonException) { outc = new Outcome("failure", "not applied: " + e.Message); }
             }
@@ -355,8 +383,111 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
             var url = PublishLog(env, d.Id.ToString(), lines);
             await gh.SetStatus(d.Id, outc.State, outc.Summary, url, ct);
             if (outc.State == "success") await LeaveNews(env, tag, d, ct);
+            // The parity check reads the box as it is now, so it runs once the
+            // Deployment is in and said; what it finds never changes how the
+            // Deployment went, and its lines join the same log.
+            if (outc.State == "success" && env == DevEnv && Gate != null)
+            {
+                await Parity(tag, Logf, ct);
+                PublishLog(env, d.Id.ToString(), lines);
+            }
         }
         finally { File.Delete(StatePath); }
+    }
+
+    // ---- after a dev Deployment ------------------------------------------------
+
+    /// <summary>A verb's lines go into the deploy log, which the dev server's
+    /// resources port serves to anybody, so addresses are taken out first.</summary>
+    static Action<string> Redacted(Action<string> logf) => l => logf(Server.Redact([l]).First());
+
+    sealed record LoadOrderState(string Commit, string Moved);
+    string LoadOrderPath(string env) => Path.Combine(cfg.Home, "state", $"load-order-{env}.json");
+
+    /// <summary>The commit whose records dev's load order and plugins were
+    /// last moved to by this agent, or "" when it has not done it yet.</summary>
+    string LoadOrderCommit(string env)
+    {
+        try
+        {
+            var p = LoadOrderPath(env);
+            return File.Exists(p) ? JsonSerializer.Deserialize<LoadOrderState>(File.ReadAllBytes(p))?.Commit ?? "" : "";
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException) { return ""; }
+    }
+
+    /// <summary>Dev's load order and plugins, moved to what the Deployment's
+    /// commit records when that commit changed one of LoadOrderPaths since
+    /// the last move (or when that cannot be told): the gate's
+    /// Deploy-DevGamemode -LoadOrder -FromRecord, the tested path a person
+    /// runs with Box-Run. The gamemode is already in when this runs, so a
+    /// move that fails leaves it in and says the plugins are not.</summary>
+    async Task<Outcome> LoadOrder(string env, string commit, Outcome applied, Action<string> logf, CancellationToken ct)
+    {
+        var since = LoadOrderCommit(env);
+        if (since == commit) return applied;
+        List<string>? changed = null;
+        if (since != "")
+        {
+            try { changed = await gh.ChangedPaths(since, commit, ct); }
+            catch (Exception e) when (e is GitHubException or HttpRequestException) { logf("load order: the change since " + Short(since) + " could not be read (" + e.Message + "), so it is moved to be sure"); }
+        }
+        var touched = changed?.Where(p => LoadOrderPaths.Contains(p, StringComparer.Ordinal)).Distinct().ToList();
+        if (touched != null && touched.Count == 0)
+        {
+            logf($"load order: nothing it is made from changed since {Short(since)}; dev keeps its order and plugins");
+            Files.WriteWhole(LoadOrderPath(env), JsonSerializer.SerializeToUtf8Bytes(new LoadOrderState(commit, Records.UtcNow())));
+            return applied;
+        }
+        logf(since == "" ? "load order: this agent has not moved dev's order yet, so it is moved to this commit's records"
+            : touched == null ? $"load order: what changed since {Short(since)} is not known in full, so dev's order and plugins are moved to this commit's records"
+            : $"load order: {string.Join(", ", touched)} changed since {Short(since)}, so dev's order and plugins are moved to this commit's records");
+        logf("load order: the gate's " + LoadOrderLine);
+        // The gate runs one verb at a time; a verb already running is waited
+        // for (up to its 45 minutes and a little more) by the connect.
+        var run = await Gate!.Run(LoadOrderLine, TimeSpan.FromMinutes(50), Redacted(logf), ct);
+        if (run.Code != 0)
+            return new Outcome("failure", $"{applied.Summary}; but the plugins are not: the load order move ended with {run.Code}, the log says why");
+        var at = run.Lines.Select(l => MainAt.Match(l)).FirstOrDefault(m => m.Success)?.Groups[1].Value ?? commit;
+        if (at != commit) logf($"load order: the gate ran main at {Short(at)}, after this Deployment's {Short(commit)}; dev has that commit's order and gamemode until its own Deployment");
+        Files.WriteWhole(LoadOrderPath(env), JsonSerializer.SerializeToUtf8Bytes(new LoadOrderState(at, Records.UtcNow())));
+        return applied with { Summary = applied.Summary + "; load order moved" };
+    }
+
+    /// <summary>The parity check (Check-ProdParity through the gate) once dev
+    /// has the Deployment, and one issue labelled parity for each row it
+    /// says to review that has no open issue by the same title. What it
+    /// finds is said in the log; it never changes how the Deployment went.</summary>
+    async Task Parity(string tag, Action<string> logf, CancellationToken ct)
+    {
+        logf("parity: Check-ProdParity through the gate");
+        var run = await Gate!.Run("Check-ProdParity", TimeSpan.FromMinutes(20), Redacted(logf), ct);
+        if (run.Code != 0) { logf($"parity: Check-ProdParity ended with {run.Code}, so nothing was filed"); return; }
+        var rows = run.Lines.Select(l => ReviewRow.Match(l)).Where(m => m.Success).ToList();
+        if (rows.Count == 0) { logf("parity: every row is as records/prod-parity.json says"); return; }
+        if (IssuesGh == null) { logf($"parity: {rows.Count} row(s) to review, and no token here that may open issues, so none was filed"); return; }
+        try
+        {
+            await IssuesGh.EnsureLabel("parity", "c5def5", "Check-ProdParity found the box not as records/prod-parity.json says", ct);
+            var open = new HashSet<string>(await IssuesGh.OpenIssueTitles("parity", ct), StringComparer.Ordinal);
+            foreach (var m in rows)
+            {
+                var r = Server.Redact([m.Groups[1].Value, m.Groups[2].Value, m.Groups[3].Value, m.Groups[4].Value]).ToArray();
+                var title = $"Parity: {r[0]} {r[1]} differs on the box";
+                if (title.Length > 200) title = title[..197] + "...";
+                if (!open.Add(title)) { logf("parity: already open: " + title); continue; }
+                var body = $"Check-ProdParity, run by the deploy agent after {tag} reached dev, found {r[0]} {r[1]} on the box not as records/prod-parity.json says.\n" +
+                           $"Expected: {r[2]}\nFound: {r[3]}\n" +
+                           "Either the record is out of date (fix records/prod-parity.json) or the box needs the script that owns this run, never a hand edit.\n" +
+                           "Done when Check-ProdParity no longer lists this row to review.";
+                await IssuesGh.OpenIssue(title, body, "parity", ct);
+                logf("parity: filed " + title);
+            }
+        }
+        catch (Exception e) when (e is GitHubException or HttpRequestException or TaskCanceledException or InvalidOperationException or InvalidDataException or JsonException)
+        {
+            logf("parity: THE ROWS WERE NOT ALL FILED: " + e.Message);
+        }
     }
 
     /// <summary>The news of the Release a Deployment put in, for the bot

@@ -201,6 +201,7 @@ winget install --id Git.Git -e --accept-package-agreements --accept-source-agree
 winget install --id GitHub.cli -e --accept-package-agreements --accept-source-agreements
 winget install --id OpenJS.NodeJS.LTS -e --accept-package-agreements --accept-source-agreements
 winget install --id Microsoft.PowerShell -e --accept-package-agreements --accept-source-agreements
+winget install --id Microsoft.DotNet.SDK.10 -e --accept-package-agreements --accept-source-agreements
 winget install --id Microsoft.VisualStudioCode -e --accept-package-agreements --accept-source-agreements
 ```
 
@@ -212,6 +213,7 @@ winget install --id Microsoft.VisualStudioCode -e --accept-package-agreements --
 | GitHub CLI (`gh`) | Pull requests from the terminal. [A. GitHub](#a-github) |
 | Node | The website, voice, and the test command. [J. Node](#j-node) |
 | PowerShell 7 | The terminal the scripts run in. [C. PowerShell](#c-powershell) |
+| .NET 10 SDK (`dotnet`) | Builds and runs the tools written in C#, under `tools`: the release note check `Check-Change.ps1 -Body` runs, and the deploy agent. |
 | Visual Studio Code | The window you edit in. [D. Visual Studio Code](#d-visual-studio-code) |
 
 #### Check that the tools open
@@ -222,6 +224,7 @@ Close that window and open **PowerShell 7** from the Start menu. A new window is
 git --version
 gh --version
 node --version
+dotnet --version
 ssh -V
 code --version
 ```
@@ -845,8 +848,8 @@ Ship, a Deploy-*, Publish-* or Install-* script, a step on the live or dev
 server, a Vortex step) is run by Bramble, from the note the change's pull
 request leaves in the private ops repo's `ops\claude-queue\` folder
 (`ops\README.md` there has the template), once that pull request is merged;
-a main or live run still waits for Patrick's word. Until the switch, the
-Claude Desk runs those notes. Bot branches carry the Bot's name
+a main or live run still waits for Patrick's word. Since 1 Nov the Claude
+Desk neither runs those notes nor merges. Bot branches carry the Bot's name
 (`wisp/3150-what-it-is`). On the shipping machine `C:\Thornswood-Repo` is
 shared and sits detached at `origin/main`: branch work goes in a worktree in
 its ignored `worktrees` folder, removed with its branch once the pull request
@@ -2051,7 +2054,7 @@ live deploy, which wait for Patrick's word.
 
 | You changed | Run |
 | --- | --- |
-| The launcher (`launcher\app`, `launcher\ui.xaml`, the art and video that Build-Launcher.ps1 embeds), the game plugins (`game\plugins`), or anything else that goes out in a pack | `.\scripts\release\Ship.ps1 -Channel dev "what changed"`. The dev build is where it goes first, by the dev-first rule in How work moves. `.\scripts\release\Ship.ps1 "what changed"` with no channel is the live one, for a security fix, for something that leaves the game untestable, or for work the team has agreed goes live. |
+| The launcher (`launcher\app`, the art and video that Build-Launcher.ps1 embeds), the game plugins (`game\plugins`), or anything else that goes out in a pack | `.\scripts\release\Ship.ps1 -Channel dev "what changed"`. The dev build is where it goes first, by the dev-first rule in How work moves. `.\scripts\release\Ship.ps1 "what changed"` with no channel is the live one, for a security fix, for something that leaves the game untestable, or for work the team has agreed goes live. |
 | The gamemode on the dev server | `.\scripts\deploy\Deploy-DevGamemode.ps1` |
 | The gamemode on the live server, `game\gamemode.js` and `game\content\Thornswood-Content.esp` | `.\scripts\deploy\Deploy-Server.ps1 -GamemodeOnly`, from any machine |
 | The live server build, or the live settings Deploy-Gamemode writes | `.\scripts\deploy\Deploy-Gamemode.ps1`, then `.\scripts\deploy\Deploy-Server.ps1`, from a machine with the fork built |
@@ -2541,7 +2544,7 @@ Stay in `C:\Dev\Thornswood`. Each big folder has its own `README.md`. Open that 
 | `README.md` | The short map of the repository | `code .\README.md` |
 | `Developer-Guide.md` | This guide | `code .\Developer-Guide.md` |
 | `launcher\app` | The launcher program | `Get-ChildItem launcher\app\*.cs` |
-| `launcher\ui.xaml` | The launcher window layout | `code .\launcher\ui.xaml` |
+| `launcher\app\MainWindow.axaml` | The launcher window layout | `code .\launcher\app\MainWindow.axaml` |
 | `game\gamemode.js` | The server rules | `code .\game\gamemode.js` |
 | `game\plugins` | Scripts that run in Skyrim | `Get-ChildItem game\plugins` |
 | `site\data\site` | The public website pages | `Get-ChildItem site\data\site` |
@@ -2810,7 +2813,7 @@ Thornswood
 
 | Folder | What it is for | Open this first |
 | --- | --- | --- |
-| `launcher` | The launcher window and the C# that runs it | [launcher/ui.xaml](launcher/ui.xaml), then [launcher/app/ARCHITECTURE.md](launcher/app/ARCHITECTURE.md) |
+| `launcher` | The launcher window and the C# that runs it | [launcher/app/MainWindow.axaml](launcher/app/MainWindow.axaml), then [launcher/app/ARCHITECTURE.md](launcher/app/ARCHITECTURE.md) |
 | `game` | What the server and the Skyrim client run for Thornswood | [game/gamemode.js](game/gamemode.js) |
 | `site` | The website program and the public pages | [site/server.js](site/server.js), then `site\data\site` |
 | `bot` | The Discord bot | [bot/README.md](bot/README.md) |
@@ -2837,7 +2840,7 @@ Click a name to open the file. The line under it says what the file is for.
 | [README.md](README.md) | The short map of the repository |
 | [game/gamemode.js](game/gamemode.js) | The server's rules. Most game changes start here or in `game\data` |
 | [game/plugins/README.md](game/plugins/README.md) | The scripts that run inside Skyrim. The plugin files sit beside that README |
-| [launcher/ui.xaml](launcher/ui.xaml) | The launcher window: buttons, pages, and labels |
+| [launcher/app/MainWindow.axaml](launcher/app/MainWindow.axaml) | The launcher window: buttons, pages, and labels |
 | [launcher/app/ARCHITECTURE.md](launcher/app/ARCHITECTURE.md) | How the launcher starts, which class owns which job, and the path from Play to the game |
 | [site/server.js](site/server.js) | The website program |
 | [site/data/site](site/data/site) | The public pages, one markdown file each |

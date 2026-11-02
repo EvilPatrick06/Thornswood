@@ -1422,6 +1422,14 @@ reserves every right it does not grant; it grants no right to copy the game's
 own files from anywhere but the person's own copy. Whether the fork's build
 keeps downloading them is Patrick's decision on #3728.
 
+The load test (`.github/workflows/load-test.yml` in this repository, #4623)
+downloads the same five files from the same address on GitHub's runner,
+through `scripts\bot\New-LoadServer.js`, which holds each to the sha256 above
+and stops when one differs, for the server the bots log in to. The same rules
+hold there: they stay on the runner for the run and go with it, they are not
+cached, and the artifact the run keeps holds only the result, the server's log
+and its samples. The same decision on #3728 covers it.
+
 ## Kept in the repository, not shipped
 
 These files sit in the repository for its tests and are never handed to

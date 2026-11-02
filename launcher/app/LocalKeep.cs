@@ -66,7 +66,7 @@ namespace Thornswood
         /// <summary>
         /// Cuts the log at its first line stamped within the last Days days,
         /// and returns how many lines went. A line with no stamp of its own (a
-        /// stack trace, the IL offsets after a fault) belongs to the stamped
+        /// stack trace, the native offsets after a fault) belongs to the stamped
         /// line before it and goes or stays with it. A log with no stamp in it
         /// at all is judged by when it was last written. The rest is written to
         /// a file beside it and put in its place, so a cut that fails part way
