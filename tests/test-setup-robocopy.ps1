@@ -1,7 +1,7 @@
 ﻿<#
   test-setup-robocopy.ps1
 
-      powershell -NoProfile -File .\tests\test-setup-robocopy.ps1
+      pwsh -NoProfile -File .\tests\test-setup-robocopy.ps1
 
   installer\Setup-Thornswood.ps1 sends every robocopy through one checked
   helper, Invoke-CheckedRobocopy (#2201): robocopy codes 0 to 7 carry on and

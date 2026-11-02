@@ -1,7 +1,7 @@
 <#
   test-door-outage.ps1
 
-      powershell -NoProfile -File .\tests\test-door-outage.ps1
+      pwsh -NoProfile -File .\tests\test-door-outage.ps1
 
   The launcher's half of "Discord did not answer is not a no".
 

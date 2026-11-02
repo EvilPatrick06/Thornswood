@@ -2,7 +2,6 @@
   test-3752-package-stage.ps1
 
       pwsh -NoProfile -File .\tests\test-3752-package-stage.ps1
-      powershell -NoProfile -File .\tests\test-3752-package-stage.ps1
 
   Issue #3752. Package-Thornswood.ps1 deleted its stage and copied every kept
   file again on every Ship, because only -ReuseStage synced and no Ship passed
