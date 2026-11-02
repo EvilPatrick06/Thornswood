@@ -18,7 +18,7 @@ const { andList, cfg, forMode, notAcceptedYet } = require('./config');
 const { BLURB, BOARDS, DOCS, escAttr, fillCreditsCommits, fillLoreLine,
   fillPage, LEVEL, MD_PAGES, pageHtml, pageMarkdown, PUBLIC_EDGE_SECONDS,
   PUBLIC_PAGES, readLines, roadmapBoard } = require('./pages');
-const { feedFile, feedSettings, feedView, nativePublished, newestSetup, releaseCopy } = require('./feed');
+const { feedFile, feedSettings, feedView, nativePublished, nativeTag, newestSetup, releaseCopy } = require('./feed');
 const { creditsFacts, findPageVersion, PAGES, pageSha256, PUBLIC_ORIGIN,
   publicAssetBody, publicAssetVersion, publicDiscovery, publicPageBody,
   singlePageHeading } = require('./public');

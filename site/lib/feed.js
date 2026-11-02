@@ -10,7 +10,7 @@
 // needs this one back finds them (a function is there from the top of its
 // file).
 module.exports = { askReleaseCopies, feedFile, feedReleaseTag, feedSettings,
-  feedView, nativePublished, newestSetup, readJsonQuiet, releaseCopy };
+  feedView, nativePublished, nativeTag, newestSetup, readJsonQuiet, releaseCopy };
 
 const https  = require('https');
 const fs     = require('fs');
