@@ -134,6 +134,51 @@ public sealed class BotPass(EnvConfig env, ITasks tasks)
     public string PluginDir => Path.Combine(Root, "plugins");
 
     public string PassLogPath => Path.Combine(RunDir, "bot-pass.log");
+    /// <summary>Where each pass's logs are kept once the next pass needs the
+    /// run folder: passes\&lt;when it last wrote&gt;-&lt;its Deployment&gt;.</summary>
+    public string KeptDir => Path.Combine(Root, "passes");
+    /// <summary>How many kept passes stay, the newest; and how much of each
+    /// log, its end, so a server that wrote without end cannot fill the disk.</summary>
+    public const int KeepPasses = 30;
+    public const long KeepBytes = 8L << 20;
+    /// <summary>The file in the run folder naming the pass's Deployment.</summary>
+    public const string PassName = "pass.txt";
+    static readonly string[] PassFiles = ["bot-pass.log", "server/bot-pass-server.log", "result.json", PassName];
+
+    static string PlainName(string name) => new(name.Where(c => char.IsAsciiLetterOrDigit(c) || c == '-').Take(64).ToArray());
+
+    /// <summary>Copies the last pass's logs out of the run folder before it is
+    /// emptied, so no pass's measurement is lost to the next one: Deployment
+    /// 7480554210's copy held the only record of where its pass hung, and the
+    /// next pass would have emptied it. A pass made before pass.txt is kept
+    /// as "unnamed". Returns the folder, or null when there was nothing.</summary>
+    public string? KeepLast(Action<string> log)
+    {
+        var present = PassFiles.Select(r => (r, at: Path.Combine(RunDir, r.Replace('/', Path.DirectorySeparatorChar)))).Where(x => File.Exists(x.at)).ToList();
+        if (present.Count == 0 || present.All(x => x.r == PassName)) return null;
+        var named = Path.Combine(RunDir, PassName);
+        var name = File.Exists(named) ? PlainName(File.ReadAllText(named).Trim()) : "";
+        var when = present.Max(x => File.GetLastWriteTimeUtc(x.at));
+        var dir = Path.Combine(KeptDir, $"{when:yyyyMMdd-HHmmss}-{(name == "" ? "unnamed" : name)}");
+        foreach (var (r, at) in present)
+        {
+            var to = Path.Combine(dir, Path.GetFileName(r));
+            Directory.CreateDirectory(dir);
+            using var src = Files.OpenShared(at);
+            using var dst = new FileStream(to, FileMode.Create, FileAccess.Write, FileShare.None);
+            if (src.Length > KeepBytes)
+            {
+                dst.Write(Encoding.UTF8.GetBytes($"[the first {src.Length - KeepBytes} bytes of {src.Length} were left out; this is its end]\n"));
+                src.Seek(src.Length - KeepBytes, SeekOrigin.Begin);
+            }
+            src.CopyTo(dst);
+            dst.Flush(true);
+        }
+        foreach (var old in Directory.GetDirectories(KeptDir).OrderByDescending(Path.GetFileName, StringComparer.Ordinal).Skip(KeepPasses))
+            Directory.Delete(old, true);
+        log($"the last pass's logs are kept in {dir}");
+        return dir;
+    }
     public string ServerLogPath => Path.Combine(ServerDir, "bot-pass-server.log");
 
     /// <summary>For a pass that wrote no result: where Bot-Pass.js had got to
@@ -177,7 +222,7 @@ public sealed class BotPass(EnvConfig env, ITasks tasks)
     /// serverZip, when given, is the server build the Deployment swaps dev
     /// onto (#5219), held to the signed manifest too: the copy runs that
     /// engine and not dev's, so the pass checks what dev will run.</summary>
-    public async Task<Outcome> Run(IReadOnlyDictionary<string, string> files, IReadOnlyCollection<string> bot, Action<string> log, CancellationToken ct, string? serverZip = null)
+    public async Task<Outcome> Run(IReadOnlyDictionary<string, string> files, IReadOnlyCollection<string> bot, Action<string> log, CancellationToken ct, string? serverZip = null, string name = "")
     {
         if (!bot.Contains(Runs)) return new Outcome("failure", $"not applied: the Release's bot part has no {Runs}, and dev's deploys wait on the bot pass");
         foreach (var n in bot.Concat(Server.ReloadFiles))
@@ -186,7 +231,7 @@ public sealed class BotPass(EnvConfig env, ITasks tasks)
         using (var turn = TakeTurn(log, out why))
         {
             if (turn == null) return new Outcome("failure", "not applied: " + why);
-            try { why = Prepare(files, bot, log, serverZip); }
+            try { why = Prepare(files, bot, log, serverZip, name); }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException or InvalidDataException) { why = e.Message; }
         }
         if (why != "") return new Outcome("failure", "not applied: the bot pass copy could not be made: " + why);
@@ -264,13 +309,15 @@ public sealed class BotPass(EnvConfig env, ITasks tasks)
     }
 
     /// <summary>The copy, made fresh: "" when it is ready, else why not.</summary>
-    public string Prepare(IReadOnlyDictionary<string, string> files, IReadOnlyCollection<string> bot, Action<string> log, string? serverZip = null)
+    public string Prepare(IReadOnlyDictionary<string, string> files, IReadOnlyCollection<string> bot, Action<string> log, string? serverZip = null, string passName = "")
     {
         if (!Directory.Exists(RunDir)) return $"{RunDir} is not there; Install-DeployAgent.ps1 makes it with the task";
         // The folder stays, with the rights the installer gave the task on it;
-        // what is in it is the last pass's and goes.
+        // what is in it is the last pass's and goes, once its logs are kept.
+        KeepLast(log);
         foreach (var d in Directory.EnumerateDirectories(RunDir)) Directory.Delete(d, true);
         foreach (var f in Directory.EnumerateFiles(RunDir)) File.Delete(f);
+        File.WriteAllText(Path.Combine(RunDir, PassName), PlainName(passName));
 
         var dev = env.Root;
         var settings = JsonNode.Parse(File.ReadAllText(Path.Combine(dev, "server-settings.json")).TrimStart('﻿'))?.AsObject()

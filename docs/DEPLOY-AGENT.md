@@ -250,6 +250,14 @@ a copy of dev that nobody plays on:
    (`IgnoreNew`), so a pass is not started while the task is still running:
    the Deployment fails saying so, rather than waiting on the older run as
    if it were its own.
+7. No pass's logs are lost to the next one. Before a pass empties the run
+   folder, the agent copies the last pass's `bot-pass.log`,
+   `bot-pass-server.log` and `result.json` to
+   `C:\Thornswood-BotPass\passes\<when it last wrote>-<its Deployment>`
+   (`run\pass.txt` names the Deployment; a pass from an agent before that is
+   kept as `unnamed`). The newest 30 stay, and of a log past 8 MiB its end.
+   `Install-DeployAgent -Status` lists them and `-Status -Pass <name>` prints
+   one.
 
 The bot pass rides in the gamemode Release as a part of its own, `bot`
 (merge-release.yml, `New-SignedManifest.ps1 -BotFiles`), so the bot that

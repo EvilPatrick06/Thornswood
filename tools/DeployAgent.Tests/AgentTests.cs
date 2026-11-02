@@ -1660,7 +1660,7 @@ public sealed class AgentTests : IDisposable
         // without its game files, nothing private, no world.
         Assert.NotNull(copyTree);
         Assert.Equal(string.Join("\n", new[] {
-            "bot/Bot-Pass.js", "bot/bot.js", "bot/character.js",
+            "bot/Bot-Pass.js", "bot/bot.js", "bot/character.js", "pass.txt",
             "server/data/scripts/ActiveMagicEffect.pex", "server/dist_back/skymp5-server.js",
             "server/gamemode.js", "server/scam_native.node", "server/server-settings.json", "server/thornswood-build.json",
         }.Order(StringComparer.Ordinal)), copyTree);
@@ -1774,6 +1774,68 @@ public sealed class AgentTests : IDisposable
         Assert.DoesNotContain("10.0.0.5", log);
         Assert.True(log.IndexOf("bot-pass.log") < log.IndexOf("bot-pass-server.log"), "the pass's own lines come first");
         Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
+    }
+
+    /// <summary>Each pass's logs are kept once the next pass needs the run
+    /// folder, named by the pass's Deployment, so no measurement is lost to
+    /// the pass after it; a pass from before pass.txt is kept as unnamed;
+    /// the newest 30 stay.</summary>
+    [Fact]
+    public async Task EachPassKeepsItsLogsWhenTheNextPassEmptiesTheFolder()
+    {
+        var n = 0;
+        var (a, gh, s, bp) = MakeWithPass(bp =>
+        {
+            n++;
+            File.WriteAllText(bp.PassLogPath, $"pass {n} said this\n");
+            File.WriteAllText(bp.ServerLogPath, $"server {n} said this\n");
+            return WriteResult(bp, true);
+        });
+        // What an agent from before left: logs and no pass.txt.
+        Directory.CreateDirectory(bp.ServerDir);
+        File.WriteAllText(bp.ServerLogPath, "the hung pass's server\n");
+        File.SetLastWriteTimeUtc(bp.ServerLogPath, new DateTime(2026, 11, 1, 23, 41, 30, DateTimeKind.Utc));
+        // Old kept passes, more than the newest 30.
+        for (var i = 0; i < BotPass.KeepPasses + 2; i++) Directory.CreateDirectory(Path.Combine(bp.KeptDir, $"20200101-0000{i:00}-deployment-{i}"));
+
+        BotRelease(gh, "build-1", "// new gamemode\n");
+        var first = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        HasStates(gh, s, first, "success", last: true);
+        var unnamed = Path.Combine(bp.KeptDir, "20261101-234130-unnamed");
+        Assert.Equal("the hung pass's server\n", File.ReadAllText(Path.Combine(unnamed, "bot-pass-server.log")));
+        Assert.Equal($"deployment-{first}", File.ReadAllText(Path.Combine(bp.RunDir, BotPass.PassName)));
+
+        BotRelease(gh, "build-2", "// newer gamemode\n");
+        var second = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-2\"}");
+        await a.Pass("dev", default);
+        HasStates(gh, s, second, "success", last: true);
+        var kept = Directory.GetDirectories(bp.KeptDir).Select(Path.GetFileName).Order(StringComparer.Ordinal).ToList();
+        var mine = kept.Single(k => k!.EndsWith($"-deployment-{first}"));
+        Assert.Equal("pass 1 said this\n", File.ReadAllText(Path.Combine(bp.KeptDir, mine!, "bot-pass.log")));
+        Assert.Equal("server 1 said this\n", File.ReadAllText(Path.Combine(bp.KeptDir, mine!, "bot-pass-server.log")));
+        Assert.True(File.Exists(Path.Combine(bp.KeptDir, mine!, "result.json")));
+        Assert.Contains($"the last pass's logs are kept in {Path.Combine(bp.KeptDir, mine!)}", s.Read(Path.Combine("data", $"deploy-{second}.log")));
+        Assert.Equal(BotPass.KeepPasses, kept.Count);
+        Assert.Contains("20261101-234130-unnamed", kept);
+        Assert.DoesNotContain("20200101-000000-deployment-0", kept);
+        Assert.Equal("pass 2 said this\n", File.ReadAllText(bp.PassLogPath));
+    }
+
+    /// <summary>A log past the limit is kept by its end, saying so.</summary>
+    [Fact]
+    public void AKeptLogPastTheLimitKeepsItsEnd()
+    {
+        var root = Temp();
+        var env = new EnvConfig { BotPassRoot = root };
+        var bp = new BotPass(env, new FakeTasks(() => null));
+        Directory.CreateDirectory(bp.ServerDir);
+        using (var f = File.Create(bp.ServerLogPath)) { f.SetLength(BotPass.KeepBytes + 10); f.Seek(-4, SeekOrigin.End); f.Write("END\n"u8); }
+        var dir = bp.KeepLast(_ => { });
+        var text = File.ReadAllText(Path.Combine(dir!, "bot-pass-server.log"));
+        Assert.StartsWith("[the first 10 bytes of " + (BotPass.KeepBytes + 10) + " were left out; this is its end]\n", text);
+        Assert.EndsWith("END\n", text);
+        Assert.Null(new BotPass(new EnvConfig { BotPassRoot = Temp() }, new FakeTasks(() => null)).KeepLast(_ => { }));
     }
 
     /// <summary>The task takes one run at a time and Task Scheduler ignores a
