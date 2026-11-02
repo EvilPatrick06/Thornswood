@@ -309,7 +309,7 @@ in with the same halves as Swap.ps1's service swap:
 
 1. The zip is opened into `<root>\.agent-stage-<stamp>` while the app runs.
    Every entry has to be a plain path to one of the files a Release may carry
-   (the site: `server.js`, `public\*`, `data\site\*`; the bot: its code and
+   (the site: `server.js`, `lib\*`, `public\*`, `data\site\*`; the bot: its code and
    `assets\*`, never anything `Get-ThornswoodBotOwned` names; voice:
    `voice-server.js`, `headlines.js`, `server-log.js`). Only the files that
    differ are kept, the programs are parsed and the JSON read. A bot whose

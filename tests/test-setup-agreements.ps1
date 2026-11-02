@@ -187,7 +187,9 @@ foreach ($k in $pages.Keys) {
     }
     $i++
 }
-$srv = [IO.File]::ReadAllText((Join-Path $Root 'site\server.js'))
+# The site is server.js over its modules in site\lib since #5357.
+. (Join-Path $PSScriptRoot 'SiteFiles.ps1')
+$srv = Get-SiteSource (Join-Path $Root 'site')
 $md = [regex]::Match($srv, "const MD_PAGES = \[([^\]]+)\]")
 Yes 'the site serves all three as written pages' ($md.Success -and $md.Groups[1].Value.Contains("'/terms'") -and
     $md.Groups[1].Value.Contains("'/privacy'") -and $md.Groups[1].Value.Contains("'/rules'"))

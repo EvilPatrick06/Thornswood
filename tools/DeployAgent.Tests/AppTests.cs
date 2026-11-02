@@ -175,6 +175,8 @@ public sealed class AppTests : IDisposable
         ["public/downloads/Thornswood-Setup.exe"] = "MZ",
         ["data/site/rules.md"] = "# Rules",
         ["data/site/old.md"] = "# Old page",
+        ["lib/serve.js"] = "// serve v1",
+        ["lib/dropped.js"] = "// a module the site no longer has",
         ["data/board.json"] = "{\"typed\":true}",
         ["data/help.md"] = "typed on the site",
     };
@@ -222,6 +224,8 @@ public sealed class AppTests : IDisposable
             ["public/home.css"] = "body{}",
             ["public/hub.js"] = "let x = 1",
             ["data/site/rules.md"] = "# Rules, new",
+            ["lib/serve.js"] = "// serve v2",
+            ["lib/news.js"] = "// news",
         }));
         var id = r.Gh.AddDeployment("Site", Commit, "{\"release\":\"build-1\",\"part\":\"site\"}");
         await r.Agent.Pass(AppKinds.Site, CancellationToken.None);
@@ -229,6 +233,10 @@ public sealed class AppTests : IDisposable
         Assert.Equal("// site v2", Read(r.Root, "server.js"));
         Assert.Equal("let x = 1", Read(r.Root, "public/hub.js"));
         Assert.Equal("# Rules, new", Read(r.Root, "data/site/rules.md"));
+        // The program's modules (#5357) come with it, and one it dropped goes.
+        Assert.Equal("// serve v2", Read(r.Root, "lib/serve.js"));
+        Assert.Equal("// news", Read(r.Root, "lib/news.js"));
+        Assert.False(Has(r.Root, "lib/dropped.js"));
         // What the Release no longer has goes aside; what the site writes and
         // the folders other scripts fill are never touched.
         Assert.False(Has(r.Root, "public/looks.css"));
@@ -239,10 +247,13 @@ public sealed class AppTests : IDisposable
         var prev = Directory.GetDirectories(r.Root, ".prev-*").Single();
         Assert.Equal("// site v1", Read(prev, "server.js"));
         Assert.Equal("gone soon", Read(prev, "public/looks.css"));
+        Assert.Equal("// a module the site no longer has", Read(prev, "lib/dropped.js"));
         Assert.False(Has(prev, "public/home.css"));
         Assert.Empty(Directory.GetDirectories(r.Root, ".agent-stage-*"));
         Assert.Equal((1, 1), (r.Control.Stops, r.Control.Starts));
         Assert.Contains("server.js", r.Control.Parsed);
+        Assert.Contains("serve.js", r.Control.Parsed);
+        Assert.Contains("news.js", r.Control.Parsed);
         Assert.DoesNotContain("hub.js", r.Control.Parsed);
         // The record, beside the site and in the store, and the log where the outside reads it.
         using var rec = JsonDocument.Parse(File.ReadAllText(Path.Combine(r.Root, "thornswood-deploy.json")));
@@ -350,6 +361,9 @@ public sealed class AppTests : IDisposable
 
     [Theory]
     [InlineData("server.js", "// SYNTAX", "server.js does not parse")]
+    [InlineData("lib/serve.js", "// SYNTAX", "lib/serve.js does not parse")]
+    [InlineData("lib/deeper/x.js", "x", "not one of the site's files a Release may carry")]
+    [InlineData("lib/notes.txt", "x", "not one of the site's files a Release may carry")]
     [InlineData("data/site/pages.json", "{nope", "data/site/pages.json does not parse")]
     [InlineData("data/board.json", "{}", "not one of the site's files a Release may carry")]
     [InlineData("public/downloads/x.exe", "MZ", "not one of the site's files a Release may carry")]

@@ -30,6 +30,7 @@ const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in test
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
+const siteFiles = require('./site-files');
 
 const ROOT = REPO_DIR;
 const CR = String.fromCharCode(13);
@@ -114,7 +115,7 @@ yes('the join password row names the script that still rotates it', /Rotate-Serv
 // game server has grown a password and the row has to be rewritten.
 const deployGm = read('scripts/deploy/Deploy-Gamemode.ps1');
 const gamemode = read('game/gamemode.js');
-const site = read('site/server.js');
+const site = siteFiles.source();
 const rotate = read('scripts/deploy/Rotate-ServerPassword.ps1');
 const publish = read('scripts/release/Publish-Update.ps1');
 const voice = read('voice/voice-server.js');

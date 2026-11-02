@@ -25,9 +25,10 @@ const path = require('path');
 const os = require('os');
 const http = require('http');
 const crypto = require('crypto');
+const siteFiles = require('../../tests/site-files');
 
 const CR = String.fromCharCode(13);
-const src = fs.readFileSync(path.join(REPO_DIR, 'site', 'server.js'), 'utf8').split(CR).join('');
+const src = siteFiles.source().split(CR).join('');
 const CSP_HEADER = JSON.parse(src.match(/const CSP_HEADER = ("[^"\r\n]*");/)[1]);
 // send() names it beside the CSP (#2762).
 const PERMISSIONS_POLICY = src.match(/const PERMISSIONS_POLICY = '([^'\r\n]*)';/)[1];

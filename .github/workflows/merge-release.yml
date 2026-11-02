@@ -91,6 +91,7 @@ on:
       - 'scripts/bot/relay.js'
       # What App-Part.ps1 puts in the site, the Discord bot and voice.
       - 'site/server.js'
+      - 'site/lib/**'
       - 'site/public/**'
       - 'site/data/site/**'
       - 'bot/bot.py'

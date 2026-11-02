@@ -28,11 +28,12 @@ const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 const { spawnSync } = require('child_process');
+const siteFiles = require('../../tests/site-files');
 
 const CR = String.fromCharCode(13);
 const read = (p) => fs.readFileSync(path.join(REPO_DIR, p), 'utf8').split(CR).join('');
 const publisher = read('scripts/release/Publish-Installer.ps1');
-const server = read(path.join('site', 'server.js'));
+const server = siteFiles.source();
 // The page is home.html and the script that builds it, which moved out of
 // home.html into home.js in #1479. The downloads builder and esc are in the
 // script; the words people read are in either.
