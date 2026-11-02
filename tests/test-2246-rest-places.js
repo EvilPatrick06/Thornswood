@@ -38,7 +38,7 @@ const CR = String.fromCharCode(13);
 function read() {
   return fs.readFileSync(path.join.apply(path, [ROOT].concat([].slice.call(arguments))), 'utf8').split(CR).join('');
 }
-const gm = read('game', 'gamemode.js');
+const gm = require('./gamemode-tables.js').joined(read('game', 'gamemode.js'));
 
 let pass = 0, fail = 0;
 function yes(what, cond) {

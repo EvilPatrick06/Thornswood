@@ -22,7 +22,7 @@ const fs = require('fs');
 const path = require('path');
 const CR = String.fromCharCode(13);
 function read(...bits) { return fs.readFileSync(path.join(REPO_DIR, ...bits), 'utf8').split(CR).join(''); }
-const src = read('game', 'gamemode.js');
+const src = require('./gamemode-tables.js').joined(read('game', 'gamemode.js'));
 const front = read('game', 'plugins', 'thornswood-front.js');
 const page = read('game', 'ui', 'thornswood-treat.js');
 const injury = read('docs', 'systems', 'injury.md');
