@@ -146,10 +146,12 @@ if ($SealOnGitHub) {
         Write-ThornswoodAnnotation 'error' 'Tunnel' 'CLOUDFLARE_TUNNEL_API_TOKEN is not among the repository''s Actions secrets, so there is nothing to seal. Patrick makes it on the report page (Account > Cloudflare Tunnel > Edit, Zone > DNS > Edit for thornswood.net). Nothing was sealed.'
         exit 1
     }
-    try { $sealed = ConvertTo-ThornswoodSealed -PublicKeyXml $key -Value $token }
+    # Its own name: this half's value never reaches the box halves below, so
+    # test-secrets-off-command-lines follows the token here and no further.
+    try { $sealedHere = ConvertTo-ThornswoodSealed -PublicKeyXml $key -Value $token }
     catch { Write-ThornswoodAnnotation 'error' 'Tunnel' $_.Exception.Message; exit 1 }
     finally { $token = $null }
-    Write-ThornswoodAnnotation 'notice' 'Tunnel' $sealed
+    Write-ThornswoodAnnotation 'notice' 'Tunnel' $sealedHere
     Write-Host 'sealed the token to the box''s key; only the box can open it'
     exit 0
 }
