@@ -3,8 +3,8 @@
 //
 // Six folders under tools each say, in a README, what they hold, how to run or
 // change it on a machine, and where it runs. And the setup block in
-// Developer-Guide.md says the dev channel needs the dev build installed and
-// run once.
+// the guide's setup block (docs/guide/set-up-a-machine.md) says the dev
+// channel needs the dev build installed and run once.
 //
 // WHY THIS EXISTS. From the To Do List: "Four deployable components have no
 // README, and the dev release path has never been proven end to end". On 19
@@ -54,6 +54,7 @@ const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in test
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const siteFiles = require('./site-files');
 
 const ROOT = REPO_DIR;
 const CR = String.fromCharCode(13);
@@ -193,8 +194,12 @@ SIX.forEach(function (d) {
       paths.length + ' named)' + (noPath.length ? ', missing ' + noPath.join(', ') : ''),
       noPath.length === 0);
 
-  const code = files(at(d)).filter(function (f) { return /\.(js|cs|html)$/.test(f); })
-    .map(function (f) { return read(at(d) + '/' + f) || ''; }).join('\n');
+  // The code beside it, and in its lib folder when it has one (the site's
+  // modules since #5357).
+  const code = files(at(d)).map(function (f) { return at(d) + '/' + f; })
+    .concat(files(at(d) + '/lib').map(function (f) { return at(d) + '/lib/' + f; }))
+    .filter(function (f) { return /\.(js|cs|html)$/.test(f); })
+    .map(function (f) { return read(f) || ''; }).join('\n');
   const settings = uniq(t.match(/THORNSWOOD_[A-Z_]+/g) || []);
   const unread = settings.filter(function (s) { return code.indexOf(s) < 0; });
   yes(name + ': every THORNSWOOD_ setting it names is read by the code beside it (' +
@@ -214,7 +219,7 @@ SIX.forEach(function (d) {
 // ------------------------------------------------------------------ the site --
 {
   const t = readme['docs-app'] || '';
-  const server = read('site/server.js') || '';
+  const server = siteFiles.source() || '';
   const deploy = read('scripts/deploy/Deploy-Docs.ps1') || '';
   const port = (/THORNSWOOD_DOCS_PORT \|\| (\d+)/.exec(server) || [])[1];
   yes('site: server.js has a default port to hold the README to', !!port);
@@ -382,15 +387,16 @@ SIX.forEach(function (d) {
     return /Get-ChildItem\s+(\(Join-Path \$App\b|(-LiteralPath\s+)?\$App\b)/.test(l);
   });
   // Since #446 and #459 the site goes up as one artifact, and server.js is in
-  // it by name beside public and data, not by a copy of the folder it sits in.
+  // it by name beside its modules in lib (#5357), public and data, not by a
+  // copy of the folder it sits in.
   const art = /New-ThornswoodArtifact -Component site [^\n]*-Paths ([^\n]+)/.exec(dd);
   const artPaths = art ? (art[1].match(/'[^']+'/g) || []).map(function (q) { return q.slice(1, -1); }) : [];
-  yes('Deploy-Docs.ps1 lists public, data and data/site, never the folder the README sits in',
+  yes('Deploy-Docs.ps1 lists lib, public, data and data/site, never the folder the README sits in',
       lists.length > 0 && lists.every(function (l) {
-        return /Get-ChildItem \(Join-Path \$App '(public|data|data\/site)'\)/.test(l);
+        return /Get-ChildItem \(Join-Path \$App '(lib|public|data|data\/site)'\)/.test(l);
       }) &&
       artPaths.length > 0 && artPaths.indexOf('site/server.js') >= 0 &&
-      artPaths.every(function (q) { return /^site\/(server\.js|public|data)$/.test(q); }));
+      artPaths.every(function (q) { return /^site\/(server\.js|lib|public|data)$/.test(q); }));
 
   const iv = read('scripts/deploy/Install-Voice.ps1') || '';
   const sent = (/foreach \(\$f in ('[^)]*')\)/.exec(iv) || [])[1];
@@ -413,15 +419,19 @@ SIX.forEach(function (d) {
       }));
 }
 
-// ------------------------------------------------------ Developer-Guide.md --
+// ------------------------------------------------------------- the guide --
+// The guide is Developer-Guide.md, an index, and its pages in docs/guide
+// (tests/guide-text.js). The pieces table is on the-system.md and the setup
+// block on set-up-a-machine.md.
 {
-  const sd = read('Developer-Guide.md') || '';
-  const lines = sd.split('\n');
+  const guide = require('./guide-text.js');
+  const sd = guide.whole();
+  const pieces = guide.page('the-system').split('\n');
+  yes('docs/guide/the-system.md\'s pieces table has a Dev build row naming Thornswood-DevBuild',
+      pieces.some(function (l) { return /^\| Dev build \|/.test(l) && l.indexOf('Thornswood-DevBuild') >= 0; }));
+  const lines = guide.page('set-up-a-machine').split('\n');
   const hits = [];
   lines.forEach(function (l, i) { if (l.indexOf('Thornswood-DevBuild') >= 0) { hits.push(i); } });
-  yes('Developer-Guide.md names Thornswood-DevBuild in two places or more (' + hits.length + ')',
-      hits.length >= 2);
-  yes('one of them is the pieces table row', hits.some(function (i) { return /^\| Dev build \|/.test(lines[i]); }));
 
   const setupAt = lines.findIndex(function (l) { return /^#{2,3} Setting up a machine$/.test(l); });
   let nextHead = lines.length;
@@ -478,7 +488,7 @@ SIX.forEach(function (d) {
       /refusal is for `<drive>:\\Thornswood-DevBuild` only/.test(para) && /`-Root`/.test(para) &&
       /Setup-ShipMachine\.ps1 -Channel dev -Root <folder>/.test(para) && /#2662/.test(para));
   // If Ship stops falling back to the Steam copy, this fails, and the
-  // sentence in Developer-Guide.md that warns about it is what to change.
+  // sentence in docs/guide/set-up-a-machine.md that warns about it is what to change.
   yes('Ship.ps1 still builds the dev release out of the Steam copy when the dev build has no game folder, ' +
       'which the paragraph warns about',
       ship.indexOf("$goArgs['Vortex'] = $true") >= 0 && /Steam\s+copy/.test(para));

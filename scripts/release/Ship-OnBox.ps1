@@ -84,6 +84,11 @@ if ($Channel -eq 'main') {
 # tags first. The gate's next fetch makes it one commit deep again, so every
 # Ship asks. origin/main is put back where the gate checked it, so a merge
 # landing meanwhile is not taken: the Ship is of the commit the gate read.
+# The tags are fetched as origin has them (+refs/tags/*), because a tag can
+# move there: the #5231 rewrite moved every tag it could, and a plain --tags
+# refuses each moved one ("would clobber existing tag") and exits 1, which
+# --quiet made a stop that said nothing (1 Nov 2026, gate run
+# 20261101-203241-0d214a). Without --quiet, a failed fetch says why.
 $was = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
 $head = (@(& git -C $repo rev-parse HEAD 2>&1 | ForEach-Object { "$_" }) -join '').Trim()
 $shallow = (@(& git -C $repo rev-parse --is-shallow-repository 2>&1 | ForEach-Object { "$_" }) -join '').Trim()
@@ -91,8 +96,8 @@ $o = @()
 $deep = 0
 if ($head -notmatch '^[0-9a-f]{40}$') { $deep = 1; $o = @('HEAD did not read as a commit: ' + $head) }
 else {
-    $words = @('-C', $repo, 'fetch', '--quiet', '--tags', 'origin', '+refs/heads/main:refs/remotes/origin/main')
-    if ($shallow -eq 'true') { $words = @('-C', $repo, 'fetch', '--quiet', '--unshallow', '--tags', 'origin', '+refs/heads/main:refs/remotes/origin/main') }
+    $words = @('-C', $repo, 'fetch', 'origin', '+refs/heads/main:refs/remotes/origin/main', '+refs/tags/*:refs/tags/*')
+    if ($shallow -eq 'true') { $words = @('-C', $repo, 'fetch', '--unshallow', 'origin', '+refs/heads/main:refs/remotes/origin/main', '+refs/tags/*:refs/tags/*') }
     $o = @(& git @words 2>&1 | ForEach-Object { "$_" })
     $deep = $LASTEXITCODE
     if ($deep -eq 0) {

@@ -213,7 +213,7 @@ namespace Thornswood
                     // Diagnostics, where Scan and Fix are since #607 and which
                     // the rail still shows. It was the Mods page until #982,
                     // which by then had no Fix on it and no rail button back.
-                    // tests\test-refused-play-page.js holds this to the page
+                    // launcher\tests\test-refused-play-page.js holds this to the page
                     // that has BtnFix in ui.xaml.
                     ShowPage(PageDiag);
 
@@ -233,12 +233,11 @@ namespace Thornswood
                             "\n\nThe usual reason is that a different profile is active in Vortex. Open Vortex, go to " +
                             "Profiles, and press Enable under Thornswood. Close Skyrim first if it is open.\n\n" +
                             "Pressing Fix will not help with this one. Fix repairs the plugin list, it cannot install a mod." +
-                            (canOpen ? "\n\nIf you have never installed the collection, press Yes to open its page and install it in Vortex." : ""),
+                            (canOpen ? "\n\nIf you have never installed the collection, press Yes to open it and install it in Vortex." : ""),
                             "Thornswood", canOpen ? MessageBoxButton.YesNo : MessageBoxButton.OK, MessageBoxImage.Warning);
                         if (canOpen && open == MessageBoxResult.Yes)
                         {
-                            try { Process.Start(new ProcessStartInfo(CollectionLink()) { UseShellExecute = true }); }
-                            catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
+                            OpenCollection();
                         }
                     }
                     else

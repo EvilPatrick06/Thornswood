@@ -29,7 +29,7 @@
     4. The az sign in. Each person who ships signs in as themselves, with an
        account of their own in the signing tenant that holds the Certificate
        Profile Signer role on the ThornswoodRelease profile, which Patrick
-       makes once (Developer-Guide.md "Your own signing sign in"; Patrick,
+       makes once (docs/guide/set-up-a-machine.md "Your own signing sign in"; Patrick,
        4 Oct, #1740; until then only his account signed, #1121). A device
        code sign in is refused by the tenant (AADSTS530035). It asks the signing service, with this
        machine's sign in, what identity the profile carries, and checks it is
@@ -336,7 +336,7 @@ function Test-SigningReach([string]$MetadataPath, [string[]]$Identities) {
     return [pscustomobject]@{ Ok = $false; Why = ('profile ' + $meta.CertificateProfileName + ' answered without the identity the launcher pins, so every installed launcher would refuse what it signs') }
   }
   if ($status -eq 401 -or $status -eq 403) {
-    return [pscustomobject]@{ Ok = $false; Why = ('the signing service refused this sign in (HTTP ' + $status + '): it has no signer role on profile ' + $meta.CertificateProfileName + '. Patrick gives the role to an account of your own once (Developer-Guide.md, Your own signing sign in)') }
+    return [pscustomobject]@{ Ok = $false; Why = ('the signing service refused this sign in (HTTP ' + $status + '): it has no signer role on profile ' + $meta.CertificateProfileName + '. Patrick gives the role to an account of your own once (docs/guide/set-up-a-machine.md, Your own signing sign in)') }
   }
   return [pscustomobject]@{ Ok = $false; Why = ('the signing service answered HTTP ' + $status) }
 }
@@ -557,7 +557,7 @@ Row 'ssh' (Has 'ssh') '' 'Settings, System, Optional features, add OpenSSH Clien
 . (Join-Path $Here 'Find-MSBuild.ps1') -Load
 $msb = Find-ThornswoodMSBuild
 Row 'MSBuild and the .NET Framework 4.8.1 reference assemblies, which build the launcher' ([bool]($msb.MSBuild -and $msb.Csc -and $msb.RefAssemblies)) $msb.MSBuild `
-    'Developer-Guide.md "Setting up a machine" has the one install line (Visual Studio 2022 Build Tools with the MSBuild workload and the 4.8.1 targeting pack)'
+    'docs/guide/set-up-a-machine.md "Setting up a machine" has the one install line (Visual Studio 2022 Build Tools with the MSBuild workload and the 4.8.1 targeting pack)'
 $signtool = Find-Signtool
 Row 'signtool, from the Windows SDK' ([bool]$signtool) $signtool 'winget install --id Microsoft.WindowsSDK.10.0.26100 -e   (its signing tools are what matter)'
 Row 'az, the Azure command line' (Has 'az') '' 'winget install --id Microsoft.AzureCLI -e'
@@ -618,8 +618,8 @@ if (-not (Has 'az')) {
   Row 'az can sign with the ThornswoodRelease profile' $false 'az is not installed' 'Install az (step 1), then az login'
 } else {
   $reach = Test-SigningReach $metaPath $ids
-  $fix = $(if ($reach.Why -match 'no Azure sign in') { 'az login --tenant 5a096034-ce55-40d2-b313-10ee86efe26a --allow-no-subscriptions   (as yourself, in the browser: Developer-Guide.md "Your own signing sign in")' }
-           elseif ($reach.Why -match 'signer role') { 'This sign in has no Certificate Profile Signer role on the ThornswoodSigning account, profile ThornswoodRelease. Patrick gives it to an account of your own once (Developer-Guide.md "Your own signing sign in"), then az login as that account' }
+  $fix = $(if ($reach.Why -match 'no Azure sign in') { 'az login --tenant 5a096034-ce55-40d2-b313-10ee86efe26a --allow-no-subscriptions   (as yourself, in the browser: docs/guide/set-up-a-machine.md "Your own signing sign in")' }
+           elseif ($reach.Why -match 'signer role') { 'This sign in has no Certificate Profile Signer role on the ThornswoodSigning account, profile ThornswoodRelease. Patrick gives it to an account of your own once (docs/guide/set-up-a-machine.md "Your own signing sign in"), then az login as that account' }
            else { 'Run this again; if it keeps failing, the lines above say what the service answered' })
   Row 'az can sign with the ThornswoodRelease profile' $reach.Ok $reach.Why $fix $(if ($reach.Why -match 'signer role') { 'patrick' } else { 'you' })
 }

@@ -66,6 +66,7 @@ public sealed class Server(EnvConfig env, HttpClient http)
         catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException) { return "the server's settings do not read: " + e.Message; }
         var port = st.TryGetProperty("port", out var p) && p.ValueKind == JsonValueKind.Number ? p.GetInt32() : 0;
         if (env.LivePort != 0 && port == env.LivePort) return $"{Root} is on port {port}, which is the live server";
+        if (env.RequirePort != 0 && port != env.RequirePort) return $"{Root} is on port {port}, not {env.RequirePort}, so it is not the server this environment names";
         var gp = "gamemode.js";
         if (Directory.Exists(Path.Combine(Root, "skymp5-gamemode"))) gp = Path.Combine("skymp5-gamemode", "gamemode.js");
         if (st.TryGetProperty("gamemodePath", out var g) && g.GetString() is { Length: > 0 } gs) gp = gs;
@@ -115,7 +116,7 @@ public sealed class Server(EnvConfig env, HttpClient http)
         catch (Exception e) when (e is TimeoutException or IOException or UnauthorizedAccessException) { return new Outcome("failure", "not applied: " + e.Message); }
         using var _ = turn;
 
-        var stamp = Now().ToString("yyyyMMdd-HHmmss");
+        var stamp = Swap.FreeStamp(Root, Now());
         var prevName = ".prev-" + stamp;
         var prev = Path.Combine(Root, prevName);
         // Not .stage-*: Deploy-DevGamemode.ps1 clears every .stage-* it finds
@@ -182,7 +183,10 @@ public sealed class Server(EnvConfig env, HttpClient http)
         }
         foreach (var rel in why == "" ? ReloadFiles : [])
         {
-            try { File.Move(Path.Combine(stage, rel), Path.Combine(Root, rel), true); placed.Add(rel); }
+            // While the engine runs and reads gamemode.js: a rename readers
+            // cannot refuse (Files.Into), not MoveFileEx, which any open
+            // handle on the old file refuses.
+            try { Files.Into(Path.Combine(stage, rel), Path.Combine(Root, rel)); placed.Add(rel); }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { why = $"could not put the new {rel} in place: {e.Message}"; break; }
         }
         var wait = TimeSpan.FromSeconds(env.LoadSeconds);
@@ -241,7 +245,7 @@ public sealed class Server(EnvConfig env, HttpClient http)
             try
             {
                 Files.Copy(kept, Path.Combine(stage, rel));
-                File.Move(Path.Combine(stage, rel), Path.Combine(Root, rel), true);
+                Files.Into(Path.Combine(stage, rel), Path.Combine(Root, rel));
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
@@ -313,13 +317,14 @@ public sealed class Server(EnvConfig env, HttpClient http)
         var port = st.TryGetProperty("port", out var pv) && pv.ValueKind == JsonValueKind.Number ? pv.GetInt32() : 0;
         if (port <= 0) return new Outcome("failure", "not applied: the server's settings name no port, so there is no telling which process is this server");
         if (env.LivePort != 0 && port == env.LivePort) return new Outcome("failure", $"not applied: {Root} is on port {port}, which is the live server");
+        if (env.RequirePort != 0 && port != env.RequirePort) return new Outcome("failure", $"not applied: {Root} is on port {port}, not {env.RequirePort}, so it is not the server this environment names");
         // skymp5-server/ts/ui.ts: 3000 when the game port is 7777, the game port plus one otherwise.
         var resPort = port == 7777 ? 3000 : port + 1;
         ServerBuild.Record rec;
         try { rec = ServerBuild.Read(record); }
         catch (Exception e) when (e is JsonException or DecoderFallbackException) { return new Outcome("failure", "not applied: the Release's server-build.json does not read: " + e.Message); }
 
-        var stamp = Now().ToString("yyyyMMdd-HHmmss");
+        var stamp = Swap.FreeStamp(Root, Now());
         var prevName = ".prev-" + stamp;
         var prev = Path.Combine(Root, prevName);
         var stage = Path.Combine(Root, ".agent-stage-" + stamp);

@@ -7,7 +7,7 @@
        The version here is a placeholder. Setup.csproj's ThornswoodManifest
        target writes the launcher's version (Updater.cs Version, four parts)
        into a copy of this file and embeds that copy, the same number as the file's version
-       details. tests\test-app-manifest.ps1 reads it back out of the built exe. -->
+       details. launcher\tests\test-app-manifest.ps1 reads it back out of the built exe. -->
   <assemblyIdentity
     type="win32"
     name="Thornswood.Installer.Setup"

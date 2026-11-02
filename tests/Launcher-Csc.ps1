@@ -60,7 +60,7 @@
   On a machine without the Build Tools, $LauncherCsc and $LauncherRefDir are
   paths that do not exist, so the harness's own "the compiler is here" check
   (Test-Path -LiteralPath $LauncherCsc) says so plainly rather than a null
-  somewhere further down. Developer-Guide.md "Setting up a machine" has the
+  somewhere further down. docs/guide/set-up-a-machine.md "Setting up a machine" has the
   install line. Off Windows there are no Build Tools at all, and the same is
   said without asking: Find-MSBuild.ps1 looks under Program Files, which only
   Windows has, and joining onto that unset folder ended every harness that
@@ -119,7 +119,7 @@ function Add-LauncherType {
         [string[]]$Reference = @()
     )
     if (-not $OnWindows) { throw 'Add-LauncherType: the compiler the build runs is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has. Ask $OnWindows first, and say what does not run.' }
-    if (-not (Test-Path -LiteralPath $LauncherCsc)) { throw ('Add-LauncherType: the compiler the build runs is not on this machine (' + $LauncherCsc + '). Developer-Guide.md "Setting up a machine" has the Build Tools install line.') }
+    if (-not (Test-Path -LiteralPath $LauncherCsc)) { throw ('Add-LauncherType: the compiler the build runs is not on this machine (' + $LauncherCsc + '). docs/guide/set-up-a-machine.md "Setting up a machine" has the Build Tools install line.') }
     $refs = New-Object System.Collections.Generic.List[string]
     foreach ($r in @('mscorlib.dll') + $LauncherNeeded + $Reference) {
         $p = if ([IO.Path]::IsPathRooted($r)) { $r } else { Find-LauncherRef $r }

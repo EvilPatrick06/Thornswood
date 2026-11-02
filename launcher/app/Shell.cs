@@ -31,7 +31,7 @@ namespace Thornswood
     /// each of the other classes owns on disk, and every step between the
     /// Play button and the game starting, with the file and line of each.
     /// Whoever changes one of those steps changes that page in the same pull
-    /// request; tests\test-architecture.js fails when the page names a step
+    /// request; launcher\tests\test-architecture.js fails when the page names a step
     /// that is gone or out of order.
     /// </summary>
     static partial class Shell
@@ -4657,6 +4657,42 @@ namespace Thornswood
         static string CollectionLink()
         {
             return Checks.CollectionRevisionUrl(cfg, Updater.FeedCollectionRevision);
+        }
+
+        /// <summary>
+        /// What every collection button does (#5200): Vortex opened straight
+        /// at the revision the server was built against, through Nexus's own
+        /// link to it (Checks.CollectionNxmUrl), so a copy on an old revision
+        /// is one press from the live one. Before this every button opened
+        /// the revision's page on the site, where somebody still had to find
+        /// and press the site's own button that hands Vortex this same link.
+        ///
+        /// The page opens instead when Vortex is not what answers nxm links
+        /// on this machine (Checks.NxmStartsVortex: nothing does, or another
+        /// manager does), or no revision is known yet. The page says what to
+        /// do from there, as it always has.
+        ///
+        /// When Vortex is done the card comes down by itself and Scan and Fix
+        /// run (ShellVortexWatch.cs, VortexChanged).
+        /// </summary>
+        static void OpenCollection()
+        {
+            string nxm = Checks.CollectionNxmUrl(cfg, Updater.FeedCollectionRevision);
+            string page = CollectionLink();
+            bool vortex = nxm.Length > 0 && Checks.NxmStartsVortex(Checks.NxmCommand());
+            try
+            {
+                if (vortex)
+                {
+                    Log("Opening revision " + Updater.FeedCollectionRevision + " of the collection in Vortex. Install it there; the launcher scans and fixes by itself when Vortex is done.");
+                    Process.Start(new ProcessStartInfo(nxm) { UseShellExecute = true });
+                    return;
+                }
+                if (nxm.Length > 0)
+                    LogOnly("Vortex does not answer Nexus links on this machine, so the collection opens on the site.");
+                Process.Start(new ProcessStartInfo(page) { UseShellExecute = true });
+            }
+            catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
         }
 
         /// <summary>The button's words, naming the revision it opens when one is known.</summary>

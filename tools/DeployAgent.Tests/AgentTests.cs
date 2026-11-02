@@ -25,7 +25,24 @@ sealed class FakeGitHub : HttpMessageHandler
     public readonly List<string> Downloaded = new();
     /// <summary>Tags with no published Release.</summary>
     public readonly List<string> BareTags = new();
+    /// <summary>Workflow runs and their approvals (#5181), by run id.</summary>
+    public readonly Dictionary<long, JsonObject> Runs = new();
+    public readonly Dictionary<long, JsonArray> Approvals = new();
+    /// <summary>The answer to a run or approvals read, when not 200 (an App without Actions: read).</summary>
+    public HttpStatusCode? RunsAnswer { get; set; }
     public Func<HttpRequestMessage, HttpResponseMessage>? Other { get; set; }
+    /// <summary>Awaited before a list of an environment's Deployments is
+    /// answered, with that environment: a test holds one environment's pass
+    /// here to stand for an apply that takes a long time.</summary>
+    public Func<string, Task>? BeforeDeployments { get; set; }
+    /// <summary>What a compare of two commits names; null answers 404.</summary>
+    public List<string>? Changed { get; set; } = new();
+    public readonly List<string> Compared = new();
+    /// <summary>The repository's issues, as opened.</summary>
+    public readonly List<JsonObject> Issues = new();
+    public readonly List<string> Labels = new();
+    /// <summary>What opening an issue answers, for a token that may not.</summary>
+    public HttpStatusCode IssueAnswer { get; set; } = HttpStatusCode.Created;
 
     public void AddRelease(string tag, Dictionary<string, byte[]> files)
     {
@@ -58,7 +75,9 @@ sealed class FakeGitHub : HttpMessageHandler
         }
     }
 
-    public long AddDeployment(string env, string sha, string payloadJson)
+    public long AddDeployment(string env, string sha, string payloadJson) => AddDeployment(env, sha, payloadJson, "github-actions[bot]");
+
+    public long AddDeployment(string env, string sha, string payloadJson, string creator)
     {
         lock (gate)
         {
@@ -66,7 +85,7 @@ sealed class FakeGitHub : HttpMessageHandler
             Deps.Insert(0, new JsonObject
             {
                 ["id"] = id, ["sha"] = sha, ["task"] = "deploy", ["environment"] = env,
-                ["payload"] = JsonNode.Parse(payloadJson), ["creator"] = new JsonObject { ["login"] = "github-actions[bot]" },
+                ["payload"] = JsonNode.Parse(payloadJson), ["creator"] = new JsonObject { ["login"] = creator },
             });
             return id;
         }
@@ -96,8 +115,19 @@ sealed class FakeGitHub : HttpMessageHandler
         var body = r.Content == null ? "" : await r.Content.ReadAsStringAsync(ct);
         var p = r.RequestUri.AbsolutePath;
         var q = System.Web.HttpUtility.ParseQueryString(r.RequestUri.Query);
+        if (r.Method == HttpMethod.Get && p == "/repos/O/R/deployments" && BeforeDeployments is { } before) await before(q["environment"] ?? "");
         lock (gate)
         {
+            const string ar = "/repos/O/R/actions/runs/";
+            if (r.Method == HttpMethod.Get && p.StartsWith(ar))
+            {
+                if (RunsAnswer is { } code) return Json(code, "{\"message\":\"Resource not accessible by integration\"}");
+                var rest = p[ar.Length..];
+                var approvals = rest.EndsWith("/approvals");
+                var rid = long.Parse(approvals ? rest[..^"/approvals".Length] : rest);
+                if (approvals) return Json(HttpStatusCode.OK, (Approvals.TryGetValue(rid, out var ap) ? ap : new JsonArray()).ToJsonString());
+                return Runs.TryGetValue(rid, out var run) ? Json(HttpStatusCode.OK, run.ToJsonString()) : Json(HttpStatusCode.NotFound, "{\"message\":\"Not Found\"}");
+            }
             const string dp = "/repos/O/R/deployments/";
             if (r.Method == HttpMethod.Get && p == "/repos/O/R/deployments")
             {
@@ -137,8 +167,53 @@ sealed class FakeGitHub : HttpMessageHandler
                 Downloaded.Add(Names[aid]);
                 return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Files[aid]) };
             }
+            const string cp = "/repos/O/R/compare/";
+            if (p.StartsWith(cp))
+            {
+                Compared.Add(Uri.UnescapeDataString(p[cp.Length..]));
+                return Changed == null ? Json(HttpStatusCode.NotFound, "{\"message\":\"No common ancestor\"}")
+                    : Json(HttpStatusCode.OK, new JsonObject { ["files"] = new JsonArray(Changed.Select(f => (JsonNode)new JsonObject { ["filename"] = f }).ToArray()) }.ToJsonString());
+            }
+            if (p == "/repos/O/R/labels" && r.Method == HttpMethod.Post)
+            {
+                var name = (string)JsonNode.Parse(body)!["name"]!;
+                if (Labels.Contains(name)) return Json(HttpStatusCode.UnprocessableEntity, "{\"message\":\"Validation Failed\"}");
+                Labels.Add(name);
+                return Json(HttpStatusCode.Created, "{}");
+            }
+            if (p == "/repos/O/R/issues" && r.Method == HttpMethod.Get)
+            {
+                var label = q["labels"];
+                return Json(HttpStatusCode.OK, new JsonArray(Issues.Where(i => (string)i["state"]! == q["state"] && i["labels"]!.AsArray().Any(l => (string)l! == label))
+                    .Select(i => i.DeepClone()).ToArray()).ToJsonString());
+            }
+            if (p == "/repos/O/R/issues" && r.Method == HttpMethod.Post)
+            {
+                if (IssueAnswer != HttpStatusCode.Created) return Json(IssueAnswer, "{\"message\":\"Resource not accessible by integration\"}");
+                var i = JsonNode.Parse(body)!.AsObject();
+                i["state"] = "open";
+                Issues.Add(i);
+                return Json(HttpStatusCode.Created, "{}");
+            }
             return Json(HttpStatusCode.NotFound, $"{{\"message\":\"no such path in the stand-in: {p}\"}}");
         }
+    }
+}
+
+// ---- a stand-in gate ----------------------------------------------------------
+
+/// <summary>The deploy gate, answering each verb line with what it was told
+/// to, and keeping the lines it was asked for.</summary>
+sealed class FakeGate : IGate
+{
+    public readonly List<string> Asked = new();
+    public readonly Dictionary<string, GateRun> Answers = new();
+    public Task<GateRun> Run(string line, TimeSpan wait, Action<string> log, CancellationToken ct)
+    {
+        Asked.Add(line);
+        var a = Answers.TryGetValue(line, out var got) ? got : new GateRun(0, []);
+        foreach (var l in a.Lines) log("  gate: " + l);
+        return Task.FromResult(a);
     }
 }
 
@@ -215,7 +290,7 @@ sealed class FakeServer : IDisposable
                      (reads && Directory.Exists(dir) && Directory.GetFiles(dir).Any(f => File.ReadAllText(f).Contains("BROKEN")));
         if (broken) return $"SyntaxError: Unexpected token at 10.1.2.3:7787\n{EngineSays}\n";
         var tree = reads ? Tables.Tree(dir) : "";
-        return $"[thornswood] gamemode.js is git blob {Thornswood.DeployAgent.Files.GamemodeBlob(gm)}, {b.Length} bytes\n" +
+        return $"[thornswood] gamemode.js is git blob {Thornswood.DeployAgent.Files.GamemodeBlob(b)}, {b.Length} bytes\n" +
                (tree != "" ? $"[thornswood] gamemode tables are git tree {tree}, {Tables.Count(dir)} files, in {dir}\n" : "") +
                "[thornswood] gamemode client scripts abc (3), changed since the last load\n";
     }
@@ -223,8 +298,7 @@ sealed class FakeServer : IDisposable
     async Task Engine()
     {
         var gm = Path.Combine(Root, "gamemode.js");
-        var last = Thornswood.DeployAgent.Files.ReadShared(gm);
-        var lastWrite = File.GetLastWriteTimeUtc(gm);
+        var (last, lastWrite) = ReadOnce(gm);
         while (!stop.IsCancellationRequested)
         {
             try { await Task.Delay(5, stop.Token); } catch (OperationCanceledException) { return; }
@@ -233,15 +307,31 @@ sealed class FakeServer : IDisposable
 
         void Look()
         {
-            if (!Running) { try { last = Thornswood.DeployAgent.Files.ReadShared(gm); lastWrite = File.GetLastWriteTimeUtc(gm); } catch (IOException) { } return; }
             byte[] b;
             DateTime w;
-            try { b = Thornswood.DeployAgent.Files.ReadShared(gm); w = File.GetLastWriteTimeUtc(gm); } catch (IOException) { return; }
+            try { (b, w) = ReadOnce(gm); } catch (IOException) { return; }
+            if (!Running) { last = b; lastWrite = w; return; }
             if (b.AsSpan().SequenceEqual(last) && w == lastWrite) return;
             last = b;
             lastWrite = w;
             try { File.AppendAllText(Path.Combine(Root, "server.log"), LoadLines(gm, b)); } catch (IOException) { }
         }
+    }
+
+    /// <summary>The bytes and the write time of one file, from one handle,
+    /// as the engine loads what it was told changed. Read by path one after
+    /// the other, a rename between the two paired the old bytes with the new
+    /// time, and the load lines named the blob of whatever was there when
+    /// they were written: a load of bytes nobody judged. With a pause put
+    /// between the two reads, 21 of 25 runs of the put-back test across
+    /// #5191 met that load before the real one (1 Nov).</summary>
+    static (byte[] bytes, DateTime written) ReadOnce(string path)
+    {
+        using var f = Thornswood.DeployAgent.Files.OpenShared(path);
+        var w = File.GetLastWriteTimeUtc(f.SafeFileHandle);
+        using var ms = new MemoryStream();
+        f.CopyTo(ms);
+        return (ms.ToArray(), w);
     }
 
     void Looked() { lock (looked) { looks++; Monitor.PulseAll(looked); } }
@@ -407,6 +497,130 @@ public sealed class AgentTests : IDisposable
     }
 
 
+    /// <summary>An agent looking after main alone (#5181), on a stand-in live server.</summary>
+    (Agent agent, FakeGitHub gh, FakeServer srv, Config cfg) MakeMain(int port = 7777)
+    {
+        var gh = new FakeGitHub();
+        var s = new FakeServer(port);
+        owned.Add(s);
+        gh.Other = s.Health;
+        var http = new HttpClient(gh);
+        var home = Temp();
+        var env = Config.DefaultMain();
+        env.Root = s.Root;
+        env.Turn = Temp();
+        env.Store = Path.Combine(home, "store");
+        env.Health = "https://health.test/api/servers/thornswood/manifest.json";
+        env.LoadSeconds = 10;
+        env.TurnSeconds = 10;
+        env.Watch = Temp();
+        env.StartSeconds = 2;
+        var cfg = new Config { Repo = "O/R", Api = FakeGitHub.Api, Home = home, Environments = { ["main"] = env } };
+        var server = new Server(env, http) { Tick = TimeSpan.FromMilliseconds(5), Control = new FakeControl(s) };
+        var gh2 = new GitHub(FakeGitHub.Api, "O/R", new StaticToken("t"), http);
+        var a = new Agent(cfg, gh2, new FakeVerifier(), new() { ["main"] = server }, "1.0.0", "", l => { lock (said) said.Add(l); }) { Host = "box" };
+        return (a, gh, s, cfg);
+    }
+
+    /// <summary>What promote-main.yml leaves: a Release dev ran, the run that
+    /// Patrick approved, and the Deployment to Main it made.</summary>
+    static long Promoted(FakeGitHub gh, string tag, long run, string approval = "approved", bool devRan = true, string path = Agent.PromoteWorkflow, string creator = "github-actions[bot]")
+    {
+        var dev = gh.AddDeployment("Dev", Commit, $"{{\"release\":\"{tag}\"}}");
+        gh.StatusesById[dev] = new() { new JsonObject { ["state"] = devRan ? "success" : "failure", ["description"] = "x" } };
+        gh.Runs[run] = new JsonObject { ["id"] = run, ["path"] = path, ["head_branch"] = "main", ["event"] = "workflow_dispatch" };
+        gh.Approvals[run] = new JsonArray(new JsonObject
+        {
+            ["state"] = approval, ["user"] = new JsonObject { ["login"] = "EvilPatrick06" },
+            ["environments"] = new JsonArray(new JsonObject { ["name"] = "Main" }),
+        });
+        return gh.AddDeployment("Main", Commit, $"{{\"release\":\"{tag}\",\"run\":{run}}}", creator);
+    }
+
+    [Fact]
+    public async Task MainTakesAnApprovedPromotionOfAReleaseDevRan()
+    {
+        var (a, gh, s, _) = MakeMain();
+        GamemodeRelease(gh, "build-1", "// new gamemode\n");
+        var id = Promoted(gh, "build-1", 55);
+        await a.Pass("main", default);
+        Assert.Equal("in_progress,success", string.Join(",", gh.States(id)));
+        Assert.Equal("// new gamemode\n", s.Read("gamemode.js"));
+        Assert.Contains(said, l => l.Contains("approved by EvilPatrick06 in run 55"));
+    }
+
+    [Theory]
+    [InlineData("nobody", "nobody approved run 55")]
+    [InlineData("rejected", "EvilPatrick06 rejected run 55")]
+    [InlineData("devfailed", "dev has not run build-1")]
+    [InlineData("workflow", "not .github/workflows/promote-main.yml")]
+    [InlineData("creator", "made by someone")]
+    [InlineData("noread", "needs Actions: read")]
+    public async Task MainRefusesWhatIsNotAnApprovedPromotion(string how, string want)
+    {
+        var (a, gh, s, _) = MakeMain();
+        GamemodeRelease(gh, "build-1", "// new gamemode\n");
+        var id = Promoted(gh, "build-1", 55, approval: how == "rejected" ? "rejected" : "approved", devRan: how != "devfailed",
+            path: how == "workflow" ? ".github/workflows/merge-release.yml" : Agent.PromoteWorkflow, creator: how == "creator" ? "someone" : "github-actions[bot]");
+        if (how == "nobody") gh.Approvals[55] = new JsonArray();
+        if (how == "noread") gh.RunsAnswer = System.Net.HttpStatusCode.Forbidden;
+        await a.Pass("main", default);
+        var last = gh.Last(id)!;
+        Assert.Equal("failure", (string)last["state"]!);
+        Assert.Contains(want, (string)last["description"]!);
+        Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
+    }
+
+    [Fact]
+    public async Task OneApprovedRunMakesOneMainDeployment()
+    {
+        var (a, gh, s, _) = MakeMain();
+        GamemodeRelease(gh, "build-1", "// new gamemode\n");
+        Promoted(gh, "build-1", 55);
+        await a.Pass("main", default);
+        var again = gh.AddDeployment("Main", Commit, "{\"release\":\"build-1\",\"run\":55}");
+        await a.Pass("main", default);
+        Assert.Contains("already made a Main Deployment", (string)gh.Last(again)!["description"]!);
+    }
+
+    [Fact]
+    public async Task MainIsNeverPutInByATagAndOnlyOnTheLivePort()
+    {
+        var (a, gh, s, _) = MakeMain();
+        GamemodeRelease(gh, "build-1", "// new gamemode\n");
+        var outc = await a.DeployTag("main", "build-1", default);
+        Assert.Equal("failure", outc.State);
+        Assert.Contains("only a Deployment Patrick approved", outc.Summary);
+        var (b, gh2, s2, _) = MakeMain(port: 7787);
+        GamemodeRelease(gh2, "build-1", "// new gamemode\n");
+        var id = Promoted(gh2, "build-1", 56);
+        await b.Pass("main", default);
+        Assert.Contains("not 7777", (string)gh2.Last(id)!["description"]!);
+        Assert.Equal("// old gamemode\r\n", s2.Read("gamemode.js"));
+    }
+
+    [Fact]
+    public void MainsConfigCannotBeWrittenAway()
+    {
+        var p = Path.Combine(Temp(), "agent.json");
+        File.WriteAllText(p, "{\"repo\":\"O/R\",\"environments\":{\"dev\":{},\"main\":{\"approved\":false,\"logBase\":\"http://x:3000/\"}}}");
+        var m = Config.Load(p).Environments["main"];
+        Assert.Equal(("Main", @"C:\Thornswood-Server", 7777, true, 0), (m.GitHubEnvironment, m.Root, m.RequirePort, m.Approved, m.LivePort));
+        foreach (var bad in new[]
+        {
+            "{\"repo\":\"O/R\",\"environments\":{\"main\":{\"githubEnvironment\":\"Dev\"}}}",
+            "{\"repo\":\"O/R\",\"environments\":{\"main\":{\"requirePort\":0}}}",
+            "{\"repo\":\"O/R\",\"environments\":{\"main\":{\"livePort\":7777}}}",
+            "{\"repo\":\"O/R\",\"environments\":{\"main\":{\"botPassRoot\":\"C:\\\\p\"}}}",
+            "{\"repo\":\"O/R\",\"environments\":{\"dev\":{},\"main\":{\"root\":\"C:\\\\Thornswood-Server-Dev\"}}}",
+            "{\"repo\":\"O/R\",\"environments\":{\"bot\":{}}}",
+        })
+        {
+            File.WriteAllText(p, bad);
+            Assert.Throws<ConfigException>(() => Config.Load(p));
+        }
+    }
+
     // ---- a new server build (an engine pin) ---------------------------------
 
     const string ForkA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -489,7 +703,7 @@ public sealed class AgentTests : IDisposable
         var (newFiles, newRec) = Build(ForkB);
         PinRelease(gh, "build-7", "// gamemode for B\n", newFiles, newRec);
         File.WriteAllText(Path.Combine(s.Root, "data", "restart.json"), "{}");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-7\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-7\"}");
         await a.Pass("dev", default);
         var last = gh.Last(id)!;
         Assert.Equal("success", (string)last["state"]!);
@@ -625,7 +839,7 @@ public sealed class AgentTests : IDisposable
     {
         var (a, gh, s, _, _) = Make();
         GamemodeRelease(gh, "build-1", "// new gamemode\n");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
         HasStates(gh, s, id, "in_progress,success");
         Assert.Equal("// new gamemode\n", s.Read("gamemode.js"));
@@ -641,6 +855,93 @@ public sealed class AgentTests : IDisposable
         // Applied once: the next pass sees its status and does nothing.
         await a.Pass("dev", default);
         Assert.Equal(2, gh.States(id).Count);
+    }
+
+    // ---- voice, with dev's Deployment (#5187) -------------------------------
+
+    static readonly Dictionary<string, string> OldVoice = new()
+    {
+        ["voice-server.js"] = "const BUILD = 'old-1';\n", ["headlines.js"] = "// headlines\n", ["server-log.js"] = "// log writer\n",
+        ["token-key.txt"] = "the service's own key",
+    };
+
+    /// <summary>Dev with its voice service beside it, running OldVoice.</summary>
+    (Agent agent, FakeGitHub gh, FakeServer srv, FakeAppControl voice, string voiceRoot) MakeWithVoice()
+    {
+        var (a, gh, s, _, cfg) = Make();
+        var vroot = Temp();
+        foreach (var (n, t) in OldVoice) File.WriteAllText(Path.Combine(vroot, n), t);
+        var vc = new FakeAppControl(vroot);
+        var venv = Config.DefaultDevVoice();
+        venv.Root = vroot;
+        venv.Store = cfg.Environments["dev"].Store;
+        venv.Watch = cfg.Environments["dev"].Watch;
+        venv.Health = "https://voice.test/health";
+        venv.WaitSeconds = 1;
+        vc.Start(venv);
+        var server = gh.Other!;
+        gh.Other = r => r.RequestUri!.Host == "voice.test" ? vc.Health(r) : server(r);
+        a.Voices["dev"] = new App(venv, new HttpClient(gh), vc) { Tick = TimeSpan.FromMilliseconds(5) };
+        return (a, gh, s, vc, vroot);
+    }
+
+    static void VoiceRelease(FakeGitHub gh, string tag, string gamemode, string voiceServer)
+    {
+        var voice = TablesZip(new() { ["headlines.js"] = "// headlines\n", ["server-log.js"] = "// log writer\n", ["voice-server.js"] = voiceServer });
+        gh.AddRelease(tag, ReleaseFiles(tag, Commit, "", new()
+        {
+            ["gamemode"] = new() { ["gamemode.js"] = B(gamemode), ["thornswood-build.json"] = B("{\"commit\":\"new\"}") },
+            ["voice"] = new() { ["voice.zip"] = voice },
+        }));
+    }
+
+    [Fact]
+    public async Task VoiceGoesInWithDevsDeploymentAndAnswersWithItsNewBuild()
+    {
+        var (a, gh, s, vc, vroot) = MakeWithVoice();
+        VoiceRelease(gh, "build-21", "// new gamemode\n", "const BUILD = 'new-2';\n");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-21\"}");
+        await a.Pass("dev", default);
+        HasStates(gh, s, id, "in_progress,success");
+        Assert.Contains("voice runs it too", (string)gh.Last(id)!["description"]!);
+        Assert.Equal("const BUILD = 'new-2';\n", File.ReadAllText(Path.Combine(vroot, "voice-server.js")));
+        Assert.Equal("new-2", vc.RunningBuild);
+        Assert.Equal("the service's own key", File.ReadAllText(Path.Combine(vroot, "token-key.txt")));
+        Assert.Equal("// new gamemode\n", s.Read("gamemode.js"));
+        Assert.Contains("voice-server.js", vc.Parsed);
+        var rec = JsonSerializer.Deserialize<DeployRecord>(File.ReadAllText(Path.Combine(vroot, "thornswood-deploy.json")))!;
+        Assert.Equal(("build-21", Commit, "voice"), (rec.Name, rec.Commit, rec.Component));
+        var log = s.Read(Path.Combine("data", $"deploy-{id}.log"));
+        Assert.Contains("voice first", log);
+        Assert.DoesNotContain("voice, which this agent does not apply yet", log);
+    }
+
+    [Fact]
+    public async Task AVoiceThatKeepsAnsweringWithTheOldBuildIsPutBackAndTheGamemodeIsNotTouched()
+    {
+        var (a, gh, s, vc, vroot) = MakeWithVoice();
+        VoiceRelease(gh, "build-22", "// new gamemode\n", "const BUILD = 'new-3'; // DEAD\n");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-22\"}");
+        await a.Pass("dev", default);
+        HasStates(gh, s, id, "in_progress,failure");
+        var why = (string)gh.Last(id)!["description"]!;
+        Assert.StartsWith("voice: ", why);
+        Assert.Equal("const BUILD = 'old-1';\n", File.ReadAllText(Path.Combine(vroot, "voice-server.js")));
+        Assert.Equal("old-1", vc.RunningBuild);
+        Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
+        Assert.Contains("says build old-1, not the new-3 in the folder", s.Read(Path.Combine("data", $"deploy-{id}.log")));
+    }
+
+    [Fact]
+    public async Task AReleaseWithVoiceOnABoxWithNoVoiceNamedLeavesItAlone()
+    {
+        var (a, gh, s, _, _) = Make();
+        VoiceRelease(gh, "build-23", "// new gamemode\n", "const BUILD = 'new-4';\n");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-23\"}");
+        await a.Pass("dev", default);
+        HasStates(gh, s, id, "in_progress,success");
+        Assert.Contains("voice, which this agent does not apply yet; left alone", s.Read(Path.Combine("data", $"deploy-{id}.log")));
+        Assert.DoesNotContain("voice.zip", gh.Downloaded);
     }
 
     // ---- the gamemode's tables (#5191) --------------------------------------
@@ -659,7 +960,7 @@ public sealed class AgentTests : IDisposable
         var oldTree = Tables.Tree(Path.Combine(s.Root, Tables.Dir));
         // The same gamemode.js the server runs: only a table changed.
         GamemodeRelease(gh, "build-1", Reading("tables gamemode"), new() { ["DATA.json"] = "{\n\"a\":2\n}\n", ["WELLS.json"] = "[]\n" });
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
         HasStates(gh, s, id, "in_progress,success");
         Assert.Equal("{\n\"a\":2\n}\n", s.Read(Path.Combine(Tables.Dir, "DATA.json")));
@@ -685,7 +986,7 @@ public sealed class AgentTests : IDisposable
         s.WriteGamemode(Reading("old tables gamemode"));
         var oldTree = Tables.Tree(Path.Combine(s.Root, Tables.Dir));
         GamemodeRelease(gh, "build-2", Reading("new gamemode"), new() { ["DATA.json"] = "BROKEN\n", ["WELLS.json"] = "[]\n" });
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-2\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-2\"}");
         await a.Pass("dev", default);
         var last = gh.Last(id)!;
         Assert.Equal("failure", (string)last["state"]!);
@@ -729,7 +1030,7 @@ public sealed class AgentTests : IDisposable
         var tree = Tables.Tree(Path.Combine(s.Root, Tables.Dir));
         GamemodeRelease(gh, "build-22", Reading("new gamemode"), new() { ["DATA.json"] = "BROKEN\n" });
         var outc = await a.DeployTag("dev", "build-22", default);
-        Assert.True(outc.State == "failure", outc.State + ": " + outc.Summary);
+        Assert.True(outc.State == "failure", outc.State + ": " + outc.Summary + "\n" + string.Join("\n", said));
         Assert.Contains("previous gamemode is back", outc.Summary);
         Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
         Assert.Equal(tree, Tables.Tree(Path.Combine(s.Root, Tables.Dir)));
@@ -814,10 +1115,11 @@ public sealed class AgentTests : IDisposable
     {
         var (a, gh, s, _, _) = Make();
         GamemodeRelease(gh, "build-2", "BROKEN gamemode\n");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-2\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-2\"}");
         await a.Pass("dev", default);
         var last = gh.Last(id)!;
-        Assert.Equal("failure", (string)last["state"]!);
+        // A state other than failure prints the deploy log (#5373).
+        HasStates(gh, s, id, "failure", last: true);
         Assert.Contains("previous gamemode is back", (string)last["description"]!);
         Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
         var log = s.Read(Path.Combine("data", $"deploy-{id}.log"));
@@ -826,18 +1128,49 @@ public sealed class AgentTests : IDisposable
         Assert.False(File.Exists(Path.Combine(s.Root, "data", "thornswood-deploy.json")), "a record was written for a deploy that did not take");
     }
 
+    // The cause of AFailedHealthCheckPutsTheOldOneBack failing now and then on
+    // the Windows gate (1 Nov, "could not put the new gamemode.js in place"):
+    // the stand-in engine reads gamemode.js every 5 ms, sharing delete as the
+    // real one does, and the swap was MoveFileEx, which Windows refuses while
+    // any handle is open on the file it replaces (#2727).
+    [Fact]
+    public void AFileIsReplacedWhileAReaderSharingDeleteHoldsTheOldOne()
+    {
+        var d = Temp();
+        var to = Path.Combine(d, "gamemode.js");
+        var from = Path.Combine(d, "gamemode.js.new");
+        File.WriteAllText(to, "// old\n");
+        File.WriteAllText(from, "// new\n");
+        using (var reader = Thornswood.DeployAgent.Files.OpenShared(to))
+        {
+            if (OperatingSystem.IsWindows())
+                Assert.True(Record.Exception(() => File.Move(from, to, true)) is UnauthorizedAccessException or IOException, "MoveFileEx replaced a file a reader held open");
+            Thornswood.DeployAgent.Files.Into(from, to);
+            using var r = new StreamReader(reader);
+            Assert.Equal("// old\n", r.ReadToEnd());
+        }
+        Assert.Equal("// new\n", File.ReadAllText(to));
+        Assert.False(File.Exists(from));
+        // A handle that does not share delete still refuses it, and nothing moves.
+        File.WriteAllText(from, "// newer\n");
+        using (new FileStream(to, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            if (OperatingSystem.IsWindows()) Assert.Throws<IOException>(() => Thornswood.DeployAgent.Files.Into(from, to));
+        if (OperatingSystem.IsWindows()) Assert.Equal("// new\n", File.ReadAllText(to));
+    }
+
     [Fact]
     public async Task AFailedHealthCheckPutsTheOldOneBack()
     {
         var (a, gh, s, server, _) = Make();
         GamemodeRelease(gh, "build-3", "// new but sick\n");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-3\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-3\"}");
         // Healthy for the check before, sick while the new gamemode is in.
         s.SickWhen = () => Encoding.UTF8.GetString(Thornswood.DeployAgent.Files.ReadShared(Path.Combine(s.Root, "gamemode.js"))).Contains("sick");
         server.Tick = TimeSpan.FromMilliseconds(20);
         await a.Pass("dev", default);
         var last = gh.Last(id)!;
-        Assert.Equal("failure", (string)last["state"]!);
+        // A state other than failure prints the deploy log (#5373).
+        HasStates(gh, s, id, "failure", last: true);
         Assert.Contains("health check failed", (string)last["description"]!);
         Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
     }
@@ -863,7 +1196,7 @@ public sealed class AgentTests : IDisposable
             gh.Replace("build-1", "manifest.json", B(text.Replace("\"schema\":1", "\"schema\":1 ")));
         }
         if (sick) s.Healthy = false;
-        var id = gh.AddDeployment("Dev server", sha, payload);
+        var id = gh.AddDeployment("Dev", sha, payload);
         await a.Pass("dev", default);
         var last = gh.Last(id)!;
         Assert.Equal("failure", (string)last["state"]!);
@@ -872,30 +1205,202 @@ public sealed class AgentTests : IDisposable
     }
 
     [Fact]
-    public async Task OnlyTheNewestIsAppliedAndRecordsAreLeftAlone()
+    public async Task OnlyTheNewestIsAppliedAndOtherEnvironmentsAreLeftAlone()
     {
         var (a, gh, _, _, _) = Make();
         GamemodeRelease(gh, "build-1", "// new gamemode\n");
-        var record = gh.AddDeployment("Dev", Commit, "{}");
-        var older = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
-        var newest = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var record = gh.AddDeployment("Dev server", Commit, "{}");
+        var older = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        var newest = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
         Assert.Equal("inactive", string.Join(",", gh.States(older)));
         Assert.Equal("in_progress,success", string.Join(",", gh.States(newest)));
         Assert.Empty(gh.States(record));
     }
 
+    // Record-Deployment.ps1 wrote Deployments to Dev with a success straight
+    // away (#5179 retired it). The newest of them is not applied again, and
+    // the unapplied older ones under it are left as they are.
+    [Fact]
+    public async Task AnOldRecordWithASuccessIsNotAppliedAgain()
+    {
+        var (a, gh, s, _, _) = Make();
+        GamemodeRelease(gh, "build-1", "// new gamemode\n");
+        var before = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        var record = gh.AddDeployment("Dev", Commit, "{}");
+        lock (gh.StatusesById) gh.StatusesById[record] = new() { new JsonObject { ["state"] = "success", ["description"] = "Live on the dev feed" } };
+        await a.Pass("dev", default);
+        Assert.Equal("success", string.Join(",", gh.States(record)));
+        Assert.Empty(gh.States(before));
+        Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
+    }
+
     [Fact]
     public async Task ADeploymentCutShortIsMarkedError()
     {
         var (a, gh, s, _, cfg) = Make();
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         var state = Path.Combine(cfg.Home, "state", "working.json");
         Directory.CreateDirectory(Path.GetDirectoryName(state)!);
         File.WriteAllText(state, $"{{\"Deployment\":\"{id}\",\"Env\":\"dev\",\"Started\":\"then\"}}");
+        // And the record an environment's own loop keeps (Run, #5190).
+        var id2 = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-2\"}");
+        var state2 = Path.Combine(cfg.Home, "state", "working-dev.json");
+        File.WriteAllText(state2, $"{{\"Deployment\":\"{id2}\",\"Env\":\"dev\",\"Started\":\"then\"}}");
         await a.Start(default);
         HasStates(gh, s, id, "error", last: true);
+        HasStates(gh, s, id2, "error", last: true);
         Assert.False(File.Exists(state));
+        Assert.False(File.Exists(state2));
+    }
+
+    // ---- after a dev Deployment: the load order and the parity check -------------
+
+    const string Before = "fedcba9876543210fedcba9876543210fedcba98";
+    const string Review1 = "REVIEW  firewall Thornswood Dev UDP: expected allow 7787, found missing";
+    const string Review2 = "REVIEW  service Thornswood Voice: expected running on 10.1.2.3, found stopped";
+
+    (Agent a, FakeGitHub gh, FakeServer s, Config cfg, FakeGate gate) MakeAfter(string? movedTo)
+    {
+        var (a, gh, s, _, cfg) = Make();
+        var gate = new FakeGate();
+        a.Gate = gate;
+        a.IssuesGh = new GitHub(FakeGitHub.Api, "O/R", new StaticToken("issues"), new HttpClient(gh));
+        if (movedTo != null)
+        {
+            Directory.CreateDirectory(Path.Combine(cfg.Home, "state"));
+            File.WriteAllText(Path.Combine(cfg.Home, "state", "load-order-dev.json"), $"{{\"Commit\":\"{movedTo}\",\"Moved\":\"then\"}}");
+        }
+        GamemodeRelease(gh, "build-1", "// new gamemode\n");
+        return (a, gh, s, cfg, gate);
+    }
+
+    static string MovedTo(Config cfg) =>
+        JsonNode.Parse(File.ReadAllText(Path.Combine(cfg.Home, "state", "load-order-dev.json")))!["Commit"]!.GetValue<string>();
+
+    [Fact]
+    public async Task TheFirstDevDeploymentMovesTheLoadOrderAndFilesEachParityRowOnce()
+    {
+        var (a, gh, s, cfg, gate) = MakeAfter(null);
+        gate.Answers[Agent.LoadOrderLine] = new GateRun(0, ["gate run x: Deploy-DevGamemode", "main at " + Commit, "the dev server runs the new order"]);
+        gate.Answers["Check-ProdParity"] = new GateRun(0, ["main at " + Commit, Review1, Review2, "40 rows, 2 to review"]);
+        gh.Issues.Add(new JsonObject { ["title"] = "Parity: firewall Thornswood Dev UDP differs on the box", ["state"] = "open", ["labels"] = new JsonArray("parity") });
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        HasStates(gh, s, id, "in_progress,success");
+        Assert.EndsWith("load order moved", (string)gh.Last(id)!["description"]!);
+        Assert.Equal([Agent.LoadOrderLine, "Check-ProdParity"], gate.Asked);
+        Assert.Empty(gh.Compared);
+        Assert.Equal(Commit, MovedTo(cfg));
+        var filed = Assert.Single(gh.Issues.Skip(1));
+        Assert.Equal("Parity: service Thornswood Voice differs on the box", (string)filed["title"]!);
+        Assert.Contains("Expected: running on <address>", (string)filed["body"]!);
+        Assert.Contains("Done when", (string)filed["body"]!);
+        Assert.Equal(["parity"], gh.Labels);
+        var log = File.ReadAllText(Path.Combine(s.Root, "data", $"deploy-{id}.log"));
+        Assert.Contains("parity: already open: Parity: firewall", log);
+        Assert.Contains("parity: filed Parity: service", log);
+        Assert.DoesNotContain("10.1.2.3", log);
+    }
+
+    [Fact]
+    public async Task ADeploymentThatChangesNothingTheOrderIsMadeFromLeavesItAlone()
+    {
+        var (a, gh, s, cfg, gate) = MakeAfter(Before);
+        gh.Changed = ["game/gamemode.js", "docs/GAMEMODE.md"];
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        HasStates(gh, s, id, "in_progress,success");
+        Assert.Equal([Before + "..." + Commit], gh.Compared);
+        Assert.Equal(["Check-ProdParity"], gate.Asked);
+        Assert.Equal(Commit, MovedTo(cfg));
+        Assert.Empty(gh.Issues);
+    }
+
+    [Theory]
+    [InlineData("records/collection-plugins.json")]
+    [InlineData("game/content/Thornswood-Content.esp")]
+    [InlineData(null)]
+    public async Task ARecordChangeMovesTheOrderAndAMoveThatFailsFailsTheDeploymentAndIsTriedByTheNext(string? changed)
+    {
+        var (a, gh, s, cfg, gate) = MakeAfter(Before);
+        gh.Changed = changed == null ? null : ["game/gamemode.js", changed];
+        gate.Answers[Agent.LoadOrderLine] = new GateRun(1, ["main at " + Commit, "the store is not whole and Nexus did not answer"]);
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        HasStates(gh, s, id, "in_progress,failure");
+        Assert.Contains("the plugins are not", (string)gh.Last(id)!["description"]!);
+        Assert.Equal("// new gamemode\n", s.Read("gamemode.js"));
+        Assert.Equal([Agent.LoadOrderLine], gate.Asked);
+        // Not moved, so the next Deployment compares from the last move again.
+        Assert.Equal(Before, MovedTo(cfg));
+    }
+
+    [Fact]
+    public async Task ParityRowsThatCannotBeFiledLeaveTheDeploymentASuccess()
+    {
+        var (a, gh, s, _, gate) = MakeAfter(Commit);
+        gh.IssueAnswer = HttpStatusCode.Forbidden;
+        gate.Answers["Check-ProdParity"] = new GateRun(0, [Review1]);
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        HasStates(gh, s, id, "in_progress,success");
+        Assert.Empty(gh.Compared);
+        Assert.Equal(["Check-ProdParity"], gate.Asked);
+        Assert.Contains("parity: THE ROWS WERE NOT ALL FILED", File.ReadAllText(Path.Combine(s.Root, "data", $"deploy-{id}.log")));
+    }
+
+    [Fact]
+    public async Task AParityCheckThatFailsFilesNothing()
+    {
+        var (a, gh, s, _, gate) = MakeAfter(Commit);
+        gate.Answers["Check-ProdParity"] = new GateRun(1, ["collecting from the VPS failed; nothing compared", Review1]);
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        HasStates(gh, s, id, "in_progress,success");
+        Assert.Empty(gh.Issues);
+        Assert.Empty(gh.Labels);
+    }
+
+    /// <summary>A broker on a pipe of its own: reads one request, answers with
+    /// the lines given, and hands back the request it read.</summary>
+    static async Task<string> Broker(string name, string[] answer)
+    {
+        using var srv = new System.IO.Pipes.NamedPipeServerStream(name, System.IO.Pipes.PipeDirection.InOut, 1, System.IO.Pipes.PipeTransmissionMode.Byte, System.IO.Pipes.PipeOptions.Asynchronous);
+        await srv.WaitForConnectionAsync();
+        var enc = new UTF8Encoding(false);
+        using var r = new StreamReader(srv, enc, false, 4096, true);
+        using var w = new StreamWriter(srv, enc, 4096, true) { NewLine = "\n", AutoFlush = true };
+        var req = await r.ReadLineAsync() ?? "";
+        foreach (var l in answer) await w.WriteLineAsync(l);
+        return req;
+    }
+
+    [Fact]
+    public async Task TheGatePipeSendsTheLineAndReadsTheVerbsLinesAndCode()
+    {
+        var name = "tw-gate-test-" + Guid.NewGuid().ToString("N")[..8];
+        var broker = Broker(name, ["| gate run 1: Check-ProdParity", "| main at " + Commit, "@FILE report.json AAAA", "@FILEEND report.json 00", "| " + Review1, "@END 2"]);
+        var logged = new List<string>();
+        var run = await new GatePipe(name).Run("Check-ProdParity", TimeSpan.FromSeconds(10), logged.Add, default);
+        Assert.Equal("LINE " + Convert.ToBase64String(Encoding.UTF8.GetBytes("Check-ProdParity")), await broker);
+        Assert.Equal(2, run.Code);
+        Assert.Equal(["gate run 1: Check-ProdParity", "main at " + Commit, Review1], run.Lines);
+        Assert.Equal(3, logged.Count);
+    }
+
+    [Fact]
+    public async Task ABrokerThatGoesAwayOrIsNotThereIsCode65()
+    {
+        var name = "tw-gate-test-" + Guid.NewGuid().ToString("N")[..8];
+        var broker = Broker(name, ["| gate run 1: Check-ProdParity"]);
+        var run = await new GatePipe(name).Run("Check-ProdParity", TimeSpan.FromSeconds(10), _ => { }, default);
+        await broker;
+        Assert.Equal(65, run.Code);
+        Assert.Contains("went away", run.Lines[^1]);
+        var none = await new GatePipe(name + "-none").Run("Check-ProdParity", TimeSpan.FromMilliseconds(200), _ => { }, default);
+        Assert.Equal(65, none.Code);
+        Assert.Contains("did not take the request", Assert.Single(none.Lines));
     }
 
     [Theory]
@@ -1085,12 +1590,11 @@ public sealed class AgentTests : IDisposable
         var p = Path.Combine(Temp(), "agent.json");
         File.WriteAllText(p, "{\"repo\":\"O/R\",\"environments\":{\"dev\":{\"loadSeconds\":60}}}");
         var e = Config.Load(p).Environments["dev"];
-        Assert.Equal((60, @"C:\Thornswood-Server-Dev", "Dev server"), (e.LoadSeconds, e.Root, e.GitHubEnvironment));
+        Assert.Equal((60, @"C:\Thornswood-Server-Dev", "Dev"), (e.LoadSeconds, e.Root, e.GitHubEnvironment));
         foreach (var bad in new[]
         {
             "{\"environments\":{\"dev\":{}}}",
-            "{\"repo\":\"O/R\",\"environments\":{\"main\":{}}}",
-            "{\"repo\":\"O/R\",\"environments\":{\"dev\":{\"githubEnvironment\":\"Dev\"}}}",
+            "{\"repo\":\"O/R\",\"environments\":{\"dev\":{\"githubEnvironment\":\"\"}}}",
             "{\"repo\":\"O/R\",\"environments\":{\"dev\":{\"githubEnvironment\":\"Main\"}}}",
             "{\"repo\":\"O/R\",\"api\":\"http://example.com\"}",
             "{\"repo\":\"O/R\",\"pollSeconds\":1}",
@@ -1121,14 +1625,14 @@ public sealed class AgentTests : IDisposable
         ["Bot-Pass.js"] = B("// the pass"), ["bot.js"] = B("// the bot"), ["character.js"] = B("// the character"),
     };
 
-    static void BotRelease(FakeGitHub gh, string tag, string body, bool withBot = true, Dictionary<string, string>? tables = null)
+    static void BotRelease(FakeGitHub gh, string tag, string body, bool withBot = true, Dictionary<string, string>? tables = null, Dictionary<string, byte[]>? bot = null)
     {
         var parts = new Dictionary<string, Dictionary<string, byte[]>>
         {
             ["gamemode"] = new() { ["gamemode.js"] = B(body), ["thornswood-build.json"] = B("{\"commit\":\"new\"}") },
         };
         if (tables != null) parts["gamemode"][Tables.Zip] = TablesZip(tables);
-        if (withBot) parts["bot"] = BotPart;
+        if (withBot) parts["bot"] = bot ?? BotPart;
         gh.AddRelease(tag, ReleaseFiles(tag, Commit, "", parts));
     }
 
@@ -1189,7 +1693,7 @@ public sealed class AgentTests : IDisposable
             return WriteResult(bp, true);
         });
         BotRelease(gh, "build-1", "// new gamemode\n");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
         HasStates(gh, s, id, "in_progress,success");
         Assert.Equal("// new gamemode\n", s.Read("gamemode.js"));
@@ -1199,7 +1703,7 @@ public sealed class AgentTests : IDisposable
         // without its game files, nothing private, no world.
         Assert.NotNull(copyTree);
         Assert.Equal(string.Join("\n", new[] {
-            "bot/Bot-Pass.js", "bot/bot.js", "bot/character.js",
+            "bot/Bot-Pass.js", "bot/bot.js", "bot/character.js", "pass.txt",
             "server/data/scripts/ActiveMagicEffect.pex", "server/dist_back/skymp5-server.js",
             "server/gamemode.js", "server/scam_native.node", "server/server-settings.json", "server/thornswood-build.json",
         }.Order(StringComparer.Ordinal)), copyTree);
@@ -1246,7 +1750,7 @@ public sealed class AgentTests : IDisposable
             ["bot"] = BotPart,
             ["server"] = new() { ["server-build.json"] = newRec, [zipName] = zip },
         }));
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-9\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-9\"}");
         await a.Pass("dev", default);
         HasStates(gh, s, id, "success", last: true);
         // The copy ran the build dev was about to get, with its own scripts
@@ -1274,7 +1778,7 @@ public sealed class AgentTests : IDisposable
             _ => WriteResult(bp, false, how),
         });
         BotRelease(gh, "build-1", "// new gamemode\n", withBot: how != "nobot");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
         var last = gh.Last(id)!;
         Assert.Equal("failure", (string)last["state"]!);
@@ -1285,6 +1789,184 @@ public sealed class AgentTests : IDisposable
         Assert.DoesNotContain("10.0.0.5", log);
         if (how == "hang") Assert.Equal(1, ((FakeTasks)a.Tasks).Ends);
         if (how == "face") Assert.Contains("FAIL  face", log);
+    }
+
+    /// <summary>A pass that runs out says where it got to: what Task
+    /// Scheduler says of it, the pass's own last lines (bot-pass.log, which
+    /// Bot-Pass.js writes as each step starts) and the copy's server's, all
+    /// redacted. Deployment 7480554210 said only that it ran out.</summary>
+    [Fact]
+    public async Task APassThatRunsOutSaysWhereItGot()
+    {
+        var (a, gh, s, bp) = MakeWithPass(bp =>
+        {
+            File.WriteAllText(bp.PassLogPath, "2026-11-01T23:11:40.000Z  the bot pass starts in C:\\x\n2026-11-01T23:11:41.000Z  the server started; it has 600 s to say gamemode.js loaded\n");
+            File.WriteAllText(bp.ServerLogPath, "[thornswood] loading plugins\r\nlistening on 10.0.0.5:7901\r\n");
+            return "hang";
+        });
+        BotRelease(gh, "build-1", "// new gamemode\n");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        Assert.Contains("did not end within 5 s", (string)gh.Last(id)!["description"]!);
+        var log = s.Read(Path.Combine("data", $"deploy-{id}.log"));
+        Assert.Contains("Task Scheduler at the limit: Running", log);
+        Assert.Contains(", this run", log);
+        Assert.Contains("  2026-11-01T23:11:41.000Z  the server started; it has 600 s to say gamemode.js loaded", log);
+        Assert.Contains("  [thornswood] loading plugins", log);
+        Assert.Contains("listening on <address>", log);
+        Assert.DoesNotContain("10.0.0.5", log);
+        Assert.True(log.IndexOf("bot-pass.log") < log.IndexOf("bot-pass-server.log"), "the pass's own lines come first");
+        Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
+    }
+
+    /// <summary>Each pass's logs are kept once the next pass needs the run
+    /// folder, named by the pass's Deployment, so no measurement is lost to
+    /// the pass after it; a pass from before pass.txt is kept as unnamed;
+    /// the newest 30 stay.</summary>
+    [Fact]
+    public async Task EachPassKeepsItsLogsWhenTheNextPassEmptiesTheFolder()
+    {
+        var n = 0;
+        var (a, gh, s, bp) = MakeWithPass(bp =>
+        {
+            n++;
+            File.WriteAllText(bp.PassLogPath, $"pass {n} said this\n");
+            File.WriteAllText(bp.ServerLogPath, $"server {n} said this\n");
+            return WriteResult(bp, true);
+        });
+        // What an agent from before left: logs and no pass.txt.
+        Directory.CreateDirectory(bp.ServerDir);
+        File.WriteAllText(bp.ServerLogPath, "the hung pass's server\n");
+        File.SetLastWriteTimeUtc(bp.ServerLogPath, new DateTime(2026, 11, 1, 23, 41, 30, DateTimeKind.Utc));
+        // Old kept passes, more than the newest 30.
+        for (var i = 0; i < BotPass.KeepPasses + 2; i++) Directory.CreateDirectory(Path.Combine(bp.KeptDir, $"20200101-0000{i:00}-deployment-{i}"));
+
+        BotRelease(gh, "build-1", "// new gamemode\n");
+        var first = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        HasStates(gh, s, first, "success", last: true);
+        var unnamed = Path.Combine(bp.KeptDir, "20261101-234130-unnamed");
+        Assert.Equal("the hung pass's server\n", File.ReadAllText(Path.Combine(unnamed, "bot-pass-server.log")));
+        Assert.Equal($"deployment-{first}", File.ReadAllText(Path.Combine(bp.RunDir, BotPass.PassName)));
+
+        BotRelease(gh, "build-2", "// newer gamemode\n");
+        var second = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-2\"}");
+        await a.Pass("dev", default);
+        HasStates(gh, s, second, "success", last: true);
+        var kept = Directory.GetDirectories(bp.KeptDir).Select(Path.GetFileName).Order(StringComparer.Ordinal).ToList();
+        var mine = kept.Single(k => k!.EndsWith($"-deployment-{first}"));
+        Assert.Equal("pass 1 said this\n", File.ReadAllText(Path.Combine(bp.KeptDir, mine!, "bot-pass.log")));
+        Assert.Equal("server 1 said this\n", File.ReadAllText(Path.Combine(bp.KeptDir, mine!, "bot-pass-server.log")));
+        Assert.True(File.Exists(Path.Combine(bp.KeptDir, mine!, "result.json")));
+        Assert.Contains($"the last pass's logs are kept in {Path.Combine(bp.KeptDir, mine!)}", s.Read(Path.Combine("data", $"deploy-{second}.log")));
+        Assert.Equal(BotPass.KeepPasses, kept.Count);
+        Assert.Contains("20261101-234130-unnamed", kept);
+        Assert.DoesNotContain("20200101-000000-deployment-0", kept);
+        Assert.Equal("pass 2 said this\n", File.ReadAllText(bp.PassLogPath));
+    }
+
+    /// <summary>A log past the limit is kept by its end, saying so.</summary>
+    [Fact]
+    public void AKeptLogPastTheLimitKeepsItsEnd()
+    {
+        var root = Temp();
+        var env = new EnvConfig { BotPassRoot = root };
+        var bp = new BotPass(env, new FakeTasks(() => null));
+        Directory.CreateDirectory(bp.ServerDir);
+        using (var f = File.Create(bp.ServerLogPath)) { f.SetLength(BotPass.KeepBytes + 10); f.Seek(-4, SeekOrigin.End); f.Write("END\n"u8); }
+        var dir = bp.KeepLast(_ => { });
+        var text = File.ReadAllText(Path.Combine(dir!, "bot-pass-server.log"));
+        Assert.StartsWith("[the first 10 bytes of " + (BotPass.KeepBytes + 10) + " were left out; this is its end]\n", text);
+        Assert.EndsWith("END\n", text);
+        Assert.Null(new BotPass(new EnvConfig { BotPassRoot = Temp() }, new FakeTasks(() => null)).KeepLast(_ => { }));
+    }
+
+    /// <summary>A pass that ended is read as ended at once, though Task
+    /// Scheduler writes its run down before the agent's own reading of the
+    /// time (#5380: 15 s on the box, so every pass was waited on to the
+    /// limit and failed). A start that never runs is still told apart.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task APassIsReadByTaskSchedulersOwnRecordNotTheAgentsClock(bool neverRuns)
+    {
+        var (a, gh, s, bp) = MakeWithPass(bp => WriteResult(bp, true));
+        var tasks = (FakeTasks)a.Tasks;
+        tasks.WrittenEarlier = TimeSpan.FromSeconds(15);
+        tasks.NeverRuns = neverRuns;
+        BotRelease(gh, "build-1", "// new gamemode\n");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        var took = System.Diagnostics.Stopwatch.StartNew();
+        await a.Pass("dev", default);
+        var log = s.Read(Path.Combine("data", $"deploy-{id}.log"));
+        if (!neverRuns)
+        {
+            HasStates(gh, s, id, "success", last: true);
+            Assert.True(took.Elapsed < TimeSpan.FromSeconds(4), $"the pass was waited on for {took.Elapsed}, past its end");
+            Assert.Contains("bot pass: ", log);
+            return;
+        }
+        Assert.Equal("failure", (string)gh.Last(id)!["state"]!);
+        Assert.Contains("did not end within 5 s", (string)gh.Last(id)!["description"]!);
+        Assert.Contains("Task Scheduler at the limit: Ready", log);
+        Assert.Contains("so this start never ran", log);
+    }
+
+    /// <summary>The task takes one run at a time and Task Scheduler ignores a
+    /// start while one runs (IgnoreNew), so a pass still running from before
+    /// is not started over and waited on as if it were this one.</summary>
+    [Fact]
+    public async Task APassStillRunningFromBeforeIsNotWaitedOnAsThisOne()
+    {
+        var (a, gh, s, bp) = MakeWithPass(bp => WriteResult(bp, true));
+        var tasks = (FakeTasks)a.Tasks;
+        tasks.AlreadyRunning(DateTime.UtcNow.AddMinutes(-31));
+        BotRelease(gh, "build-1", "// new gamemode\n");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        var d = (string)gh.Last(id)!["description"]!;
+        Assert.Equal("failure", (string)gh.Last(id)!["state"]!);
+        Assert.Contains("the bot pass task is still Running", d);
+        Assert.Contains("nothing was started", s.Read(Path.Combine("data", $"deploy-{id}.log")));
+        Assert.Equal(0, tasks.Starts);
+        Assert.Equal(0, tasks.Ends);
+        Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
+    }
+
+    /// <summary>The bot part goes into the copy whole: a file the bot carries
+    /// beside the three it began with (its relay client and the voice service
+    /// it joins, #5196) needs no change here. Without Bot-Pass.js, the file
+    /// the task runs, there is no pass, and dev keeps what it runs.</summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task TheCopyTakesTheWholeBotPart(bool withPass)
+    {
+        string? botTree = null;
+        var (a, gh, s, bp) = MakeWithPass(bp =>
+        {
+            botTree = string.Join(",", Directory.GetFiles(bp.BotDir).Select(Path.GetFileName).Order(StringComparer.Ordinal));
+            return WriteResult(bp, true);
+        });
+        var part = new Dictionary<string, byte[]>(BotPart)
+        {
+            ["relay.js"] = B("// the relay client"), ["voice-server.js"] = B("// voice"), ["headlines.js"] = B("// headlines"),
+        };
+        if (!withPass) part.Remove(BotPass.Runs);
+        BotRelease(gh, "build-1", "// new gamemode\n", bot: part);
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        if (withPass)
+        {
+            HasStates(gh, s, id, "in_progress,success");
+            Assert.Equal("Bot-Pass.js,bot.js,character.js,headlines.js,relay.js,voice-server.js", botTree);
+            return;
+        }
+        var last = gh.Last(id)!;
+        Assert.Equal("failure", (string)last["state"]!);
+        Assert.Contains("the Release's bot part has no Bot-Pass.js", (string)last["description"]!);
+        Assert.Null(botTree);
+        Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
     }
 
     [Fact]
@@ -1302,7 +1984,7 @@ public sealed class AgentTests : IDisposable
     {
         var (a, gh, s, _, _) = Make();
         GamemodeRelease(gh, "build-1", "// new gamemode\n");
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
         HasStates(gh, s, id, "success", last: true);
         Assert.Contains("no bot pass: it is not set up on this box yet", s.Read(Path.Combine("data", $"deploy-{id}.log")));
@@ -1325,7 +2007,7 @@ public sealed class AgentTests : IDisposable
         });
         PutTables(s, new() { ["FOODS.json"] = "[\"dev\"]" });
         BotRelease(gh, "build-1", Reading("new gamemode"), tables: inRelease ? new() { ["FOODS.json"] = "[\"new\"]", ["DATA.json"] = "{}" } : null);
-        var id = gh.AddDeployment("Dev server", Commit, "{\"release\":\"build-1\"}");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
         await a.Pass("dev", default);
         HasStates(gh, s, id, "success", last: true);
         Assert.NotNull(copied);
@@ -1345,19 +2027,19 @@ public sealed class AgentTests : IDisposable
             File.WriteAllBytes(files[n], b);
         }
         var said = new List<string>();
-        Assert.Equal("", bp.Prepare(files, said.Add));
+        Assert.Equal("", bp.Prepare(files, BotPart.Keys, said.Add));
         Assert.Contains(said, l => l.Contains("3 were new or changed on dev"));
         said.Clear();
-        Assert.Equal("", bp.Prepare(files, said.Add));
+        Assert.Equal("", bp.Prepare(files, BotPart.Keys, said.Add));
         Assert.Contains(said, l => l.Contains("0 were new or changed on dev"));
         File.WriteAllText(Path.Combine(s.Root, "data", "Thornswood.esp"), "plugin Thornswood.esp, changed");
         said.Clear();
-        Assert.Equal("", bp.Prepare(files, said.Add));
+        Assert.Equal("", bp.Prepare(files, BotPart.Keys, said.Add));
         Assert.Contains(said, l => l.Contains("1 were new or changed on dev"));
         Assert.Equal("plugin Thornswood.esp, changed", File.ReadAllText(Path.Combine(bp.PluginDir, "Thornswood.esp")));
         // A load order naming a file that is not there stops the copy.
         File.Delete(Path.Combine(s.Root, "data", "Skyrim.esm"));
-        Assert.Throws<InvalidDataException>(() => bp.Prepare(files, said.Add));
+        Assert.Throws<InvalidDataException>(() => bp.Prepare(files, BotPart.Keys, said.Add));
     }
 
     [Fact]
@@ -1390,16 +2072,25 @@ sealed class FakeTasks(Func<string?> work) : ITasks
     public string? LastName;
     volatile bool running;
     DateTime last = DateTime.MinValue;
+    /// <summary>How much earlier than the agent's clock the run is written
+    /// down. On the box Task Scheduler wrote each run 13 to 15 s before the
+    /// time the agent read just before starting it (#5380), so every test
+    /// runs with that.</summary>
+    public TimeSpan WrittenEarlier { get; set; } = TimeSpan.FromSeconds(15);
+    /// <summary>A start Task Scheduler takes and never runs.</summary>
+    public bool NeverRuns { get; set; }
     public void Start(string name)
     {
         Starts++;
         LastName = name;
+        if (NeverRuns) return;
         running = true;
-        last = DateTime.UtcNow;
+        last = DateTime.UtcNow - WrittenEarlier;
         Task.Run(() => { var w = work(); if (w != "hang") running = false; });
     }
     public TaskInfo Info(string name) => new(running ? "Running" : "Ready", last, 0);
     public void End(string name) { Ends++; running = false; }
+    public void AlreadyRunning(DateTime since) { running = true; last = since; }
 }
 
 sealed class Stub(Func<HttpRequestMessage, Task<HttpResponseMessage>> f) : HttpMessageHandler

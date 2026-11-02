@@ -14,7 +14,7 @@
        tests\Launcher-Csc.ps1, #2821) and asked: for every picture and
        recording in tests\fixtures\media-3648.js, MediaStrip.Clean gives
        exactly the bytes the site keeps (the same fixture's clean bytes,
-       which tests\test-3648-media-metadata.js holds the site to), so what the
+       which site\tests\test-3648-media-metadata.js holds the site to), so what the
        launcher sends and what the site keeps cannot drift apart; none of
        them holds a GPS block or XMP; a clean file comes back as the same
        array; one whose blocks cannot be walked comes back null; and the
@@ -105,10 +105,12 @@ Yes 'and refuses a file that cannot be cleaned, saying why, with what stopped it
     $submit.Contains('Swallow.Note("Gallery.Submit clean", unwalked)'))
 
 # ------------------------------------------------- 3. one set of rules, two copies
-$site = [IO.File]::ReadAllText((Join-Path $root 'site\server.js'))
+# The site is server.js over its modules in site\lib since #5357.
+. (Join-Path $PSScriptRoot 'SiteFiles.ps1')
+$site = Get-SiteSource (Join-Path $root 'site')
 $strip = [IO.File]::ReadAllText((Join-Path $app 'MediaStrip.cs'))
 Yes 'the site''s stripMedia names the launcher''s copy' ($site.Contains('launcher/app/MediaStrip.cs'))
-Yes 'and the launcher''s names the site''s' ($strip.Contains('stripMedia in site/server.js'))
+Yes 'and the launcher''s names the site''s' ($strip.Contains('stripMedia in site/lib/media.js'))
 
 Write-Host ''
 Write-Host "$script:pass passed, $script:fail failed"

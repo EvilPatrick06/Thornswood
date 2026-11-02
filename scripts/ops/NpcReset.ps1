@@ -6,8 +6,8 @@
   Dot-sourced by Reset-Npcs.ps1, which sends $ThornswoodNpcReset to the box
   with the step that stops and starts the server, and by
   tests\test-4595-npc-reset.ps1, which runs it over stand-in server folders.
-  It does nothing on its own. Keep it ASCII and Windows PowerShell 5.1: the
-  box reads a file with no byte order mark as ANSI.
+  It does nothing on its own. Keep it ASCII. It runs on the box, in
+  PowerShell 7.
 
   WHY. The engine fork's #98 gives an NPC only the gear it fights and looks
   with, marked as its own (npcEquipment), and never its plugin's death list.
@@ -47,9 +47,14 @@
     runtime     any other actor made by the server with no profile.
 
   WHAT IT MEASURES AS WELL.
-    - How many NPCs carry #98's mark (npcEquipment on an entry) and how many
-      do not. Before the reset on a server running #98, the unmarked ones
-      are what this is for; after it, an NPC saved again carries the mark.
+    - What the NPCs carry, in three counts: every item marked with #98's
+      mark (npcEquipment), at least one item without it, and nothing at
+      all. #98 puts only weapons, armour, ammunition, scrolls and carried
+      lights into a new NPC, so a record with none of them (most animals
+      and many creatures) starts with nothing, and there is nothing to
+      mark (EnsureBaseContainerAdded). Before the reset on a server running
+      #98, the NPCs with an unmarked item are what this is for; after it,
+      an NPC saved again is marked or carries nothing.
     - Kill contracts. A character's quest record (thornswoodQuests) keeps
       killHistory, the highest life of each NPC it was credited for, and a
       kill of that NPC at a life no higher is refused as a duplicate. An NPC
@@ -76,11 +81,18 @@
   Lines it prints, besides plain ones:
     NPCRESET|<moved>|<characters kept>|<other references kept>|<not read>
     NPCKINDS|placed=<n>|patrol=<n>|staff-run=<n>|staff-kept=<n>|runtime=<n>
-    NPCMARKS|<npcs with #98's mark>|<npcs without it>
+    NPCMARKS|<every item marked>|<an item without the mark>|<carrying nothing>
     KILLHISTORY|<characters>|<npcs>
     STAFFKEPT|<formDesc>|<baseDesc>|<world or cell>|<x,y,z>
     NOTREAD|<file>|<why>
     STOP|<why>                      nothing was moved
+
+  THE SERVER BUILD. Test-ThornswoodServerBuild reads the server-build.json
+  a deploy puts in the server's folder (Deploy-Server.ps1, Publish-Server)
+  and says whether it is the build records\server-build.json holds on main:
+    SERVERBUILD|<same, differs or unknown>|<the box's fork commit>|<its sha256>|<main's fork commit>|<main's sha256>
+  Reset-Npcs.ps1 moves nothing unless it says same, since an NPC made again
+  by a server without #98 is unmarked again.
 #>
 $ThornswoodNpcReset = @'
 # ---- the NPC reset (scripts\ops\NpcReset.ps1, #4595) ----
@@ -96,7 +108,7 @@ function Get-ThornswoodField($o, [string]$Name) {
 # What one saved change form is: @{ kind; npc; why; desc; ... }. $File is
 # its name in changeForms, which must be its own formDesc's.
 function Get-ThornswoodFormKind($o, [string]$File) {
-  $r = @{ kind = ''; npc = $false; why = ''; desc = ''; marked = $false; life = $null }
+  $r = @{ kind = ''; npc = $false; why = ''; desc = ''; gear = 'empty'; life = $null }
   if (-not ($o -is [System.Management.Automation.PSCustomObject])) { $r.kind = 'unread'; $r.why = 'it is not a JSON object'; return $r }
   $desc = Get-ThornswoodField $o 'formDesc'
   if (-not ($desc -is [string]) -or $desc -notmatch '^[0-9a-f]{1,8}(:[^:\\/]+)?$') { $r.kind = 'unread'; $r.why = 'its formDesc is not one'; return $r }
@@ -118,10 +130,26 @@ function Get-ThornswoodFormKind($o, [string]$File) {
   else { $r.kind = 'runtime' }
   $inv = Get-ThornswoodField $o 'inv'
   foreach ($e in @(Get-ThornswoodField $inv 'entries')) {
-    if ((Get-ThornswoodField $e 'npcEquipment') -eq $true) { $r.marked = $true; break }
+    if ($null -eq $e) { continue }
+    if ((Get-ThornswoodField $e 'npcEquipment') -eq $true) { if ($r.gear -eq 'empty') { $r.gear = 'marked' } }
+    else { $r.gear = 'unmarked'; break }
   }
   $r.life = Get-ThornswoodField $df '_skympNpcLifeGeneration'
   return $r
+}
+# Whether the server in $Root is the build main's record names (#98 and
+# later): one SERVERBUILD line, said the same way whether it reads or not.
+function Test-ThornswoodServerBuild([string]$Root, [string]$WantCommit, [string]$WantSha) {
+  $path = Join-Path $Root 'server-build.json'
+  $rec = $null; $why = ''
+  if (-not (Test-Path -LiteralPath $path)) { $why = 'none there' }
+  else { try { $rec = Read-ThornswoodJson $path } catch { $why = 'it will not read' } }
+  $commit = [string](Get-ThornswoodField (Get-ThornswoodField $rec 'source') 'commit')
+  $sha = [string](Get-ThornswoodField $rec 'sha256')
+  if (-not $why -and (-not $commit -or -not $sha)) { $why = 'it names no commit or sha256' }
+  $state = if ($why) { 'unknown' } elseif ($sha -eq $WantSha -and $commit -eq $WantCommit) { 'same' } else { 'differs' }
+  if ($why) { $commit = $why; $sha = '' }
+  return ('SERVERBUILD|' + $state + '|' + $commit + '|' + $sha + '|' + $WantCommit + '|' + $WantSha)
 }
 function Read-ThornswoodJson([string]$Path) {
   return ([IO.File]::ReadAllText($Path) -replace '^\uFEFF', '' | ConvertFrom-Json)
@@ -189,7 +217,7 @@ function Invoke-ThornswoodNpcReset([string]$Root, [string]$Stamp, [switch]$Move)
 
   $moves = @()
   $kinds = [ordered]@{ 'placed' = 0; 'patrol' = 0; 'staff-run' = 0; 'staff-kept' = 0; 'runtime' = 0 }
-  $chars = 0; $objects = 0; $unread = 0; $marked = 0; $unmarked = 0
+  $chars = 0; $objects = 0; $unread = 0; $gear = @{ 'marked' = 0; 'unmarked' = 0; 'empty' = 0 }
   $npcDescs = @{}
   $histories = @()
   $staffKept = @()
@@ -213,7 +241,7 @@ function Invoke-ThornswoodNpcReset([string]$Root, [string]$Stamp, [switch]$Move)
       continue
     }
     $kinds[$k.kind]++
-    if ($k.marked) { $marked++ } else { $unmarked++ }
+    $gear[$k.gear]++
     $npcDescs[$k.desc] = $true
     if ($k.kind -eq 'staff-kept') {
       $pos = @(Get-ThornswoodField $o 'position' | ForEach-Object { [math]::Round([double]$_) }) -join ','
@@ -250,7 +278,7 @@ function Invoke-ThornswoodNpcReset([string]$Root, [string]$Stamp, [switch]$Move)
 
   'NPCRESET|' + $(if ($Move) { $done } else { $moves.Count }) + '|' + $chars + '|' + $objects + '|' + $unread
   'NPCKINDS|' + (($kinds.Keys | ForEach-Object { $_ + '=' + $kinds[$_] }) -join '|')
-  'NPCMARKS|' + $marked + '|' + $unmarked
+  'NPCMARKS|' + $gear['marked'] + '|' + $gear['unmarked'] + '|' + $gear['empty']
   'KILLHISTORY|' + $heldBy + '|' + $heldFor.Count
   $staffKept
   if ($Move) {

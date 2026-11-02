@@ -29,7 +29,9 @@
   packs nor sends nor checks for it, making the dev instance copies no page
   from live, the build parses no file there, no harness reads it, and the
   only files that open a socket to the service are the launcher's voice
-  page and the game's chat overlay.
+  page, the game's chat overlay and the load test's bots
+  (scripts\bot\load-bots.js, #4623), which stand in for the overlay: each
+  gets a join token from /token first, as the overlay does.
 
   VOICE points it at another copy of voice-server.js, which is how it was
   shown to fail on the code before the change. Writes only to a temp folder,
@@ -249,9 +251,13 @@ function get(port, route) {
   yes('making the dev instance copies the voice program and no page from live',
       /robocopy \$liveVoice \$devVoice voice-server\.js/.test(dev) && !/Join-Path \$liveVoice 'public'/.test(dev));
 
+  // The list of what the build parses is in scripts\dev\Check-Parse.ps1
+  // since #5291, which build.yml and the pre-push hook both run.
   const build = read('.github/workflows/build.yml');
+  const parse = read('scripts/dev/Check-Parse.ps1');
   yes('the build parses the service and no file in voice\\public',
-      /Get-ChildItem -Path site\\server\.js, voice\\voice-server\.js -File/.test(build) && build.indexOf('voice\\public') < 0);
+      /Check-Parse\.ps1 -What Scripts/.test(build) && /\(Join-Path 'voice' 'voice-server\.js'\)/.test(parse) &&
+      build.indexOf('voice\\public') < 0 && !/public/.test(parse));
 
   const readers = tracked.filter((f) => /^(tests|voice)\/test-[^/]+\.(js|ps1)$/.test(f) && !/test-1822-/.test(f))
     .filter((f) => {
@@ -271,8 +277,11 @@ function get(port, route) {
   const opens = tracked.filter((f) => /\.(js|html)$/.test(f) && !/^(tests|voice|docs|engine|site\/node_modules)\//.test(f) &&
                                f !== 'game/gamemode.js')
     .filter((f) => /new WebSocket\(/.test(read(f)));
-  yes('the only files that open a socket are the launcher\'s voice page and the game\'s chat overlay (' + opens.join(', ') + ')',
-      opens.length === 2 && opens.indexOf('launcher/voice-host.html') >= 0 && opens.indexOf('game/ui/thornswood-chat.js') >= 0);
+  // And the bot pass's relay client (#5196), which joins a copy of the
+  // service of its own the way the chat overlay does, from node, with no Origin.
+  const clients = ['game/ui/thornswood-chat.js', 'launcher/voice-host.html', 'scripts/bot/load-bots.js', 'scripts/bot/relay.js'];
+  yes('the only files that open a socket are the launcher\'s voice page, the game\'s chat overlay, the load test\'s bots and the bot pass\'s relay client (' + opens.join(', ') + ')',
+      opens.length === clients.length && clients.every((f) => opens.indexOf(f) >= 0));
 
   // ------------------------------------------------------- the service
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-1822-'));

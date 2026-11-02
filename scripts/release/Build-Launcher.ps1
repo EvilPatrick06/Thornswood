@@ -51,7 +51,7 @@ param(
     [string]$OutDir,
     [switch]$NoPause,
     # Where the setup program goes, out\setup-stub.exe unless told otherwise.
-    # tests\test-498-msbuild.ps1 builds into scratch so a test build never
+    # launcher\tests\test-498-msbuild.ps1 builds into scratch so a test build never
     # replaces the stub a clone's packaging copies from.
     [string]$StubOut,
     # Leaves the launcher unsigned even on a machine with records\signing\signing.json.

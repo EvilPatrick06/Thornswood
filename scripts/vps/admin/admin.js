@@ -70,7 +70,10 @@
                     vulnerability reporting, immutable releases, secret
                     scanning and its push protection, and auto-merge, are
                     each on or off as the entry says (left as they are when the entry does not
-                    say). A ruleset GitHub has that the record does not name
+                    say). An App or a deploy key may bypass only a tag
+                    ruleset: a record that lets one bypass a branch
+                    ruleset stops the run (the redesign's part 20). A
+                    ruleset GitHub has that the record does not name
                     is never deleted here; it stops the run, named, so a
                     protection nobody wrote down is a pull request to the
                     record or a deliberate removal, never a silent loss. A repository
@@ -88,28 +91,6 @@
                     GitHub, never a merged pull request through this App.
                     An entry that gives no list leaves its people as they
                     are.
-    go-public       the flip (#4013, #3721; Patrick's word of 30 Oct 2026,
-                    and his of the same evening that it is not done on
-                    One). A cloud thread's proxy refuses the visibility
-                    switch and every secrets and environments path, so the
-                    App does it, and what it does is fixed here, never said
-                    by the caller. It reads first and stops, changing
-                    nothing, while any runner is still registered to this
-                    repository (#3792: once it is public, a fork's pull
-                    request could ask for one), while the ops repository
-                    lacks its own copy of a box secret this one is about to
-                    lose (PUBLIC_DROPS, OPS_COPIES), or while the App lacks
-                    the Secrets or Environments write the deletes need.
-                    Then it deletes this repository's copies of the box's
-                    secrets (the box's workflows moved to the ops
-                    repository with #4039, so nothing here runs with them),
-                    and only once all are gone makes the repository public,
-                    and reads everything back. The desk environment stays,
-                    with NEXUS_API_KEY, for nexus-run.yml on GitHub's
-                    runner. With check it says what it would do. Once done
-                    it changes nothing and says so. Making a repository
-                    public cannot be taken back, so a failed delete stops
-                    it before the switch.
   What to do comes from Thornswood's main, read through the App, never from the caller,
   so whoever asks can only make GitHub match main. A change is a pull
   request to the record.
@@ -119,7 +100,10 @@
   GitHub gave that run, for the audience thornswood-admin, and this checks it
   against GitHub's published keys (fetched each time) and its claims:
   GitHub's issuer, the audience, not expired, the ops repository,
-  refs/heads/main, that exact workflow on main, started by hand. A push here
+  refs/heads/main, that exact workflow on main, started by hand or by its
+  nightly schedule. A scheduled run may only check (CHANGING_ASKS): its
+  repository settings check opens one issue on the board while GitHub
+  differs from the record and closes it once it matches. A push here
   cannot start it there, so the Desk runs Set-BuildRunners.ps1 (with
   -RepoSettings for the repository settings) or Set-RepoAbout.ps1 after a
   merge that changes a record. A pull request's
@@ -138,9 +122,12 @@
   App's manifest to GitHub (name, no webhook, private, administration write
   and contents read on the repositories it is installed on, and since #3534
   read of the names of its secrets, variables and environments, never their
-  values, since #4013's go-public write of the secrets and environment
-  secrets, which only go-public asks for, and since #2841's Ship verbs
-  Actions write, which only ship-access.js asks for); Patrick creates
+  values, Environments write for an environment's secret, which only
+  ops-access.js keys asks for (Renew-BoxKey.ps1), Issues write for the
+  Discord bot's token (#5260), and since #2841's Ship verbs Actions write,
+  which only ship-access.js asks for, and Deployments write, which only the
+  deploy agent asks for (tools/DeployAgent, #5180); records/github-apps.json is the list
+  and the nightly checks the App against it); Patrick creates
   it, GitHub sends him back to /setup/done with a one-time code, and this
   trades the code for the App's key straight from GitHub. The key goes into
   state\key.pem, the App's id and name into state\app.json, the setup is
@@ -205,15 +192,26 @@ const RULES = {
   repositoryId: '1435123931', // ThornswoodRP/Thornswood-Ops (repos API, 1 Nov 2026)
   ref: 'refs/heads/main',
   workflow: '/.github/workflows/github-admin.yml@refs/heads/main',
-  events: ['workflow_dispatch'],
+  // A scheduled run (github-admin.yml's nightly) may only check: converge
+  // refuses it anything that would change GitHub (CHECK_ONLY).
+  events: ['workflow_dispatch', 'schedule'],
 };
+// The asks that change GitHub unless they are a check. A scheduled run may
+// ask them only with check (the redesign's part 20, 1 Nov 2026); settings and
+// installation-repos only read, so they need no check.
+const CHANGING_ASKS = ['runner-labels', 'repo-about', 'repo-settings'];
+// The one issue a scheduled check of the repository settings opens on the
+// board when GitHub differs from the record, and closes once it matches
+// again. Found by this title among the open issues the App itself opened.
+const DRIFT_TITLE = 'GitHub\'s repository settings differ from the record';
+const DRIFT_LINES = 8;
 // The labels every VPS runner carries, or GitHub gives itself; a record may
 // never name one, since taking it off would strand every job that asks.
 const RESERVED = ['self-hosted', 'windows', 'linux', 'macos', 'x64', 'arm64', 'thornswood-vps', 'thornswood-pr'];
 // What a run may ask for. None takes anything from the caller but the
 // check: runner-labels, repo-about and repo-settings each read their record
 // from main, and settings reads GitHub's settings alone.
-const ASKS = ['runner-labels', 'installation-repos', 'repo-about', 'settings', 'repo-settings', 'go-public'];
+const ASKS = ['runner-labels', 'installation-repos', 'repo-about', 'settings', 'repo-settings'];
 const SETTINGS_FILE = 'records/github-repo-settings.json';
 // The repositories repo-settings may change: this one and the engine fork.
 // The App reaches only those it is installed on, and this stops a record
@@ -242,25 +240,13 @@ const MERGE_KEYS = ['allow_auto_merge'];
 // main's record too; the fork's only needs its settings.
 const HOME_PERMISSIONS = { administration: 'write', contents: 'read' };
 const FORK_PERMISSIONS = { administration: 'write' };
-// What go-public takes off this repository before it is public (#4013):
-// the box's secrets, whose copies moved to the ops repository with the box's
-// workflows (#4039). OPS_COPIES is what the ops repository must hold first,
-// so no box job is left without its key. PUBLIC_KEEPS stays, for
-// nexus-run.yml, and is only read.
-const PUBLIC_DROPS = {
-  secrets: ['CLOUDFLARE_TURNSTILE_TOKEN'],
-  environments: ['notices'],
-  environmentSecrets: [{ environment: 'desk', name: 'DESK_KEY_B64' }],
-};
-const OPS_COPIES = {
-  secrets: ['CLOUDFLARE_TURNSTILE_TOKEN'],
-  environmentSecrets: [{ environment: 'notices', name: 'NOTICE_KEY_B64' }, { environment: 'desk', name: 'DESK_KEY_B64' }],
-};
-const PUBLIC_KEEPS = [{ environment: 'desk', name: 'NEXUS_API_KEY' }];
-
 // The parts of a ruleset the record says and GitHub is made to match. Any
 // other key in a record entry (why) is the record's own note and never sent.
 const RULESET_KEYS = ['name', 'target', 'enforcement', 'conditions', 'rules', 'bypass_actors'];
+// The bypass actors that are machines rather than people's roles: GitHub's
+// actor_type for an App, and for a deploy key. checkRulesets lets them bypass
+// a tag ruleset only.
+const MACHINE_ACTORS = ['Integration', 'DeployKey'];
 
 // Server-Log.js --stamp puts the time on each line, as it does for the bridge.
 function log(line) {
@@ -404,6 +390,20 @@ function checkRulesets(repo, list) {
     if (!Array.isArray(inc) || !inc.length) throw new Error(at + ': ' + name + ' applies to no ref');
     if (!Array.isArray(r.rules) || !r.rules.length || r.rules.some(x => !x || typeof x.type !== 'string')) throw new Error(at + ': ' + name + ' has no rules, or one with no type');
     if (!Array.isArray(r.bypass_actors)) throw new Error(at + ': ' + name + ' does not say who may bypass it (an empty list is nobody)');
+    // An App or a deploy key, a machine's identity, may bypass a tag ruleset
+    // and never a branch one (the redesign's part 20, 1 Nov 2026): a branch
+    // is changed only through a pull request with its checks, whoever pushes.
+    for (const b of r.bypass_actors) {
+      // GitHub Actions, the identity of a run's own token, is refused as a
+      // bypass actor: 422 Validation Failed on 31 Oct 2026 in a personal
+      // repository and on 1 Nov 2026 in the organization (#5296).
+      if (b && b.actor_type === 'Integration' && b.actor_id === 15368) {
+        throw new Error(at + ': ' + name + ' lets GitHub Actions (15368) bypass it, which GitHub refuses (422); a run that must bypass a ruleset uses an App of its own');
+      }
+      if (MACHINE_ACTORS.indexOf(b && b.actor_type) >= 0 && r.target !== 'tag') {
+        throw new Error(at + ': ' + name + ' lets ' + (b.actor_type === 'Integration' ? 'the App ' + b.actor_id : 'a deploy key') + ' bypass a branch ruleset; an App or a deploy key may bypass only a tag ruleset');
+      }
+    }
   }
 }
 
@@ -579,8 +579,15 @@ function send(method, url, headers, body) {
     req.end();
   });
 }
+// What GitHub answered, with its reasons. A 422 says only "Validation
+// Failed" in message; why is in errors, as strings (rulesets) or as
+// { resource, field, code, message } objects, and leaving them out hid why
+// the release tag ruleset was refused on 1 Nov 2026 (#5296).
 function said(a) {
-  return 'HTTP ' + a.status + (a.body && a.body.message ? ': ' + a.body.message : '');
+  const b = a.body || {};
+  const why = (Array.isArray(b.errors) ? b.errors : []).map(e =>
+    typeof e === 'string' ? e : (e && (e.message || [e.resource, e.field, e.code].filter(Boolean).join(' '))) || '').filter(Boolean);
+  return 'HTTP ' + a.status + (b.message ? ': ' + b.message : '') + (why.length ? ' (' + why.join('; ') + ')' : '');
 }
 
 function readApp() {
@@ -1040,96 +1047,45 @@ async function readSettings(token, held) {
   return { ok: true, readings, unread };
 }
 
-// ---------------------------------------------------------------- go-public --
-// Every name in one of repo's lists, or found false when GitHub has no such
-// list (an environment that is not there). key is the array's name in the
-// answer (secrets, runners).
-async function listNames(token, repo, pathPart, key) {
-  const items = [];
-  for (let page = 1; page <= 20; page++) {
-    const a = await call('GET', API + '/repos/' + repo + '/' + pathPart + '?per_page=100&page=' + page, { Authorization: 'Bearer ' + token });
-    if (a.status === 404) return { found: false, items: [] };
-    if (a.status !== 200 || !a.body || !Array.isArray(a.body[key])) throw new Error('GET ' + repo + '/' + pathPart + ' answered ' + said(a));
-    for (const x of a.body[key]) items.push(String(x.name));
-    if (a.body[key].length < 100) break;
-  }
-  return { found: true, items };
+// What a scheduled repository settings check found, told to the board: the
+// one open issue titled DRIFT_TITLE that this App opened is opened, or its
+// body brought up to date, while GitHub differs from the record (or the
+// check stopped), and closed with a comment once a check matches again.
+// Uses the Issues write the Discord bot's token already takes, for this
+// repository alone. Returns what it did, in a few words.
+function driftBody(r) {
+  // Only what differs or stopped; a line that says GitHub matches is left out.
+  const what = r.lines.filter(l => /^STOP\b| would /.test(l));
+  const shown = what.slice(0, DRIFT_LINES).map(l => '- ' + l);
+  if (what.length > DRIFT_LINES) shown.push('- and ' + (what.length - DRIFT_LINES) + ' more in the run\'s log');
+  return 'The nightly check of records/github-repo-settings.json found GitHub ' + (r.ok ? 'differs from it in ' + r.differs + ' place(s)' : 'could not be checked all the way') + ':\n\n' +
+    shown.join('\n') + '\n\nDone when: the Desk\'s pwsh scripts/deploy/Set-BuildRunners.ps1 -RepoSettings run, or a pull request to the record, makes the nightly check match.';
 }
-
-// What this repository and the ops repository hold now, read with read-only
-// tokens: { visibility, runners, secrets, envs: { name: secrets or null },
-// ops: { secrets, envs } }.
-async function publicState(home, ops) {
-  const repo = await call('GET', API + '/repos/' + REPO, { Authorization: 'Bearer ' + home });
-  if (repo.status !== 200 || !repo.body || !repo.body.visibility) throw new Error('GitHub would not give ' + REPO + ' (' + said(repo) + ')');
-  const out = { visibility: String(repo.body.visibility), runners: (await listNames(home, REPO, 'actions/runners', 'runners')).items, secrets: (await listNames(home, REPO, 'actions/secrets', 'secrets')).items, envs: {}, ops: { envs: {} } };
-  const envs = new Set(PUBLIC_DROPS.environments.concat(PUBLIC_DROPS.environmentSecrets.map(e => e.environment), PUBLIC_KEEPS.map(e => e.environment)));
-  for (const env of envs) {
-    const r = await listNames(home, REPO, 'environments/' + encodeURIComponent(env) + '/secrets', 'secrets');
-    out.envs[env] = r.found ? r.items : null;
+async function reportDrift(held, now, r) {
+  const token = await installationToken(held, now, REPO, BOT_PERMISSIONS);
+  const auth = { Authorization: 'Bearer ' + token };
+  const me = String(held.app.slug || '') + '[bot]';
+  const list = await call('GET', API + '/repos/' + REPO + '/issues?state=open&per_page=100&creator=' + encodeURIComponent(me), auth);
+  if (list.status !== 200 || !Array.isArray(list.body)) throw new Error('GitHub would not list the open issues (' + said(list) + ')');
+  const open = list.body.find(i => i && i.title === DRIFT_TITLE && !i.pull_request);
+  if (!r.ok || r.differs > 0) {
+    const body = driftBody(r);
+    if (open) {
+      if (open.body === body) return 'issue #' + open.number + ' already says this';
+      const a = await call('PATCH', API + '/repos/' + REPO + '/issues/' + open.number, auth, { body });
+      if (a.status !== 200) throw new Error('GitHub did not update issue #' + open.number + ' (' + said(a) + ')');
+      return 'issue #' + open.number + ' updated';
+    }
+    const a = await call('POST', API + '/repos/' + REPO + '/issues', auth, { title: DRIFT_TITLE, body });
+    if (a.status !== 201 || !a.body) throw new Error('GitHub did not open the issue (' + said(a) + ')');
+    return 'issue #' + a.body.number + ' opened';
   }
-  out.ops.secrets = (await listNames(ops, RUNNERS_REPO, 'actions/secrets', 'secrets')).items;
-  for (const env of new Set(OPS_COPIES.environmentSecrets.map(e => e.environment))) {
-    const r = await listNames(ops, RUNNERS_REPO, 'environments/' + encodeURIComponent(env) + '/secrets', 'secrets');
-    out.ops.envs[env] = r.found ? r.items : null;
-  }
-  return out;
-}
-
-// What go-public still has to do, in the order it does it: every delete,
-// then the switch. [{ what, method, path, body, needs }], needs being the
-// App's permission the call takes, at write.
-function planPublic(st) {
-  const plan = [];
-  for (const n of PUBLIC_DROPS.secrets) if (st.secrets.includes(n)) plan.push({ what: 'the secret ' + n, method: 'DELETE', path: '/actions/secrets/' + n, needs: 'secrets' });
-  for (const e of PUBLIC_DROPS.environmentSecrets) if ((st.envs[e.environment] || []).includes(e.name)) plan.push({ what: 'the ' + e.environment + ' environment\'s secret ' + e.name, method: 'DELETE', path: '/environments/' + encodeURIComponent(e.environment) + '/secrets/' + e.name, needs: 'environments' });
-  for (const env of PUBLIC_DROPS.environments) if (st.envs[env]) plan.push({ what: 'the ' + env + ' environment, with its secrets ' + (st.envs[env].join(', ') || 'none'), method: 'DELETE', path: '/environments/' + encodeURIComponent(env), needs: 'administration' });
-  if (st.visibility !== 'public') plan.push({ what: 'the switch from ' + st.visibility + ' to public', method: 'PATCH', path: '', body: { visibility: 'public' }, needs: 'administration' });
-  return plan;
-}
-
-// Why go-public may not go on, from what it read: [] when it may.
-function publicStops(st) {
-  const stops = [];
-  if (st.runners.length) stops.push('these runners are still registered to ' + REPO + ': ' + st.runners.join(', ') + '. #4013 step 2 moves them; a public repository has none (#3792)');
-  for (const n of OPS_COPIES.secrets) if (!st.ops.secrets.includes(n)) stops.push(RUNNERS_REPO + ' has no secret ' + n + ' of its own yet');
-  for (const e of OPS_COPIES.environmentSecrets) if (!(st.ops.envs[e.environment] || []).includes(e.name)) stops.push(RUNNERS_REPO + ' has no ' + e.environment + ' environment secret ' + e.name + ' of its own yet (#4013 step 4, Grant-BoxAccess.ps1)');
-  return stops;
-}
-
-// The flip, or with check what it would do. { ok, lines, changed, differs }.
-async function goPublic(held, now, check) {
-  const inst = await installation(held, now);
-  const p = inst.permissions;
-  const home = await installationToken(held, now, REPO, { administration: 'read', secrets: 'read', environments: 'read' }, inst);
-  const ops = await installationToken(held, now, RUNNERS_REPO, { secrets: 'read', environments: 'read' }, inst);
-  const st = await publicState(home, ops);
-  const lines = [REPO + ' is ' + st.visibility + '; runners registered to it: ' + (st.runners.length ? st.runners.join(', ') : 'none')];
-  for (const k of PUBLIC_KEEPS) if (!(st.envs[k.environment] || []).includes(k.name)) lines.push('note: the ' + k.environment + ' environment has no ' + k.name + ', which nexus-run.yml needs; go-public leaves that alone');
-  const plan = planPublic(st);
-  if (!plan.length) return { ok: true, lines: lines.concat([REPO + ' is public and holds none of the box\'s secrets']), changed: 0, differs: 0 };
-  const stops = publicStops(st);
-  const needs = [...new Set(plan.map(c => c.needs))];
-  for (const k of needs) if (p[k] !== 'write') stops.push('the App has ' + (p[k] || 'no') + ' ' + k + ' permission, and ' + plan.filter(c => c.needs === k).map(c => c.what).join(', ') + ' needs write: its permissions page, then Accept on the installation');
-  for (const c of plan) lines.push((check ? 'would take ' : 'to take ') + c.what);
-  if (stops.length) return { ok: false, lines: lines.concat(stops.map(s => 'STOP ' + s + '; nothing was changed')), changed: 0, differs: plan.length };
-  if (check) return { ok: true, lines, changed: 0, differs: plan.length };
-  // Write for exactly what the plan takes, on this repository alone.
-  const write = await installationToken(held, now, REPO, Object.fromEntries(needs.map(k => [k, 'write'])), inst);
-  let changed = 0;
-  for (const c of plan) {
-    const a = await call(c.method, API + '/repos/' + REPO + c.path, { Authorization: 'Bearer ' + write }, c.body);
-    const done = c.method === 'PATCH' ? a.status === 200 : (a.status === 204 || a.status === 404);
-    if (!done) return { ok: false, lines: lines.concat(['STOP GitHub did not take ' + c.what + ' (' + said(a) + '); ' + REPO + ' is still ' + st.visibility + (c.method === 'PATCH' ? '' : ', and nothing after this was done')]), changed, differs: plan.length };
-    lines.push('took ' + c.what);
-    changed++;
-  }
-  // Read back rather than trust the calls.
-  const after = await publicState(home, ops);
-  const left = planPublic(after);
-  if (left.length) return { ok: false, lines: lines.concat(['STOP GitHub still has ' + left.map(c => c.what).join(', ')]), changed, differs: plan.length };
-  lines.push(REPO + ' is ' + after.visibility + '; the desk environment holds ' + ((after.envs.desk || []).join(', ') || 'nothing'));
-  return { ok: true, lines, changed, differs: plan.length };
+  if (!open) return 'GitHub matches the record';
+  const c = await call('POST', API + '/repos/' + REPO + '/issues/' + open.number + '/comments', auth, { body: 'The nightly check matches the record again.' });
+  if (c.status !== 201) throw new Error('GitHub did not take the comment on issue #' + open.number + ' (' + said(c) + ')');
+  const a = await call('PATCH', API + '/repos/' + REPO + '/issues/' + open.number, auth, { state: 'closed', state_reason: 'completed' });
+  if (a.status !== 200) throw new Error('GitHub did not close issue #' + open.number + ' (' + said(a) + ')');
+  return 'issue #' + open.number + ' closed: GitHub matches the record again';
 }
 
 // The repositories the App's installation holds, and nothing changed.
@@ -1221,7 +1177,7 @@ function manifest() {
     hook_attributes: { url: 'https://thornswood.net/github-app/hook', active: false },
     redirect_url: 'https://thornswood.net/github-app/setup/done',
     public: false,
-    default_permissions: { administration: 'write', contents: 'read', secrets: 'write', actions_variables: 'read', environments: 'write', actions: 'write', issues: 'write' },
+    default_permissions: { administration: 'write', contents: 'read', secrets: 'read', actions_variables: 'read', environments: 'write', actions: 'write', issues: 'write', deployments: 'write' },
     default_events: [],
   };
 }
@@ -1308,6 +1264,12 @@ async function converge(req, res, now) {
   try { ask = JSON.parse((await readBody(req, 4096)) || '{}'); } catch (e) { ask = null; }
   if (!ask || !ASKS.includes(ask.what)) { json(res, 400, { ok: false, lines: ['the only things this does are ' + ASKS.slice(0, -1).join(', ') + ' and ' + ASKS[ASKS.length - 1]] }); return; }
   const run = claims.run_id + ' (' + claims.event_name + ' by ' + claims.actor + ')';
+  const scheduled = claims.event_name === 'schedule';
+  if (scheduled && CHANGING_ASKS.includes(ask.what) && ask.check !== true) {
+    log('run ' + run + ': refused ' + ask.what + ' without check');
+    json(res, 403, { ok: false, lines: ['refused: a scheduled run only checks, and ' + ask.what + ' was asked without check'] });
+    return;
+  }
   const held = readApp();
   if (!held) { log('run ' + run + ': no App yet'); json(res, 503, { ok: false, lines: ['there is no App here yet: Install-AdminService.ps1 -Setup makes it'] }); return; }
   if (ask.what === 'settings') {
@@ -1342,8 +1304,12 @@ async function converge(req, res, now) {
     let r;
     if (ask.what === 'repo-settings') {
       r = await repoSettings(held, now, !!ask.check);
-    } else if (ask.what === 'go-public') {
-      r = await goPublic(held, now, !!ask.check);
+      // The nightly check tells the board (#5298: scanning went off on both
+      // repositories and nothing read it for a day).
+      if (scheduled) {
+        try { r.lines.push('board: ' + await reportDrift(held, now, r)); }
+        catch (e) { r.ok = false; r.lines.push('STOP the board was not told: ' + e.message); }
+      }
     } else if (ask.what === 'repo-about') {
       r = await repoAbout(await installationToken(held, now, REPO, { administration: 'write', contents: 'read' }), !!ask.check);
     } else {
@@ -1381,5 +1347,5 @@ function serve() {
   return server;
 }
 
-module.exports = { verifyOidc, appJwt, call, botToken, BOT_PERMISSIONS, planCollaborators, planPublic, publicStops, PUBLIC_DROPS, OPS_COPIES, PUBLIC_KEEPS, planLabels, planLeftovers, checkRecords, checkAbout, planAbout, runnerNumber, checkRulesets, checkSettings, planRulesets, rulesetBody, says, manifest, RULES, ASKS, REPO, RUNNERS_REPO, SETTINGS_REPOS, SCANNING_KEYS, MERGE_KEYS, SETTINGS_PERMISSIONS, SETTINGS_EXTRA, serve };
+module.exports = { said, driftBody, CHANGING_ASKS, DRIFT_TITLE, MACHINE_ACTORS, verifyOidc, appJwt, call, botToken, BOT_PERMISSIONS, planCollaborators, planLabels, planLeftovers, checkRecords, checkAbout, planAbout, runnerNumber, checkRulesets, checkSettings, planRulesets, rulesetBody, says, manifest, RULES, ASKS, REPO, RUNNERS_REPO, SETTINGS_REPOS, SCANNING_KEYS, MERGE_KEYS, SETTINGS_PERMISSIONS, SETTINGS_EXTRA, serve };
 if (require.main === module) serve();
