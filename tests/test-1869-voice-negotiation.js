@@ -580,7 +580,11 @@ async function launcher(name, pid, tone) {
   await l.send({ do: 'configure', profileId: pid, name: name, token: tokenFor(pid), base: 'https://127.0.0.1:' + PORT });
   return l;
 }
-const joined = (l) => until(() => l.host('status').indexOf('connected') >= 0, 15000);
+/* In the room: the service took its join, which it says with the roster that
+   names it. "connected" is only the socket open and the join sent, and a
+   socket that opens after it can still join first and take the lower peer
+   id. */
+const joined = (l) => until(() => l.host('peers').length > 0, 15000);
 /* The address the launcher's voice last dialled. */
 function dialled(l) {
   const said = l.host('log').filter((t) => /^connecting to /.test(t));
@@ -1011,8 +1015,11 @@ async function partFive() {
   };
   yes('the launcher there first sends that socket an offer and candidates, as the lower peer id',
       idOf(501) < G.peer() && await until(() => from(501, 0).offer && from(501, 0).ice, 10000));
+  // The launcher's own socket saying it joined comes on another socket than
+  // the roster that names it to the game's, so that roster can still be on
+  // its way: read the late launcher's peer id once the game's socket has it.
   yes('the launcher that joined after it sends it candidates and no offer, as the side that answers',
-      idOf(503) > G.peer() && await until(() => from(503, 0).ice, 10000) && !from(503, 0).offer);
+      await until(() => idOf(503) > 0, 10000) && idOf(503) > G.peer() && await until(() => from(503, 0).ice, 10000) && !from(503, 0).offer);
   yes('each launcher holds a connection to the other and one to the game\'s socket (' + both.map(reported).join(', ') + ')',
       await until(() => both.every((l) => reported(l) === 2)));
   yes('the two launchers connect to each other with the game\'s socket in the room',
