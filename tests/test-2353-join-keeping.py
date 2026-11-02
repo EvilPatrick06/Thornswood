@@ -9,7 +9,7 @@ name it. Decided by Patrick on 12 Oct: a keeping time for each store,
 enforced in code. A number is now kept while its person is in the Discord and
 for JOIN_KEEP_DAYS (365) after they leave.
 
-joins_age is lifted out of bot/bot.py by its source and run on its own, so
+joins_age is lifted out of bot/bot_joins.py by its source and run on its own, so
 this needs neither discord.py nor a token and runs on every pull request; the
 nightly runs the bot's own tests against the whole module. It proves:
   - somebody numbered and not in the server is marked left now, once;

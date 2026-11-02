@@ -9,7 +9,7 @@ Decided by Patrick on 19 Oct: the bot deletes a ticket thread
 TICKET_KEEP_DAYS (365) after it closes, checked every hour like the join
 numbers.
 
-ticket_past_keeping and age_closed_tickets are lifted out of bot/bot.py by
+ticket_past_keeping and age_closed_tickets are lifted out of bot/bot_tickets.py by
 their source and run on their own against made-up servers, channels and
 threads, so this needs neither discord.py nor a token and runs on every pull
 request. It proves:
