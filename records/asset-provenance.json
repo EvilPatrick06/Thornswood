@@ -376,6 +376,19 @@
       "from": "launcher/launcher-header.mp4"
     },
     {
+      "path": "launcher/hrtf-composite.wav",
+      "sha256": "a25fc99a6e875f659aaa9d107c791aeff250030e0d7f16458baf3a00943394e3",
+      "what": "The impulse responses the launcher's voice panner filters each voice with (launcher/app/VoiceHrtf.cs, #963): 240 stereo responses of 256 frames at 44.1 kHz.",
+      "published": "The launcher, through the update feed and the installer",
+      "source": "Chromium's third_party/blink/renderer/platform/audio/resources/Composite.flac at commit dd2ed7a2, decoded to 16-bit PCM unchanged",
+      "creator": "Chris Rogers, for WebKit, by averaging impulse responses from IRCAM's Listen HRTF Database",
+      "licence": "Granted to the public domain, as Firefox's copy of the same samples says; IRCAM's terms for the Listen database say it is public and available for any use, with an acknowledgment asked for",
+      "attribution": "The acknowledgment IRCAM asks for: installer/licences/IRCAM-Listen-HRTF.txt goes with every install and THIRD-PARTY.md names the database",
+      "approved": "Not needed: public domain",
+      "evidence": "THIRD-PARTY.md, The voice's HRTF panner and its impulse responses, with this file's sha256 and Composite.flac's; installer/licences/README.txt and IRCAM-Listen-HRTF.txt, which quote Firefox's note and IRCAM's terms word for word; launcher/app/Thornswood.csproj embeds it.",
+      "status": "cleared"
+    },
+    {
       "path": "launcher/app.ico",
       "sha256": "be99a5cd8ef3c1d025702ac3fb9a73824928f3320b8b0d75bd2e428d50526e60",
       "what": "The launcher's icon, the badge at every size: Thornswood at 128 and 256, TW at 32 to 64, the crest and scene alone at 16 and 24 (Djinn, 27 Oct, #3319; tests\\test-launcher-icons.js).",
