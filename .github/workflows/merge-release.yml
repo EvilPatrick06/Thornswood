@@ -202,6 +202,10 @@ jobs:
           if ($rc -eq 3) { [IO.File]::WriteAllText($file, $env:NOTHING_TO_TELL + "`n"); $rc = 0 }
           if ($rc -ne 0) { Write-Host "::error::the notes could not be written (Collect-ReleaseNotes.ps1 exit $rc); the lines above say why, and nothing was built"; exit 1 }
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("file=" + $file)
+          # Exit 3 is an answer, not a failure, but GitHub's pwsh step ends
+          # with "exit $LASTEXITCODE", which still holds the script's 3: the
+          # step says how it went itself (run 41362111729 stopped here).
+          exit 0
 
       - name: Fetch CI's server build of the pin
         id: server
