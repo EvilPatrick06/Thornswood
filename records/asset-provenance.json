@@ -692,14 +692,14 @@
     {
       "path": "docs/launcher-play-dev.png",
       "sha256": "fcf51dc085b68383d0db6719e45f1909be2926b791b6de2b0414dc53427894f0",
-      "what": "A screenshot of the launcher's Play page for Developer-Guide.md.",
+      "what": "A screenshot of the launcher's Play page for the Developer Guide (docs/guide/tools.md).",
       "published": "nowhere: the guide is in this private repository",
       "source": "A screenshot of Thornswood's own launcher, taken for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
       "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 27 Oct 2026, on the report page (q-3688-unrecorded-art, A): Djinn made it",
-      "evidence": "Developer-Guide.md, H. Dev Build.",
+      "evidence": "docs/guide/tools.md, H. Dev Build.",
       "status": "ours"
     }
   ],

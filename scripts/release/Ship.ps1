@@ -1893,7 +1893,7 @@ if ($GameDir -and -not (Get-Command node -ErrorAction SilentlyContinue)) {
     Unbump 'node is not on this machine'
     Die ('node is not on this machine, and Ship reads SkyUI''s menus in the game folder with it (scripts\mods\Check-SkyUIMenus.js), ' +
          'so a release never gives everybody the SkyUI error box on the way in. Install it with ' +
-         'winget install --id OpenJS.NodeJS.LTS -e (Developer-Guide.md, "Install the tools"), open a new window, and Ship again. ' +
+         'winget install --id OpenJS.NodeJS.LTS -e (docs/guide/set-up-a-machine.md, "Install the tools"), open a new window, and Ship again. ' +
          'Nothing was built or published.')
 }
 

@@ -177,7 +177,8 @@ if (tracked) {
       tracked.indexOf('site/config.example.json') >= 0);
   // The long CLAUDE.md is in the private ops repo since #3693; its
   // tests/test-ops-docs.js holds the same check of it there.
-  ['Developer-Guide.md'].forEach(function (rel) {
+  // The guide is its index and its pages (tests/guide-text.js).
+  ['Developer-Guide.md'].concat(require('./guide-text.js').pages().map(function (p) { return p.rel; })).forEach(function (rel) {
     const t = read(rel);
     yes(rel + ' is there', t !== null);
     if (t !== null) {

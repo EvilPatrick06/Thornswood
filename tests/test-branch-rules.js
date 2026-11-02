@@ -187,7 +187,8 @@ yes('LauncherVersion.ps1 runs no git command that writes',
 
 // ------------------------------------------------------------ CODEOWNERS
 const coRaw = read('.github/CODEOWNERS');
-const claudeRaw = read('Developer-Guide.md');
+// The whole guide, the index and its pages (tests/guide-text.js): these rules sit on several pages.
+const claudeRaw = require('./guide-text.js').whole();
 const rules = coRaw.split(/\r?\n/).filter(function (l) { return l.trim() && !/^\s*#/.test(l); })
   .map(function (l) { const p = l.trim().split(/\s+/); return { path: p[0], owners: p.slice(1) }; });
 yes('CODEOWNERS has rules to read (' + rules.length + ')', rules.length >= 6);
@@ -217,7 +218,7 @@ yes('every CODEOWNERS owner is one of the owners on the six shared files', badOw
 
 const shared = /An edit to ([\s\S]*?) that blocks others' work gets a line in #dev-coordination/.exec(claudeRaw);
 const sharedNames = shared ? shared[1].replace(/\s+/g, ' ').split(/,\s*|\s+or\s+/).map(function (s) { return s.trim(); }).filter(Boolean) : [];
-yes('Developer-Guide.md lists the six shared files (' + sharedNames.join(', ') + ')', sharedNames.length === 6);
+yes('The guide lists the six shared files (' + sharedNames.join(', ') + ')', sharedNames.length === 6);
 const uncovered = sharedNames.filter(function (n) {
   return !rules.some(function (r) { return path.posix.basename(r.path) === n && TEAM.every(function (o) { return r.owners.indexOf(o) >= 0; }); });
 });
@@ -226,7 +227,7 @@ yes('each of the six shared files has a CODEOWNERS line naming the whole team ('
 
 // ------------------------------------------------------------ the documents
 const docs = [
-  { name: 'Developer-Guide.md', text: flat(claudeRaw, false) },
+  { name: 'The guide', text: flat(claudeRaw, false) },
   { name: '.github/CODEOWNERS', text: flat(coRaw, true) }
 ];
 const PROTECTION = 'gh api repos/ThornswoodRP/Thornswood/branches/main/protection';
@@ -250,10 +251,10 @@ docs.forEach(function (d) {
 // merges once main's ruleset's required check is green. The guide says so,
 // gives the command, and no longer says auto-merge is off.
 const guideText = docs[0].text;
-yes('Developer-Guide.md says auto-merge is on (#5182)', /auto-merge is on/i.test(guideText));
-yes('Developer-Guide.md gives gh pr merge --auto --squash', guideText.indexOf('gh pr merge --auto --squash') !== -1);
-yes('Developer-Guide.md does not say auto-merge is off', !/auto-merge is off/i.test(guideText));
-yes('Developer-Guide.md says main\'s ruleset requires Build check result', /ruleset[^.]*requires[^.]*Build check result/.test(guideText));
+yes('The guide says auto-merge is on (#5182)', /auto-merge is on/i.test(guideText));
+yes('The guide gives gh pr merge --auto --squash', guideText.indexOf('gh pr merge --auto --squash') !== -1);
+yes('The guide does not say auto-merge is off', !/auto-merge is off/i.test(guideText));
+yes('The guide says main\'s ruleset requires Build check result', /ruleset[^.]*requires[^.]*Build check result/.test(guideText));
 
 // #5296 (the redesign's part 5, Patrick's A on 31 Oct 2026): main's ruleset
 // requires the merge queue, squash, each pull request passing on its own, and
@@ -267,7 +268,7 @@ yes('  squash, each pull request passing on its own, merging as soon as one pass
     mqp.merge_method === 'SQUASH' && mqp.grouping_strategy === 'ALLGREEN' && mqp.min_entries_to_merge === 1 && mqp.min_entries_to_merge_wait_minutes === 0);
 yes('  with every setting GitHub needs given',
     ['max_entries_to_build', 'max_entries_to_merge', 'check_response_timeout_minutes'].every(k => Number.isInteger(mqp[k]) && mqp[k] > 0));
-yes('Developer-Guide.md says auto-merge puts a green pull request in the merge queue', /puts it in the merge queue/.test(guideText));
+yes('The guide says auto-merge puts a green pull request in the merge queue', /puts it in the merge queue/.test(guideText));
 
 const sd = docs[0].text;
 // #3617. While enforce_admins is off, "GitHub refuses it" is true only for
@@ -279,24 +280,24 @@ const sd = docs[0].text;
   [/went on, because Ship writes nothing/, 'that enforce_admins went on, as if it still is'],
   [/refuses a push from everybody/i, 'that main refuses a push from everybody']
 ].forEach(function (b) {
-  yes('Developer-Guide.md does not say ' + b[1], !b[0].test(sd));
+  yes('The guide does not say ' + b[1], !b[0].test(sd));
 });
-yes('Developer-Guide.md says GitHub holds an admin to none of main\'s rules while enforce_admins is off',
+yes('The guide says GitHub holds an admin to none of main\'s rules while enforce_admins is off',
     /enforce_admins off, GitHub holds an admin to none of main's rules/.test(sd));
-yes('Developer-Guide.md says for whom a push to main is refused: write access, not the admin account',
+yes('The guide says for whom a push to main is refused: write access, not the admin account',
     /GitHub refuses a push to main from write access\. It does not refuse one from the admin account/.test(sd) &&
     /GitHub refuses it from write access; from the admin account it does not/.test(sd));
-yes('Developer-Guide.md says for whom a force push to main is refused',
+yes('The guide says for whom a force push to main is refused',
     /Never force push main: GitHub refuses it from write access, but not from the admin account/.test(sd));
 yes('Ship.ps1 does not say main refuses a push from everybody',
     !/refuses a push from everybody|refuses a\s+#?\s*push from everybody/i.test(flat(shipSrc, true)));
-yes('Developer-Guide.md does not say Ship bumps the version; it says the version comes from the build (#5179)',
-    !/Ship bumps/i.test(sd) && /### The version comes from the build/.test(sd) && /LauncherVersion\.ps1/.test(sd));
-yes('Developer-Guide.md does not say Ship patches the client; it checks it with Sync-Client.ps1 -Check',
+yes('The guide does not say Ship bumps the version; it says the version comes from the build (#5179)',
+    !/Ship bumps/i.test(sd) && /## The version comes from the build/.test(sd) && /LauncherVersion\.ps1/.test(sd));
+yes('The guide does not say Ship patches the client; it checks it with Sync-Client.ps1 -Check',
     !/patches the client/i.test(sd) && /Sync-Client\.ps1 -Check/.test(sd));
-yes('Developer-Guide.md does not say the other person reads every pull request, which nothing enforces',
+yes('The guide does not say the other person reads every pull request, which nothing enforces',
     !/The other person reads the pull request/i.test(sd));
-yes('Developer-Guide.md says Patrick\'s own work goes through a pull request too',
+yes('The guide says Patrick\'s own work goes through a pull request too',
     /Every change goes through a pull request, Patrick's included/.test(sd));
 [docs[0]].forEach(function (d) {
   // scripts\ and the other folders a release is built from since phase 8 of #440.
