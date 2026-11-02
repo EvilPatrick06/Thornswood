@@ -31,8 +31,8 @@
        site\server.js reads the feed only through feedFile, the newest
        generation, in the feed route, the watch, the join pass, the credits
        and the most-online fallback.
-    2. In this shell and in Windows PowerShell 5.1 (the VPS runs the store's
-       script with it): a reader holding a file open with share-delete does
+    2. In this shell, PowerShell 7, which the VPS runs the store's script
+       with since #5356: a reader holding a file open with share-delete does
        not stop the POSIX rename and keeps the old bytes; a holder without
        share-delete is refused and the file stays whole; and the real send
        (Receive-FeedStore, then Send-FeedStore on a stand-in -SiteDir) lands
@@ -109,8 +109,8 @@ $null = New-Item -ItemType Directory -Force -Path $work
 $oldAppData = $env:LOCALAPPDATA
 $reader = $null
 try {
-    # ---- 2: held open, in this shell and in Windows PowerShell 5.1 --------------------
-    # The same script in both: it prints one line a check, OK or NO and what it saw.
+    # ---- 2: held open, in this shell, the box's PowerShell 7 --------------------------
+    # One script: it prints one line a check, OK or NO and what it saw.
     $held = Join-Path $work 'held.ps1'
     [IO.File]::WriteAllText($held, @'
 param($store, $dir)
@@ -165,12 +165,6 @@ Say 'send' ($err -eq '' -and $sent -contains 'version.json' -and $names -eq '000
     $env:LOCALAPPDATA = Join-Path $work 'appdata'
     $shells = @(@{ Name = ('this shell, PowerShell ' + $PSVersionTable.PSVersion.ToString()); Run = { param($d) & $held $storePs1 $d } })
     . (Join-Path $PSScriptRoot 'Windows.ps1')
-    if (-not $OnWindows) {
-        Write-Host 'SKIP  the same under Windows PowerShell 5.1, which the VPS runs the store''s script with: this is not Windows'
-    } else {
-        $ps51 = Get-WindowsPowerShell
-        $shells += @{ Name = 'Windows PowerShell 5.1'; Run = { param($d) & $ps51 -NoProfile -ExecutionPolicy Bypass -File $held $storePs1 $d 2>&1 } }
-    }
     $k = 0
     foreach ($s in $shells) {
         $k++
