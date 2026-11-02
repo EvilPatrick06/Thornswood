@@ -160,7 +160,9 @@ from loopback as the gamemode does, so the gamemode's routes (`/positions`,
 `/commands`, `/silenced`, `/textmute`, `/say`) also refuse any request with a
 forwarding header on it, which Caddy always sets (#1797). Its clients are the
 launcher's hidden voice page (`launcher`), the in-game overlays
-(`game\ui`) and the two gamemodes. `.\scripts\deploy\Install-Voice.ps1` copies
+(`game\ui`) and the two gamemodes. The bot pass before every dev
+Deployment runs a copy of its own beside its server copy, and its bots join
+it the way the chat page does (`scripts\bot\relay.js`, #5196). `.\scripts\deploy\Install-Voice.ps1` copies
 `voice-server.js` and `headlines.js`, restarts the task and waits
 for `/health` on the box; the dev service is the same script with
 `-Root C:\Thornswood-Voice-Dev -Port 7789 -TaskName 'Thornswood Dev Voice'`.
