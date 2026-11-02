@@ -312,8 +312,14 @@ $same = @('GPL-3.0.txt', 'AGPL-3.0.txt' | Where-Object {
     $n = $_; $e = @($entries | Where-Object { $_.Name -eq $n })
     $e.Count -eq 1 -and [Convert]::ToBase64String($e[0].Bytes) -eq [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $licenceDir $n))) })
 Yes 'the setup carries the GPL and AGPL texts from installer\licences, byte for byte' ($same.Count -eq 2)
-$notStaged = @($voiceTexts | Where-Object { -not $setupFiles.Contains($_) })
-Yes ('Build-SetupFiles.ps1 puts the voice libraries'' texts in the package for the install to copy' + $(if ($notStaged.Count) { ', not: ' + ($notStaged -join ', ') } else { '' })) ($notStaged.Count -eq 0)
+# Build-SetupFiles.ps1 packs the names InstallSteps.LicenceFiles lists, read
+# off that one list, so the voice texts are packed when the list holds them.
+$licList = [regex]::Match($steps, '(?s)static\s+readonly\s+string\[\]\s+LicenceFiles\s*=\s*\{(.*?)\};')
+$notStaged = @($voiceTexts | Where-Object { -not $licList.Success -or -not $licList.Groups[1].Value.Contains('"' + $_ + '"') })
+Yes ('Build-SetupFiles.ps1 puts the voice libraries'' texts in the package for the install to copy, off InstallSteps.LicenceFiles' + $(if ($notStaged.Count) { ', not: ' + ($notStaged -join ', ') } else { '' })) (
+    $notStaged.Count -eq 0 -and $setupFiles.Contains("`$stepsCs = Join-Path `$RepoDir 'launcher\app\InstallSteps.cs'") -and
+    $setupFiles.Contains('$launcherLicences = @([regex]::Matches($listAt.Groups[1].Value') -and
+    $setupFiles.Contains("Copy-Item -LiteralPath `$from -Destination (Join-Path `$files `$lic) -Force"))
 $notCopied = @(@('GPL-3.0.txt', 'AGPL-3.0.txt') + $voiceTexts | Where-Object { -not $steps.Contains('"' + $_ + '"') })
 Yes ('InstallSteps.cs copies the GPL, AGPL and voice library texts into the install folder' + $(if ($notCopied.Count) { ', not: ' + ($notCopied -join ', ') } else { '' })) ($notCopied.Count -eq 0)
 foreach ($v in @('AGPL-3.0.txt', 'GPL-3.0.txt') + $voiceTexts) {

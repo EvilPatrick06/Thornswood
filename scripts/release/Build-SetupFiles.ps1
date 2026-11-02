@@ -6,8 +6,8 @@
 .DESCRIPTION
   Velopack's Setup.exe puts the launcher and its package on the PC, and the
   launcher's first start runs the install (launcher\app\InstallSteps.cs,
-  #4824). That reads, from the package's own folder, what the old setup
-  payload carried beside the game files (Package-Thornswood.ps1 until #4825):
+  #4824). That reads these, from the package's own folder, beside the game
+  files:
 
       config.json       the -Channel feed's server, voice and site, the
                         fields New-FeedRoot.ps1 writes, and Channel, which
@@ -16,8 +16,8 @@
       profile\          plugins.txt and loadorder.txt, the reference load
                         order of the release the game files were built over
                         (dev's, its :golden:), fetched from the site by their
-                        sha256, as Package-Thornswood -FromFeed took them
-                        (#3412), so the load order matches the files
+                        sha256 (#3412), so the load order matches the
+                        files
       applied.txt       every pack the -Channel feed lists, so a fresh
                         install does not offer the whole history of the
                         project as pending updates (the install writes it
@@ -27,9 +27,11 @@
       AGPL-3.0.txt,     libraries inside those files (Source-Notice.ps1, kind
       licences\         setup; #421, #3099)
       *-LICENSE.txt,    the licence texts of the libraries inside the
-      *-NOTICES.txt,    launcher and shipped with it, from installer\licences
-      Velopack-Rust-    (its README.txt says where each is from;
-      crates.txt        InstallSteps.LicenceFiles names them; #4823)
+      *-NOTICES.txt,    launcher and shipped with it, the voice's Concentus,
+      Velopack-Rust-    SharpSRTP and BouncyCastle among them, from
+      crates.txt        installer\licences (its README.txt says where each
+                        is from); the names are InstallSteps.LicenceFiles,
+                        read from InstallSteps.cs (#4823)
 
   merge-release.yml packs every one of them at the top of the package, beside
   Thornswood.exe and Game, and setup-files.<channel>.json lists each with its
@@ -185,17 +187,19 @@ Say ("  SOURCE CODE.txt, the GPL and AGPL texts and {0} library licence texts" -
 # ---- the launcher's libraries' licence texts
 # Everything built into the launcher or shipped with it (.NET, Avalonia,
 # SkiaSharp and Skia, HarfBuzz, ANGLE, Velopack and its Rust crates, the voice
-# libraries, NLayer, the voice's HRTF code and data): installer\licences\README.txt says where each text is
-# from. InstallSteps.LicenceFiles names the same files, copies them into the
-# install folder and Uninstall.cs removes them (#4823).
-$launcherLicences = @(
-    'Concentus-LICENSE.txt', 'SharpSRTP-LICENSE.txt', 'BouncyCastle-LICENSE.txt',
-    'dotnet-LICENSE.txt', 'dotnet-THIRD-PARTY-NOTICES.txt',
-    'Avalonia-LICENSE.txt', 'MicroCom-LICENSE.txt', 'Tmds.DBus-LICENSE.txt',
-    'SkiaSharp-LICENSE.txt', 'SkiaSharp-THIRD-PARTY-NOTICES.txt', 'ANGLE-LICENSE.txt',
-    'Velopack-LICENSE.txt', 'Velopack-Rust-crates.txt', 'NLayer-LICENSE.txt',
-    'Chromium-HRTF-LICENSE.txt', 'IRCAM-Listen-HRTF.txt'
-)
+# libraries Concentus, SharpSRTP and BouncyCastle, NLayer, the voice's HRTF
+# code and data): installer\licences\README.txt says where each text is from.
+# The names are read from InstallSteps.LicenceFiles in
+# launcher\app\InstallSteps.cs, the one list: the install copies those names
+# from the package into the install folder and Uninstall.cs removes them
+# (#4823), so a text added there is packed here with no second list to keep
+# in step. The GPL and AGPL texts on it are Source-Notice's, written above.
+$stepsCs = Join-Path $RepoDir 'launcher\app\InstallSteps.cs'
+if (-not (Test-Path -LiteralPath $stepsCs)) { throw "$stepsCs is not there, so the licence texts the install copies cannot be read." }
+$listAt = [regex]::Match([IO.File]::ReadAllText($stepsCs), '(?s)static\s+readonly\s+string\[\]\s+LicenceFiles\s*=\s*\{(.*?)\};')
+if (-not $listAt.Success) { throw 'InstallSteps.cs has no LicenceFiles list, so the licence texts the install copies cannot be read.' }
+$launcherLicences = @([regex]::Matches($listAt.Groups[1].Value, '"([^"]+)"') | ForEach-Object { $_.Groups[1].Value } | Where-Object { $_ -notin 'GPL-3.0.txt', 'AGPL-3.0.txt' })
+if ($launcherLicences.Count -eq 0) { throw 'InstallSteps.LicenceFiles names no licence text of the launcher''s libraries.' }
 foreach ($lic in $launcherLicences) {
     $from = Join-Path $RepoDir (Join-Path 'installer\licences' $lic)
     if (-not (Test-Path -LiteralPath $from)) { throw "installer\licences\$lic is missing. Each library inside the launcher has its licence text go with the install (#4823)." }

@@ -1059,10 +1059,22 @@ yes('installer/licences/WebView2-LICENSE.txt is gone with the web view', !fs.exi
   yes('InstallSteps.LicenceFiles names every file in installer/licences but README.txt, and nothing else',
       listed.length > 0 && JSON.stringify(listed) === JSON.stringify(onDisk));
   const setup = fs.readFileSync(path.join(ROOT, 'scripts', 'release', 'Build-SetupFiles.ps1'), 'utf8');
-  const s = /\$launcherLicences = @\(([\s\S]*?)\)/.exec(setup);
-  const packed = s ? (s[1].match(/'[^']+'/g) || []).map(function (x) { return x.slice(1, -1); }) : [];
+  // Build-SetupFiles.ps1 reads its names off that list in InstallSteps.cs, so
+  // there is no second list: its pattern is run here on the same file, and the
+  // GPL and AGPL (which come with SOURCE CODE.txt) are the ones it leaves out.
+  const s = /\$listAt = \[regex\]::Match\(\[IO\.File\]::ReadAllText\(\$stepsCs\), '([^']+)'\)/.exec(setup);
+  const readsSteps = setup.indexOf("$stepsCs = Join-Path $RepoDir 'launcher\\app\\InstallSteps.cs'") >= 0;
+  let packed = [];
+  if (s) {
+    const pat = s[1].replace(/^\(\?s\)/, '');
+    const got = new RegExp(pat, 's').exec(steps);
+    packed = got ? (got[1].match(/"[^"]+"/g) || []).map(function (x) { return x.slice(1, -1); })
+      .filter(function (f) { return f !== 'GPL-3.0.txt' && f !== 'AGPL-3.0.txt'; }) : [];
+  }
   const wantPacked = listed.filter(function (f) { return f !== 'GPL-3.0.txt' && f !== 'AGPL-3.0.txt'; });
-  yes('Build-SetupFiles.ps1 packs the same launcher licence texts (GPL and AGPL come with SOURCE CODE.txt)',
+  yes('Build-SetupFiles.ps1 packs the launcher licence texts InstallSteps.LicenceFiles names, read off that list (GPL and AGPL come with SOURCE CODE.txt)',
+      readsSteps && /\$launcherLicences = @\(\[regex\]::Matches\(\$listAt\.Groups\[1\]\.Value/.test(setup) &&
+      setup.indexOf("Where-Object { $_ -notin 'GPL-3.0.txt', 'AGPL-3.0.txt' }") >= 0 &&
       packed.length > 0 && JSON.stringify(packed.slice().sort()) === JSON.stringify(wantPacked));
   const uninstall = fs.readFileSync(path.join(ROOT, 'launcher', 'app', 'Uninstall.cs'), 'utf8');
   yes('Uninstall.cs removes every file of InstallSteps.LicenceFiles',
