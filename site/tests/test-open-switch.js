@@ -29,10 +29,11 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const siteFiles = require('../../tests/site-files');
 const CR = String.fromCharCode(13);
 const ROOT = path.join(__dirname, '..', '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8').split(CR).join('');
-const src = read('site/server.js');
+const src = siteFiles.source();
 
 let pass = 0, fail = 0;
 function yes(what, cond) {

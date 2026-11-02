@@ -38,6 +38,8 @@ param([string]$Scratch)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')
 $repo = Split-Path -Parent $PSScriptRoot
+# The site is server.js over its modules in site\lib since #5357.
+. (Join-Path $PSScriptRoot 'SiteFiles.ps1')
 $app = Join-Path $repo 'launcher\app'
 function Src([string]$name) { [IO.File]::ReadAllText((Join-Path $app $name)).Replace("`r", '') }
 
@@ -125,6 +127,9 @@ $env:THORNSWOOD_HARNESS = '1'
 $tmp = if ($Scratch) { $Scratch } else { Join-Path ([IO.Path]::GetTempPath()) ('thornswood-4115-' + [guid]::NewGuid().ToString('N')) }
 New-Item -ItemType Directory -Path $tmp -Force | Out-Null
 $lift = Join-Path $tmp 'news.js'
+# The whole site as one text, for the lift to read (#5357).
+$siteSource = Join-Path $tmp 'site-source.js'
+[IO.File]::WriteAllText($siteSource, (Get-SiteSource (Join-Path $repo 'site')), (New-Object Text.UTF8Encoding $false))
 [IO.File]::WriteAllText($lift, @'
 const fs = require('fs');
 const s = fs.readFileSync(process.argv[2], 'utf8');
@@ -135,7 +140,7 @@ console.log(JSON.stringify(api.publicNews(JSON.parse(fs.readFileSync(process.arg
 function News([string]$name, $feed) {
     $f = Join-Path $tmp ($name + '.json')
     [IO.File]::WriteAllText($f, ($feed | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding $false))
-    $out = & node $lift (Join-Path $repo 'site\server.js') $f 2>&1
+    $out = & node $lift $siteSource $f 2>&1
     if ($LASTEXITCODE -ne 0) { Write-Host ('      the site''s news did not run: ' + ($out -join ' ')); return $null }
     return ($out -join '') | ConvertFrom-Json
 }
@@ -145,7 +150,7 @@ Yes 'the site''s News page links the feed''s revision on the Downloads page' ($n
 $bare = News 'bare' ([ordered]@{ launcherVersion = '9.9.9'; collectionUrl = $c; news = @() })
 Yes 'with no revision in the feed it links the collection as it is, revision 0' ($null -ne $bare -and [string]$bare.collection -eq $c -and [int]$bare.collectionRevision -eq 0)
 Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
-$server = [IO.File]::ReadAllText((Join-Path $repo 'site\server.js'))
+$server = Get-SiteSource (Join-Path $repo 'site')
 Yes 'the site''s public answer carries the revision' ($server.Contains('collectionRevision: Number(feed.collectionRevision) > 0 ? Number(feed.collectionRevision) : 0,'))
 $homeJs = [IO.File]::ReadAllText((Join-Path $repo 'site\public\home.js'))
 Yes 'the Downloads button names the revision and says not to take a newer one' ($homeJs.Contains("'Open revision ' + esc(String(d.collectionRevision))") -and $homeJs.Contains('Nexus may show first.'))

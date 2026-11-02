@@ -350,7 +350,16 @@ try {
         $wf -match "(?m)^\s+- 'game/\*\*'\s*$" -and $wf -match "(?m)^\s+- 'launcher/\*\*'\s*$" -and $wf -match "(?m)^\s+- 'records/\*\*'\s*$" -and $wf -match "(?m)^\s+- 'scripts/bot/Bot-Pass\.js'\s*$")
     $self = @('Build-GameFiles.ps1', 'Build-SetupFiles.ps1', 'Source-Notice.ps1', 'MergeRelease.ps1', 'New-SignedManifest.ps1', 'Build-Launcher.ps1', 'Go.ps1', 'Build-Front.ps1') | Where-Object { $wf -notmatch ("(?m)^\s+- 'scripts/release/" + [regex]::Escape($_) + "'\s*$") }
     Yes ('  and for the scripts it runs that decide what is built' + $(if ($self) { ': not ' + ($self -join ', ') } else { '' })) (-not $self)
-    Yes '  in the release environment, on main only, one run at a time' ($wf -match '(?m)^\s+environment: release\s*$' -and $wf.Contains("if: `${{ github.ref == 'refs/heads/main' }}") -and $wf -match '(?m)^\s+cancel-in-progress: false\s*$')
+    Yes '  in the release environment, on main only, one run at a time, a newer merge cancelling the run before (#5398)' ($wf -match '(?m)^\s+environment: release\s*$' -and $wf.Contains("if: `${{ github.ref == 'refs/heads/main' }}") -and $wf -match '(?m)^\s+group: merge-release\s*$' -and $wf -match '(?m)^\s+cancel-in-progress: true\s*$')
+    # GitHub refuses the run's token a tag on a commit whose workflow files
+    # differ from main's (probe runs 41375894899 and 41376016183, #5398), so
+    # only main's newest merge is published; the newer run carries the rest.
+    $newestAt = $wf.IndexOf('- name: Is this still main''s newest merge'); $publishAt = $wf.IndexOf('- name: Publish the Release')
+    # Four steps wait on it: the Release, main's held package (kept only for
+    # a Release that is out), and the two Deployments.
+    Yes 'a merge main has moved past publishes nothing, keeps no main package, and says the newer merge releases it' ($newestAt -gt 0 -and $publishAt -gt $newestAt -and
+        $wf.Contains('gh api "repos/$($env:GITHUB_REPOSITORY)/commits/main" --jq .sha') -and $wf.Contains("if ([string]`$head -eq `$env:GITHUB_SHA) { Add-Content -LiteralPath `$env:GITHUB_OUTPUT -Value 'release=yes'; exit 0 }") -and
+        ([regex]::Matches($wf, [regex]::Escape("if: `${{ steps.newest.outputs.release == 'yes'"))).Count -eq 4)
     $notes = $wf.IndexOf('Collect-ReleaseNotes.ps1'); $build = $wf.IndexOf('Build-Launcher.ps1 -Root')
     Yes 'the notes are written before anything is built, and "none" from every pull request is the one line' ($notes -gt 0 -and $build -gt $notes -and $wf.Contains('if ($rc -eq 3)') -and $wf.Contains("NOTHING_TO_TELL: 'Nothing people would notice: every change in this release says none.'"))
     # The notes step itself, run the way GitHub runs a pwsh step: its text
@@ -437,13 +446,13 @@ try {
     Yes 'the site, the Discord bot and voice are zipped by App-Part.ps1 before the parts are compared' ($appsAt -gt 0 -and $stampAt -gt $appsAt -and
         $wf.Contains("foreach (`$p in 'site', 'discord', 'voice')") -and $wf.Contains('./scripts/release/App-Part.ps1 -Part $p -Out $zip'))
     Yes '  and each is a part of every Release' ($wf.Contains('"site=$($env:SITE_ZIP)", "discord=$($env:DISCORD_ZIP)", "voice=$($env:VOICE_ZIP)"'))
-    $appPaths = @(@('site/server.js', 'site/public/**', 'site/data/site/**', 'bot/bot.py', 'bot/dev-channel.txt', 'bot/staff-channel.txt', 'bot/requirements.txt', 'bot/assets/join-card.png',
+    $appPaths = @(@('site/server.js', 'site/lib/**', 'site/public/**', 'site/data/site/**', 'bot/bot.py', 'bot/dev-channel.txt', 'bot/staff-channel.txt', 'bot/requirements.txt', 'bot/assets/join-card.png',
         'voice/voice-server.js', 'voice/headlines.js', 'scripts/vps/Server-Log.js', 'scripts/release/App-Part.ps1') | Where-Object { $wf -notmatch ("(?m)^\s+- '" + [regex]::Escape($_) + "'\s*$") })
     Yes ('  and a merge that changes one of their files starts it' + $(if ($appPaths) { ': not ' + ($appPaths -join ', ') } else { '' })) ($appPaths.Count -eq 0)
-    Yes 'dev gets a Deployment only when a part dev runs changed' ($wf.Contains("if: `${{ steps.changed.outputs.release == 'yes' && steps.changed.outputs.dev == 'yes' }}") -and
+    Yes 'dev gets a Deployment only when a part dev runs changed' ($wf.Contains("if: `${{ steps.newest.outputs.release == 'yes' && steps.changed.outputs.dev == 'yes' }}") -and
         $wf.Contains("`$dev = @(`$changed | Where-Object { `$_ -notin 'site', 'discord' })"))
     Yes 'the site and the bot each get a Deployment of their own with the part beside the tag' ($wf.Contains("`$where = @{ site = 'Site'; discord = 'Discord bot' }") -and
-        $wf.Contains('payload = [ordered]@{ release = $env:TAG; part = $part }') -and $wf.Contains("if: `${{ steps.changed.outputs.release == 'yes' && steps.changed.outputs.apps != '' }}"))
+        $wf.Contains('payload = [ordered]@{ release = $env:TAG; part = $part }') -and $wf.Contains("if: `${{ steps.newest.outputs.release == 'yes' && steps.changed.outputs.apps != '' }}"))
     $wfs = @(Get-ChildItem -LiteralPath (Join-Path $Repo '.github/workflows') -Filter *.yml -File | Where-Object { [IO.File]::ReadAllText($_.FullName) -match 'Record-Deployment|gamemode-release' } | ForEach-Object { $_.Name })
     Yes ('no other workflow records a Deployment or names the old gamemode release' + $(if ($wfs) { ': ' + ($wfs -join ', ') } else { '' })) ($wfs.Count -eq 0 -or ($wfs.Count -eq 2 -and $wfs -contains 'merge-release.yml' -and $wfs -contains 'release-files.yml' -and
         -not ([IO.File]::ReadAllText((Join-Path $Repo '.github/workflows/release-files.yml'))).Contains('deployments: write')))

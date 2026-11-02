@@ -112,7 +112,7 @@ read it (issue #440, phase 8):
   `scripts\deploy\MaxOnline.ps1` reads it for Deploy-Gamemode,
   Deploy-DevGamemode (dev), Publish-Server and Publish-Update (each for its
   channel) and Install-Voice (dev for `C:\Thornswood-Voice-Dev`), and
-  `site\server.js` reads `people` and `staffSeats` when the site runs from
+  `site\lib\game.js` reads `people` and `staffSeats` when the site runs from
   the repository. What people are shown, the M of "N of M awake", is the
   seats, people and staffSeats together: 30 on main, 5 on dev. No script writes
   this one: it is changed by hand in a pull request, then each server is

@@ -113,7 +113,7 @@ is not signed, and give the dated name it was published under.
 1. **VirusTotal, the report itself.** Get the hash the way the site gets it,
    in lower case: GitHub measures every Release file and gives its SHA-256 as
    the asset's digest, the site reads it from there, and the Downloads page
-   shows it, lower cased by the site, beside the size (`site\server.js`
+   shows it, lower cased by the site, beside the size (`site\lib\downloads.js`
    `listFiles`, `site\public\home.js` `sum`).
    Open `https://www.virustotal.com/gui/file/<sha256>`, read which engines
    flagged it, and leave a community comment with the three facts above.

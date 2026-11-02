@@ -263,7 +263,9 @@ function Run {
     $ver = ''
     try { $ver = Get-LauncherVersion -RepoDir $Here }
     catch { Write-Host ('      ' + $_.Exception.Message) }
-    $site = [IO.File]::ReadAllText((Join-Path (Join-Path $Here 'site') 'server.js'))
+    # The site is server.js over its modules in site\lib since #5357.
+    . (Join-Path $Here 'tests\SiteFiles.ps1')
+    $site = Get-SiteSource (Join-Path $Here 'site')
     $gate = [regex]::Match($site, "const FEED_SPLIT_LAUNCHER = '([^']+)'").Groups[1].Value
     . (Join-Path (Join-Path (Join-Path $Here 'scripts') 'release') 'Release-Baseline.ps1')
     $cmp = Compare-FeedVersion $ver $gate

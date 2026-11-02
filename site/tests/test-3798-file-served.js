@@ -31,9 +31,10 @@ const path = require('path');
 const os = require('os');
 const http = require('http');
 const crypto = require('crypto');
+const siteFiles = require('../../tests/site-files');
 
 const CR = String.fromCharCode(13);
-const src = fs.readFileSync(path.join(REPO_DIR, 'site', 'server.js'), 'utf8').split(CR).join('');
+const src = siteFiles.source().split(CR).join('');
 const CSP_HEADER = JSON.parse(src.match(/const CSP_HEADER = ("[^"\r\n]*");/)[1]);
 // send() names it beside the CSP (#2762).
 const PERMISSIONS_POLICY = src.match(/const PERMISSIONS_POLICY = '([^'\r\n]*)';/)[1];
@@ -77,10 +78,10 @@ eval(servedSrc);
 eval(grab('function cspFor('));
 eval(grab('function send('));
 eval(grab('function rangeReply('));
-// The setup programs' names, as server.js has them, and a stand-in for the
+// The setup programs' names, as the site has them (lib/feed.js), and a stand-in for the
 // Release lookup (test-release-copies.js drives the real one).
 const kindsAt = src.indexOf('const SETUP_KINDS = {');
-yes('server.js names the setup programs in SETUP_KINDS', kindsAt >= 0);
+yes('the site names the setup programs in SETUP_KINDS', kindsAt >= 0);
 const SETUP_KINDS = eval('(' + src.slice(src.indexOf('{', kindsAt), block(kindsAt)) + ')');
 const MAIN_SETUP = { name: 'Thornswood-Setup.exe', size: 123456789, sha256: 'c'.repeat(64), tag: 'main-build-20261101.3',
   at: 1761998400000, url: 'https://github.com/ThornswoodRP/Thornswood/releases/download/main-build-20261101.3/Thornswood-Setup.exe' };

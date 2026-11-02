@@ -28,6 +28,7 @@ const http = require('http');
 const net = require('net');
 const os = require('os');
 const path = require('path');
+const siteFiles = require('../../tests/site-files');
 
 const ROOT = path.join(__dirname, '..', '..');
 const SITE = process.argv[2] || path.join(ROOT, 'site', 'server.js');
@@ -45,7 +46,7 @@ const TEMP = process.env.THORNSWOOD_TEMP || os.tmpdir();
 function scratch(name, invite) {
   const dir = fs.mkdtempSync(path.join(TEMP, 'ts-routes-' + name + '-'));
   const secret = crypto.randomBytes(32).toString('hex');
-  fs.copyFileSync(SITE, path.join(dir, 'server.js'));
+  siteFiles.copy(dir, SITE);
   fs.mkdirSync(path.join(dir, 'data'), { recursive: true });
   fs.mkdirSync(path.join(dir, 'public', '.well-known'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({

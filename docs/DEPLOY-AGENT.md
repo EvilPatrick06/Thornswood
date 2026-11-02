@@ -18,6 +18,10 @@ It does two jobs with the same code:
   verb. This came first (Patrick, 31 Oct 2026). A rollback is this with the
   Release before.
 - **Apply each new Deployment by itself**, as the Windows service. Dev first.
+  Each environment has its own loop, one Deployment at a time in it, so a
+  site or bot change goes in while dev is still in its bot pass rather than
+  waiting behind it (#5190). The update check waits until no environment is
+  part way through one, so a restart never cuts an apply short.
 
 ## What this first slice does, and what it does not
 
@@ -261,7 +265,12 @@ a copy of dev that nobody plays on:
    run at a time and Task Scheduler ignores a start while one runs
    (`IgnoreNew`), so a pass is not started while the task is still running:
    the Deployment fails saying so, rather than waiting on the older run as
-   if it were its own.
+   if it were its own. A pass has ended when Task Scheduler shows a run
+   newer than the one it showed before the start and the task is not
+   running: its own record against its own record. Set against the agent's
+   clock it never held, since Task Scheduler writes a run down 13 to 15 s
+   before the agent's reading of the time just before it starts it, and
+   every pass was waited on for the whole 30 minutes (#5380).
 7. No pass's logs are lost to the next one. Before a pass empties the run
    folder, the agent copies the last pass's `bot-pass.log`,
    `bot-pass-server.log` and `result.json` to
@@ -305,7 +314,7 @@ in with the same halves as Swap.ps1's service swap:
 
 1. The zip is opened into `<root>\.agent-stage-<stamp>` while the app runs.
    Every entry has to be a plain path to one of the files a Release may carry
-   (the site: `server.js`, `public\*`, `data\site\*`; the bot: its code and
+   (the site: `server.js`, `lib\*`, `public\*`, `data\site\*`; the bot: its code and
    `assets\*`, never anything `Get-ThornswoodBotOwned` names; voice:
    `voice-server.js`, `headlines.js`, `server-log.js`). Only the files that
    differ are kept, the programs are parsed and the JSON read. A bot whose

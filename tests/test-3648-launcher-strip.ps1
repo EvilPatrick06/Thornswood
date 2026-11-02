@@ -101,10 +101,12 @@ Yes 'and refuses a file that cannot be cleaned, saying why, with what stopped it
     $submit.Contains('Swallow.Note("Gallery.Submit clean", unwalked)'))
 
 # ------------------------------------------------- 3. one set of rules, two copies
-$site = [IO.File]::ReadAllText((Join-Path $root 'site\server.js'))
+# The site is server.js over its modules in site\lib since #5357.
+. (Join-Path $PSScriptRoot 'SiteFiles.ps1')
+$site = Get-SiteSource (Join-Path $root 'site')
 $strip = [IO.File]::ReadAllText((Join-Path $app 'MediaStrip.cs'))
 Yes 'the site''s stripMedia names the launcher''s copy' ($site.Contains('launcher/app/MediaStrip.cs'))
-Yes 'and the launcher''s names the site''s' ($strip.Contains('stripMedia in site/server.js'))
+Yes 'and the launcher''s names the site''s' ($strip.Contains('stripMedia in site/lib/media.js'))
 
 Write-Host ''
 Write-Host "$script:pass passed, $script:fail failed"

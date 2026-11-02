@@ -56,6 +56,7 @@ const net = require('net');
 const http = require('http');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
+const siteFiles = require('./site-files');
 
 const ROOT = REPO_DIR;
 const APP = path.join(REPO_DIR, 'site');
@@ -89,7 +90,7 @@ function canon(v) {
 }
 
 const readme = read('site/README.md') || '';
-const server = read('site/server.js') || '';
+const server = siteFiles.source() || '';
 const deploy = read('scripts/deploy/Deploy-Docs.ps1') || '';
 const sampleText = String(read('site/config.example.json'));
 // server.js takes a byte order mark off the front before it parses, so this
@@ -299,9 +300,9 @@ const made = [];
 function copy(tag, withConfig, patch) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-site-' + tag + '-'));
   made.push(dir);
-  let src = fs.readFileSync(path.join(APP, 'server.js'), 'utf8');
-  if (patch) { src = patch(src); }
-  fs.writeFileSync(path.join(dir, 'server.js'), src);
+  // server.js and its modules (#5357), with patch run over each file's text:
+  // the anchor it changes is in one of them.
+  siteFiles.copy(dir, null, patch ? function (src) { return patch(src); } : null);
   fs.mkdirSync(path.join(dir, 'public'));
   fs.copyFileSync(path.join(APP, 'public', 'home.html'), path.join(dir, 'public', 'home.html'));
   // The written pages the copy serves. Since #1585 a written page with no

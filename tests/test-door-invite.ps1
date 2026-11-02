@@ -58,7 +58,9 @@ Yes 'and Yes opens the invite the site sent' ($explain -match '(?s)if \(Ask\.Yes
 Yes 'Explain no longer offers the invite for guild alone' (-not $explain.Contains('st.Why == "guild" && st.Invite'))
 
 # ---- the site sends the invite with 'role' -----------------------------------
-$server = [IO.File]::ReadAllText((Join-Path $Here 'site\server.js'))
+# The site is server.js over its modules in site\lib since #5357.
+. (Join-Path $PSScriptRoot 'SiteFiles.ps1')
+$server = Get-SiteSource (Join-Path $Here 'site')
 Yes 'site\server.js sends why role with the invite on /api/play/join' (
     $server -match "(?s)why:'role', message:\s*notAcceptedYet\(\),\s*invite: cfg\.discord\.invite")
 

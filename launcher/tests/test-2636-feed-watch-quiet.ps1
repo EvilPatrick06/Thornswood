@@ -262,7 +262,9 @@ function Run {
 
     # ---- the launcher waits longer than the site holds -----------------------
     $upd = [IO.File]::ReadAllText((Join-Path $Src 'Updater.cs'))
-    $site = [IO.File]::ReadAllText((Join-Path $Here 'site\server.js'))
+    # The site is server.js over its modules in site\lib since #5357.
+    . (Join-Path $Here 'tests\SiteFiles.ps1')
+    $site = Get-SiteSource (Join-Path $Here 'site')
     $mWait = [regex]::Match($upd, 'return\s+Tip\(\s*cfg\s*,\s*tip\s*,\s*tag\s*,\s*(\d+)\s*\)')
     $at = $site.IndexOf("const feedWatch = p.match(")
     $mHold = if ($at -ge 0) { [regex]::Match($site.Substring($at), 'WAIT_MS\s*=\s*(\d+)') } else { $null }

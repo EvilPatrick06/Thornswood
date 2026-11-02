@@ -91,10 +91,22 @@ yml.forEach(function (l) {
 // the required "Build check result" (#3683, build-pr.yml) needs both.
 // #5183: "pick" builds nothing; it says what each share of the gate runs.
 // #5295: "report" builds nothing either; it merges the shares' reports.
-const main = jobs.filter(function (j) { return j.id !== 'tested' && j.id !== 'gate' && j.id !== 'pick' && j.id !== 'report'; });
-yes('build.yml has exactly one build job beside its gate (found ' + main.length + ')', main.length === 1);
+// #5310, #5360: "gate-linux" is the gate's shares that run on Linux, and
+// "checks" the tree checks that need no Windows; neither builds (#5386).
+const NOT_BUILDS = ['tested', 'pick', 'gate', 'gate-linux', 'report', 'checks'];
+const main = jobs.filter(function (j) { return NOT_BUILDS.indexOf(j.id) < 0; });
+yes('build.yml has exactly one build job beside its gate and checks (found ' + main.length + ': ' + main.map(function (j) { return j.id; }).join(', ') + ')', main.length === 1);
+// The required check of a pull request needs every job of build-pr.yml
+// whose failure must stop a merge: all of them but the report, which only
+// merges the shares' reports, and itself.
 const prYml = read('.github/workflows/build-pr.yml');
-yes('  and the required check of a pull request needs the build and the gate both', /\n    name: Build check result\n    needs: \[launcher, gate\]\n/.test(prYml));
+const prJobs = (prYml.match(/^  [A-Za-z0-9_-]+:\s*$/gm) || []).map(function (l) { return l.trim().replace(/:$/, ''); })
+  .filter(function (id) { return ['pull_request', 'merge_group', 'workflow_dispatch'].indexOf(id) < 0; });
+const resNeeds = /\n    name: Build check result\n    needs: \[([^\]]*)\]\n/.exec(prYml);
+const needs = resNeeds ? resNeeds[1].split(',').map(function (x) { return x.trim(); }).sort() : [];
+const want = prJobs.filter(function (id) { return id !== 'result' && id !== 'report'; }).sort();
+yes('  and the required check of a pull request needs every job but the report (needs ' + needs.join(', ') + '; jobs ' + want.join(', ') + ')',
+  needs.length > 0 && needs.join(',') === want.join(',') && needs.indexOf('launcher') >= 0 && needs.indexOf('gate') >= 0);
 const CHECK = main.length ? main[0].name : null;
 yes('that job is named "Launcher builds" (found "' + CHECK + '")', CHECK === 'Launcher builds');
 
