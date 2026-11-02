@@ -122,9 +122,9 @@ namespace Thornswood
     $r = IconNow
     Yes 'a start after an install deleted it writes it back before any shortcut is touched' ((Test-Path -LiteralPath $r.Path) -and $r.Wrote)
 
-    # #2627: what Ensure would change, said and not done, for Scan. Before any
-    # launcher exe is in the scratch install, so no shortcut anywhere names it
-    # and none is missing for it; only the icon file and the stamp count.
+    # #2627: what Ensure would change, said and not done, for Scan. Here the
+    # icon file and the stamp count; the shortcuts in the real Desktop and
+    # Start menu are not this harness's to write (see below).
     $outOfDate = $icons.GetMethod('OutOfDate', [Reflection.BindingFlags]'Public, Static')
     Yes 'Icons has OutOfDate, what Ensure would change, for Scan (#2627)' ([bool]$outOfDate)
     if ($outOfDate) {
@@ -141,7 +141,14 @@ namespace Thornswood
         [string]$thisExe = $icons.GetProperty('Exe').GetValue($null)
         $remember.Invoke($null, @($thisExe, ([string]$r.Path + ',0'))) | Out-Null
         $l = @($outOfDate.Invoke($null, @()))
-        Yes ('with the icon written and the shortcuts redrawn for this launcher, nothing is out of date' + $(if ($l.Count) { ' (' + ($l -join '; ') + ')' } else { '' })) ($l.Count -eq 0)
+        # This PowerShell is a file that exists, so on Windows OutOfDate also
+        # says the real Desktop and Start menu have no Thornswood.lnk to it.
+        # They are not this harness's to write (the header), so those lines
+        # are set aside here, by their exact shape, and only those.
+        $missing = @($l | Where-Object { "$_" -match '\\Thornswood\.lnk is missing$' })
+        $rest = @($l | Where-Object { "$_" -notmatch '\\Thornswood\.lnk is missing$' })
+        Yes ('with the icon written and the shortcuts redrawn for this launcher, nothing is out of date' + $(if ($rest.Count) { ' (' + ($rest -join '; ') + ')' } else { '' })) ($rest.Count -eq 0)
+        if ($missing.Count) { Write-Host ('      set aside, places this harness does not write: ' + ($missing -join '; ')) }
         Remove-Item -LiteralPath (Join-Path $profileDir 'icons.stamp') -Force
     }
     $want = [string]$r.Path + ',0'
@@ -236,9 +243,19 @@ namespace Thornswood
     New-Item -ItemType Directory -Force -Path $stage | Out-Null
     # A build whose app.ico is the dev art: what a CI-built launcher with art
     # other than the checkout's looks like to the install. app-dev.ico is the
-    # main art, so a dev root taking the other file shows. The exe and the
-    # library are stand-in bytes: Install-Launcher reads neither (#4823).
-    [IO.File]::WriteAllBytes((Join-Path $stage 'Thornswood.exe'), [byte[]](@(0x4D, 0x5A) + [byte[]](1..200)))
+    # main art, so a dev root taking the other file shows. Install-Launcher
+    # reads neither the exe nor the library (#4823), but the exe is a real
+    # Windows program: on the gate's runner the shell would not save a
+    # shortcut to an exe of stand-in bytes ("Unable to save shortcut"), and
+    # saved one to the compiled stand-in this used before. The library is
+    # stand-in bytes.
+    $standDll = $null
+    try { $standDll = Build-LauncherCode -Exe -Property @{ UseAppHost = 'true' } -Source "class P { static void Main() { } }`n" }
+    catch { ($_.Exception.Message -split "`n") | Select-Object -First 20 | ForEach-Object { Write-Host "  $_" } }
+    $standExe = if ($standDll) { [IO.Path]::ChangeExtension($standDll, '.exe') } else { '' }
+    Yes 'a stand-in Thornswood.exe that is a real program compiles' ($standExe -and (Test-Path -LiteralPath $standExe))
+    if (-not ($standExe -and (Test-Path -LiteralPath $standExe))) { Done }
+    Copy-Item -LiteralPath $standExe -Destination (Join-Path $stage 'Thornswood.exe')
     [IO.File]::WriteAllBytes((Join-Path $stage 'libSkiaSharp.dll'), [byte[]](@(0x4D, 0x5A) + [byte[]](201..250)))
     Copy-Item -LiteralPath $devIco -Destination (Join-Path $stage 'app.ico')
     Copy-Item -LiteralPath $appIco -Destination (Join-Path $stage 'app-dev.ico')

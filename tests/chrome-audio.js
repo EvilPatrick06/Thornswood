@@ -35,8 +35,17 @@ function find() {
   return null;
 }
 
+// On Windows, chrome.exe takes no --version: it opens a browser window and
+// keeps running, which held the gate's Windows runner until the harness was
+// killed at 300 s. So there the version is the one the exe's own file
+// version resource carries, read by Windows PowerShell; elsewhere --version
+// prints it and exits.
 function version(exe) {
-  const r = cp.spawnSync(exe, ['--version'], { encoding: 'utf8' });
+  const r = os.platform() === 'win32'
+    ? cp.spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+      '$v = (Get-Item -LiteralPath $env:TS_CHROME_EXE).VersionInfo; $v.ProductName + \' \' + $v.ProductVersion'],
+    { encoding: 'utf8', env: Object.assign({}, process.env, { TS_CHROME_EXE: exe }) })
+    : cp.spawnSync(exe, ['--version'], { encoding: 'utf8' });
   return ((r.stdout || '') + (r.stderr || '')).trim();
 }
 
