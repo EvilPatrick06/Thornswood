@@ -98,10 +98,16 @@ Yes ('the client record names a fork, a branch and a commit (' + $cCommit + ')')
 Yes ('the server record names a commit (' + $sCommit.Substring(0, [Math]::Min(8, $sCommit.Length)) + ')') ($sCommit -match '^[0-9a-f]{7,40}$')
 Yes ('the client record lists the six runtime files') ($files.Count -eq 6)
 
-# Every commit either record names, full or short. A hash on the page or in
-# the note has to be a prefix of one of these, or one of these of it.
-$known = @($cCommit, $sCommit, [string]$client.upstreamBase, [string]$server.source.upstreamBase) |
-    Where-Object { $_ -match '^[0-9a-f]{7,40}$' }
+# Every commit a record names, full or short: the client and server records,
+# and since the setup's note is Source-Notice.ps1's (#4824) with the library
+# notices of the runtime note, the records those come from too, Frida's
+# sources (records\frida-sources.json) and the vcpkg ports' versions
+# (records\client-licences.json). A hash on the page or in the note has to be
+# a prefix of one of these, or one of these of it.
+$known = @(@($cCommit, $sCommit, [string]$client.upstreamBase, [string]$server.source.upstreamBase) +
+    @(foreach ($r in 'frida-sources.json', 'client-licences.json') {
+        [regex]::Matches([IO.File]::ReadAllText((Join-Path (Join-Path $Here 'records') $r)), '\b[0-9a-f]{7,40}\b') | ForEach-Object { $_.Value }
+    })) | Where-Object { $_ -match '^[0-9a-f]{7,40}$' }
 function Test-Known([string]$h) {
     foreach ($k in $known) { if ($k.StartsWith($h) -or $h.StartsWith($k)) { return $true } }
     return $false
@@ -162,21 +168,36 @@ try {
     $c2 = Read-Json $clientPath
     $c2.forkCommit = 'abcdef12'
     $cp = Join-Path $tmp 'client-build.json'
-    [IO.File]::WriteAllText($cp, ($c2 | ConvertTo-Json -Depth 6))
+    # The note carries the licence texts of the libraries in the files
+    # (client-licences.json beside the record, #3099), measured from the
+    # record's own commit, so each record written here gets the real texts
+    # beside it under the commit it names.
+    Copy-Item -LiteralPath (Join-Path (Join-Path $Here 'records') 'client-licences') -Destination $tmp -Recurse
+    function Put-Licences([string]$recordPath) {
+        $l = Read-Json (Join-Path (Join-Path $Here 'records') 'client-licences.json')
+        $l.forkCommit = [string](Read-Json $recordPath).forkCommit
+        [IO.File]::WriteAllText((Join-Path (Split-Path -Parent $recordPath) 'client-licences.json'), ($l | ConvertTo-Json -Depth 8))
+    }
+    function Put-Record($o, [switch]$Bom) {
+        if ($Bom) { [IO.File]::WriteAllText($cp, ($o | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($true))) }
+        else { [IO.File]::WriteAllText($cp, ($o | ConvertTo-Json -Depth 6)) }
+        Put-Licences $cp
+    }
+    Put-Record $c2
     $n2 = Get-SetupNote $cp $files ''
     Yes 'a new client commit in the record comes out in the note' ($n2.Contains('/tree/abcdef12'))
     Yes 'the old commit does not survive a new record' (-not $n2.Contains($cCommit))
 
     # Windows PowerShell 5.1 writes a byte order mark with -Encoding UTF8,
     # and a record saved that way still has to read.
-    [IO.File]::WriteAllText($cp, ($c2 | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($true)))
+    Put-Record $c2 -Bom
     Yes 'a record saved with a byte order mark still reads' ((Get-SetupNote $cp $files '').Contains('/tree/abcdef12'))
 
     # A file the record gains with no known source folder stops the setup's
     # build rather than shipping a note that leaves it out.
     $c3 = Read-Json $clientPath
     $c3.files | Add-Member -NotePropertyName 'Data\SKSE\Plugins\Unheard.dll' -NotePropertyValue ([pscustomobject]@{ sha256 = '00'; bytes = 1 })
-    [IO.File]::WriteAllText($cp, ($c3 | ConvertTo-Json -Depth 6))
+    Put-Record $c3
     $threw = $false
     try { $null = Get-SetupNote $cp $files '' } catch { $threw = $true }
     Yes 'a recorded file with no known source folder stops it' $threw
@@ -187,7 +208,7 @@ try {
 
     $c4 = Read-Json $clientPath
     $c4.forkCommit = ''
-    [IO.File]::WriteAllText($cp, ($c4 | ConvertTo-Json -Depth 6))
+    Put-Record $c4
     $threw = $false
     try { $null = Get-SetupNote $cp $files '' } catch { $threw = $true }
     Yes 'a record with no commit stops it' $threw
@@ -196,7 +217,7 @@ try {
     # say so in the note rather than passing for a commit.
     $c5 = Read-Json $clientPath
     $c5.upstreamBase = 'unknown, fetch upstream to fill this in'
-    [IO.File]::WriteAllText($cp, ($c5 | ConvertTo-Json -Depth 6))
+    Put-Record $c5
     $n5 = Get-SetupNote $cp $files ''
     Yes 'an upstream base the record does not know is said as a gap, not printed as a commit' `
         ($n5.Contains('a commit the build record does not name') -and -not $n5.Contains('unknown, fetch'))
@@ -205,7 +226,7 @@ try {
     # like the 23 September stage, with a record from before the front was
     # built from the fork (no front-build.json beside it), get all three
     # named, as their own group, with the gap said and no commit claimed.
-    [IO.File]::Copy($clientPath, $cp, $true)
+    [IO.File]::Copy($clientPath, $cp, $true); Put-Licences $cp
     $extraFiles = @('Data\Platform\UI\build.js', 'Data\Platform\Modules\skyrimPlatform.ts', 'Data\Scripts\MpClientPlugin.pex')
     $n6 = Get-SetupNote $cp ($files + $extraFiles) ''
     $cut = $n6.IndexOf('did not build')
@@ -322,8 +343,11 @@ Yes ('Build-SetupFiles.ps1 puts the voice libraries'' texts in the package for t
     $setupFiles.Contains("Copy-Item -LiteralPath `$from -Destination (Join-Path `$files `$lic) -Force"))
 $notCopied = @(@('GPL-3.0.txt', 'AGPL-3.0.txt') + $voiceTexts | Where-Object { -not $steps.Contains('"' + $_ + '"') })
 Yes ('InstallSteps.cs copies the GPL, AGPL and voice library texts into the install folder' + $(if ($notCopied.Count) { ', not: ' + ($notCopied -join ', ') } else { '' })) ($notCopied.Count -eq 0)
+# The uninstall takes out every text on that same list, so a text the
+# install copies is one it removes.
+$uninstallsList = $uninstall.Contains('foreach (string lic in InstallSteps.LicenceFiles) leave.Add(Path.Combine(Paths.Root, lic));')
 foreach ($v in @('AGPL-3.0.txt', 'GPL-3.0.txt') + $voiceTexts) {
-    Yes "Uninstall.cs removes $v from the install folder" ($uninstall.Contains('leave.Add(Path.Combine(Paths.Root, "' + $v + '"));'))
+    Yes "Uninstall.cs removes $v from the install folder, off InstallSteps.LicenceFiles" ($uninstallsList -and $licList.Success -and $licList.Groups[1].Value.Contains('"' + $v + '"'))
 }
 Yes 'SOURCE CODE.txt names the GPL and AGPL texts beside it' ($note -match 'AGPL-3\.0\.txt' -and $note -match 'GPL-3\.0\.txt')
 

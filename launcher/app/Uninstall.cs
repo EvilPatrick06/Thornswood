@@ -514,8 +514,8 @@ namespace Thornswood
             // is how anybody finds out it is still holding something.
             leave.Add(Path.Combine(Paths.Root, "_dist"));
             leave.Add(Path.Combine(Paths.Root, "tools"));
-            // The note on where the SkyMP source is. Setup-Thornswood.ps1 puts
-            // it here, beside the folders above, so without this line the
+            // The note on where the SkyMP source is. The install puts it here
+            // (InstallSteps.cs), beside the folders above, so without this line the
             // install folder is never empty and the farewell calls our own
             // note "not Thornswood's".
             leave.Add(Path.Combine(Paths.Root, "SOURCE CODE.txt"));
