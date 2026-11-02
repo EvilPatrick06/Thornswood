@@ -169,7 +169,9 @@ function standIn(root, break_) {
   // The running server, so the stand-in engine can print the gamemode's lines.
   let child0 = null;
   const blob = botPass.gitBlob(path.join(root, 'gamemode.js'));
-  const formFile = path.join(root, 'world', 'changeForms', '1.json');
+  // Named as the engine names a form made on the server: its id in hex
+  // (FormDesc::ToString, %x), here the refrId it sends, 0xff000801.
+  const formFile = path.join(root, 'world', 'changeForms', 'ff000801.json');
 
   function spawn() {
     const child = new EventEmitter();
@@ -384,6 +386,11 @@ function failedAt(r, step) {
   fs.mkdirSync(path.join(w, 'saves', 'changeForms'), { recursive: true });
   fs.writeFileSync(path.join(w, 'saves', 'changeForms', '7.json'), JSON.stringify({ profileId: 77, position: [1, 2, 3] }));
   yes('Bot-Pass reads the world where databaseName says', !!botPass.formOf(w, { databaseName: 'saves' }, 77));
+  fs.writeFileSync(path.join(w, 'saves', 'changeForms', 'ff000a3c.json'), JSON.stringify({ profileId: 78, position: [1, 2, 3] }));
+  fs.writeFileSync(path.join(w, 'saves', 'changeForms', '14_Skyrim.esm.json'), JSON.stringify({ profileId: 79 }));
+  yes('Bot-Pass finds a character whose file the engine named in hex, as a made one is (#5379)', !!botPass.formOf(w, { databaseName: 'saves' }, 78));
+  yes('and not a plugin\'s form, which is no character', botPass.formOf(w, { databaseName: 'saves' }, 79) === null);
+  yes('and none when the world folder is not there', botPass.formOf(path.join(TMP, 'no-world'), {}, 78) === null);
   yes('character.js reads it there too (not a worldDir setting the engine does not have)',
     character.characters(w, { databaseName: 'saves' }).some((c) => c.profileId === 77));
 

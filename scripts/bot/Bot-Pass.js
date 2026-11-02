@@ -51,6 +51,7 @@ const fs = require('fs');
 const path = require('path');
 const { Bot, MSG, loadAddon, mintPass } = require('./bot.js');
 const { VoiceRun, Relay } = require('./relay.js');
+const { characters } = require('./character.js');
 
 const LOADED = '[thornswood] gamemode client scripts ';
 const NOT_LOADED = ['[thornswood] gamemode did not load', 'Bad syntax, ignoring'];
@@ -103,20 +104,17 @@ function face(name) {
   };
 }
 
-// The character with this profile id in the world folder, or null. The
-// engine's own setting names the folder (databaseName, "world" when unset,
-// DatabaseFactory.cpp).
+// The character with this profile id in the world folder, or null. It is
+// read as character.js reads every world (the restore rehearsal and the
+// nightly count read the same way, #5287): the engine names a form's file by
+// its id in hex (FormDesc::ToString with %x, FileDatabase), so a character
+// made on the server is ff000800.json, never digits alone. Reading digits
+// only is how the first pass to reach saved failed (#5379).
 function formOf(root, settings, profileId) {
-  const dir = path.join(root, String(settings.databaseName || 'world'), 'changeForms');
-  let names = [];
-  try { names = fs.readdirSync(dir); } catch (e) { return null; }
-  for (const n of names) {
-    if (!/^\d+\.json$/.test(n)) { continue; }
-    let o = null;
-    try { o = readJson(path.join(dir, n)); } catch (e) { continue; }
-    if (o && Number(o.profileId) === profileId && !o.isDeleted) { return o; }
-  }
-  return null;
+  let all = [];
+  try { all = characters(root, settings); } catch (e) { return null; }
+  const c = all.find((x) => x.profileId === profileId);
+  return c ? c.form : null;
 }
 
 function nameIn(form) {
