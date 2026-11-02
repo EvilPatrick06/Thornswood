@@ -19,7 +19,7 @@
   have gone to main untried.
 
   WHAT IS DIFFERENT FROM ONE. Nothing in Ship.ps1. Its box steps
-  (Publish-Update, Sync-Client, Publish-Installer, the feed store,
+  (Publish-Update, Sync-Client, the feed store,
   announced.json) reach the box the way they do from One, as Administrator
   over ssh, here over loopback with the gate's own key. Two things only this
   script does:

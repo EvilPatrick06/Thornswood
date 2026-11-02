@@ -26,10 +26,13 @@ person would, before they do.
 The one that ships today. It has three parts, and a run that reaches a lit PLAY
 button has been through all three.
 
-1. The installer on the Downloads page fetches Thornswood's own files and puts
-   them into the Steam copy of Skyrim. Its payload is built with everything the
-   collection provides left out, so the install (`launcher\app\InstallSteps.cs`)
-   puts them into the Steam copy rather than make a Skyrim of its own.
+1. The installer on the Downloads page, `Thornswood-Setup.exe`, is Velopack's
+   setup program from a GitHub Release (#4824). It puts down the launcher with
+   Thornswood's own files and starts it, and the launcher's first start asks
+   where to install and puts those files into the Steam copy of Skyrim
+   (`launcher\app\InstallWindow.cs`, `launcher\app\InstallSteps.cs`). Nothing
+   the collection provides is in it, so the install uses the Steam copy rather
+   than make a Skyrim of its own.
 2. Vortex deploys the Nexus collection into that same Steam copy.
 3. The launcher makes Thornswood's own game folder, `C:\Thornswood\Game`, out
    of what Vortex deployed: the big files as hard links, so the collection is
@@ -422,7 +425,7 @@ tester confused by a list that no longer matches.
 | 42 | `is missing, the launcher will fetch it` | `launcher\app\Checks.cs` |
 | 42 | `The client runtime is back to the recorded build.` | `launcher\app\ClientRuntime.cs` |
 | 43 | `UPDATE FIRST` | `launcher\app\Shell.cs` |
-| 44 | `Give your character a name that belongs in Skyrim` | `launcher\ui.xaml` |
+| 44 | `Give your character a name that belongs in Skyrim` | `launcher\app\MainWindow.axaml` |
 | 44 | `Closed for maintenance` | `launcher\app\FeedNotice.cs` |
 | 44 | `This launcher is too old to play` | `launcher\app\FeedNotice.cs` |
 | 45 | `PLAY` | `launcher\app\Shell.cs` |

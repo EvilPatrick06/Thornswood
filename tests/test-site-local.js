@@ -197,8 +197,7 @@ yes('every route in the table is one server.js answers, with that method' +
 const unasked = [];
 rows.forEach(function (r) {
   // A route the table says nothing asks any more names no caller, and the
-  // check below each one holds that to the code: /api/play/who, and
-  // /api/payload since the setup program retired (#4824).
+  // check below holds that to the code: /api/play/who.
   if (/^nothing in the repo asks it now/.test(r.text)) { return; }
   if (!r.files.length) { unasked.push(r.routes[0] + ' names no caller'); return; }
   const text = r.files.map(function (f) { return read(f.split(BS).join('/')) || ''; }).join('\n');
@@ -231,11 +230,13 @@ yes('the table says nothing asks /api/play/who, and nothing in ' + askers.length
     (whoCallers.length ? ', but ' + whoCallers.join(', ') + ' does' : ''),
     !!whoRow && /^nothing in the repo asks it now/.test(whoRow.text) && askers.length > 20 && whoCallers.length === 0);
 
+// /api/payload went with the old setup program (#4824): not answered, not in
+// the table, and nothing asks it.
 const payloadRow = rows.filter(function (r) { return r.routes.indexOf('/api/payload') >= 0; })[0];
 const payloadCallers = askers.filter(function (f) { return (read(f) || '').indexOf('/api/payload') >= 0; });
-yes('the table says nothing asks /api/payload since the setup program retired, and nothing does' +
+yes('/api/payload is gone from server.js and the table, and nothing asks it' +
     (payloadCallers.length ? ', but ' + payloadCallers.join(', ') + ' does' : ''),
-    !!payloadRow && /^nothing in the repo asks it now/.test(payloadRow.text) && payloadCallers.length === 0);
+    !payloadRow && !answers('/api/payload', 'GET') && payloadCallers.length === 0);
 
 // Nothing the launcher or a key holder asks can be left out of the table.
 const inTable = [].concat.apply([], rows.map(function (r) { return r.routes; }));

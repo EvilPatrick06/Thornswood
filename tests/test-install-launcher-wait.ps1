@@ -56,6 +56,10 @@ $destExe = Join-Path $launcherDir 'Thornswood.exe'
 $builtExe = Join-Path $from 'Thornswood.exe'
 Set-Content -LiteralPath $destExe -Value 'OLD-LAUNCHER-BYTES' -Encoding ASCII
 Set-Content -LiteralPath $builtExe -Value 'NEW-LAUNCHER-BYTES-1190' -Encoding ASCII
+# The two icons the exe embeds, which Build-Launcher.ps1 writes beside it and
+# Install-Launcher.ps1 names the shortcuts' icon file from (#887, #4823).
+Copy-Item -LiteralPath $icon -Destination (Join-Path $from 'app.ico')
+Copy-Item -LiteralPath (Join-Path $RepoDir 'launcher\app-dev.ico') -Destination (Join-Path $from 'app-dev.ico')
 
 function Start-Hold([string]$exePath, [string]$readyPath, [string]$scriptPath, [int]$holdMs, [int]$delayMs = 0) {
     $exeEsc = $exePath.Replace('\', '\\')

@@ -1,40 +1,21 @@
 <#
   test-2661-keep-feed-launcher.ps1
 
-  A main Ship with -Package that keeps the feed's launcher packs the launcher
-  the feed offers. Issue #2661.
+  Get-FeedLauncher in Ship.ps1 (issue #2661): a launcher a feed already
+  offers, downloaded from its launcherUrl and held to the feed's
+  launcherSha256 and to the signature, for a Ship that puts that launcher out
+  again rather than building one (main's own on dev, or the one dev tried, on
+  main). It began as the half of a main Ship with -Package that put the
+  feed's launcher into the ship root for the old installer; that half,
+  Install-FeedLauncher, went with the installer (#4824).
 
-  Package-Thornswood.ps1 packs <root>\Launcher\Thornswood.exe as it finds it.
-  A Ship that builds a launcher installs it there first. One that keeps the
-  feed's (Test-KeepFeedLauncher, #921, or -ModsOnly) set $ModsOnly, which also
-  skipped the only code that put an exe in the root. That held while main's
-  root was Patrick's own install, whose launcher updated itself to the feed's;
-  main's ship root local\release-main (#2448, #2603) is never started, so
-  -Package packed whatever exe the folder held, or stopped at "MISSING the
-  launcher" after the release was already out (#2243).
-
-  Ship.ps1 now has Get-FeedLauncher (download the feed's launcherUrl, check it
-  against launcherSha256 and the signature) and Install-FeedLauncher (leave a
-  folder already holding it alone, else put the checked exe in place with
-  Install-Launcher.ps1 -From and read it back), run before anything is built
-  or published on a main Ship with -Package that keeps the feed's launcher.
-
-  This lifts both out of the shipped Ship.ps1 by the parser, the way
-  test-ship-ci-sign.ps1 lifts Set-ReleaseLauncherSignature, and drives them
-  against a file:// feed, a stand-in Get-PublishSignRefusal and stand-in
-  installers, so no network, certificate or signtool is needed:
-    1. a root with no Launcher folder ends with the feed's exe in it;
-    2. a root holding another exe ends with the feed's exe in it;
-    3. a root already holding the feed's exe is left alone;
-    4. a download that is not the feed's sha256, one signed by somebody else,
-       a feed naming no whole launcher and a URL that does not answer each
-       stop with a reason, and leave nothing half written and the root as it
-       was;
-    5. an installer that fails, or that puts nothing in place, stops too.
-  It also checks the order in Ship.ps1: after the keep decision and the
-  animation and body files and node checks (#1692), on main with -Package and not on
-  a dry run, before Publish-Update and Package-Thornswood, and that a reason
-  stops the Ship. If a name moves, this says so rather than
+  This lifts Get-FeedLauncher out of the shipped Ship.ps1 by the parser and
+  drives it against a file:// feed and a stand-in Get-PublishSignRefusal, so
+  no network, certificate or signtool is needed: the feed's launcher arrives
+  whole with no .part left, and a download that is not the feed's sha256,
+  one signed by somebody else, a feed naming no whole launcher, an empty
+  ExpectedSigner and a URL that does not answer each stop with a reason and
+  leave nothing half written. If the name moves, this says so rather than
   quietly testing nothing.
 
   Read only apart from files under its own temp folder.
@@ -48,7 +29,6 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if (-not $ShipPath) { $ShipPath = Join-Path (Split-Path -Parent $Here) 'scripts/release/Ship.ps1' }
-$InstallPath = Join-Path (Split-Path -Parent $ShipPath) 'Install-Launcher.ps1'
 
 $script:pass = 0
 $script:fail = 0
@@ -73,50 +53,14 @@ Yes 'Ship.ps1 parses' (@($e).Count -eq 0)
 $FnAst = [System.Management.Automation.Language.FunctionDefinitionAst]
 $fns = @{}
 foreach ($f in $ast.FindAll({ param($n) $n -is $FnAst }, $true)) { $fns[$f.Name] = $f.Extent.Text }
-foreach ($n in 'Get-FeedLauncher', 'Install-FeedLauncher') {
+foreach ($n in 'Get-FeedLauncher') {
     Yes "Ship.ps1 has $n" ($fns.ContainsKey($n))
     if (-not $fns.ContainsKey($n)) { Done }
     Invoke-Expression $fns[$n]
 }
 
-# ---- the order in Ship.ps1 --------------------------------------------------
-$iAssert  = $src.IndexOf(". (Join-Path `$Here 'Assert-PublishSigned.ps1')")
-$iSeed    = $src.IndexOf("`n`$pubLauncher = `$null")
-$iKeep    = $src.IndexOf('if (Test-KeepFeedLauncher $pubLauncher')
-$iKept    = $src.IndexOf('$ModsOnly = $true')
-$iGen     = $src.IndexOf("Head 'Animation and body files'")
-$iNode    = $src.IndexOf("Die ('node is not on this machine")
-# From the feed installer.yml takes the feed's launcher itself (#3412), so the
-# step is for a Ship that packages on One.
-$iWhen    = $src.IndexOf('if ($Package -and -not $Dev -and -not $DryRun -and $ModsOnly -and -not $FromFeed) {')
-$iStep    = $src.IndexOf('$fed = Install-FeedLauncher $pubLauncher $Root $feedLauncherDir $feedSigner (Join-Path $Here ''Install-Launcher.ps1'')')
-$iDie     = $src.IndexOf('if ($fed.Why) { Die $fed.Why }')
-$iBuild   = $src.IndexOf("`nif (-not `$ModsOnly) {`n    `$launchDir = Join-Path `$Root 'Launcher'")
-$iPublish = $src.IndexOf("& (Join-Path `$Here 'Publish-Update.ps1') @pubArgs")
-$iPackage = $src.IndexOf("& (Join-Path `$Here 'Package-Thornswood.ps1') @pkgArgs")
-Yes 'Ship seeds $pubLauncher before it asks whether to keep the feed''s launcher' ($iSeed -ge 0 -and $iKeep -gt $iSeed)
-Yes 'Ship still keeps the feed''s launcher when nothing it is built from changed' ($iKeep -ge 0 -and $iKept -gt $iKeep)
-Yes 'Ship puts the feed''s launcher in the root on main with -Package, not on a dry run or from the feed, when it keeps it' ($iWhen -ge 0)
-Yes '  through Install-FeedLauncher with Install-Launcher.ps1' ($iStep -gt $iWhen)
-Yes '  and a reason stops the Ship' ($iDie -gt $iStep)
-Yes '  after the keep decision' ($iWhen -gt $iKept)
-Yes '  after the animation and body files and node checks, so nothing is installed for a release that stops there (#1692)' (
-    $iGen -ge 0 -and $iNode -ge 0 -and $iWhen -gt $iGen -and $iWhen -gt $iNode)
-Yes '  with the sign helpers loaded before it' ($iAssert -ge 0 -and $iAssert -lt $iWhen)
-$iPlugins = $src.IndexOf("Head 'The in game plugins'")
-Yes '  in the launcher build block''s place, after it' ($iBuild -ge 0 -and $iWhen -gt $iBuild)
-Yes '  and before the in game plugins, as the built launcher is installed' ($iPlugins -gt $iDie)
-Yes '  before Publish-Update' ($iPublish -gt $iDie)
-Yes '  and before Package-Thornswood packs <root>\Launcher' ($iPackage -gt $iDie)
-Yes 'Get-FeedLauncher checks the signature with Get-PublishSignRefusal' ($fns['Get-FeedLauncher'] -match 'Get-PublishSignRefusal -Path \$exe -ExpectedSigner \$expectedSigner')
-Yes 'Install-FeedLauncher installs with -From the checked download' ($fns['Install-FeedLauncher'] -match '& \$installer -Root \$root -From \$scratch -NoPause')
 
-# Install-Launcher.ps1 takes what Install-FeedLauncher hands it.
-$it = $null; $ie = $null
-$iast = [System.Management.Automation.Language.Parser]::ParseFile($InstallPath, [ref]$it, [ref]$ie)
-$pnames = @()
-if ($iast.ParamBlock) { $pnames = @($iast.ParamBlock.Parameters | ForEach-Object { $_.Name.VariablePath.UserPath }) }
-foreach ($n in 'Root', 'From', 'NoPause') { Yes "Install-Launcher.ps1 takes -$n" ($pnames -contains $n) }
+Yes 'Get-FeedLauncher checks the signature with Get-PublishSignRefusal' ($fns['Get-FeedLauncher'] -match 'Get-PublishSignRefusal -Path \$exe -ExpectedSigner \$expectedSigner')
 
 # ---- drive it ---------------------------------------------------------------
 # The stand-in reads the signer off the exe's first line: "signed by <who>".
@@ -145,37 +89,6 @@ try {
     function Pub([string]$url, [string]$sha) { return [pscustomobject]@{ Version = '1.2.5'; Url = $url; Sha = $sha; Inputs = 'abc' } }
     $good = Pub (Url $feedExe) (Sha $feedExe)
 
-    $log = Join-Path $work 'installer.log'
-    # An installer that does what Install-Launcher.ps1 does to the exe.
-    $inst = Join-Path $work 'install.ps1'
-    [IO.File]::WriteAllText($inst, @"
-param([string]`$Root, [string]`$From, [switch]`$NoPause)
-Add-Content -LiteralPath '$log' -Value ('installed from ' + `$From)
-`$d = Join-Path `$Root 'Launcher'
-New-Item -ItemType Directory -Force -Path `$d | Out-Null
-Copy-Item -LiteralPath (Join-Path `$From 'Thornswood.exe') -Destination (Join-Path `$d 'Thornswood.exe') -Force
-exit 0
-"@)
-    $broken = Join-Path $work 'broken-install.ps1'
-    [IO.File]::WriteAllText($broken, @"
-param([string]`$Root, [string]`$From, [switch]`$NoPause)
-Add-Content -LiteralPath '$log' -Value 'failed'
-exit 1
-"@)
-    $idle = Join-Path $work 'idle-install.ps1'
-    [IO.File]::WriteAllText($idle, @"
-param([string]`$Root, [string]`$From, [switch]`$NoPause)
-Add-Content -LiteralPath '$log' -Value 'did nothing'
-exit 0
-"@)
-    function Ran { if (Test-Path -LiteralPath $log) { return @([IO.File]::ReadAllLines($log)) } return @() }
-    function Fresh([string]$name) {
-        Remove-Item -LiteralPath $log -Force -ErrorAction SilentlyContinue
-        $r = Join-Path $work $name
-        Remove-Item -LiteralPath $r -Recurse -Force -ErrorAction SilentlyContinue
-        New-Item -ItemType Directory -Force -Path $r | Out-Null
-        return $r
-    }
     function Left([string]$dir) { return @(Get-ChildItem -LiteralPath $dir -File -Force -ErrorAction SilentlyContinue | ForEach-Object { $_.Name }) }
 
     # ---- Get-FeedLauncher ---------------------------------------------------
@@ -207,58 +120,6 @@ exit 0
     Yes "a launcherUrl that does not answer stops: '$why'" ($why -match 'could not be downloaded' -and $why -match 'Run this same Ship again')
     Yes '  and leaves nothing in the folder' ((Left $into).Count -eq 0)
 
-    # ---- Install-FeedLauncher -----------------------------------------------
-    # 1. A new ship root: Game and config.json, no Launcher folder (local\release-main on 16 Oct).
-    $root = Fresh 'release-main'
-    $scratch = Join-Path $work 'scratch'
-    $r = Install-FeedLauncher $good $root $scratch $who $inst
-    $exe = Join-Path $root 'Launcher\Thornswood.exe'
-    Yes "1. a root with no Launcher folder: '$($r.Why)'" ($r.Why -eq '' -and $r.Placed)
-    Yes '1.   ends with the feed''s exe in <root>\Launcher' ((Test-Path -LiteralPath $exe) -and (Sha $exe) -eq $good.Sha)
-    $ran = @(Ran)
-    Yes '1.   put there by the installer, from the checked download' ($ran.Count -eq 1 -and $ran[0] -eq ('installed from ' + $scratch))
-
-    # 2. A root holding another launcher (the last one a Ship built, or a dev one).
-    $root = Fresh 'release-other'
-    New-Item -ItemType Directory -Force -Path (Join-Path $root 'Launcher') | Out-Null
-    $exe = Join-Path $root 'Launcher\Thornswood.exe'
-    [IO.File]::WriteAllText($exe, "signed by $who`nthe 1.2.4 a Ship built here before`n")
-    $r = Install-FeedLauncher $good $root $scratch $who $inst
-    Yes "2. a root holding another launcher: '$($r.Why)'" ($r.Why -eq '' -and $r.Placed)
-    Yes '2.   ends with the feed''s exe in its place' ((Sha $exe) -eq $good.Sha)
-
-    # 3. A root already holding the feed's launcher is left alone.
-    Remove-Item -LiteralPath $log -Force -ErrorAction SilentlyContinue
-    $stamp = (Get-Item -LiteralPath $exe).LastWriteTimeUtc
-    $r = Install-FeedLauncher $good $root $scratch $who $inst
-    Yes "3. a root already holding the feed's launcher: '$($r.Why)'" ($r.Why -eq '' -and -not $r.Placed)
-    Yes '3.   nothing downloaded and the installer not run' ((Ran).Count -eq 0)
-    Yes '3.   the exe untouched' ((Get-Item -LiteralPath $exe).LastWriteTimeUtc -eq $stamp -and (Sha $exe) -eq $good.Sha)
-
-    # 4. A download that fails a check never reaches the root.
-    $root = Fresh 'release-bad'
-    New-Item -ItemType Directory -Force -Path (Join-Path $root 'Launcher') | Out-Null
-    $exe = Join-Path $root 'Launcher\Thornswood.exe'
-    [IO.File]::WriteAllText($exe, "signed by $who`nthe one that was here`n")
-    $was = Sha $exe
-    foreach ($case in @(
-            @{ Name = 'not the feed''s sha256'; Pub = (Pub (Url $feedExe) ('0' * 64)); Says = 'does not match' },
-            @{ Name = 'signed by somebody else'; Pub = (Pub (Url $theirs) (Sha $theirs)); Says = 'not signed by ExpectedSigner' },
-            @{ Name = 'a feed naming no whole launcher'; Pub = (Pub '' ''); Says = 'names no whole launcher' },
-            @{ Name = 'a launcherUrl that does not answer'; Pub = (Pub (Url (Join-Path $feedDir 'gone.exe')) $good.Sha); Says = 'could not be downloaded' })) {
-        Remove-Item -LiteralPath $log -Force -ErrorAction SilentlyContinue
-        $r = Install-FeedLauncher $case.Pub $root $scratch $who $inst
-        Yes "4. $($case.Name) stops: '$($r.Why)'" ($r.Why -match $case.Says -and -not $r.Placed)
-        Yes '4.   the installer not run and the root as it was' ((Ran).Count -eq 0 -and (Sha $exe) -eq $was)
-    }
-
-    # 5. An installer that fails, or that puts nothing in place, stops the Ship.
-    $root = Fresh 'release-broken'
-    $r = Install-FeedLauncher $good $root $scratch $who $broken
-    Yes "5. an installer that exits 1 stops: '$($r.Why)'" ($r.Why -match 'stopped with exit code 1' -and -not $r.Placed)
-    $root = Fresh 'release-idle'
-    $r = Install-FeedLauncher $good $root $scratch $who $idle
-    Yes "5. an installer that puts nothing in place stops: '$($r.Why)'" ($r.Why -match 'is not in place' -and $r.Why -match 'no exe' -and -not $r.Placed)
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue

@@ -46,8 +46,7 @@
   need it say SKIP and are not counted; the refusals are still proved.
 
   It also runs scripts\release\Assert-PublishSigned.ps1's gate on the same
-  files, because Ship and Publish-Installer must refuse whatever the launcher
-  would.
+  files, because Ship must refuse whatever the launcher would.
 
   Builds Signature.cs with the .NET 10 SDK the way the launcher project
   does (tests\Launcher-Csc.ps1) and runs it in this PowerShell, which is

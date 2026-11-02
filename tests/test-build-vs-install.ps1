@@ -15,13 +15,14 @@
   Nothing here closes anything, touches the Desktop or restarts Explorer. The
   two scripts are copied into a temp folder beside a stand-in Close-Launcher.ps1
   that writes down what it was asked to close and closes nothing. The build
-  compiles a two line program with the real csc, so it is quick; the real
-  launcher compile is tests\test-498-msbuild.ps1, which the build check runs.
+  publishes a two line program of its own, with the real dotnet and the same
+  native publish the launcher gets (#4823), so it takes a minute and not the
+  launcher's ten; the real launcher's publish is the Launcher builds check
+  (build.yml), which runs Build-Launcher.ps1 over launcher\app itself.
 
   The callers, each shown:
     .github/workflows/nightly.yml its "Build the launcher" step's lines, run the way
-                                  GitHub runs them (build.yml's copy went with #3114:
-                                  tests\test-498-msbuild.ps1 builds there)
+                                  GitHub runs them
     Ship.ps1                      its build block lifted out and run against stand-ins
     Install-Thornswood.ps1        a copy run with -Only launcher, against the same stand-ins
 #>
@@ -36,7 +37,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $Here = Split-Path -Parent $Here
 $RepoDir = $Here
 . (Join-Path $PSScriptRoot 'Windows.ps1')
-if (-not $OnWindows) { Write-Host 'NOT RUN  the launcher is built with the Build Tools'' csc and installed over a Windows shortcut, so this runs only on Windows'; exit 0 }
+if (-not $OnWindows) { Write-Host 'NOT RUN  the launcher''s native publish is for win-x64 on Windows only, and it is installed over a Windows shortcut, so this runs only on Windows'; exit 0 }
 
 $script:pass = 0
 $script:fail = 0
@@ -156,52 +157,61 @@ $saved = @{ TEMP = $env:TEMP; TMP = $env:TMP; RUNNER_TEMP = $env:RUNNER_TEMP; TS
 $held = $null
 try {
     # Laid out like the repository: the scripts in scripts\release beside
-    # scripts\dev, the launcher's files in launcher\, the client record in
-    # records\, and out\ for the setup stub the build leaves (issue #440,
-    # phase 10). Since phase 0 Build-Launcher stops when any file the repository
-    # tracks is missing, so the art, the ini and the record are here too.
+    # scripts\dev, the launcher's project in launcher\app, its art in
+    # launcher\ and the records it embeds in records\ (issue #440, phase 10).
+    # The project is a two line program of its own, published the way the
+    # launcher is (Build-Launcher.ps1, #4823). It is a git repository with one
+    # commit, because the build takes its number from when the launcher's
+    # sources last changed (LauncherVersion.ps1) when nobody passes -Version,
+    # and the CI step passes none.
     $fakeRepo = $repo
     foreach ($d in @((Join-Path $fakeRepo 'scripts\release'), (Join-Path $fakeRepo 'scripts\dev'), (Join-Path $fakeRepo 'launcher\app'),
-                     (Join-Path $fakeRepo 'launcher\lib\webview2'), (Join-Path $fakeRepo 'launcher\lib\nlayer'), (Join-Path $fakeRepo 'records'), (Join-Path $fakeRepo 'installer\setup'), $tmp)) {
+                     (Join-Path $fakeRepo 'records'), $tmp)) {
         New-Item -ItemType Directory -Force -Path $d | Out-Null
     }
     $realRepo = $Here
     Copy-Item -LiteralPath (Join-Path $realRepo 'scripts\release\Build-Launcher.ps1') -Destination (Join-Path $fakeRepo 'scripts\release')
-    # Build-Launcher holds the embedded records to RecordShape.ps1 (#2180), and
-    # asks Where.ps1 which folders are the installs (#3031).
+    # Build-Launcher holds the embedded records to RecordShape.ps1 (#2180),
+    # asks Where.ps1 which folders are the installs (#3031) and
+    # LauncherVersion.ps1 for its number (#5179).
     foreach ($n in 'RecordShape.ps1', 'Read-JsonFile.ps1', 'Where.ps1', 'LauncherVersion.ps1') { Copy-Item -LiteralPath (Join-Path $realRepo ('scripts\release\' + $n)) -Destination (Join-Path $fakeRepo 'scripts\release') -Force }
-    # The build is MSBuild and the two project files since #498's switch:
-    # Find-MSBuild.ps1 finds MSBuild, and the projects say what goes in.
-    Copy-Item -LiteralPath (Join-Path $realRepo 'scripts\release\Find-MSBuild.ps1') -Destination (Join-Path $fakeRepo 'scripts\release') -Force
-    Copy-Item -LiteralPath (Join-Path $realRepo 'launcher\app\Thornswood.csproj') -Destination (Join-Path $fakeRepo 'launcher\app')
-    Copy-Item -LiteralPath (Join-Path $realRepo 'installer\setup\Setup.csproj') -Destination (Join-Path $fakeRepo 'installer\setup')
     $haveInstall = Test-Path -LiteralPath (Join-Path $realRepo 'scripts\release\Install-Launcher.ps1')
     if ($haveInstall) { Copy-Item -LiteralPath (Join-Path $realRepo 'scripts\release\Install-Launcher.ps1') -Destination (Join-Path $fakeRepo 'scripts\release') }
-    foreach ($f in 'app.ico', 'app-dev.ico', 'ui.xaml', 'logo.png', 'logo-dev.png', 'logo-192.png', 'launcher-header.jpg', 'launcher-header.mp4', 'Thornswood.ini', 'voice-host.html') {
+    foreach ($f in 'app.ico', 'app-dev.ico', 'logo.png', 'logo-dev.png', 'logo-192.png', 'launcher-header.jpg', 'launcher-header.mp4', 'Thornswood.ini') {
         $from = Join-Path $realRepo ('launcher\' + $f)
         if (Test-Path -LiteralPath $from) { Copy-Item -LiteralPath $from -Destination (Join-Path $fakeRepo 'launcher') }
     }
-    # The application manifest (PerMonitorV2, #463): Build-Launcher stops
-    # without it, since a launcher built without it has no DPI awareness.
-    Copy-Item -LiteralPath (Join-Path $realRepo 'launcher\app\Thornswood.manifest') -Destination (Join-Path $fakeRepo 'launcher\app')
-    # The setup program's manifest and the window fit it is compiled with (#463),
-    # and the colours it is drawn in (#2851).
-    Copy-Item -LiteralPath (Join-Path $realRepo 'installer\setup\Setup.manifest') -Destination (Join-Path $fakeRepo 'installer\setup')
-    Copy-Item -LiteralPath (Join-Path $realRepo 'launcher\app\WindowFit.cs') -Destination (Join-Path $fakeRepo 'launcher\app')
-    Copy-Item -LiteralPath (Join-Path $realRepo 'launcher\app\Themes.cs') -Destination (Join-Path $fakeRepo 'launcher\app')
-    # And the path fence its unpack is held to (#3561).
-    Copy-Item -LiteralPath (Join-Path $realRepo 'launcher\app\PathFence.cs') -Destination (Join-Path $fakeRepo 'launcher\app')
-    Copy-Item -Path (Join-Path $realRepo 'launcher\lib\webview2\*') -Destination (Join-Path $fakeRepo 'launcher\lib\webview2')
-    Copy-Item -Path (Join-Path $realRepo 'launcher\lib\nlayer\*') -Destination (Join-Path $fakeRepo 'launcher\lib\nlayer')
-    Copy-Item -LiteralPath (Join-Path $realRepo 'records\client-build.json') -Destination (Join-Path $fakeRepo 'records')
-    Copy-Item -LiteralPath (Join-Path $realRepo 'records\skyrim-files.json') -Destination (Join-Path $fakeRepo 'records')
-    Copy-Item -LiteralPath (Join-Path $realRepo 'records\ui-gone.json') -Destination (Join-Path $fakeRepo 'records')
-    Copy-Item -LiteralPath (Join-Path $realRepo 'records\generated.json') -Destination (Join-Path $fakeRepo 'records')
-    Set-Content -LiteralPath (Join-Path $repo 'launcher\app\Program.cs') -Value 'static class Program { [System.STAThread] static void Main() { } }' -Encoding ASCII
-    # Both projects read the version off Updater.cs, as the real one has it.
-    Set-Content -LiteralPath (Join-Path $repo 'launcher\app\Updater.cs') -Value 'static class Updater { public const string Version = "1.0.0"; }' -Encoding ASCII
-    Set-Content -LiteralPath (Join-Path $repo 'installer\setup\Bootstrap.cs') -Value 'static class Setup { [System.STAThread] static void Main() { } }' -Encoding ASCII
+    foreach ($n in 'client-build.json', 'skyrim-files.json', 'ui-gone.json', 'generated.json') {
+        Copy-Item -LiteralPath (Join-Path $realRepo ('records\' + $n)) -Destination (Join-Path $fakeRepo 'records')
+    }
+    # The launcher's own project says the same of itself: Thornswood.exe, a
+    # windowed .NET 10 program published to native code, embedding the two
+    # icons under the names Build-Launcher writes beside it (#887).
+    Set-Content -LiteralPath (Join-Path $repo 'launcher\app\Thornswood.csproj') -Encoding ASCII -Value @'
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Thornswood</AssemblyName>
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\app.ico"><LogicalName>app.ico</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\app-dev.ico"><LogicalName>app-dev.ico</LogicalName></EmbeddedResource>
+  </ItemGroup>
+</Project>
+'@
+    Set-Content -LiteralPath (Join-Path $repo 'launcher\app\Program.cs') -Value 'static class Program { static void Main() { } }' -Encoding ASCII
     Set-Content -LiteralPath (Join-Path $repo 'scripts\dev\Close-Launcher.ps1') -Value $fakeClose -Encoding ASCII
+    # One commit, made by a name that is only this scratch repository's.
+    $gitOld = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    & git -C $repo init -q 2>&1 | Out-Null
+    & git -C $repo add -A 2>&1 | Out-Null
+    & git -C $repo -c user.name=test-build-vs-install -c user.email=test@invalid -c commit.gpgsign=false commit -q -m 'scratch' 2>&1 | Out-Null
+    $gitCode = $LASTEXITCODE
+    $ErrorActionPreference = $gitOld
+    Yes "the scratch repository has its one commit (git exit $gitCode)" ($gitCode -eq 0)
 
     $env:TEMP = $tmp
     $env:TMP = $tmp
@@ -234,7 +244,7 @@ try {
     }
     $stepText = $stepLines -join "`n"
     Yes 'the CI step that builds the launcher is in nightly.yml' ($stepLines.Count -gt 0)
-    Yes 'CI still calls Build-Launcher.ps1 with -Root and -NoPause, and nothing else' ($stepText -match '(?m)^\.\\scripts\\release\\Build-Launcher\.ps1 -Root \$root -NoPause\s*$')
+    Yes 'CI calls Build-Launcher.ps1 with -Root, -NoSign and -NoPause, and nothing else' ($stepText -match '(?m)^\.\\scripts\\release\\Build-Launcher\.ps1 -Root \$root -NoSign -NoPause\s*$')
     Yes 'CI does not install anything' ($stepText -notmatch 'Install-Launcher')
     Yes 'CI still looks for the exe in <root>\Launcher' ($stepText -match "Launcher\\Thornswood\.exe")
 
@@ -250,12 +260,17 @@ try {
     Yes "B1 the CI step passes with this build (exit $($ci.Code))" ($ci.Code -eq 0)
     if ($ci.Code -ne 0) { Write-Host $ci.Out }
     Yes 'B2 Thornswood.exe is where CI uploads it from' (Test-Path -LiteralPath $ciExe)
-    Yes 'B3 the setup stub is still built by the build, in out\, where packaging looks for it' (Test-Path -LiteralPath (Join-Path $repo 'out\setup-stub.exe'))
+    # B3 was the setup stub, built into out\ beside it; it went with #4824.
     $ciFiles = @(Get-ChildItem -LiteralPath $ciRoot -Recurse -Force -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName.Substring($ciRoot.Length + 1) })
     # Thornswood.pdb beside the exe is intentional since #462 (pdbonly symbols for
-    # the shipping machine). Packs and the installer still leave it out.
-    $b4extra = @($ciFiles | Where-Object { $_ -ne 'Launcher\Thornswood.exe' -and $_ -ne 'Launcher\Thornswood.pdb' })
+    # the shipping machine). Nothing packs it. app.ico and app-dev.ico are the
+    # icons the exe embeds, for Install-Launcher (#887).
+    $b4extra = @($ciFiles | Where-Object { $_ -notin 'Launcher\Thornswood.exe', 'Launcher\Thornswood.pdb', 'Launcher\app.ico', 'Launcher\app-dev.ico' })
     Yes ('B4 the build wrote Thornswood.exe under the root (and optionally its pdb), found: ' + ($ciFiles -join ', ')) (($ciFiles -contains 'Launcher\Thornswood.exe') -and ($b4extra.Count -eq 0))
+    $sameBytes = { param($a, $b) (Test-Path -LiteralPath $a) -and (Get-FileHash -LiteralPath $a).Hash -eq (Get-FileHash -LiteralPath $b).Hash }
+    Yes 'B6 and the two icons it embeds beside it, byte for byte the project''s (#887)' (
+        (& $sameBytes (Join-Path $ciRoot 'Launcher\app.ico') (Join-Path $repo 'launcher\app.ico')) -and
+        (& $sameBytes (Join-Path $ciRoot 'Launcher\app-dev.ico') (Join-Path $repo 'launcher\app-dev.ico')))
     $asked = @(Read-Log $closeLog)
     Yes ('B5 the build asked to close nothing, asked: ' + ($asked -join ' ; ')) ($asked.Count -eq 0)
 
@@ -391,8 +406,6 @@ try {
         New-Item -ItemType Directory -Force -Path $shipTools | Out-Null
         Set-Content -LiteralPath (Join-Path $shipTools 'Build-Launcher.ps1') -Value $stubBuild -Encoding ASCII
         Set-Content -LiteralPath (Join-Path $shipTools 'Install-Launcher.ps1') -Value $stubInstall -Encoding ASCII
-        # The block asks Where.ps1 for out\, where the setup stub's symbols are.
-        Set-Content -LiteralPath (Join-Path $shipTools 'Where.ps1') -Value "param([string]`$What) Join-Path (Split-Path -Parent (Split-Path -Parent `$PSScriptRoot)) 'out'" -Encoding ASCII
         Copy-Item -LiteralPath (Join-Path $Here 'scripts\release\Get-ScratchDir.ps1') -Destination $shipTools
         $sb = [scriptblock]::Create(
             'param($Root, $Here) ' +

@@ -22,11 +22,9 @@
        measured, a text that is not the one licences.json names, a port in a
        file with no text, a port in a file that licences.json does not list,
        and a build that measured nothing.
-    3. Save-PackageClientLicences (Package-ClientRecord.ps1), which gives the
-       installer the texts of the client it packs: the checkout's own when
-       they are of that client; an older client's from the commit of the
-       checkout's history that recorded it, byte for byte, CR LF and all; and
-       a client no commit recorded stops it.
+  Save-PackageClientLicences, which gave the old installer the texts of the
+  client it packed, went with that installer (Package-ClientRecord.ps1,
+  #4824).
 
   Writes only under a temp folder, which it removes. Needs git. Connects to
   nothing.
@@ -204,11 +202,7 @@ try {
     $r = Try-Case $k
     Yes 'a build that measured nothing (no licences.json) is refused, and nothing is written' ($r.Code -ne 0 -and $r.Out -match 'did not measure' -and -not (Wrote $k))
 
-    # ---- 3. the installer's texts, for the client it packs ----------------
-    . (Join-Path $root 'scripts\release\Package-ClientRecord.ps1')
-    $h = Join-Path $T 'history'
-    $null = New-Item -ItemType Directory -Force -Path $h
-    function G { $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'; try { & git -C $h @args 2>&1 | Out-Null } finally { $ErrorActionPreference = $eap } }
+} finally { $ErrorActionPreference = $eap } }
     G init -q
     G config user.email 'test@example.invalid'
     G config user.name 'test'

@@ -9,9 +9,9 @@
 // collection in Vortex is required, told people the password was in Discord
 // when the build carries it, described an F2 party menu that no plugin binds,
 // sent problems to one named person, and broke the repo's own rule against em
-// dashes five times. installer\READ ME FIRST.txt was worse, because it is not a
-// leftover: Package-Thornswood.ps1 copies it into every installer, and it
-// opened with the old mod's name, named its setup program and told a new
+// dashes five times. installer\READ ME FIRST.txt was worse, because it was not
+// a leftover: the old installer's Package-Thornswood.ps1 copied it into every
+// installer, and it opened with the old mod's name, named its setup program and told a new
 // customer to ask in the Discord for a password. config.example.json still
 // pointed at the old box (192.135.119.166, port 25565) and the old product's
 // update repository. SETUP.md walked a reader through making a repository
@@ -97,13 +97,11 @@ if (readme !== null) {
 }
 
 // ------------------------------------------------------ READ ME FIRST.txt
-// Shipped, so it is rewritten and never deleted. Package-Thornswood.ps1 only
-// prints a yellow line when it is missing and carries on, which is an
-// installer with no read me that nobody notices.
+// Rewritten and never deleted. The old installer's Package-Thornswood.ps1
+// copied it into every installer until #4824; Velopack's Setup.exe does not
+// carry it (Build-SetupFiles.ps1 says why), so it is a page in the
+// repository that the words below still hold to.
 const RMF = 'installer/READ ME FIRST.txt';
-const pkg = read('scripts/release/Package-Thornswood.ps1');
-yes('Package-Thornswood.ps1 still copies READ ME FIRST.txt into the installer',
-    pkg !== null && /foreach\s*\(\$f in [^)]*'READ ME FIRST\.txt'/.test(pkg));
 
 let tracked = null;
 try {
@@ -112,7 +110,7 @@ try {
 } catch (e) {
   console.log('SKIP  git ls-files did not answer, so the tracked-file checks are left out: ' + e.message);
 }
-if (tracked) yes(RMF + ' is tracked, so a fresh clone can build the installer', tracked.indexOf(RMF) >= 0);
+if (tracked) yes(RMF + ' is tracked', tracked.indexOf(RMF) >= 0);
 
 const rmf = read(RMF);
 yes(RMF + ' is there', rmf !== null);

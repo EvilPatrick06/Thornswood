@@ -330,9 +330,9 @@ saved fields that come from elsewhere, as their rows say.
 
 | Field | Type | Written by | Read by | If wrong or missing |
 | --- | --- | --- | --- | --- |
-| `launcherVersion` | string, dotted numbers | `Publish-Update.ps1:Set-Prop $doc 'launcherVersion' $launcherVersion`, from `Version` in `launcher/app/Updater.cs:Version` or Ship's dev number | `ShellUpdate.cs:bool newLauncher = Updater.IsNewer(v.launcherVersion, Updater.Version)`, `Updater.IsNewer` (`Updater.cs:IsNewer`) | Offered only when higher, part by part. Equal or lower offers nothing. A number that does not parse is offered whenever it differs. Not saved. |
-| `launcherUrl` | string, https | `Publish-Update.ps1`: since #897 the site address `/feed[-dev]/assets/<sha256>` | `Updater.SelfUpdate` (`Updater.cs:SelfUpdate`) | Empty: no launcher update is offered (`ShellUpdate.cs:&& !string.IsNullOrEmpty(v.launcherUrl);`). Must pass the host list below. |
-| `launcherSha256` | string, 64 hex | `Publish-Update.ps1:Set-Prop $doc 'launcherSha256' $nowSha` | `Updater.Download` (`Updater.cs:Download`) | Empty: download refused. Mismatch: file deleted, update fails. |
+| `launcherVersion` | string, dotted numbers | `Publish-Update.ps1:Set-Prop $doc 'launcherVersion' $launcherVersion`, the number Ship built the exe with (`-VersionOverride`) | The site's join pass (`site/server.js:feedLaunchers`, with `minLauncher`), main's number for a dev launcher (`MainVersion.cs:MainLauncherVersion`), the news and Discord posts. Not the launcher's own update since #4825: a launcher takes that from its Velopack channel (`VeloUpdate.cs:CheckLauncher`), and Scan goes by the same answer (`Upkeep.cs:LauncherWaiting`) | Wrong: the site refuses join passes from launchers it should let in, or lets in ones it should not. Not saved. |
+| `launcherUrl` | string, https | `Publish-Update.ps1`: since #897 the site address `/feed[-dev]/assets/<sha256>` | `Ship.ps1:Get-FeedLauncher` (a Ship that puts the feed's launcher out again), `Watch-Outside.ps1` and `Check-Outside.ps1`. No launcher downloads it since #4825 | Empty: a Ship that keeps the feed's launcher stops. Must pass the host list below. |
+| `launcherSha256` | string, 64 hex | `Publish-Update.ps1:Set-Prop $doc 'launcherSha256' $nowSha` | `Ship.ps1:Get-FeedLauncher`, and the launcher's manifest check (`FeedManifest.cs:"launcher " + v.launcherVersion, v.launcherSha256`) | Empty: Ship refuses the feed's launcher. Mismatch: the download is deleted and Ship stops. |
 | `serverAddress` | string | `Publish-Update.ps1:@('ServerAddress', 'serverAddress')` from config `ServerAddress`; `Set-Server.ps1:@('serverAddress', $Address)`. Not `Set-Vps.ps1`, which moves the launcher's built-in address and leaves the feed to `Set-Server.ps1` (`Set-Vps.ps1:What it does NOT do, because Set-Server.ps1 already does it properly`) | `ShellUpdate.cs:v.serverAddress != cfg.ServerAddress` | Saved, unless the config points at a server on this machine (`SkyMp.IsLocal`: 127.0.0.1, localhost, ::1), which keeps its own address, `serverPort` and `voicePort` (#5020: a restore rehearsal or a developer's own server). A change stops Ship unless `-MoveServer` (`Publish-Update.ps1:-not $MoveServer -and -not $Dev`); the dev channel skips that check. Wrong: everybody connects to the wrong box. |
 | `serverPort` | string | as above, `ServerPort` | `ShellUpdate.cs:OnVersionDoc` | Saved. Must be a string; the launcher field is a string. |
 | `maxOnline` | number | `Publish-Update.ps1`, from `records\most-online.json` by way of `scripts\deploy\MaxOnline.ps1` (#481): the channel's seats, people and staff seats together (30 on main, 5 on dev from its `dev` numbers; Patrick, 12 Oct) | `ShellUpdate.cs:v.maxOnline > 0` | Saved when above 0. Written as a number because a quoted `"30"` reads as 0. It is the M of "N of M awake". The Play page prefers the number the running server announces as `max` in its `online.json` (`Online.cs`), which is the same seats. |
@@ -397,16 +397,17 @@ same title and body as the newest entry adds nothing (`Publish-Update.ps1:same n
    pending packs are every `packs` entry whose `id` is not a line in
    `Profile\applied.txt`, in feed order (`Updater.cs:Applied`, `Updater.cs:Pending`). Order
    matters: part one before part two.
-3. The launcher is offered when `launcherVersion` is higher and `launcherUrl`
-   is set.
+3. The launcher is not offered by the feed since #4825: it is offered when its
+   Velopack channel on GitHub has a newer one (`VeloUpdate.cs:CheckLauncher`).
 4. Packs go in first, one by one, each id appended to `applied.txt` once it is
-   in (`Updater.cs:MarkApplied`). Then the launcher replaces itself through a
-   swap script that keeps `Thornswood.exe.old` and puts it back if the new one
-   does not start (`Updater.cs:SelfUpdate`).
+   in (`Updater.cs:MarkApplied`). Then Velopack applies the launcher in a
+   process of its own and keeps the version before in its packages folder,
+   after every check in `VeloUpdate.cs:FetchLauncher`.
 5. A fresh install gets an `applied.txt` listing every pack in the feed at
-   build time, because the installer already contains them
-   (`Package-Thornswood.ps1:$appliedOut`). The dev build copies the main build's
-   `applied.txt` when it is installed (`DevBuild.cs:Install`).
+   build time, because the setup package already contains them
+   (`Build-SetupFiles.ps1:applied.txt: every pack the channel's feed lists`).
+   The dev build copies the main build's `applied.txt` when it is installed
+   (`DevBuild.cs:Install`).
 
 A machine that loses `applied.txt` asks for every pack on the feed again. A
 launcher from #1050 on does not: it syncs to the record, which needs no
@@ -640,13 +641,17 @@ reads a feed that is not split the same as before, so the site can go first.
   `objects.githubusercontent.com`, `release-assets.githubusercontent.com`,
   `api.github.com` or `thornswood.net`, or under one of them
   (`Updater.cs:AllowedHosts`). The update token, if any, goes only to
-  `api.github.com` (`Updater.cs:Client`).
-- **sha256.** Required for packs, the launcher and the client runtime; an empty
-  one refuses the download (`Updater.cs:Download`).
-- **Signature.** A downloaded launcher exe must carry a signer whose Subject
-  contains `ExpectedSigner`, the name on the signing certificate
-  (`Updater.CheckSigner`; the profile is ThornswoodRelease), checked
-  before the swap, in every launcher from dev 1.1.101.17 on. Main's live
+  `api.github.com` (`Updater.cs:FeedAsk`).
+- **sha256.** Required for packs and the client runtime; an empty one refuses
+  the download (`Updater.cs:Download`). The launcher's Velopack package is
+  held to its channel's feed and to the Release's signed record
+  (`VeloUpdate.cs:FetchLauncher`).
+- **Signature.** Every program in a downloaded launcher package, and
+  Velopack's Update.exe, must carry a signer whose Subject contains
+  `ExpectedSigner`, the name on the signing certificate (the profile is
+  ThornswoodRelease), checked before anything is replaced
+  (`VeloUpdate.cs:FetchLauncher`). Before #4825 the launcher's own swap
+  checked its new exe the same way, in every launcher from dev 1.1.101.17 on. Main's live
   1.1.101 predates it and is itself unsigned; dev 1.1.101.34 is signed and
   timestamped. Up to #912 the check read only the embedded certificate's
   Subject, so a self-made certificate with that name passed. Since #912
@@ -676,10 +681,11 @@ reads a feed that is not split the same as before, so the site can go first.
   runtime is sent to the site and named there. `Check-Secrets.ps1` scans every zip
   and exe before upload. Nothing is written to the feed if any asset failed to
   upload, and `version.json` is written without a byte order mark.
-- **Signing.** On since 27 Sep: `Ship.ps1` and `Publish-Installer.ps1` refuse
-  a launcher or setup program that is not Authenticode Valid under
-  `ExpectedSigner` (Developer-Guide.md, `records\signing\README.md`), or that
-  the launcher's own `Signature.cs` check refuses (#912).
+- **Signing.** On since 27 Sep: `Ship.ps1` refuses a launcher that is not
+  Authenticode Valid under `ExpectedSigner` (Developer-Guide.md,
+  `records\signing\README.md`), or that the launcher's own `Signature.cs`
+  check refuses (#912). The setup program is Velopack's since #4824, signed
+  by `merge-release.yml` with the launcher's package inside it.
 - **Optional packs go to the site too.** `Publish-Pack.ps1` sends each zip to
   `/feed/assets/<sha256>` with `Remirror-Site-Feed.ps1 -Send` before
   `version.json` is touched, names it there, and sends the feed to the VPS

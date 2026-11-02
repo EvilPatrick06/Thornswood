@@ -20,8 +20,9 @@
       the upstream base and every file the download carries with its folder
       and licence, and puts GPL-3.0.txt and AGPL-3.0.txt from
       installer\licences beside it.
-    - Each folder and licence agrees with the installer's SOURCE CODE.txt
-      (Get-SourceNotice, lifted out of Package-Thornswood.ps1 by text).
+    - Each folder and licence agrees with the setup's SOURCE CODE.txt, the
+      note of kind setup Build-SetupFiles.ps1 puts in the launcher's Velopack
+      package (#4825; Package-Thornswood.ps1's Get-SourceNotice until #4824).
     - A pack of only our own files gets nothing; a SkyMP file taken from
       upstream is named apart with no commit; a recorded file with no known
       folder stops it.
@@ -62,26 +63,13 @@ function Text($entries, [string]$name) {
     return ''
 }
 function Names($entries) { return @(@($entries) | Where-Object { $_ } | ForEach-Object { $_.Name }) }
-function Get-FunctionText([string]$text, [string]$name) {
-    $at = $text.IndexOf("function $name")
-    if ($at -lt 0) { return $null }
-    $b = $text.IndexOf('{', $at)
-    $depth = 0
-    for ($i = $b; $i -lt $text.Length; $i++) {
-        if ($text[$i] -eq '{') { $depth++ }
-        elseif ($text[$i] -eq '}') { $depth--; if ($depth -eq 0) { return $text.Substring($at, $i - $at + 1) } }
-    }
-    return $null
-}
 
 $record   = Join-Path $Repo 'records\client-build.json'
 $libRecord = Join-Path $Repo 'records\client-licences.json'
 $libTexts = Join-Path $Repo 'records\client-licences'
-$server   = Join-Path $Repo 'records\server-build.json'
 $licences = Join-Path $Repo 'installer\licences'
 $notice   = Join-Path $Repo 'scripts\release\Source-Notice.ps1'
 $publish  = Join-Path $Repo 'scripts\release\Publish-Update.ps1'
-$package  = Join-Path $Repo 'scripts\release\Package-Thornswood.ps1'
 
 Yes 'scripts\release\Source-Notice.ps1 is there' (Test-Path -LiteralPath $notice)
 . $notice
@@ -177,24 +165,19 @@ Yes '  and a pack carrying only MpClientPlugin.dll names none of them' `
 Yes '  and its note names none of the libraries only the other files have' `
     (-not ((Text $ie 'SOURCE CODE.txt') -match '(?m)^\s{2}slikenet\.txt\s'))
 
-# ---- the same folders and licences as the installer's note -----------------
-$pkgText = Get-Content -LiteralPath $package -Raw
-$fn = Get-FunctionText $pkgText 'Get-SourceNotice'
-Yes 'Package-Thornswood.ps1 has a Get-SourceNotice to compare with' ($null -ne $fn)
-if ($fn) {
-    . ([ScriptBlock]::Create($fn))
-    $inst = Get-SourceNotice $record $server
-    $rowRx = '^\s{2}(\S+)\s{2,}(\S+)\s{2,}(GNU A?GPL version 3)\s*$'
-    $want = @{}
-    foreach ($l in ($inst -split "`r?`n")) { $m = [regex]::Match($l, $rowRx); if ($m.Success) { $want[$m.Groups[1].Value] = $m.Groups[2].Value + '|' + $m.Groups[3].Value } }
-    $bad = @()
-    foreach ($f in $six) {
-        $leaf = Leaf $f
-        $m = [regex]::Match(($readme -split "`r?`n" | Where-Object { $_ -match ('^\s{2}' + [regex]::Escape($leaf) + '\s') } | Select-Object -First 1), $rowRx)
-        if (-not $m.Success -or $want[$leaf] -ne ($m.Groups[2].Value + '|' + $m.Groups[3].Value)) { $bad += $leaf }
-    }
-    Yes ('every file has the folder and licence the installer''s note gives it' + $(if ($bad.Count) { ', differ: ' + ($bad -join ', ') } else { '' })) ($bad.Count -eq 0)
+# ---- the same folders and licences as the setup's note ---------------------
+$setupNote = Text (Get-SourceNoticeEntries $record $six 'setup' $licences) 'SOURCE CODE.txt'
+Yes 'the setup''s note is SOURCE CODE.txt, and says what the install put into the Skyrim folder' ($setupNote.Contains('Thornswood''s setup put SkyMP files into your Skyrim folder'))
+$rowRx = '^\s{2}(\S+)\s{2,}(\S+)\s{2,}(GNU A?GPL version 3)\s*$'
+$want = @{}
+foreach ($l in ($setupNote -split "`r?`n")) { $m = [regex]::Match($l, $rowRx); if ($m.Success) { $want[$m.Groups[1].Value] = $m.Groups[2].Value + '|' + $m.Groups[3].Value } }
+$bad = @()
+foreach ($f in $six) {
+    $leaf = Leaf $f
+    $m = [regex]::Match(($readme -split "`r?`n" | Where-Object { $_ -match ('^\s{2}' + [regex]::Escape($leaf) + '\s') } | Select-Object -First 1), $rowRx)
+    if (-not $want.ContainsKey($leaf) -or -not $m.Success -or $want[$leaf] -ne ($m.Groups[2].Value + '|' + $m.Groups[3].Value)) { $bad += $leaf }
 }
+Yes ('every file has the folder and licence the setup''s note gives it' + $(if ($bad.Count) { ', differ: ' + ($bad -join ', ') } else { '' })) ($bad.Count -eq 0)
 
 # ---- packs -------------------------------------------------------------------
 $own = @('Data\Platform\Plugins\thornswood-front.js', 'Data\Platform\UI\thornswood-select.js')

@@ -669,12 +669,20 @@ namespace Thornswood
             Put(Path.Combine(Paths.WinMyGames + ".st-backup", "Saves\\mine.ess"), "MY SAVE");
             Put(Paths.StateFile, "{}");
 
-            // A newer launcher on the feed.
+            // The feed's launcherVersion is not the launcher's update any more
+            // (#4825): a feed naming a newer one, with no launcher waiting on
+            // the Velopack channel, is no update.
             var feed = new VersionDoc();
             feed.launcherVersion = "999.0.0";
             feed.launcherUrl = "https://thornswood.net/feed/assets/0";
-
+            Upkeep.LauncherWaiting = null;
             VersionDoc read;
+            Yes("a newer launcherVersion on the feed alone is no update",
+                Find(Upkeep.Look(cfg, true, feed, out read), IssueKind.Update, null) == null);
+
+            // A newer launcher waiting on the Velopack channel, as the shell's
+            // launcher check found it.
+            Upkeep.LauncherWaiting = "999.0.0";
             List<Issue> look = Upkeep.Look(cfg, true, feed, out read);
             Issue build = Find(look, IssueKind.BuildFiles, null);
             Issue folders = Find(look, IssueKind.WindowsFolders, null);
@@ -688,7 +696,7 @@ namespace Thornswood
             Yes("Vortex's file the own folder lost", lost != null && lost.Fixable && lost.Text.IndexOf("lost.dds", StringComparison.Ordinal) >= 0);
             Yes("Skyrim's own file it lost, which the Downgrade puts back", skyrim != null && skyrim.Fixable && skyrim.Text.IndexOf("Skyrim - Gone.bsa", StringComparison.Ordinal) >= 0 &&
                 skyrim.Text.IndexOf("Downgrade", StringComparison.Ordinal) >= 0);
-            Yes("and the newer launcher on the feed, which Fix takes last", update != null && update.Fixable && update.Blocking &&
+            Yes("and the newer launcher on its channel, which Fix takes last", update != null && update.Fixable && update.Blocking &&
                 update.Text.IndexOf("999.0.0", StringComparison.Ordinal) >= 0 && update.Text.IndexOf("last", StringComparison.Ordinal) >= 0);
             Yes("the feed it went by is the one it was handed, not asked again", read == feed);
             bool words = true;
