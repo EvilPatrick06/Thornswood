@@ -24,7 +24,7 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const CR = String.fromCharCode(13);
 const SRC = process.env.GM || path.join(ROOT, 'game', 'gamemode.js');
-const gm = fs.readFileSync(SRC, 'utf8').split(CR).join('');
+const gm = require('./gamemode-tables.js').joined(fs.readFileSync(SRC, 'utf8')).split(CR).join('');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {

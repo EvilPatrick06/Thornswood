@@ -16,7 +16,7 @@ const published={
  'q-whiterun-enchanter-shimmermist':'402f870a3f8d330987e97d83c14a5ef54f1474fd3b3fbb644ec38e00928041f4'
 };
 for(const [id,hash] of Object.entries(published))assert.equal(activation.killScenes.find(row=>row.id===id)?.sha256,hash);
-const mode=fs.readFileSync(path.join(__dirname,'../game/gamemode.js'),'utf8'),bundleContext={require,Buffer,Uint8Array};
+const mode=require('./gamemode-tables.js').joined(fs.readFileSync(path.join(__dirname,'../game/gamemode.js'),'utf8')),bundleContext={require,Buffer,Uint8Array};
 vm.createContext(bundleContext);
 vm.runInContext(mode.slice(mode.indexOf('// MERCHANT TRADING BUNDLE BEGIN'),mode.indexOf('// MERCHANT TRADING BUNDLE END'))+
  '\nglobalThis.rows=MERCHANT_TRADING.expandedScenes();',bundleContext);
@@ -35,7 +35,7 @@ for(const defect of ['hash','missing','commission','duplicate','too-many']) {
  const fakeFs={readFileSync(file,...args){return file.endsWith('merchant-quest-activation.json')?JSON.stringify(pins):fs.readFileSync(file,...args);},
    writeFileSync(){throw Error('activation validation must never write source');}};
  assert.throws(()=>vm.runInNewContext(fs.readFileSync(buildFile,'utf8'),{__dirname:path.dirname(buildFile),
-   require:name=>name==='node:fs'?fakeFs:require(name),process:{argv:['node',buildFile,'--check']},console:{log(){}}}),
+   require:name=>name==='node:fs'?fakeFs:require(name.startsWith('.')?path.join(path.dirname(buildFile),name):name),process:{argv:['node',buildFile,'--check']},console:{log(){}}}),
    /activation|activated|changed/i,defect);
 }
 const file=path.join(__dirname,'test-1621-quest-state.js'),context={require:createRequire(file),__dirname,Buffer,JSON,console:{log(){}}};
