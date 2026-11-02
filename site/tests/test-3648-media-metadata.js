@@ -153,7 +153,12 @@ function leaks(b) {
       if (c.clean === null) {
         yes(file + ', whose blocks cannot be walked, is refused 415 (' + r.status + ')', r.status === 415);
         yes('and nothing of it is kept', fs.readdirSync(path.join(dir, 'uploads')).length === before);
-        yes('and the site says which upload in its log', /could not clean the upload \S+broken\.jpg: its blocks could not be walked/.test(out));
+        // The site writes the line before it answers, but its stderr is a
+        // pipe, which node writes to without waiting, so the answer can be
+        // read here first: wait for the line itself.
+        const said = /could not clean the upload \S+broken\.jpg: its blocks could not be walked/;
+        for (let i = 0; i < 100 && !said.test(out); i++) await wait(50);
+        yes('and the site says which upload in its log', said.test(out));
         continue;
       }
       const name = r.json && r.json.name;
