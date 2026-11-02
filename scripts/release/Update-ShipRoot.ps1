@@ -110,7 +110,7 @@ if (-not $Tool) {
     # Build-Launcher.ps1): the tool is the launcher's own OwnGame and what it
     # calls, at the launcher's framework.
     $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
-    if (-not $dotnet) { Die 'dotnet was not found on this machine. The ship root tool builds with the .NET 10 SDK, as the launcher does; Developer-Guide.md "Setting up a machine" has the install line. The ship root was not touched.' }
+    if (-not $dotnet) { Die 'dotnet was not found on this machine. The ship root tool builds with the .NET 10 SDK, as the launcher does; docs/guide/set-up-a-machine.md "Setting up a machine" has the install line. The ship root was not touched.' }
     $sdks = @(& $dotnet.Source --list-sdks 2>$null | Where-Object { $_ -match '^10\.' })
     if ($sdks.Count -eq 0) { Die 'This machine has dotnet but no .NET 10 SDK (dotnet --list-sdks lists none starting 10.). The ship root tool targets .NET 10, as the launcher does; install the SDK and run this again. The ship root was not touched.' }
     $proj = Join-Path $Here 'ShipRoot\ShipRoot.csproj'

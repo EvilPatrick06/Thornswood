@@ -128,7 +128,7 @@ function build(opts) {
     if (!fs.existsSync(f)) throw new Error('launcher-csc build: ' + f + ' is not there.');
     return fs.realpathSync(f);
   });
-  if (!dotnet) throw new Error('launcher-csc build: the .NET SDK the launcher builds with is not on this machine. Developer-Guide.md "Setting up a machine" has the install line.');
+  if (!dotnet) throw new Error('launcher-csc build: the .NET SDK the launcher builds with is not on this machine. docs/guide/set-up-a-machine.md "Setting up a machine" has the install line.');
   if (sources.length + files.length === 0 && !opts.launcher) throw new Error('launcher-csc build: nothing to build.');
   let xaml = [];
   let resources = [];
@@ -242,7 +242,7 @@ function projectHash() {
 }
 
 function buildProject() {
-  if (!dotnet) throw new Error('launcher-csc buildProject: the .NET SDK the launcher builds with is not on this machine. Developer-Guide.md "Setting up a machine" has the install line.');
+  if (!dotnet) throw new Error('launcher-csc buildProject: the .NET SDK the launcher builds with is not on this machine. docs/guide/set-up-a-machine.md "Setting up a machine" has the install line.');
   const base = path.join(repo, 'out', 'harness');
   const done = path.join(base, 'project-' + projectHash());
   const dll = path.join(done, 'Thornswood.dll');

@@ -47,7 +47,7 @@ try {
     # Compile the same helper at C# 5 against the .NET Framework as well:
     # scripts\mods\LoadOrder.ps1 loads this file with Add-Type, which in
     # Windows PowerShell is the .NET Framework compiler and stops at C# 5
-    # (Developer-Guide.md, Settled design). The .NET SDK the launcher builds
+    # (docs/guide/settled-design.md). The .NET SDK the launcher builds
     # with fetches the Framework's reference assemblies on any machine, so
     # this runs everywhere (#4823). Build-FrameworkCode throws with what the
     # compiler said when it refuses the file.

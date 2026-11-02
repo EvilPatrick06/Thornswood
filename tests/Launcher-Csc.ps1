@@ -169,7 +169,7 @@ function Build-LauncherCode {
         [hashtable]$Resource = @{},
         [hashtable]$Property = @{}
     )
-    if (-not (Test-Path -LiteralPath $LauncherDotnet)) { throw ('Build-LauncherCode: the .NET SDK the launcher builds with is not on this machine (' + $LauncherDotnet + '). Developer-Guide.md "Setting up a machine" has the install line.') }
+    if (-not (Test-Path -LiteralPath $LauncherDotnet)) { throw ('Build-LauncherCode: the .NET SDK the launcher builds with is not on this machine (' + $LauncherDotnet + '). docs/guide/set-up-a-machine.md "Setting up a machine" has the install line.') }
     if (@($Source).Count + @($File).Count -eq 0 -and -not $Launcher) { throw 'Build-LauncherCode: nothing to build.' }
     $files = @(foreach ($f in $File) {
         if (-not (Test-Path -LiteralPath $f)) { throw ('Build-LauncherCode: ' + $f + ' is not there.') }
@@ -295,7 +295,7 @@ function Get-LauncherProjectHash {
 }
 
 function Build-LauncherProject {
-    if (-not (Test-Path -LiteralPath $LauncherDotnet)) { throw ('Build-LauncherProject: the .NET SDK the launcher builds with is not on this machine (' + $LauncherDotnet + '). Developer-Guide.md "Setting up a machine" has the install line.') }
+    if (-not (Test-Path -LiteralPath $LauncherDotnet)) { throw ('Build-LauncherProject: the .NET SDK the launcher builds with is not on this machine (' + $LauncherDotnet + '). docs/guide/set-up-a-machine.md "Setting up a machine" has the install line.') }
     $base = Join-Path $launcherRepo (Join-Path 'out' 'harness')
     $done = Join-Path $base ('project-' + (Get-LauncherProjectHash))
     $dll = Join-Path $done 'Thornswood.dll'

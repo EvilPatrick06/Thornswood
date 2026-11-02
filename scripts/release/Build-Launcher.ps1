@@ -104,7 +104,7 @@ if ($Root.TrimEnd('\\') -ieq [string](& (Join-Path $Here 'Where.ps1') Install)) 
 # The .NET 10 SDK's dotnet (launcher\app\Thornswood.csproj is an SDK
 # project, #4823).
 $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
-if (-not $dotnet) { Die 'dotnet was not found on this machine. The launcher builds with the .NET 10 SDK (https://dotnet.microsoft.com/download/dotnet/10.0) and, for the native step, the Visual Studio 2022 C++ build tools; Developer-Guide.md "Setting up a machine" has the install lines.' }
+if (-not $dotnet) { Die 'dotnet was not found on this machine. The launcher builds with the .NET 10 SDK (https://dotnet.microsoft.com/download/dotnet/10.0) and, for the native step, the Visual Studio 2022 C++ build tools; the "Setting up a machine" page of the Developer Guide has the install lines.' }
 $sdks = @(& $dotnet.Source --list-sdks 2>$null | Where-Object { $_ -match '^10\.' })
 if ($sdks.Count -eq 0) { Die 'This machine has dotnet but no .NET 10 SDK (dotnet --list-sdks lists none starting 10.). The launcher targets .NET 10; install the SDK and build again.' }
 Say "  dotnet $(($sdks[-1] -split ' ')[0])" 'DarkGray'

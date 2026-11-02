@@ -91,7 +91,7 @@ scripts above), which is phase C's question to settle.
 
 | Thing | Owner | Custody |
 | --- | --- | --- |
-| Signing account ThornswoodSigning and profile ThornswoodRelease | Patrick (makes accounts and gives the Certificate Profile Signer role, Developer-Guide.md "Your own signing sign in", #1740) | In Azure. No private key leaves Microsoft's HSM; certificates last three days and are reissued |
+| Signing account ThornswoodSigning and profile ThornswoodRelease | Patrick (makes accounts and gives the Certificate Profile Signer role, docs/guide/set-up-a-machine.md "Your own signing sign in", #1740) | In Azure. No private key leaves Microsoft's HSM; certificates last three days and are reissued |
 | Release signing in release.yml (decided, section 8) | Patrick sets up the Azure side (the federated credential and the Signer role on ThornswoodRelease); the owner of the release.yml move does the workflow | A federated (OIDC) identity in Azure that trusts only release.yml on `v*` tags of this repository. No secret, password or key is stored in GitHub or on any machine; GitHub mints a short token per run. Pull request jobs never get it |
 | Right to sign by hand | Each person who ships, with their own account holding Certificate Profile Signer on ThornswoodRelease | Their own `az login` on the machine they ship from, for local and fallback signing only once release.yml signs. Nothing is copied between machines; `signing.json` holds paths only |
 | Durable identity pinned by launchers | Launcher lane | `Signature.Identities` in `launcher\app\Signature.cs` |

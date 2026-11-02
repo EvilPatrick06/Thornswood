@@ -48,7 +48,7 @@ function Build-FrameworkCode {
         [string]$Main,
         [string]$LangVersion = '5'
     )
-    if (-not (Test-Path -LiteralPath $LauncherDotnet)) { throw ('Build-FrameworkCode: the .NET SDK the launcher builds with is not on this machine (' + $LauncherDotnet + '). Developer-Guide.md "Setting up a machine" has the install line.') }
+    if (-not (Test-Path -LiteralPath $LauncherDotnet)) { throw ('Build-FrameworkCode: the .NET SDK the launcher builds with is not on this machine (' + $LauncherDotnet + '). docs/guide/set-up-a-machine.md "Setting up a machine" has the install line.') }
     if (@($Source).Count + @($File).Count -eq 0) { throw 'Build-FrameworkCode: nothing to build.' }
     $files = @(foreach ($f in $File) {
         if (-not (Test-Path -LiteralPath $f)) { throw ('Build-FrameworkCode: ' + $f + ' is not there.') }

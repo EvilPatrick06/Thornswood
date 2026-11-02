@@ -448,7 +448,7 @@ if (Get-Command dotnet -ErrorAction SilentlyContinue) {
   $sdk10 = [string](@(& dotnet --list-sdks 2>$null | Where-Object { $_ -match '^10\.' }) | Select-Object -Last 1)
 }
 Ready 'the .NET 10 SDK is here' ([bool]$sdk10) $sdk10 `
-  'winget install --id Microsoft.DotNet.SDK.10 -e   (Developer-Guide.md "Setting up a machine" has the C++ build tools Native AOT needs)'
+  'winget install --id Microsoft.DotNet.SDK.10 -e   (docs/guide/set-up-a-machine.md "Setting up a machine" has the C++ build tools Native AOT needs)'
 
 $node = $null
 $nodeCmd = Get-Command node -ErrorAction SilentlyContinue | Select-Object -First 1

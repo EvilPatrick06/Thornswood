@@ -68,7 +68,7 @@ if ($Sign) {
     # builds with makes it (#5356, #4823): a one file project, built with its
     # apphost, the exe that is signed.
     $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue | Select-Object -First 1
-    if (-not $dotnet) { Write-Host 'No .NET SDK: dotnet is not on this machine (Developer-Guide.md, Setting up a machine).' -ForegroundColor Red; exit 1 }
+    if (-not $dotnet) { Write-Host 'No .NET SDK: dotnet is not on this machine (docs/guide/set-up-a-machine.md, "Setting up a machine").' -ForegroundColor Red; exit 1 }
     $proj = Join-Path $Out 'pilot-src'
     New-Item -ItemType Directory -Force -Path $proj | Out-Null
     [IO.File]::WriteAllText((Join-Path $proj 'pilot.cs'), $src)
