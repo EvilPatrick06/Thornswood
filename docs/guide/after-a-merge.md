@@ -16,11 +16,11 @@ live deploy, which wait for Patrick's word.
 | The gamemode on the dev server | `.\scripts\deploy\Deploy-DevGamemode.ps1` |
 | The gamemode on the live server, `game\gamemode.js` and `game\content\Thornswood-Content.esp` | `.\scripts\deploy\Deploy-Server.ps1 -GamemodeOnly`, from any machine |
 | The live server build, or the live settings Deploy-Gamemode writes | `.\scripts\deploy\Deploy-Gamemode.ps1`, then `.\scripts\deploy\Deploy-Server.ps1`, from a machine with the fork built |
-| The site's app or `site\public` | `.\scripts\deploy\Deploy-Docs.ps1` |
-| The public pages, `site\data\site\*.md` | `.\scripts\deploy\Deploy-Docs.ps1 -Site` |
-| The bot's code or join card art in `bot` | `.\scripts\deploy\Install-Bot.ps1 -CodeOnly` |
+| The site's app or `site\public` | Nothing. The merge's Release carries it and the box deploy agent puts it in within minutes ([docs\DEPLOY-AGENT.md](../DEPLOY-AGENT.md)). `Deploy-Docs.ps1` sends no app once the agent has the site; it is for the documents, the boards and the password. |
+| The public pages, `site\data\site\*.md` | Nothing. They ride the same Release, and `Deploy-Docs.ps1 -Site` is refused once the agent has the site. |
+| The bot's code or join card art in `bot` | Nothing. The merge's Release carries it and the deploy agent swaps it in. `Install-Bot.ps1` is for the service, its libraries and its token. |
 | The bot's avatar, `bot\thornswood-bot-*.png` | No script sends it. Upload it by hand in the Discord developer portal. |
-| The voice service, `voice\voice-server.js` or `voice\headlines.js` | `.\scripts\deploy\Install-Voice.ps1` |
+| The voice service, `voice\voice-server.js` or `voice\headlines.js` | Dev voice: nothing, it goes in with the merge's Deployment to Dev. Live voice: `.\scripts\deploy\Install-Voice.ps1` |
 | Scripts that only change how a release is built (Ship.ps1, Publish-Update.ps1, the Deploy scripts) | Nothing more. The pull is the change. |
 
 3. Everybody else, once it is out, from the main folder: `git checkout main`, then

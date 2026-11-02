@@ -171,7 +171,7 @@ from that tag (`git checkout -b hotfix/<name> live-<version>`).
 
 Everything else, and which one each change needs, is the list in [After a
 pull request is merged](after-a-merge.md): `Deploy-Server.ps1` pushes a server
-build, `Deploy-Server.ps1 -GamemodeOnly` the gamemode from any machine (`Deploy-DevGamemode.ps1` for dev), `Deploy-Docs.ps1` the site, `Install-Bot.ps1` the bot,
+build, `Deploy-Server.ps1 -GamemodeOnly` the gamemode from any machine (`Deploy-DevGamemode.ps1` for dev), the box deploy agent the site and the bot from each merge's Release,
 `Request-Restart.ps1` an announcement. `Rotate-ServerPassword.ps1` changes a
 password nothing checks any more; the [secrets table](secrets.md) says why. Every
 script closes the launcher and Skyrim itself when it needs to.

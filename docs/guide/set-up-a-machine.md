@@ -196,7 +196,7 @@ through the gate instead, with `gh` signed in as somebody who may run workflows 
 `pwsh scripts/vps/Box-Run.ps1 -Line '<verb>'` ([E. VPS](tools.md#e-vps)). Ships go
 the same way (`Ship-Dev`, `Ship-Main`), so a machine without a key can still
 release; the scripts that ssh to the VPS themselves (`Ship`, `Deploy-*`,
-`Request-Restart`, `Install-Bot`, `Publish-Installer`, `Publish-News`) do not
+`Request-Restart`, `Install-Bot`, `Publish-Installer`) do not
 run from it, and Ship stops before it builds anything there: the feed and its
 baseline are received from the VPS (#907).
 

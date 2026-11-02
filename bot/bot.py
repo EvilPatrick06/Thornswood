@@ -2520,8 +2520,8 @@ def site_open():
 # list, is one of Thornswood's hints and lore lines, a new one every
 # LINES_EVERY seconds. Their one copy is site\data\site\lines.md; the site
 # hands them out in /api/public as "lines", read here at every change, so a
-# line edited there reaches the bot at the next Deploy-Docs.ps1 -Site, with
-# no bot install. Hints and lore lines take turns, each list in its own order.
+# line edited there reaches the bot once its merge's Release is on the site
+# (the deploy agent, #5190), with no bot install. Hints and lore lines take turns, each list in its own order.
 LINES_EVERY = 15 * 60
 
 

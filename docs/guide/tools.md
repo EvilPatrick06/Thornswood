@@ -221,14 +221,13 @@ The website is the `site` folder. Public pages are `site\data\site`. On the VPS 
 
 ### Deploy
 
-From your clone, after the pull request that changed the site is merged:
+Nothing to run: the merge's Release carries the app and the public pages, and the box deploy agent puts them in within minutes ([docs\DEPLOY-AGENT.md](../DEPLOY-AGENT.md)). An older copy goes back by its tag:
 
 ```powershell
-.\scripts\deploy\Deploy-Docs.ps1
-.\scripts\deploy\Deploy-Docs.ps1 -Site
+pwsh scripts/vps/Box-Run.ps1 -Line 'Deploy-Release -Environment site -Tag <tag>'
 ```
 
-The first command deploys the app. `-Site` deploys the public pages. News for a main release is [Release to main](release-to-main.md).
+`Deploy-Docs.ps1` is for the documents, the boards and the password, and for a new box before the agent has the site. News for a main release is [Release to main](release-to-main.md).
 
 ### Learn more about Website
 
