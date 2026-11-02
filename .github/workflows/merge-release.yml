@@ -111,6 +111,7 @@ on:
       - 'scripts/bot/Bot-Pass.js'
       - 'scripts/bot/bot.js'
       - 'scripts/bot/character.js'
+      - 'scripts/bot/relay.js'
       # What App-Part.ps1 puts in the site, the Discord bot and voice.
       - 'site/server.js'
       - 'site/public/**'
@@ -396,7 +397,7 @@ jobs:
           $stamp = Join-Path $out 'thornswood-build.json'
           $s = Save-ThornswoodBuildStamp -Gamemode $gm -Channel dev -RepoDir . -Path $stamp
           Write-Host (Format-ThornswoodBuildStamp $s)
-          $bot = @('Bot-Pass.js', 'bot.js', 'character.js') | ForEach-Object { Join-Path 'scripts\bot' $_ }
+          $bot = @(@('Bot-Pass.js', 'bot.js', 'character.js', 'relay.js') | ForEach-Object { Join-Path 'scripts\bot' $_ }) + @(@('voice-server.js', 'headlines.js') | ForEach-Object { Join-Path 'voice' $_ })
           $launcher = @(Get-ChildItem -LiteralPath $env:LAUNCHER_DIR -File | ForEach-Object { 'launcher=' + $_.FullName })
           $adds = $launcher + @("game=$($env:GAME_ZIP)", "game=$($env:GAME_LIST)",
                     "site=$($env:SITE_ZIP)", "discord=$($env:DISCORD_ZIP)", "voice=$($env:VOICE_ZIP)")
@@ -561,7 +562,7 @@ jobs:
           STAMP: ${{ steps.changed.outputs.stamp }}
         run: |
           $rel = Join-Path $env:RUNNER_TEMP 'merge-release'
-          $bot = @('Bot-Pass.js', 'bot.js', 'character.js') | ForEach-Object { Join-Path 'scripts\bot' $_ }
+          $bot = @(@('Bot-Pass.js', 'bot.js', 'character.js', 'relay.js') | ForEach-Object { Join-Path 'scripts\bot' $_ }) + @(@('voice-server.js', 'headlines.js') | ForEach-Object { Join-Path 'voice' $_ })
           $adds = @(Get-Content -LiteralPath (Join-Path $env:RUNNER_TEMP 'parts.txt'))
           $vp = Join-Path $env:RUNNER_TEMP 'velopack.txt'
           if (Test-Path -LiteralPath $vp) { $adds += @(Get-Content -LiteralPath $vp) }
