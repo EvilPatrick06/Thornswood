@@ -220,7 +220,7 @@ $h = @{}; $want = ''
     $null = & pwsh -NoProfile -Command "& '$(Join-Path $Repo 'scripts\release\New-SignedManifest.ps1')' -Out '$out2' -Tag build-1.3 -Commit $commit -Part gamemode -Files '$gmf' -BotFiles '$gmf' -Repo O/R -NoCatalog" 2>&1
     Yes '  and refuses two files of one name, which the agent puts in one folder' ($LASTEXITCODE -ne 0)
     $wf = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\merge-release.yml'))
-    Yes 'merge-release.yml puts the bot pass in every Release' ($wf.Contains('-BotFiles $bot') -and $wf.Contains("@('Bot-Pass.js', 'bot.js', 'character.js')") -and $wf.Contains("- 'scripts/bot/Bot-Pass.js'"))
+    Yes 'merge-release.yml puts the bot pass in every Release' ($wf.Contains('-BotFiles $bot') -and $wf.Contains("@('Bot-Pass.js', 'bot.js', 'character.js', 'relay.js')") -and $wf.Contains("@('voice-server.js', 'headlines.js') | ForEach-Object { Join-Path 'voice' `$_ }") -and $wf.Contains("- 'scripts/bot/relay.js'") -and $wf.Contains("- 'scripts/bot/Bot-Pass.js'"))
     $cs = [IO.File]::ReadAllText((Join-Path $Repo 'tools\DeployAgent\BotPass.cs'))
     Yes '  and the agent takes that part whole, needing only the file the task runs' ($cs.Contains('public const string Runs = "Bot-Pass.js";') -and $cs.Contains('foreach (var n in bot) Files.Copy(files[n], Path.Combine(BotDir, n));') -and -not $cs.Contains('BotFiles ='))
     $r = Probe 'Deploy-Release.ps1' 'DEPLOYED: probe' @('-Tag', 'build-20261101.3')
