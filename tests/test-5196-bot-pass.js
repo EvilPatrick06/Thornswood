@@ -189,6 +189,27 @@ function failedAt(r, step) {
   yes('the face is a Nord with the engine\'s 19 morphs and 4 presets',
     (() => { const f = botPass.face('X'); return f.raceId === 0x13746 && f.options.length === 19 && f.presets.length === 4 && f.name === 'X'; })());
 
+  // ------------------------------------- where a pass that runs on got to
+  // The pass says each step as it starts, before it waits on it, so the
+  // last line of bot-pass.log names the wait a pass that never ends is in.
+  const order = ['loading the engine', 'the server started; it has 2 s', 'PASS  loads', 'a bot connects to port 7801',
+    'PASS  login', 'the bot sends a face', 'PASS  face', 'waiting for the world on disk', 'PASS  saved',
+    'the server is stopped', 'the server started again', 'PASS  restart', 'a second bot connects', 'PASS  loads back', 'the pass ends'];
+  const at = order.map((o) => good.said.findIndex((l) => l.startsWith(o)));
+  yes('the pass says each step as it starts, in order, before its PASS line', at.every((x, i) => x >= 0 && (i === 0 || x > at[i - 1])));
+  {
+    const cp = require('child_process');
+    const root = folder('mainlog', { thornswoodRequirePass: true });
+    const out = path.join(TMP, 'mainlog-run', 'result.json');
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    const ran = cp.spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'bot', 'Bot-Pass.js'), '--root', root, '--out', out], { encoding: 'utf8' });
+    const logAt = path.join(path.dirname(out), 'bot-pass.log');
+    const text = fs.existsSync(logAt) ? fs.readFileSync(logAt, 'utf8') : '';
+    yes('run as the task runs it, the pass writes bot-pass.log beside its result as it goes, each line timed',
+      ran.status === 1 && fs.existsSync(out) && /^\d{4}-\d\d-\d\dT[\d:.]+Z  the bot pass starts in /.test(text) &&
+      /FAIL  loads: .*not a bot pass copy/.test(text) && /BOT PASS FAILED\n$/.test(text));
+  }
+
   // ------------------------------------------------------------- broken
   yes('the gamemode does not load: FAIL on loads', failedAt((await run('noload', 'no load')).r, 'loads'));
   const other = await run('other', 'other gamemode');

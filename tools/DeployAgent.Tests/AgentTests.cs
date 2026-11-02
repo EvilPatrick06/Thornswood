@@ -1748,6 +1748,55 @@ public sealed class AgentTests : IDisposable
         if (how == "face") Assert.Contains("FAIL  face", log);
     }
 
+    /// <summary>A pass that runs out says where it got to: what Task
+    /// Scheduler says of it, the pass's own last lines (bot-pass.log, which
+    /// Bot-Pass.js writes as each step starts) and the copy's server's, all
+    /// redacted. Deployment 7480554210 said only that it ran out.</summary>
+    [Fact]
+    public async Task APassThatRunsOutSaysWhereItGot()
+    {
+        var (a, gh, s, bp) = MakeWithPass(bp =>
+        {
+            File.WriteAllText(bp.PassLogPath, "2026-11-01T23:11:40.000Z  the bot pass starts in C:\\x\n2026-11-01T23:11:41.000Z  the server started; it has 600 s to say gamemode.js loaded\n");
+            File.WriteAllText(bp.ServerLogPath, "[thornswood] loading plugins\r\nlistening on 10.0.0.5:7901\r\n");
+            return "hang";
+        });
+        BotRelease(gh, "build-1", "// new gamemode\n");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        Assert.Contains("did not end within 5 s", (string)gh.Last(id)!["description"]!);
+        var log = s.Read(Path.Combine("data", $"deploy-{id}.log"));
+        Assert.Contains("Task Scheduler at the limit: Running", log);
+        Assert.Contains(", this run", log);
+        Assert.Contains("  2026-11-01T23:11:41.000Z  the server started; it has 600 s to say gamemode.js loaded", log);
+        Assert.Contains("  [thornswood] loading plugins", log);
+        Assert.Contains("listening on <address>", log);
+        Assert.DoesNotContain("10.0.0.5", log);
+        Assert.True(log.IndexOf("bot-pass.log") < log.IndexOf("bot-pass-server.log"), "the pass's own lines come first");
+        Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
+    }
+
+    /// <summary>The task takes one run at a time and Task Scheduler ignores a
+    /// start while one runs (IgnoreNew), so a pass still running from before
+    /// is not started over and waited on as if it were this one.</summary>
+    [Fact]
+    public async Task APassStillRunningFromBeforeIsNotWaitedOnAsThisOne()
+    {
+        var (a, gh, s, bp) = MakeWithPass(bp => WriteResult(bp, true));
+        var tasks = (FakeTasks)a.Tasks;
+        tasks.AlreadyRunning(DateTime.UtcNow.AddMinutes(-31));
+        BotRelease(gh, "build-1", "// new gamemode\n");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        await a.Pass("dev", default);
+        var d = (string)gh.Last(id)!["description"]!;
+        Assert.Equal("failure", (string)gh.Last(id)!["state"]!);
+        Assert.Contains("the bot pass task is still Running", d);
+        Assert.Contains("nothing was started", s.Read(Path.Combine("data", $"deploy-{id}.log")));
+        Assert.Equal(0, tasks.Starts);
+        Assert.Equal(0, tasks.Ends);
+        Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
+    }
+
     /// <summary>The bot part goes into the copy whole: a file the bot carries
     /// beside the three it began with (its relay client and the voice service
     /// it joins, #5196) needs no change here. Without Bot-Pass.js, the file
@@ -1897,6 +1946,7 @@ sealed class FakeTasks(Func<string?> work) : ITasks
     }
     public TaskInfo Info(string name) => new(running ? "Running" : "Ready", last, 0);
     public void End(string name) { Ends++; running = false; }
+    public void AlreadyRunning(DateTime since) { running = true; last = since; }
 }
 
 sealed class Stub(Func<HttpRequestMessage, Task<HttpResponseMessage>> f) : HttpMessageHandler

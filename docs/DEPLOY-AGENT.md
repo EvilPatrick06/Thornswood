@@ -239,6 +239,17 @@ a copy of dev that nobody plays on:
    next pass, with its own server log at
    `C:\Thornswood-BotPass\run\server\bot-pass-server.log`;
    `Install-DeployAgent -Status` prints the last pass.
+6. A pass that writes no result says where it got to, in the Deployment's
+   log and in `-Status`: what Task Scheduler says of the task at the limit,
+   the pass's own last lines (`run\bot-pass.log`, which Bot-Pass.js writes
+   with the time as each step starts and ends, since the task keeps no
+   output and result.json is written only at the end) and the copy's
+   server's last lines, with addresses taken out. Deployment 7480554210 ran
+   out at 30 minutes and said nothing more, which is why. The task takes one
+   run at a time and Task Scheduler ignores a start while one runs
+   (`IgnoreNew`), so a pass is not started while the task is still running:
+   the Deployment fails saying so, rather than waiting on the older run as
+   if it were its own.
 
 The bot pass rides in the gamemode Release as a part of its own, `bot`
 (merge-release.yml, `New-SignedManifest.ps1 -BotFiles`), so the bot that

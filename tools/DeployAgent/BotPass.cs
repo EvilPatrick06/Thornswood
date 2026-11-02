@@ -1,4 +1,5 @@
 #nullable enable
+using System.Text;
 // The bot pass a dev Deployment waits on (#5196). Before the agent puts a
 // new gamemode on dev, it makes a throwaway copy of the dev server with that
 // gamemode, in a folder of its own on ports of its own, and starts the
@@ -132,6 +133,43 @@ public sealed class BotPass(EnvConfig env, ITasks tasks)
     public string ResultPath => Path.Combine(RunDir, "result.json");
     public string PluginDir => Path.Combine(Root, "plugins");
 
+    public string PassLogPath => Path.Combine(RunDir, "bot-pass.log");
+    public string ServerLogPath => Path.Combine(ServerDir, "bot-pass-server.log");
+
+    /// <summary>For a pass that wrote no result: where Bot-Pass.js had got to
+    /// (bot-pass.log, which it writes as each step starts and ends) and what
+    /// the copy's server said last, so the Deployment's log says where it
+    /// stopped and nobody has to fetch either off the box.</summary>
+    void SayWhereItGot(Action<string> log)
+    {
+        SayTail(log, PassLogPath, 20, "the pass's own lines, last 20 (bot-pass.log)",
+            "Bot-Pass.js wrote nothing to bot-pass.log, so node never ran it (or it stopped before its first line)");
+        SayTail(log, ServerLogPath, 40, "the copy's server said, last 40 lines (bot-pass-server.log)",
+            "the copy's server wrote nothing to bot-pass-server.log, so it was never started");
+    }
+
+    static void SayTail(Action<string> log, string at, int n, string what, string none)
+    {
+        List<string> tail;
+        try
+        {
+            tail = [];
+            if (File.Exists(at))
+            {
+                // Its last 64 KiB: the log of a pass that ran on can be long.
+                using var f = Files.OpenShared(at);
+                f.Seek(Math.Max(0, f.Length - (64 << 10)), SeekOrigin.Begin);
+                using var ms = new MemoryStream();
+                f.CopyTo(ms);
+                tail = Encoding.UTF8.GetString(ms.ToArray()).Replace("\r\n", "\n").Split('\n').Where(l => l != "").TakeLast(n).ToList();
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { log($"{Path.GetFileName(at)} could not be read: {e.Message}"); return; }
+        if (tail.Count == 0) { log(none); return; }
+        log($"--- {what} ---");
+        foreach (var l in Server.Redact(tail)) log("  " + l);
+    }
+
     /// <summary>Makes the copy, runs the task, reads what it wrote. files are
     /// the Release's gamemode and bot parts, each held to the signed manifest;
     /// bot names the files of the bot part, which go into the copy's bot
@@ -153,6 +191,19 @@ public sealed class BotPass(EnvConfig env, ITasks tasks)
         }
         if (why != "") return new Outcome("failure", "not applied: the bot pass copy could not be made: " + why);
 
+        // The task takes one instance at a time and ignores a start while one
+        // runs (MultipleInstances IgnoreNew), so a pass still running from
+        // before would be waited on as if it were this one, to the limit.
+        try
+        {
+            var before = tasks.Info(env.BotPassTask);
+            if (before.State is "Running" or "Queued")
+            {
+                log($"the bot pass task is already {before.State}, a run from {before.LastRun:yyyy-MM-dd HH:mm:ss}Z, and takes one run at a time (IgnoreNew), so a start now would be ignored and that run waited on as this one; nothing was started");
+                return new Outcome("failure", $"not applied: the bot pass task is still {before.State} from {before.LastRun:HH:mm}Z, so a start now is ignored");
+            }
+        }
+        catch (InvalidOperationException e) { return new Outcome("failure", "not applied: the bot pass could not be read: " + e.Message); }
         var started = DateTime.UtcNow;
         try { tasks.Start(env.BotPassTask); }
         catch (InvalidOperationException e) { return new Outcome("failure", "not applied: the bot pass did not start: " + e.Message); }
@@ -169,8 +220,12 @@ public sealed class BotPass(EnvConfig env, ITasks tasks)
             if (info.State is not ("Running" or "Queued") && info.LastRun >= started.AddSeconds(-1)) break;
             if (DateTime.UtcNow > deadline)
             {
+                // What it had got to, so a pass that runs out says where
+                // (Deployment 7480554210 said only that it ran out).
+                log($"Task Scheduler at the limit: {info.State}, last run {info.LastRun:yyyy-MM-dd HH:mm:ss}Z" + (info.LastRun < started.AddSeconds(-1) ? ", before this start, so this start never ran" : ", this run"));
                 try { tasks.End(env.BotPassTask); log("the bot pass was still running at its time limit and was stopped"); }
                 catch (InvalidOperationException e) { log("the bot pass was still running at its time limit and could not be stopped: " + e.Message); }
+                SayWhereItGot(log);
                 return new Outcome("failure", $"not applied: the bot pass did not end within {env.BotPassSeconds} s");
             }
             try { await Task.Delay(Tick, ct); } catch (OperationCanceledException) { tasks.End(env.BotPassTask); throw; }
@@ -187,7 +242,8 @@ public sealed class BotPass(EnvConfig env, ITasks tasks)
         if (r == null || r.Schema != 1)
         {
             why = why != "" ? why : r == null ? "it wrote no result.json" : $"its result.json is schema {r.Schema}, and this agent reads 1";
-            return new Outcome("failure", $"not applied: the bot pass ended (Task Scheduler says {info.LastResult}) and {why}; its log is {Path.Combine(ServerDir, "bot-pass-server.log")}");
+            SayWhereItGot(log);
+            return new Outcome("failure", $"not applied: the bot pass ended (Task Scheduler says {info.LastResult}) and {why}; its log is {ServerLogPath}");
         }
         // Network addresses stay on the box, as in a server log (Server.Redact).
         foreach (var l in r.Lines) l.Detail = Server.Redact([l.Detail]).First();

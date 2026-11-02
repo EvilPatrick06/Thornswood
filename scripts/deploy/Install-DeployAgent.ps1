@@ -171,6 +171,15 @@ if (`$t) { `$i = `$t | Get-ScheduledTaskInfo; 'task $passTask is ' + `$t.State +
 else { 'no task ${passTask}: dev Deployments go in without a bot pass' }
 `$res = '$passRoot\run\result.json'
 if (Test-Path -LiteralPath `$res) { try { `$r = [IO.File]::ReadAllText(`$res) | ConvertFrom-Json; 'last pass ' + `$r.ended + ': ' + `$(if (`$r.ok) { 'OK' } else { 'FAILED' }); foreach (`$l in @(`$r.lines)) { '  ' + `$(if (`$l.ok) { 'PASS' } else { 'FAIL' }) + '  ' + `$l.step + ': ' + `$l.detail } } catch { 'its result.json does not read: ' + `$_.Exception.Message } }
+# Where the last pass got to, as the agent says it in a Deployment's log
+# when a pass runs out (#5196): its own lines and the copy's server's, kept
+# until the next pass empties the run folder. Addresses never leave the box.
+foreach (`$tail in @(@('$passRoot\run\bot-pass.log', 20), @('$passRoot\run\server\bot-pass-server.log', 40))) {
+  if (Test-Path -LiteralPath `$tail[0]) {
+    '--- ' + `$tail[0] + ', last ' + `$tail[1] + ', written ' + (Get-Item -LiteralPath `$tail[0]).LastWriteTimeUtc.ToString('yyyy-MM-dd HH:mm:ss') + 'Z ---'
+    Get-Content -LiteralPath `$tail[0] -Tail `$tail[1] | ForEach-Object { `$_ -replace '\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?\b', '<address>' }
+  } else { 'no ' + `$tail[0] + ' (no pass has written it since the run folder was last emptied)' }
+}
 '--- agent.log, last 30 ---'
 `$log = '$Root\logs\agent.log'
 if (Test-Path -LiteralPath `$log) { Get-Content -LiteralPath `$log -Tail 30 } else { 'no log yet' }
