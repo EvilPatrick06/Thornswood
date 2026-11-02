@@ -14,8 +14,8 @@
   payload with a plugin missing from the load order leaves the old root byte
   for byte as it was, and the old server still answers.
 
-  HOW. The installer is run by Windows PowerShell 5.1, which is what runs it on
-  the VPS, against a root in a scratch folder, with -AllowGamingPc so it runs on
+  HOW. The installer is run by PowerShell 7, which is what runs it on the VPS
+  (#5356), against a root in a scratch folder, with -AllowGamingPc so it runs on
   a machine with the game on it. The payloads are real zips. The server in
   them is a node stub that holds its game port on UDP and its resources port on
   TCP the way skymp5-server does, and dies on start, or never opens the
@@ -168,10 +168,10 @@ Yes 'the stop waits for each of the server''s processes to exit, not for its por
 $node = Get-Command node -CommandType Application -EA SilentlyContinue | Select-Object -First 1
 . (Join-Path $PSScriptRoot 'Windows.ps1')
 if (-not $OnWindows) {
-    Write-Host 'SKIP  the runs need Windows PowerShell 5.1 and Get-NetUDPEndpoint, which only Windows has, and this is not Windows'
+    Write-Host 'SKIP  the runs need Get-NetUDPEndpoint, Windows ACLs and cmd.exe, which only Windows has, and this is not Windows'
     Done
 }
-$ps51 = Get-WindowsPowerShell
+$boxPs = Get-BoxPowerShell
 if (-not $node -or -not (Get-Command Get-NetUDPEndpoint -EA SilentlyContinue)) {
     Write-Host 'SKIP  the runs need node and Get-NetUDPEndpoint as well, and this machine lacks one'
     Done
@@ -505,14 +505,14 @@ $prelude = $prelude.Replace('@@PIDLOG@@', $pidLog.Replace("'", "''")).Replace('@
 # Everything the stand-ins below read is in $global:TsBox, not in a variable
 # of this script: they run inside the script under test, and PowerShell
 # finds that script's own variables first (its Remote has a $far of its own).
-$global:TsBox = [pscustomobject]@{ Far = $far; Prelude = $prelude; Work = $work; Ps51 = $ps51; Box = $box }
+$global:TsBox = [pscustomobject]@{ Far = $far; Prelude = $prelude; Work = $work; BoxPs = $boxPs; Box = $box }
 function RunWrapped([string]$body) {
     $f = Join-Path $global:TsBox.Far ('far-' + [Guid]::NewGuid().ToString('N') + '.ps1')
     [IO.File]::WriteAllText($f, ($global:TsBox.Prelude + $body), (New-Object Text.UTF8Encoding($true)))
     $eap = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     Push-Location -LiteralPath $global:TsBox.Work
-    try { $out = @(& $global:TsBox.Ps51 -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $f 2>&1 | ForEach-Object { "$_".TrimEnd() }) }
+    try { $out = @(& $global:TsBox.BoxPs -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $f 2>&1 | ForEach-Object { "$_".TrimEnd() }) }
     finally { Pop-Location; $ErrorActionPreference = $eap }
     $script:lastCode = $LASTEXITCODE
     $global:TsLastCode = $LASTEXITCODE
@@ -726,8 +726,7 @@ try {
         $acl = Get-Acl -LiteralPath $d
         $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier('S-1-5-19')), 'Read', 'ObjectInherit', 'NoPropagateInherit', 'Allow')))
         $item = Get-Item -LiteralPath $d -Force
-        if ($PSVersionTable.PSEdition -eq 'Core') { [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]$item, [Security.AccessControl.DirectorySecurity]$acl) }
-        else { $item.SetAccessControl($acl) }
+        [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]$item, [Security.AccessControl.DirectorySecurity]$acl)
     }
     $running = Owner $P
     $v2 = Payload

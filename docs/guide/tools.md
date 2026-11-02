@@ -106,13 +106,7 @@ Every nightly and build run starts a PowerShell harness with `pwsh -NoProfile -F
 pwsh -NoProfile -File .\tests\test-install-server.ps1
 ```
 
-From Git Bash too (the shell Claude Code's Bash tool uses on One), never `powershell.exe` straight: Windows PowerShell 5.1 started from there inherits PowerShell 7's `PSModulePath`, finds PowerShell 7's Utility module first and loses `Get-FileHash` (#2460). PowerShell 7 rewrites that path for every 5.1 it starts, so a harness started with `pwsh` that runs 5.1 keeps working. `tests\test-2460-winps-module-path.ps1` holds both halves.
-
-If 5.1 itself is the point, clear the inherited path first:
-
-```bash
-env -u PSModulePath powershell.exe -NoProfile -File ./tests/test-install-server.ps1
-```
+From Git Bash too (the shell Claude Code's Bash tool uses on One), the same line with forward slashes. Nothing here runs in Windows PowerShell 5.1 any more, the box included (#5356): every script, task and harness starts `pwsh`.
 
 ### Learn more about PowerShell
 
@@ -192,36 +186,28 @@ For the whole repository, `Ctrl+Shift+F` is the search to use.
 
 ## E. VPS
 
-The VPS is the remote Windows machine. The site, the bot, voice, and both game servers run there. You do not get the server password. Your PC has a key and a token of its own, and the scripts connect through the bridge at `wss://thornswood.net/box/` with them. The whole guide, with what to do when it stops working, is `docs\BOX-ACCESS.md` in the private ops repo.
+The VPS is the remote Windows machine. The site, the bot, voice, and both game servers run there. You do not get the server password, and since 31 Oct 2026 you do not get a key to it either (Patrick's answer A on q-retire-box-keys, #2862): every job on the box is a verb of the deploy gate, which runs main's script there and hands what it printed back to you alone. `scripts\vps\gate\verbs.json` is the whole list, with what each verb takes.
 
-### Make a key and test it
+### Run a verb
 
-```powershell
-.\scripts\vps\Setup-SshKey.ps1
-```
-
-Copy the whole `ssh-ed25519` line into Discord, and press Enter when it asks for the token. On One, Patrick runs:
+From the repository folder, with `gh` signed in as somebody who may run workflows in the private ops repository:
 
 ```powershell
-.\scripts\vps\Grant-BoxAccess.ps1 -Name <you> -FromClipboard
+pwsh scripts/vps/Box-Run.ps1 -Line 'ping'
 ```
 
-and sends you the token. Then, on your machine, run `Setup-SshKey.ps1` again, paste the token, and check:
-
-```powershell
-.\scripts\vps\Setup-SshKey.ps1 -Test
-```
-
-A good answer is that ssh to the box works. `Host key verification failed` means `known_hosts` holds a key for the server that is not the pinned one: stop and ask.
+A good answer says `ENDED 0`. It starts `box-run.yml` in the private ops repository, which asks the gate on the box over its own ssh, and nothing reaches the box from your machine.
 
 ### Two reads
 
 ```powershell
-.\scripts\vps\Check-Site.ps1
-.\scripts\vps\Get-Logs.ps1
+pwsh scripts/vps/Box-Run.ps1 -Line 'Check-Site'
+pwsh scripts/vps/Box-Run.ps1 -Line 'Get-Logs -Lines 300'
 ```
 
-`Check-Site.ps1` says whether the website answers. `Get-Logs.ps1` copies the tail of the site, bot, game server, and voice logs onto your machine and prints the folder. `-Lines 40000` pulls more.
+`Check-Site` says whether the website answers. `Get-Logs` brings the tail of the site, bot, game server, and voice logs back to your machine and prints the folder. `-Lines 40000` pulls more.
+
+The machines that hold a key from before 31 Oct keep it; `docs\BOX-ACCESS.md` in the private ops repo has those, and the secrets table below says how one is changed.
 
 ### Learn more about VPS
 

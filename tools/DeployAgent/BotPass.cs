@@ -46,17 +46,17 @@ public interface ITasks
     void End(string name);
 }
 
-/// <summary>Task Scheduler through Windows PowerShell's ScheduledTasks
-/// module, the way the installers register the tasks.</summary>
+/// <summary>Task Scheduler through PowerShell 7's ScheduledTasks module,
+/// the way the installers register the tasks.</summary>
 public sealed class WindowsTasks : ITasks
 {
     static string Ps(string command, string task)
     {
-        var ps = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
+        var ps = WindowsServerControl.Pwsh;
         var psi = new ProcessStartInfo(ps, ["-NoProfile", "-NonInteractive", "-Command", "$ErrorActionPreference = 'Stop'; " + command])
         { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
         psi.Environment["TW_TASK"] = task;
-        using var p = Process.Start(psi) ?? throw new InvalidOperationException("Windows PowerShell did not start");
+        using var p = Process.Start(psi) ?? throw new InvalidOperationException("PowerShell 7 did not start");
         var outText = p.StandardOutput.ReadToEnd().Trim();
         var err = p.StandardError.ReadToEnd().Trim();
         p.WaitForExit();
@@ -98,8 +98,11 @@ public sealed class PassResult
 
 public sealed class BotPass(EnvConfig env, ITasks tasks)
 {
-    /// <summary>The files the bot part of a Release carries; Bot-Pass.js is the one the task runs.</summary>
-    public static readonly string[] BotFiles = ["Bot-Pass.js", "bot.js", "character.js"];
+    /// <summary>The file of the bot part the task runs. The rest of the part
+    /// is whatever that file needs beside it, and the copy takes the part
+    /// whole, so the bot can carry more (the voice service it joins, #5196)
+    /// without this agent having to know each file by name.</summary>
+    public const string Runs = "Bot-Pass.js";
 
     /// <summary>Settings that reach outside the box or hold a secret, which a
     /// throwaway copy has no use for.</summary>
@@ -130,19 +133,22 @@ public sealed class BotPass(EnvConfig env, ITasks tasks)
     public string PluginDir => Path.Combine(Root, "plugins");
 
     /// <summary>Makes the copy, runs the task, reads what it wrote. files are
-    /// the Release's gamemode and bot parts, each held to the signed manifest.
+    /// the Release's gamemode and bot parts, each held to the signed manifest;
+    /// bot names the files of the bot part, which go into the copy's bot
+    /// folder, every one of them.
     /// serverZip, when given, is the server build the Deployment swaps dev
     /// onto (#5219), held to the signed manifest too: the copy runs that
     /// engine and not dev's, so the pass checks what dev will run.</summary>
-    public async Task<Outcome> Run(IReadOnlyDictionary<string, string> files, Action<string> log, CancellationToken ct, string? serverZip = null)
+    public async Task<Outcome> Run(IReadOnlyDictionary<string, string> files, IReadOnlyCollection<string> bot, Action<string> log, CancellationToken ct, string? serverZip = null)
     {
-        foreach (var n in BotFiles.Concat(Server.ReloadFiles))
+        if (!bot.Contains(Runs)) return new Outcome("failure", $"not applied: the Release's bot part has no {Runs}, and dev's deploys wait on the bot pass");
+        foreach (var n in bot.Concat(Server.ReloadFiles))
             if (!files.ContainsKey(n)) return new Outcome("failure", $"not applied: the Release has no {n}, and dev's deploys wait on the bot pass");
         string why;
         using (var turn = TakeTurn(log, out why))
         {
             if (turn == null) return new Outcome("failure", "not applied: " + why);
-            try { why = Prepare(files, log, serverZip); }
+            try { why = Prepare(files, bot, log, serverZip); }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException or InvalidDataException) { why = e.Message; }
         }
         if (why != "") return new Outcome("failure", "not applied: the bot pass copy could not be made: " + why);
@@ -202,7 +208,7 @@ public sealed class BotPass(EnvConfig env, ITasks tasks)
     }
 
     /// <summary>The copy, made fresh: "" when it is ready, else why not.</summary>
-    public string Prepare(IReadOnlyDictionary<string, string> files, Action<string> log, string? serverZip = null)
+    public string Prepare(IReadOnlyDictionary<string, string> files, IReadOnlyCollection<string> bot, Action<string> log, string? serverZip = null)
     {
         if (!Directory.Exists(RunDir)) return $"{RunDir} is not there; Install-DeployAgent.ps1 makes it with the task";
         // The folder stays, with the rights the installer gave the task on it;
@@ -231,7 +237,7 @@ public sealed class BotPass(EnvConfig env, ITasks tasks)
         }
         foreach (var dll in Directory.EnumerateFiles(dev, "*.dll")) Files.Copy(dll, Path.Combine(ServerDir, Path.GetFileName(dll)));
         foreach (var n in Server.ReloadFiles) Files.Copy(files[n], Path.Combine(ServerDir, n));
-        foreach (var n in BotFiles) Files.Copy(files[n], Path.Combine(BotDir, n));
+        foreach (var n in bot) Files.Copy(files[n], Path.Combine(BotDir, n));
         // The tables the gamemode reads beside it (#5191): the Release's, or,
         // when it carries none, dev's own, which the Deployment leaves in place.
         var devTables = Path.Combine(dev, Tables.Dir);

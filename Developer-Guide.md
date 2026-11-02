@@ -123,7 +123,7 @@ Each page is one task. A first day reads them in this order; a later day opens t
     - [Where to click](docs/guide/tools.md#where-to-click)
     - [Learn more about Visual Studio Code](docs/guide/tools.md#learn-more-about-visual-studio-code)
   - [E. VPS](docs/guide/tools.md#e-vps)
-    - [Make a key and test it](docs/guide/tools.md#make-a-key-and-test-it)
+    - [Run a verb](docs/guide/tools.md#run-a-verb)
     - [Two reads](docs/guide/tools.md#two-reads)
     - [Learn more about VPS](docs/guide/tools.md#learn-more-about-vps)
   - [F. Website](docs/guide/tools.md#f-website)

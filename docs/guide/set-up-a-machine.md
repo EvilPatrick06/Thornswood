@@ -17,6 +17,7 @@ winget install --id Git.Git -e --accept-package-agreements --accept-source-agree
 winget install --id GitHub.cli -e --accept-package-agreements --accept-source-agreements
 winget install --id OpenJS.NodeJS.LTS -e --accept-package-agreements --accept-source-agreements
 winget install --id Microsoft.PowerShell -e --accept-package-agreements --accept-source-agreements
+winget install --id Microsoft.DotNet.SDK.10 -e --accept-package-agreements --accept-source-agreements
 winget install --id Microsoft.VisualStudioCode -e --accept-package-agreements --accept-source-agreements
 ```
 
@@ -28,6 +29,7 @@ winget install --id Microsoft.VisualStudioCode -e --accept-package-agreements --
 | GitHub CLI (`gh`) | Pull requests from the terminal. [A. GitHub](tools.md#a-github) |
 | Node | The website, voice, and the test command. [J. Node](tools.md#j-node) |
 | PowerShell 7 | The terminal the scripts run in. [C. PowerShell](tools.md#c-powershell) |
+| .NET 10 SDK (`dotnet`) | Builds and runs the tools written in C#, under `tools`: the release note check `Check-Change.ps1 -Body` runs, and the deploy agent. |
 | Visual Studio Code | The window you edit in. [D. Visual Studio Code](tools.md#d-visual-studio-code) |
 
 ### Check that the tools open
@@ -38,6 +40,7 @@ Close that window and open **PowerShell 7** from the Start menu. A new window is
 git --version
 gh --version
 node --version
+dotnet --version
 ssh -V
 code --version
 ```
@@ -186,13 +189,16 @@ Then in `Thornswood-Repo`:
 ```
 
 which makes a key for the VPS, points ssh at it through the bridge, and
-prints the public line. Send that line to Patrick; he runs
-`.\scripts\vps\Grant-BoxAccess.ps1 -Name <you> -FromClipboard` on One and
-sends you a token, which you paste when the same script asks
-(`docs\BOX-ACCESS.md` in the private ops repo). `.\scripts\vps\Setup-SshKey.ps1 -Test` proves it. Until then the scripts that talk to the VPS (`Ship`, `Deploy-*`,
-`Request-Restart`, `Install-Bot`, `Publish-Installer`, `Publish-News`) cannot
-reach it, and Ship stops before it builds anything: the feed and its baseline
-are received from the VPS (#907).
+prints the public line. That is for a machine that already holds a key: since
+31 Oct 2026 no key is made for a new person or machine (Patrick's answer A
+on q-retire-box-keys, #2862), and the keys there are changed only by Patrick (the workflows' two with the deploy gate's Renew-BoxKey verb). Box work from a new machine goes
+through the gate instead, with `gh` signed in as somebody who may run workflows in the private ops repository, and no key:
+`pwsh scripts/vps/Box-Run.ps1 -Line '<verb>'` ([E. VPS](tools.md#e-vps)). Ships go
+the same way (`Ship-Dev`, `Ship-Main`), so a machine without a key can still
+release; the scripts that ssh to the VPS themselves (`Ship`, `Deploy-*`,
+`Request-Restart`, `Install-Bot`, `Publish-Installer`, `Publish-News`) do not
+run from it, and Ship stops before it builds anything there: the feed and its
+baseline are received from the VPS (#907).
 
 Every Ship, dev included, checks the SkyMP client against the record, so
 this machine builds the engine once (Visual Studio 2022 Build Tools with
@@ -265,8 +271,12 @@ says so and carries on.
 ## Shipping from another machine
 
 Issue #458: if One (Patrick's machine) dies, the release process has to
-survive it. Measured on One on 29 September, this is everything a dev Ship
-reads that is not in a fresh clone, where it is on One, and where a second
+survive it. Since 31 Oct 2026 it does without any machine of ours: a Ship
+runs on the box through the deploy gate (`Box-Run.ps1 -Line 'Ship-Dev ...'`,
+`Ship-Main`), signs on GitHub's runner, and the box installs, backups, reads
+and deletion requests are gate verbs too (#2862). The table below is for a
+Ship run from a machine of one's own instead. Measured on One on 29 September, it is everything a dev Ship
+reads that is not in a fresh clone, where it was on One, and where a second
 machine gets it or how it is rebuilt. Nothing in this list is copied from One
 by hand, and no secret is written into the repository.
 
@@ -275,14 +285,14 @@ by hand, and no secret is written into the repository.
 | The source | the shared clone | `git clone https://github.com/ThornswoodRP/Thornswood.git` and `gh auth login` as a collaborator |
 | The feed, its baseline, the launcher list and history | the VPS store, with a working copy in `%LOCALAPPDATA%\Thornswood\feed\<channel>` | Nothing to copy: every Ship receives them from the VPS first (`scripts\release\Feed-Store.ps1`, #907). The working copy is made on the first Ship |
 | The release webhooks, dev and #news | the VPS, `C:\Thornswood-Bot\webhooks`; One has no local copy | Nothing to copy: Ship reads them over ssh (`scripts\ops\Discord-Hook.ps1`) |
-| VPS access | One's own key, `.ssh\thornswood_ed25519`, and its own bridge token, `.ssh\thornswood-box-token` | Its own key and token: `.\scripts\vps\Setup-SshKey.ps1`, and somebody the VPS already knows runs `.\scripts\vps\Grant-BoxAccess.ps1 -Name <machine> -FromClipboard` with the line it prints (`docs\BOX-ACCESS.md` in the private ops repo). With no such machine left, the BisectHosting panel is the way in (`docs\IT-IS-DOWN.md` in the private ops repo) |
+| VPS access | One's own key, `.ssh\thornswood_ed25519`, and its own bridge token, `.ssh\thornswood-box-token` | None: no new key is made (Patrick's A on q-retire-box-keys, 31 Oct 2026), and a Ship from the gate needs none. Box work goes through `scripts\vps\Box-Run.ps1`, with `gh` signed in as somebody who may run workflows in the private ops repository. With the gate down too, the BisectHosting panel is the way in (`docs\IT-IS-DOWN.md` in the private ops repo) |
 | Signing: `records\signing\signing.json` | written from the template like any other machine's since 5 Oct, when `C:\tools` (an older copy of `metadata.json`) was removed. Never copy one machine's to another | `.\scripts\release\Setup-ShipMachine.ps1` writes one from `records\signing\signing.template.json` (paths and "enabled": true, no key or password) |
 | Signing: Microsoft's signing client | `records\signing\client`, ignored by git | The same script fetches `Microsoft.ArtifactSigning.Client` 1.0.128 from nuget.org and refuses it unless its sha256 is the pinned one, which is the package One has |
 | Signing: the Azure sign in | `az login` on One, as Patrick | `az login` on the new machine, as the person who ships from it, with an account of their own in the signing tenant that holds the Certificate Profile Signer role on the ThornswoodSigning account's profile ThornswoodRelease (Patrick, 4 Oct; #1740). Patrick makes the account and gives the role once: [Your own signing sign in](#your-own-signing-sign-in). The script asks the signing service with that sign in and checks the profile answers with the identity the launcher pins |
 | The client runtime `records\client-build.json` names | only in the dev game folder, `C:\Thornswood-DevBuild\Game`. The build copies in `Downloads\Thornswood-ClientBuild-<commit>` are older builds, and the shared clone's `engine\skymp\build` does not match the record | Setup-ShipMachine records CI's build of the pin as the machine's engine build (`-EngineBuild ci`, which it does by itself on a machine with no engine build), and `Get-EngineArtifact.ps1` fetches the public fork's build of the pin, `thornswood-engine-<fork commit>` from ThornswoodRP/skymp (#3540), and holds every file to both records. A build made on the machine is not the recorded bytes (engine\README.md, "A Ship machine takes CI's build") |
 | The game folder the Ship packs, `<root>-DevBuild\Game` | built by the dev launcher from what Vortex deployed | Skyrim Special Edition on Steam, Vortex with a profile named Thornswood and the Thornswood collection installed and deployed, the launcher from thornswood.net, then the dev build and its own game folder (Setting up a machine, above). A person does this; it needs a Nexus account, not Patrick's |
 | The collection itself | Nexus collection `7essxf`, curated from Patrick's Nexus account in his Vortex | Any machine installs it. Only publishing a new revision needs his account (`docs\OWNERSHIP.md` in the private ops repo) |
-| Backups | the originals on the VPS, `C:\Thornswood-Backup`, and copies fetched to `local\backups` in One's repository folder (`.\scripts\release\Where.ps1 Backups`); the passphrase on the VPS and in One's Documents | Not needed to Ship. `.\scripts\vps\Fetch-Backups.ps1` brings them down to any machine the VPS knows |
+| Backups | the originals on the VPS, `C:\Thornswood-Backup`; the copy off the box goes to the Oracle VM and on to Google Drive (`Send-Backups.ps1`, #2862), not to One; the passphrase on the VPS and in Patrick's keeping | Not needed to Ship. `pwsh scripts/vps/Box-Run.ps1 -Line 'Send-Backups -Status'` says what went off the box |
 
 ### Your own signing sign in
 
