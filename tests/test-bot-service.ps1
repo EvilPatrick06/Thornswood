@@ -2,7 +2,6 @@
   test-bot-service.ps1
 
       pwsh -NoProfile -File .\tests\test-bot-service.ps1
-      powershell -NoProfile -File .\tests\test-bot-service.ps1 -Scratch <folder>
 
   The bot runs as the Windows service ThornswoodBot under its own account,
   NT SERVICE\ThornswoodBot, is stopped and started by that name, and its log

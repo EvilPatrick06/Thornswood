@@ -2,7 +2,6 @@
   test-2928-stop-and-move.ps1
 
       pwsh -NoProfile -File .\tests\test-2928-stop-and-move.ps1
-      powershell -NoProfile -File .\tests\test-2928-stop-and-move.ps1
 
   Issue #2928. Every swap on the box stopped what was running and then
   renamed its files in a loop with a sleep between tries (Swap.ps1's Shift,

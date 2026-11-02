@@ -1,7 +1,7 @@
 <#
   test-dev-door-seed.ps1
 
-      powershell -NoProfile -File .\tests\test-dev-door-seed.ps1 [-Temp <folder>]
+      pwsh -NoProfile -File .\tests\test-dev-door-seed.ps1 [-Temp <folder>]
 
   The dev server's door asks the dev list, and a dev publish leaves the dev
   server's own files alone (#964).

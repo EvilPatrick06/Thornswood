@@ -2,7 +2,6 @@
   test-2753-cloud-ssh.ps1
 
       pwsh -NoProfile -File .\tests\test-2753-cloud-ssh.ps1
-      powershell -NoProfile -File .\tests\test-2753-cloud-ssh.ps1
 
   The PowerShell half of ssh from cloud Claude threads (#2753):
   Install-Bridge.ps1 (the box's end, as a task) and Setup-CloudSsh.ps1 (the

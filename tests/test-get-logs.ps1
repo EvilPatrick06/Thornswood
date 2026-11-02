@@ -2,7 +2,6 @@
   test-get-logs.ps1
 
       pwsh -NoProfile -File .\tests\test-get-logs.ps1
-      powershell -NoProfile -File .\tests\test-get-logs.ps1
 
   Get-Logs.ps1, issue #453 leftover: the rolled generations of every log
   that rolls come down with the current file. door.log does not roll, so it

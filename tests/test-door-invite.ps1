@@ -1,7 +1,7 @@
 <#
   test-door-invite.ps1
 
-      powershell -NoProfile -File .\tests\test-door-invite.ps1
+      pwsh -NoProfile -File .\tests\test-door-invite.ps1
 
   "Not accepted yet" offers the Discord invite (#999).
 

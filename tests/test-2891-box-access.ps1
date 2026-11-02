@@ -2,7 +2,6 @@
   test-2891-box-access.ps1
 
       pwsh -NoProfile -File .\tests\test-2891-box-access.ps1
-      powershell -NoProfile -File .\tests\test-2891-box-access.ps1
 
   Each person and machine reaches the box through the bridge with a key and a
   token of their own (#2891). This holds the PowerShell half of that:
