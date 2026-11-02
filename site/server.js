@@ -1300,6 +1300,63 @@ function newestSetup(channel) {
   askSetups();
   return setups[channel] || null;
 }
+/* THE LAUNCHERS A CHANNEL LETS IN, SINCE VELOPACK (#4825). The launcher goes
+   out only through Velopack: merge-release.yml packs it as version
+   <yyyy>.<M*100+d>.<n> on the build Release build-<yyyyMMdd>.<n>
+   (MergeRelease.ps1, New-MergeReleaseNames), and promote-main.yml puts main's
+   package of the same number on main-build-<yyyyMMdd>.<n>. The launcher says
+   that number at Play (Updater.Version), and a channel lets it in when its
+   Release is out on GitHub with that channel's Velopack feed on it,
+   releases.dev.json or releases.main.json, since that is the only way a
+   launcher reaches the number. Velopack moves a launcher forward at its
+   start, so any number the channel published is let in; the update feed's
+   launcherVersion and minLauncher are the old launcher's, which nothing writes
+   any more, and are read only while a channel has no Velopack setup program
+   out (newestSetup). Once it has one, a launcher from before Velopack is told
+   to install the new one from the Downloads page.
+
+   Asked of GitHub without a token, like the setup programs: a number found is
+   kept, since a published Release stays published. A number not found is
+   asked again only RELEASE_LOOK_MS later, and a number nobody has asked about
+   yet is asked at most once every NATIVE_ASK_MS, which keeps the site inside
+   GitHub's sixty unsigned calls an hour even when a linked account sends a
+   new number at every Play. The launcher can only be on a number after its
+   Release is published, so the first Play on a new number finds it. */
+const NATIVE_ASK_MS = 90 * 1000;
+const nativeSeen = {};   // '<channel> <number>' -> { ok: true } once found; { at } while not
+let nativeAskedAt = 0;
+// The Release tag a launcher number is from, for a channel, or '' when the
+// number is not a Velopack one (an old launcher's 1.x, or nonsense).
+function nativeTag(channel, said) {
+  const m = /^(20\d\d)\.(\d{3,4})\.(\d{1,9})$/.exec(String(said || ''));
+  if (!m) return '';
+  const md = Number(m[2]), month = Math.floor(md / 100), day = md % 100;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return '';
+  const tag = 'build-' + m[1] + String(month).padStart(2, '0') + String(day).padStart(2, '0') + '.' + Number(m[3]);
+  return channel === 'main' ? 'main-' + tag : tag;
+}
+// Whether a channel published this Velopack launcher number: 'yes', 'no', or
+// 'unknown' when GitHub could not be asked just now.
+async function nativePublished(channel, said) {
+  const tag = nativeTag(channel, said);
+  if (!tag) return 'no';
+  const key = channel + ' ' + said;
+  const had = nativeSeen[key];
+  if (had && had.ok) return 'yes';
+  if (had && Date.now() - had.at < RELEASE_LOOK_MS) return 'no';
+  if (Date.now() - nativeAskedAt < NATIVE_ASK_MS) return 'unknown';
+  nativeAskedAt = Date.now();
+  const got = await releaseGitHub('/releases/tags/' + encodeURIComponent(tag));
+  if (got.status === 404) { nativeSeen[key] = { at: Date.now() }; return 'no'; }
+  if (got.status !== 200 || !got.body) return 'unknown';
+  const r = got.body;
+  const feedName = 'releases.' + channel + '.json';
+  const ok = r.tag_name === tag && !r.draft && Array.isArray(r.assets) &&
+    r.assets.some((a) => a && a.name === feedName && a.state === 'uploaded');
+  nativeSeen[key] = ok ? { ok: true } : { at: Date.now() };
+  if (ok) console.log('[thornswood-docs] launcher ' + said + ' is published on ' + channel + ' (' + tag + ')');
+  return ok ? 'yes' : 'no';
+}
 /* ---- end release copies ---- */
 function creditsFacts() {
   const feeds = {};
@@ -9187,11 +9244,13 @@ async function handle(req, res) {
     (the hand written admin list aside, as at /api/play/join). A refusal here
     means that session is ended by the game server, which is the point.
 
-    THE VERSION IS THE LAUNCHER'S OWN WORD, checked against the channel's feed
-    both ways: below minLauncher is an old launcher and is told to update, and
-    above launcherVersion is a number Thornswood never published. So an old
-    launcher cannot get in, and neither can a request that simply claims to be a
-    new one. A person who writes their own request with their own ticket gets a
+    THE VERSION IS THE LAUNCHER'S OWN WORD, checked against what the channel
+    published: a Velopack number only when its Release is out on GitHub with
+    the channel's Velopack feed on it (nativePublished, #4825), and a launcher
+    from before Velopack only while the channel has no Velopack setup program
+    out, inside the update feed's minLauncher to launcherVersion as before.
+    So an old launcher cannot get in, and neither can a request that simply
+    claims to be a new one. A person who writes their own request with their own ticket gets a
     pass only for their own characters, which is all the game server lets it
     prove.
 
@@ -9213,20 +9272,34 @@ async function handle(req, res) {
     if (!cfg.passKey) return sendJson(res, 503, { ok: false, why: 'no key', message:
       'Thornswood cannot let anybody into the game right now. Tell Patrick.' });
 
-    const feed = feedLaunchers(server);
-    if (!feed) return sendJson(res, 503, { ok: false, why: 'feed', message:
-      'Thornswood could not read its own update feed just now. Try again in a minute.' });
     const said = String(o.version == null ? '' : o.version).trim().slice(0, 40);
     const have = versionParts(said);
-    if (!have || versionCompare(have, versionParts(feed.min)) < 0) {
-      return sendJson(res, 403, { ok: false, why: 'update', need: feed.min, message:
-        'This launcher is ' + (said || 'too old to say') + ' and Thornswood needs ' + feed.min +
-        ' or newer. Update the launcher, then press Play again.' });
-    }
-    if (versionCompare(have, versionParts(feed.current)) > 0) {
-      return sendJson(res, 403, { ok: false, why: 'unknown launcher', need: feed.current, message:
+    const setup = newestSetup(server);
+    if (nativeTag(server, said)) {
+      const out = await within(nativePublished(server, said), by - Date.now(), () => 'unknown');
+      if (out === 'unknown') return sendJson(res, 503, { ok: false, why: 'releases', message:
+        'Thornswood could not check this launcher with GitHub just now. Try again in a minute.' });
+      if (out !== 'yes') return sendJson(res, 403, { ok: false, why: 'unknown launcher', message:
         'This launcher says it is ' + said + ', which Thornswood never published. ' +
-        'Install the launcher from thornswood.net, then press Play again.' });
+        'Install the launcher from thornswood.net/downloads, then press Play again.' });
+    } else if (setup) {
+      return sendJson(res, 403, { ok: false, why: 'update', message:
+        'Thornswood has a new launcher, and this one (' + (said || 'too old to say') + ') cannot update itself to it. ' +
+        'Install it once from thornswood.net/downloads, then press Play again.' });
+    } else {
+      const feed = feedLaunchers(server);
+      if (!feed) return sendJson(res, 503, { ok: false, why: 'feed', message:
+        'Thornswood could not read its own update feed just now. Try again in a minute.' });
+      if (!have || versionCompare(have, versionParts(feed.min)) < 0) {
+        return sendJson(res, 403, { ok: false, why: 'update', need: feed.min, message:
+          'This launcher is ' + (said || 'too old to say') + ' and Thornswood needs ' + feed.min +
+          ' or newer. Update the launcher, then press Play again.' });
+      }
+      if (versionCompare(have, versionParts(feed.current)) > 0) {
+        return sendJson(res, 403, { ok: false, why: 'unknown launcher', need: feed.current, message:
+          'This launcher says it is ' + said + ', which Thornswood never published. ' +
+          'Install the launcher from thornswood.net, then press Play again.' });
+      }
     }
 
     const st = await within(standingCached(t.d), by - Date.now(), () => standingLate(t.d));
