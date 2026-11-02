@@ -171,7 +171,9 @@ $log = [Action[string]] { param($m) $script:said.Add([string]$m) }
 $site = Join-Path $T 'site'
 $fa = Join-Path $site 'feed\assets'; $da = Join-Path $site 'feed-dev\assets'
 New-Item -ItemType Directory -Force -Path $fa, $da | Out-Null
-Copy-Item -LiteralPath (Join-Path $repo 'site\server.js') -Destination (Join-Path $site 'server.js')
+# The site is server.js over its modules in site\lib since #5357.
+. (Join-Path $PSScriptRoot 'SiteFiles.ps1')
+Copy-SiteProgram -To $site -App (Join-Path $repo 'site')
 $sitePort = Free-Port
 # The game check knocks on port 1 (#1816). The system never hands that port
 # out for a listen on 0 and no harness listens on a fixed port

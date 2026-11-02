@@ -68,6 +68,7 @@ const http = require('http');
 const net = require('net');
 const os = require('os');
 const path = require('path');
+const siteFiles = require('./site-files');
 
 const ROOT = path.join(__dirname, '..');
 const GM = process.env.GM || path.join(ROOT, 'game', 'gamemode.js');
@@ -79,7 +80,7 @@ const MENU = path.join(ROOT, 'game', 'ui', 'thornswood-select.js');
 const CR = String.fromCharCode(13);
 const read = (f) => fs.readFileSync(f, 'utf8').split(CR).join('');
 const src = read(GM);
-const siteSrc = read(SITE);
+const siteSrc = siteFiles.source(SITE);
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -98,7 +99,7 @@ const KEY = crypto.randomBytes(24).toString('hex');
 const SECRET = crypto.randomBytes(32).toString('hex');
 const PASSKEY = crypto.randomBytes(32).toString('hex');
 const STAFF_D = '222222222', STAFF2_D = '555555555', BJORN_D = '333333333', CARA_D = '666666666', NOBODY_D = '444444444';
-fs.copyFileSync(SITE, path.join(dir, 'server.js'));
+siteFiles.copy(dir, SITE);
 fs.mkdirSync(path.join(dir, 'data'), { recursive: true });
 fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({
   password: crypto.randomBytes(12).toString('hex'),
@@ -349,7 +350,7 @@ async function adminRoleOnly() {
   const ids = { owner: '710000001', mod: '720000002', tova: '730000003', mira: '740000004' };
   const key2 = crypto.randomBytes(24).toString('hex');
   const secret2 = crypto.randomBytes(32).toString('hex');
-  fs.copyFileSync(SITE, path.join(d2, 'server.js'));
+  siteFiles.copy(d2, SITE);
   fs.mkdirSync(path.join(d2, 'data'), { recursive: true });
   fs.writeFileSync(path.join(d2, 'config.json'), JSON.stringify({
     password: crypto.randomBytes(12).toString('hex'),

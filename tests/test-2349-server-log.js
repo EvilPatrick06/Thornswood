@@ -34,6 +34,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const cp = require('child_process');
+const siteFiles = require('./site-files');
 
 const REPO = path.resolve(__dirname, '..');
 const WRITER = path.join(REPO, 'scripts', 'vps', 'Server-Log.js');
@@ -176,7 +177,7 @@ function runPart() {
 
     // ---- the site reads across the dated files -------------------------------
     process.env.THORNSWOOD_HARNESS = '1';
-    const site = rd(path.join(REPO, 'site', 'server.js')) || '';
+    const site = siteFiles.source() || '';
     const at = site.indexOf('function serverLogSlice(');
     yes('the site still reads the server log for a session (serverLogSlice)', at >= 0);
     yes('  and lists the rolled files rather than counting .1 to .5', site.indexOf('const keep = 5;') < 0 && /serverLogGenerations/.test(site));

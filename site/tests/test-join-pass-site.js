@@ -23,9 +23,10 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
+const siteFiles = require('../../tests/site-files');
 const CR = String.fromCharCode(13);
 const SRC = path.join(__dirname, '..', '..', 'site', 'server.js');
-const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
+const src = siteFiles.source(SRC).split(CR).join('');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {

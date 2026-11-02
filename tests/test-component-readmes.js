@@ -54,6 +54,7 @@ const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in test
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const siteFiles = require('./site-files');
 
 const ROOT = REPO_DIR;
 const CR = String.fromCharCode(13);
@@ -193,8 +194,12 @@ SIX.forEach(function (d) {
       paths.length + ' named)' + (noPath.length ? ', missing ' + noPath.join(', ') : ''),
       noPath.length === 0);
 
-  const code = files(at(d)).filter(function (f) { return /\.(js|cs|html)$/.test(f); })
-    .map(function (f) { return read(at(d) + '/' + f) || ''; }).join('\n');
+  // The code beside it, and in its lib folder when it has one (the site's
+  // modules since #5357).
+  const code = files(at(d)).map(function (f) { return at(d) + '/' + f; })
+    .concat(files(at(d) + '/lib').map(function (f) { return at(d) + '/lib/' + f; }))
+    .filter(function (f) { return /\.(js|cs|html)$/.test(f); })
+    .map(function (f) { return read(f) || ''; }).join('\n');
   const settings = uniq(t.match(/THORNSWOOD_[A-Z_]+/g) || []);
   const unread = settings.filter(function (s) { return code.indexOf(s) < 0; });
   yes(name + ': every THORNSWOOD_ setting it names is read by the code beside it (' +
@@ -214,7 +219,7 @@ SIX.forEach(function (d) {
 // ------------------------------------------------------------------ the site --
 {
   const t = readme['docs-app'] || '';
-  const server = read('site/server.js') || '';
+  const server = siteFiles.source() || '';
   const deploy = read('scripts/deploy/Deploy-Docs.ps1') || '';
   const port = (/THORNSWOOD_DOCS_PORT \|\| (\d+)/.exec(server) || [])[1];
   yes('site: server.js has a default port to hold the README to', !!port);
@@ -382,15 +387,16 @@ SIX.forEach(function (d) {
     return /Get-ChildItem\s+(\(Join-Path \$App\b|(-LiteralPath\s+)?\$App\b)/.test(l);
   });
   // Since #446 and #459 the site goes up as one artifact, and server.js is in
-  // it by name beside public and data, not by a copy of the folder it sits in.
+  // it by name beside its modules in lib (#5357), public and data, not by a
+  // copy of the folder it sits in.
   const art = /New-ThornswoodArtifact -Component site [^\n]*-Paths ([^\n]+)/.exec(dd);
   const artPaths = art ? (art[1].match(/'[^']+'/g) || []).map(function (q) { return q.slice(1, -1); }) : [];
-  yes('Deploy-Docs.ps1 lists public, data and data/site, never the folder the README sits in',
+  yes('Deploy-Docs.ps1 lists lib, public, data and data/site, never the folder the README sits in',
       lists.length > 0 && lists.every(function (l) {
-        return /Get-ChildItem \(Join-Path \$App '(public|data|data\/site)'\)/.test(l);
+        return /Get-ChildItem \(Join-Path \$App '(lib|public|data|data\/site)'\)/.test(l);
       }) &&
       artPaths.length > 0 && artPaths.indexOf('site/server.js') >= 0 &&
-      artPaths.every(function (q) { return /^site\/(server\.js|public|data)$/.test(q); }));
+      artPaths.every(function (q) { return /^site\/(server\.js|lib|public|data)$/.test(q); }));
 
   const iv = read('scripts/deploy/Install-Voice.ps1') || '';
   const sent = (/foreach \(\$f in ('[^)]*')\)/.exec(iv) || [])[1];

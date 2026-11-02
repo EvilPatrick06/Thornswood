@@ -107,7 +107,7 @@ is not signed, and give the dated name it was published under.
    in lower case: Publish-Installer measures the exe
    (`scripts\release\Publish-Installer.ps1:$exeSha`) and writes the hash into
    the site's `files.json`, and the Downloads page shows it, lower cased by the
-   site, beside the size (`site\server.js` `listFiles`, `site\public\home.js` `sum`).
+   site, beside the size (`site\lib\downloads.js` `listFiles`, `site\public\home.js` `sum`).
    Open `https://www.virustotal.com/gui/file/<sha256>`, read which engines
    flagged it, and leave a community comment with the three facts above.
    `scripts\release\Add-VirusTotalComment.ps1` posts that comment through the

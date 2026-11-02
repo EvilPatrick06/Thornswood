@@ -305,7 +305,7 @@ node --version
 node tests\test-site-local.js
 ```
 
-A passing run ends without an error. Use the file in `tests\` whose name matches the area you touched. Voice is `voice\voice-server.js`, also Node. The site program is `site\server.js`.
+A passing run ends without an error. Use the file in `tests\` whose name matches the area you touched. Voice is `voice\voice-server.js`, also Node. The site program is `site\server.js` over its modules in `site\lib`.
 
 ### Learn more about Node
 
@@ -422,7 +422,7 @@ Thornswood
 | --- | --- | --- |
 | `launcher` | The launcher window and the C# that runs it | [launcher/ui.xaml](../../launcher/ui.xaml), then [launcher/app/ARCHITECTURE.md](../../launcher/app/ARCHITECTURE.md) |
 | `game` | What the server and the Skyrim client run for Thornswood | [game/gamemode.js](../../game/gamemode.js) |
-| `site` | The website program and the public pages | [site/server.js](../../site/server.js), then `site\data\site` |
+| `site` | The website program and the public pages | [site/server.js](../../site/server.js) and the modules in `site\lib`, then `site\data\site` |
 | `bot` | The Discord bot | [bot/README.md](../../bot/README.md) |
 | `voice` | The proximity voice service | [voice/voice-server.js](../../voice/voice-server.js) |
 | `scripts` | Commands you run from the repository folder | [scripts/README.md](../../scripts/README.md) |
@@ -449,7 +449,7 @@ Click a name to open the file. The line under it says what the file is for.
 | [game/plugins/README.md](../../game/plugins/README.md) | The scripts that run inside Skyrim. The plugin files sit beside that README |
 | [launcher/ui.xaml](../../launcher/ui.xaml) | The launcher window: buttons, pages, and labels |
 | [launcher/app/ARCHITECTURE.md](../../launcher/app/ARCHITECTURE.md) | How the launcher starts, which class owns which job, and the path from Play to the game |
-| [site/server.js](../../site/server.js) | The website program |
+| [site/server.js](../../site/server.js) | The website program: it starts the site, and `site\lib` holds one module per area |
 | [site/data/site](../../site/data/site) | The public pages, one markdown file each |
 | [bot/README.md](../../bot/README.md) | How the Discord bot is laid out and how to change it |
 | [voice/voice-server.js](../../voice/voice-server.js) | The proximity voice service |
@@ -527,7 +527,7 @@ CSS is the look of a page: colour, type, and spacing. A rule names a part of the
 | --- | --- |
 | [site/public/home.css](../../site/public/home.css) | The public page |
 | [site/public/hub.css](../../site/public/hub.css) | The staff hub |
-| [site/public/door.css](../../site/public/door.css) | The door page. `site\server.js` is what links it |
+| [site/public/door.css](../../site/public/door.css) | The door page. `site\lib\passes.js` is what links it |
 | [site/public/fonts.css](../../site/public/fonts.css) | Spectral and Cinzel. The font files sit beside it |
 
 Open `home.css`. The `:root` block at the top names the colours and the fonts the rest of the file uses. `--night` is the ground. `--gold` is the warm colour. A change here shows on https://thornswood.net after the deploy in [F. Website](#f-website).

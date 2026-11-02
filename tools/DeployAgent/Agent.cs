@@ -49,7 +49,9 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
     public const string LoadOrderLine = "Deploy-DevGamemode -LoadOrder -FromRecord -ShipFollows";
     static readonly Regex ReviewRow = new(@"^REVIEW  (\S+) (.+?): expected (.*?), found (.*)$");
     static readonly Regex MainAt = new(@"^main at ([0-9a-f]{40})$");
-    string StatePath => Path.Combine(cfg.Home, "state", "working.json");
+    /// <summary>The record of the Deployment an environment is part way
+    /// through, one per environment because each has its own loop (Run).</summary>
+    string StatePath(string env) => Path.Combine(cfg.Home, "state", $"working-{env}.json");
     static readonly Regex BuildTag = new(@"^build-[A-Za-z0-9._-]{1,80}$");
     static readonly Regex AgentTag = new(@"^agent-v(\d+)\.(\d+)\.(\d+)$");
 
@@ -247,57 +249,111 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
 
     sealed record Working(string Deployment, string Env, string Started);
 
-    /// <summary>Once as the service starts. A Deployment it was part way
-    /// through when it last stopped gets an error status naming that, and a
-    /// program an update left behind is removed.</summary>
+    /// <summary>Once as the service starts. Each Deployment it was part way
+    /// through when it last stopped (one an environment, and the one record
+    /// agents before the per-environment loops kept, working.json) gets an
+    /// error status naming that, and a program an update left behind is
+    /// removed.</summary>
     public async Task Start(CancellationToken ct)
     {
         if (exe != "" && File.Exists(exe + ".old"))
         {
             try { File.Delete(exe + ".old"); log("removed the agent an update replaced"); } catch (IOException) { }
         }
-        if (!File.Exists(StatePath)) return;
-        try
+        var state = Path.Combine(cfg.Home, "state");
+        if (!Directory.Exists(state)) return;
+        foreach (var path in Directory.GetFiles(state, "working*.json").OrderBy(p => p, StringComparer.Ordinal))
         {
-            var w = JsonSerializer.Deserialize<Working>(File.ReadAllText(StatePath));
-            if (w != null && long.TryParse(w.Deployment, out var id))
+            try
             {
-                await gh.SetStatus(id, "error", $"the deploy agent stopped part way through this (started {w.Started}); its log on the box says how far it got", "", ct);
-                log($"deployment {id} was cut short when the agent last stopped; marked error");
+                var w = JsonSerializer.Deserialize<Working>(File.ReadAllText(path));
+                if (w != null && long.TryParse(w.Deployment, out var id))
+                {
+                    await gh.SetStatus(id, "error", $"the deploy agent stopped part way through this (started {w.Started}); its log on the box says how far it got", "", ct);
+                    log($"deployment {id} was cut short when the agent last stopped; marked error");
+                }
             }
+            catch (Exception e) when (e is JsonException or GitHubException or HttpRequestException or InvalidOperationException)
+            {
+                log("a deployment was cut short and its status could not be set: " + e.Message);
+                continue;
+            }
+            File.Delete(path);
         }
-        catch (Exception e) when (e is JsonException or GitHubException or HttpRequestException or InvalidOperationException)
-        {
-            log("a deployment was cut short and its status could not be set: " + e.Message);
-            return;
-        }
-        File.Delete(StatePath);
     }
 
-    /// <summary>The service's loop. A pass that fails is said in the log (once
-    /// for each new reason) and the next pass looks again from GitHub's record,
-    /// which is the desired state: nothing is tried again from memory.</summary>
+    /// <summary>The service's loops: one for each environment, so a site or
+    /// bot change goes in while dev is still in a bot pass (up to
+    /// botPassSeconds) instead of waiting behind it (#5190: on build-20261102.2
+    /// the Site and Discord bot Deployments sat with no status while Dev ran).
+    /// Each loop applies one Deployment of its environment at a time. A pass
+    /// that fails is said in the log (once for each new reason) and the next
+    /// pass looks again from GitHub's record, which is the desired state:
+    /// nothing is tried again from memory. The update check takes every
+    /// environment's turn first, so a restart never cuts an apply short.</summary>
     public async Task Run(CancellationToken ct)
     {
         await Start(ct);
-        var nextUpdate = DateTime.MinValue;
-        var lastSaid = new Dictionary<string, string>();
-        void Once(string key, string s) { if (!lastSaid.TryGetValue(key, out var was) || was != s) { lastSaid[key] = s; log(s); } }
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var envs = cfg.Environments.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList();
+        var turns = envs.ToDictionary(e => e, _ => new SemaphoreSlim(1, 1));
+        var loops = envs.Select(e => Loop(e, turns[e], stop.Token)).Append(UpdateLoop(turns.Values.ToList(), stop.Token)).ToList();
+        try
+        {
+            // The first to end is the update loop with a newer agent in place
+            // (RestartException), or all of them when the service stops.
+            var first = await Task.WhenAny(loops);
+            stop.Cancel();
+            await first;
+        }
+        finally
+        {
+            stop.Cancel();
+            // Every loop has ended before Run does; what ended the first is
+            // what Run says, above.
+            await Task.WhenAll(loops.Select(l => l.ContinueWith(_ => { }, TaskScheduler.Default)));
+        }
+    }
+
+    async Task Loop(string env, SemaphoreSlim turn, CancellationToken ct)
+    {
+        string said = "";
         while (!ct.IsCancellationRequested)
         {
-            foreach (var env in cfg.Environments.Keys.OrderBy(k => k, StringComparer.Ordinal))
+            try { await turn.WaitAsync(ct); } catch (OperationCanceledException) { return; }
+            try { await Pass(env, ct); said = ""; }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
+            catch (Exception e) when (e is not OperationCanceledException)
             {
-                try { await Pass(env, ct); lastSaid.Remove(env); }
-                catch (Exception e) when (e is not OperationCanceledException) { Once(env, $"{env}: {e.Message}"); }
+                var s = $"{env}: {e.Message}";
+                if (s != said) { said = s; log(s); }
             }
-            if (DateTime.UtcNow > nextUpdate)
-            {
-                nextUpdate = DateTime.UtcNow.AddMinutes(cfg.UpdateMinutes);
-                try { await SelfUpdate(ct); lastSaid.Remove("update"); }
-                catch (RestartException) { throw; }
-                catch (Exception e) when (e is not OperationCanceledException) { Once("update", "update check: " + e.Message); }
-            }
+            finally { turn.Release(); }
             try { await Task.Delay(TimeSpan.FromSeconds(cfg.PollSeconds), ct); } catch (OperationCanceledException) { return; }
+        }
+    }
+
+    async Task UpdateLoop(List<SemaphoreSlim> turns, CancellationToken ct)
+    {
+        string said = "";
+        while (!ct.IsCancellationRequested)
+        {
+            var held = new List<SemaphoreSlim>();
+            try
+            {
+                foreach (var t in turns) { await t.WaitAsync(ct); held.Add(t); }
+                await SelfUpdate(ct);
+                said = "";
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
+            catch (RestartException) { throw; }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                var s = "update check: " + e.Message;
+                if (s != said) { said = s; log(s); }
+            }
+            finally { foreach (var t in held) t.Release(); }
+            try { await Task.Delay(TimeSpan.FromMinutes(cfg.UpdateMinutes), ct); } catch (OperationCanceledException) { return; }
         }
     }
 
@@ -352,7 +408,7 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
     {
         var lines = new List<string>();
         void Logf(string s) { lines.Add($"{DateTime.Now:h:mm:ss tt}  {s}"); log($"{env} deployment {d.Id}: {s}"); }
-        Files.WriteWhole(StatePath, JsonSerializer.SerializeToUtf8Bytes(new Working(d.Id.ToString(), env, Records.UtcNow())));
+        Files.WriteWhole(StatePath(env), JsonSerializer.SerializeToUtf8Bytes(new Working(d.Id.ToString(), env, Records.UtcNow())));
         try
         {
             await gh.SetStatus(d.Id, "in_progress", "the deploy agent on the box is applying this", "", ct);
@@ -392,7 +448,7 @@ public sealed class Agent(Config cfg, GitHub gh, IVerifier verify, Dictionary<st
                 PublishLog(env, d.Id.ToString(), lines);
             }
         }
-        finally { File.Delete(StatePath); }
+        finally { File.Delete(StatePath(env)); }
     }
 
     // ---- after a dev Deployment ------------------------------------------------

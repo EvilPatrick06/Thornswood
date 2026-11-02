@@ -168,6 +168,7 @@ function Grab(`$from, `$asName) {
 }
 
 Grab 'C:\Thornswood-Docs\data' 'site\data'
+Grab 'C:\Thornswood-Docs\lib' 'site\lib'
 foreach (`$f in @('server.js','package.json','package-lock.json','config.json')) {
   if (Test-Path ('C:\Thornswood-Docs\' + `$f)) { Grab ('C:\Thornswood-Docs\' + `$f) ('site\' + `$f) }
 }

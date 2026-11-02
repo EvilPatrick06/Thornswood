@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  80,
-    "callCount":  326,
+    "callCount":  327,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -262,7 +262,7 @@
                       "script":  "scripts/deploy/Deploy-Docs.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "foreach (`$d in @(\u0027$rootWin\u0027,\u0027$rootWin\\public\u0027,\u0027$rootWin\\data\u0027,\u0027$rootWin\\files\u0027,\u0027$rootWin\\uploads\u0027)) {",
+                      "anchor":  "foreach (`$d in @(\u0027$rootWin\u0027,\u0027$rootWin\\lib\u0027,\u0027$rootWin\\public\u0027,\u0027$rootWin\\data\u0027,\u0027$rootWin\\files\u0027,\u0027$rootWin\\uploads\u0027)) {",
                       "does":  "makes the site folders",
                       "class":  "stage",
                       "reason":  "folder create under the site root"
@@ -272,6 +272,15 @@
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
                       "anchor":  "$hashedServer = Remote @\"",
+                      "does":  "reads files, settings, logs or status",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/deploy/Deploy-Docs.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$hashedLib = Remote @\"",
                       "does":  "reads files, settings, logs or status",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"

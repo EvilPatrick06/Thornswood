@@ -34,6 +34,8 @@ $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
 if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $repo = Split-Path -Parent (Split-Path -Parent $here)
+# The site is server.js over its modules in site\lib since #5357.
+. (Join-Path $PSScriptRoot '..\..\tests\SiteFiles.ps1')
 $script:pass = 0
 $script:fail = 0
 function Yes([string]$what, [bool]$cond) {
@@ -187,7 +189,7 @@ $cache   = Join-Path $work 'cache'
 New-Item -ItemType Directory -Force -Path $siteDir, $ghDir, $cache | Out-Null
 $procs = @()
 try {
-    Copy-Item -LiteralPath $serverJs -Destination (Join-Path $siteDir 'server.js')
+    Copy-SiteProgram -To $siteDir -App (Join-Path $repo 'site')
     $secret = ShaOf ([Text.Encoding]::UTF8.GetBytes([Guid]::NewGuid().ToString()))
     $sitePort = Free-Port
     # The game check knocks on port 1 (#1816). The system never hands that port

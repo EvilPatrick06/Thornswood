@@ -278,7 +278,9 @@ function Run {
     # FeedSettings.cs check below would throw once the launcher reached the split.
     $updaterText = [IO.File]::ReadAllText((Join-Path $Src 'Updater.cs'))
     $ver = [regex]::Match($updaterText, 'public const string Version = "([^"]+)"').Groups[1].Value
-    $site = [IO.File]::ReadAllText((Join-Path $Here 'site\server.js'))
+    # The site is server.js over its modules in site\lib since #5357.
+    . (Join-Path $Here 'tests\SiteFiles.ps1')
+    $site = Get-SiteSource (Join-Path $Here 'site')
     $gate = [regex]::Match($site, "const FEED_SPLIT_LAUNCHER = '([^']+)'").Groups[1].Value
     . (Join-Path $Here 'scripts\release\Release-Baseline.ps1')
     $cmp = Compare-FeedVersion $ver $gate

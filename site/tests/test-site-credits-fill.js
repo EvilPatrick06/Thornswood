@@ -24,10 +24,11 @@ const path = require('path');
 const net = require('net');
 const http = require('http');
 const { spawn } = require('child_process');
+const siteFiles = require('../../tests/site-files');
 
 const REPO = path.join(__dirname, '..', '..');
 const APP = path.join(REPO, 'site');
-const SRC = fs.readFileSync(path.join(APP, 'server.js'), 'utf8');
+const SRC = siteFiles.source();
 const CREDITS = fs.readFileSync(path.join(APP, 'data', 'site', 'credits.md'), 'utf8');
 
 let pass = 0, fail = 0;
@@ -126,7 +127,7 @@ function wait(ms) { return new Promise(function (ok) { setTimeout(ok, ms); }); }
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-credits-fill-'));
   let child = null;
   try {
-    fs.writeFileSync(path.join(dir, 'server.js'), SRC);
+    siteFiles.copy(dir);
     fs.mkdirSync(path.join(dir, 'public'));
     fs.copyFileSync(path.join(APP, 'public', 'home.html'), path.join(dir, 'public', 'home.html'));
     const marked = fs.readdirSync(path.join(APP, 'public')).filter(function (n) { return /^marked-.*\.js$/.test(n); });
