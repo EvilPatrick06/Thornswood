@@ -15,25 +15,13 @@
       "rulesets": [
         {
           "name": "release tags",
-          "why": "Patrick's A on q-3721-release-tags, 26 Oct 2026: a v* tag names what a release was built from, so only the admin role may move or delete one. GitHub refused the answer as first written, with GitHub Actions (15368) as a second bypass, with 422 Validation Failed on 31 Oct 2026: a personal repository's ruleset can only be bypassed by its roles, deploy keys and installed apps. So making a v* tag stays open to anyone who can push, which release-tag.yml needs, since it makes the tag with the run's own token and never moves or deletes one.",
+          "why": "Patrick's A on q-3721-release-tags, 26 Oct 2026: a v* tag names what a release was built from, so only the admin role may move or delete one. Making a v* tag stays open to anyone who can push (Patrick's A on q-5296-release-tags, 1 Nov 2026: leave it open, nothing by hand). GitHub refuses GitHub Actions (15368), the identity of the run's own token, as a bypass actor: 422 Validation Failed on 31 Oct 2026 while the repository was personal and again on 1 Nov 2026 in the organization, so a creation lock would stop release-tag.yml, which makes the tag with that token and never moves or deletes one. A v* tag pushed by hand builds nothing itself: release.yml hands it to main's own workflow, which builds only a commit on main, the run anyone who can push may start by hand anyway.",
           "target": "tag",
           "enforcement": "active",
           "conditions": { "ref_name": { "include": ["refs/tags/v*"], "exclude": [] } },
           "rules": [{ "type": "update" }, { "type": "deletion" }],
           "bypass_actors": [
             { "actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always" }
-          ]
-        },
-        {
-          "name": "release tags made by the release workflow",
-          "why": "Patrick's A on q-3721-release-tags (26 Oct 2026) asked for this from the start: a v* tag is made only by release-tag.yml, with the run's own token, which GitHub names the App GitHub Actions (15368). GitHub refused that with 422 on 31 Oct 2026 while the repository was a personal one, so making a v* tag was left open (q-3683-lock-tag-creation, A). Since the move to ThornswoodRP on 1 Nov 2026 an organization's ruleset may name an App, and an App may bypass only a tag ruleset (the redesign's part 20). Every Ship makes its launcher tag through release-tag.yml, from the cloud and on the box (ship-access.js), so a v* tag pushed by a person or a Bot is refused; a pushed v* tag would otherwise start release.yml from that tag's own commit. Kept apart from release tags so the release workflow may make a v* tag and never move or delete one.",
-          "target": "tag",
-          "enforcement": "active",
-          "conditions": { "ref_name": { "include": ["refs/tags/v*"], "exclude": [] } },
-          "rules": [{ "type": "creation" }],
-          "bypass_actors": [
-            { "actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always" },
-            { "actor_id": 15368, "actor_type": "Integration", "bypass_mode": "always" }
           ]
         },
         {
