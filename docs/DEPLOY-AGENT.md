@@ -312,6 +312,12 @@ install has set it up (the task `Thornswood Docs`, the service
 Deployment logs go in the dev server's data folder beside dev's. The gate's
 `Deploy-Release -Environment site` or `discord` rolls either back by tag.
 
+Once `agent.json` names the site, `Deploy-Docs.ps1` sends neither the app
+nor the public pages and refuses `-Site`: two senders of the same files
+would each put back what the other put in. It still sends the documents,
+the boards and the password, sets up the task, and sends the app on a new
+box before the agent has the site.
+
 ## Release news
 
 Once a Deployment's success is on GitHub, the agent reads its Release again

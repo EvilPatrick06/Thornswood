@@ -23,7 +23,7 @@ import re
 # questions take what you need and what happens to your own Skyrim out of its
 # "What you need" section. Change the page and the next Setup-Discord.ps1
 # -Posts says the same thing. join.md rather than help.md because the site's
-# pages go out from the repo with Deploy-Docs.ps1 -Site, while help.md is
+# pages go out from the repo with each merge's Release, while help.md is
 # edited in the hub and a redeploy never overwrites it, so the repo copy of
 # help.md is not always the one people read.
 #

@@ -47,6 +47,18 @@
                                A task put on SYSTEM with -RunAs SYSTEM goes
                                back to LOCAL SERVICE at the next plain deploy.
 
+  ONCE THE DEPLOY AGENT HAS THE SITE (#5190), the app (server.js and
+  public) and the public pages (data\site) come only from each merge's
+  Release: merge-release.yml zips them (App-Part.ps1) and the box deploy
+  agent swaps them in when they changed (docs\DEPLOY-AGENT.md). This asks
+  the box whether the agent's agent.json names the site. When it does, a
+  plain run sends no app and no public pages, -Site is refused before
+  anything is sent, and the documents, the boards, -Password, -RunAs, the
+  task and the firewall go on as below. Two senders of the same files would
+  each put back what the other put in. -PutBack still puts back the newest
+  .prev folder, which the agent's swap leaves the same way. Before the agent
+  names it (a new box), this sends the app as it always did.
+
   THE APP IS STAGED, CHECKED, THEN SWAPPED (issue #446). server.js and the
   public files that changed go into $Root\.stage-<stamp> while the site runs,
   the box checks them there (each file by its hash, server.js through
@@ -124,6 +136,10 @@ param(
   [int]$Wait = 30,
   # Put the app the last deploy replaced back in, and send nothing.
   [switch]$PutBack,
+  # The box deploy agent's settings. Once they name the site (#5190), each
+  # merge's Release puts the app and the public pages in, and this sends
+  # neither. A harness points it at a planted copy.
+  [string]$AgentConfig = 'C:\Thornswood-Agent\agent.json',
     # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
     [switch]$AllowStaleCheckout
 )
@@ -208,6 +224,32 @@ if ($Board) {
   }
 }
 
+# Whether the box deploy agent has the site (header, ONCE THE DEPLOY AGENT
+# HAS THE SITE). A settings file that is there and does not read stops this:
+# guessing either way would send the app over the agent's or leave it out.
+$agentSite = $false
+if (-not $PutBack) {
+  $agentPath = $AgentConfig.Replace("'", "''")
+  $agentSaid = @(Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script @"
+`$p = '$agentPath'
+if (-not (Test-Path -LiteralPath `$p -PathType Leaf)) { 'AGENT SITE: no' }
+else {
+  try {
+    `$c = [IO.File]::ReadAllText(`$p) | ConvertFrom-Json
+    if (`$c.environments -and `$c.environments.PSObject.Properties['site']) { 'AGENT SITE: yes' } else { 'AGENT SITE: no' }
+  } catch { 'AGENT SITE: unreadable, ' + `$_.Exception.Message }
+}
+"@ | Where-Object { $_ -is [string] } | ForEach-Object { $_.Trim() } | Where-Object { $_ -like 'AGENT SITE:*' })
+  if ($agentSaid.Count -ne 1 -or $agentSaid[0] -notin 'AGENT SITE: yes', 'AGENT SITE: no') {
+    throw ("the box did not say whether the deploy agent has the site (" + $AgentConfig + "): " + $(if ($agentSaid.Count) { $agentSaid -join '; ' } else { 'no answer' }) + '. Nothing was sent.')
+  }
+  $agentSite = ($agentSaid[0] -eq 'AGENT SITE: yes')
+  if ($agentSite -and $Site) {
+    throw '-Site sends the public pages, and the deploy agent puts them in from each merge''s Release now (#5190). A page that changed goes out with its merge; an older one goes back with: pwsh scripts/vps/Box-Run.ps1 -Line ''Deploy-Release -Environment site -Tag <tag>''. Nothing was sent.'
+  }
+  if ($agentSite) { Write-Host 'The deploy agent has the site: the app and the public pages come from each merge''s Release, and this sends neither.' }
+}
+
 # What goes up is the site artifact (issue #459, Artifact.ps1): server.js,
 # public and data as the commit holds them, in one zip named by commit and
 # hash. Everything below sends from its folder, not from the working tree, and
@@ -265,7 +307,8 @@ $hashes    = [ordered]@{}
 $appUnchanged = $false
 $gonePublic = @()
 
-if (-not $PutBack) {
+if ($agentSite) { $appUnchanged = $true }
+if (-not $PutBack -and -not $agentSite) {
 Write-Host 'Making room...'
 # A stage a run that died part way left is cleared first; it was never
 # swapped in.
@@ -368,6 +411,8 @@ if ($checkOut -notcontains 'STAGE OK') {
 
 # The public pages are markdown like everything else, so they can be edited
 # from the site rather than redeployed. Same rule: only the missing ones go.
+# Once the agent has the site, every Release carries them and this sends none.
+if (-not $agentSite) {
 Remote "if (-not (Test-Path '$rootWin\data\site')) { New-Item -ItemType Directory -Path '$rootWin\data\site' -Force | Out-Null }" | Out-Null
 $siteThere = @((Remote "Get-ChildItem '$rootWin\data\site' -File -EA SilentlyContinue | ForEach-Object Name") |
                Where-Object { $_ -is [string] } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
@@ -376,6 +421,7 @@ Get-ChildItem (Join-Path $App 'data/site') -Filter *.md -EA SilentlyContinue | F
     Push $_.FullName "$Root/data/site/$($_.Name)"
     Write-Host "  sent site/$($_.Name)"
   }
+}
 }
 
 # Documents are only sent on the first install, or when asked for outright.
