@@ -370,10 +370,11 @@ saved fields that come from elsewhere, as their rows say.
 
 There is no `size` or `files` field on a pack. The files a pack wrote are
 recorded on each machine in `Profile\Packs\<id>.files`, not in the feed
-(`Updater.cs:PackListFile`). `NewsItem.files` exists and the News tab
-shows it (`Config.cs:files`, `ShellNews.cs:n.files != null && n.files.Length > 0`), but no publisher fills it any
-more: `Publish-Update.ps1:$entry` has no `files`, and `Publish-Server.ps1:$entry`
-writes it empty.
+(`Updater.cs:PackListFile`). A news entry's `files` was shown on the News tab
+of the launchers before #5187; the launcher now reads its news from the build
+Releases' notes (`ReleaseNews.cs:ReadReleaseNews`) and no feed news at all, and
+no publisher fills it any more: `Publish-Update.ps1:$entry` has no `files`, and
+`Publish-Server.ps1:$entry` writes it empty.
 
 A pack is a zip with a `game/` tree (into the game folder), a `profile/` tree
 (into `Profile\Default`, and a carried plugin list is put in place at once),
