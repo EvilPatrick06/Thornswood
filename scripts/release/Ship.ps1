@@ -752,6 +752,8 @@ function Get-LauncherInputHash([string]$repoDir) {
         foreach ($f in @(Get-ChildItem -LiteralPath $launcherDir -Recurse -File -Force -EA SilentlyContinue |
                          Where-Object { $_.Extension -ne '.md' })) {
             $rel = 'launcher/' + $f.FullName.Substring($launcherDir.Length).TrimStart('\', '/').Replace('\', '/')
+            # Its harnesses are no part of it, as LauncherVersion.ps1 leaves them out.
+            if ($rel.StartsWith('launcher/tests/')) { continue }
             # As a Windows checkout holds it, so the fingerprint is the same from
             # any machine (ShippedBytes.ps1, #2903).
             $lines.Add($rel + "`t" + (Get-ThornswoodShippedSha256 $f.FullName))
@@ -1891,7 +1893,7 @@ if ($GameDir -and -not (Get-Command node -ErrorAction SilentlyContinue)) {
     Unbump 'node is not on this machine'
     Die ('node is not on this machine, and Ship reads SkyUI''s menus in the game folder with it (scripts\mods\Check-SkyUIMenus.js), ' +
          'so a release never gives everybody the SkyUI error box on the way in. Install it with ' +
-         'winget install --id OpenJS.NodeJS.LTS -e (Developer-Guide.md, "Install the tools"), open a new window, and Ship again. ' +
+         'winget install --id OpenJS.NodeJS.LTS -e (docs/guide/set-up-a-machine.md, "Install the tools"), open a new window, and Ship again. ' +
          'Nothing was built or published.')
 }
 

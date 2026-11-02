@@ -394,6 +394,12 @@ function checkRulesets(repo, list) {
     // and never a branch one (the redesign's part 20, 1 Nov 2026): a branch
     // is changed only through a pull request with its checks, whoever pushes.
     for (const b of r.bypass_actors) {
+      // GitHub Actions, the identity of a run's own token, is refused as a
+      // bypass actor: 422 Validation Failed on 31 Oct 2026 in a personal
+      // repository and on 1 Nov 2026 in the organization (#5296).
+      if (b && b.actor_type === 'Integration' && b.actor_id === 15368) {
+        throw new Error(at + ': ' + name + ' lets GitHub Actions (15368) bypass it, which GitHub refuses (422); a run that must bypass a ruleset uses an App of its own');
+      }
       if (MACHINE_ACTORS.indexOf(b && b.actor_type) >= 0 && r.target !== 'tag') {
         throw new Error(at + ': ' + name + ' lets ' + (b.actor_type === 'Integration' ? 'the App ' + b.actor_id : 'a deploy key') + ' bypass a branch ruleset; an App or a deploy key may bypass only a tag ruleset');
       }
@@ -573,8 +579,15 @@ function send(method, url, headers, body) {
     req.end();
   });
 }
+// What GitHub answered, with its reasons. A 422 says only "Validation
+// Failed" in message; why is in errors, as strings (rulesets) or as
+// { resource, field, code, message } objects, and leaving them out hid why
+// the release tag ruleset was refused on 1 Nov 2026 (#5296).
 function said(a) {
-  return 'HTTP ' + a.status + (a.body && a.body.message ? ': ' + a.body.message : '');
+  const b = a.body || {};
+  const why = (Array.isArray(b.errors) ? b.errors : []).map(e =>
+    typeof e === 'string' ? e : (e && (e.message || [e.resource, e.field, e.code].filter(Boolean).join(' '))) || '').filter(Boolean);
+  return 'HTTP ' + a.status + (b.message ? ': ' + b.message : '') + (why.length ? ' (' + why.join('; ') + ')' : '');
 }
 
 function readApp() {
@@ -1334,5 +1347,5 @@ function serve() {
   return server;
 }
 
-module.exports = { driftBody, CHANGING_ASKS, DRIFT_TITLE, MACHINE_ACTORS, verifyOidc, appJwt, call, botToken, BOT_PERMISSIONS, planCollaborators, planLabels, planLeftovers, checkRecords, checkAbout, planAbout, runnerNumber, checkRulesets, checkSettings, planRulesets, rulesetBody, says, manifest, RULES, ASKS, REPO, RUNNERS_REPO, SETTINGS_REPOS, SCANNING_KEYS, MERGE_KEYS, SETTINGS_PERMISSIONS, SETTINGS_EXTRA, serve };
+module.exports = { said, driftBody, CHANGING_ASKS, DRIFT_TITLE, MACHINE_ACTORS, verifyOidc, appJwt, call, botToken, BOT_PERMISSIONS, planCollaborators, planLabels, planLeftovers, checkRecords, checkAbout, planAbout, runnerNumber, checkRulesets, checkSettings, planRulesets, rulesetBody, says, manifest, RULES, ASKS, REPO, RUNNERS_REPO, SETTINGS_REPOS, SCANNING_KEYS, MERGE_KEYS, SETTINGS_PERMISSIONS, SETTINGS_EXTRA, serve };
 if (require.main === module) serve();

@@ -24,7 +24,7 @@ namespace Thornswood
     /// Shared: Build-Launcher.ps1 compiles this file into the setup program as
     /// well, so it uses nothing else from launcher\app (no Swallow, no Paths).
     /// Callers wrap it in their own try and log the way their exe logs.
-    /// tests\test-app-manifest.ps1 runs Clamp at 100 to 200 percent.
+    /// launcher\tests\test-app-manifest.ps1 runs Clamp at 100 to 200 percent.
     /// </summary>
     static class WindowFit
     {

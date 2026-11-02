@@ -67,7 +67,7 @@ if ($Sign) {
     # PowerShell 7's Add-Type writes no exe, so the build's own compiler
     # (the Roslyn csc MSBuild runs, Find-MSBuild.ps1) makes it (#5356).
     $msb = & { . (Join-Path $PSScriptRoot 'Find-MSBuild.ps1') -Load; Find-ThornswoodMSBuild }
-    if (-not $msb.Csc) { Write-Host 'No C# compiler: the Build Tools are not on this machine (Developer-Guide.md, Setting up a machine).' -ForegroundColor Red; exit 1 }
+    if (-not $msb.Csc) { Write-Host 'No C# compiler: the Build Tools are not on this machine (docs/guide/set-up-a-machine.md, "Setting up a machine").' -ForegroundColor Red; exit 1 }
     $srcFile = Join-Path $Out 'pilot.cs'
     [IO.File]::WriteAllText($srcFile, $src)
     $said = @(& $msb.Csc /nologo /target:exe ('/out:' + $exe) $srcFile 2>&1 | ForEach-Object { "$_" })

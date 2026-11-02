@@ -16,12 +16,12 @@
   two scripts are copied into a temp folder beside a stand-in Close-Launcher.ps1
   that writes down what it was asked to close and closes nothing. The build
   compiles a two line program with the real csc, so it is quick; the real
-  launcher compile is tests\test-498-msbuild.ps1, which the build check runs.
+  launcher compile is launcher\tests\test-498-msbuild.ps1, which the build check runs.
 
   The callers, each shown:
     .github/workflows/nightly.yml its "Build the launcher" step's lines, run the way
                                   GitHub runs them (build.yml's copy went with #3114:
-                                  tests\test-498-msbuild.ps1 builds there)
+                                  launcher\tests\test-498-msbuild.ps1 builds there)
     Ship.ps1                      its build block lifted out and run against stand-ins
     Install-Thornswood.ps1        a copy run with -Only launcher, against the same stand-ins
 #>

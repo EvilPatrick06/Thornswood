@@ -72,7 +72,7 @@ try { fs.rmSync(CHAT_DIR, { recursive: true, force: true }); } catch (e) { }
 // Since #1131 the text a command writes comes from commandLogText (the pass
 // masked, a waiting menu's repeated /line left out); the press flag is passed
 // on exactly as before. Since #2723 commandLogText also reads it, to leave
-// the front plugin's own reports out (tests\test-2723-plugin-reports.js).
+// the front plugin's own reports out (voice\tests\test-2723-plugin-reports.js).
 yes('B5 the chat handler passes msg.press on only when it is exactly true',
     /const press = msg\.press === true;\s*const logged = commandLogText\(me, text, press\);\s*if \(logged\) chatWrite\('command', myId, me, logged, press \? 'press' : ''\);/.test(VOICE));
 const lbox = {};

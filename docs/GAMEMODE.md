@@ -156,7 +156,7 @@ check once when it comes online; it is on unless it is `false`.
 key in `private\door.json` (`gamemode.js:path.join(privDir, 'door.json')`) and refreshed on a timer
 (`gamemode.js:refresh`). It turns somebody away only when that file says
 `"enforce": true`; otherwise it writes WOULD TURN AWAY in `private\door.log`
-(`gamemode.js:WOULD TURN AWAY profile`). `scripts\ops\Set-Door.ps1` sets both. Developer-Guide.md,
+(`gamemode.js:WOULD TURN AWAY profile`). `scripts\ops\Set-Door.ps1` sets both. docs/guide/secrets.md,
 "Who gets into the game", says what it can and cannot keep out.
 
 Turning somebody away (`turnAway`, #1894) is the same as every other end on
