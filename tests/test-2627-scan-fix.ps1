@@ -250,7 +250,10 @@ namespace Thornswood
 
         static bool Clean(string said)
         {
-            return said != null && said.IndexOf('—') < 0 && said.IndexOf("player", StringComparison.OrdinalIgnoreCase) < 0;
+            // The word, as the writing check reads it: "multiplayer client" is
+            // the name of a part, not the word the house rules keep out.
+            return said != null && said.IndexOf('—') < 0 &&
+                !System.Text.RegularExpressions.Regex.IsMatch(said, @"\bplayers?\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         }
 
         static Issue Find(List<Issue> l, string kind, string has)

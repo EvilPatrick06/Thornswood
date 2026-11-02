@@ -298,22 +298,50 @@ function ice(port, method, body, viaCaddy) {
   });
 }
 /*
-  A relay that only listens: a UDP socket on loopback that counts the TURN
+  A relay that only listens: a UDP socket that counts the TURN
   Allocate requests it is sent (STUN method 3, class request, with the magic
   cookie), by the address they came from. Each connection the launcher's
   voice builds from a list with a relay in it asks the relay for an address
   of its own from a socket of its own, so the senders here are the
   connections that used the relay. It answers nothing: what is measured is
   that the list was used, not the relay.
+
+  It listens on the address the launcher's voice binds to, which is the one
+  the machine reaches the internet from and never loopback (VoiceIce.cs,
+  DefaultLocal, #911), found the same way. Windows sends nothing from a
+  socket bound there to 127.0.0.1, so a relay on loopback heard nothing on
+  Windows while Linux routed it.
 */
-function listeningRelay() {
+function usableAddress(a) {
+  return typeof a === 'string' && /^\d+\.\d+\.\d+\.\d+$/.test(a) && !/^(127\.|0\.|169\.254\.)/.test(a);
+}
+function defaultLocal() {
+  const firstUp = () => {
+    for (const list of Object.values(os.networkInterfaces())) {
+      for (const n of list || []) { if (n.family === 'IPv4' && !n.internal && usableAddress(n.address)) { return n.address; } }
+    }
+    return '127.0.0.1';
+  };
+  return new Promise((ok) => {
+    const s = dgram.createSocket('udp4');
+    s.on('error', () => { try { s.close(); } catch (e) { } ok(firstUp()); });
+    s.connect(53, '8.8.8.8', () => {
+      let a = '';
+      try { a = s.address().address; } catch (e) { a = ''; }
+      s.close();
+      ok(usableAddress(a) ? a : firstUp());
+    });
+  });
+}
+async function listeningRelay() {
+  const host = await defaultLocal();
   return new Promise((ok) => {
     const u = dgram.createSocket('udp4');
     const from = new Set();
     u.on('message', (b, rinfo) => {
       if (b.length >= 20 && b.readUInt16BE(0) === 0x0003 && b.readUInt32BE(4) === 0x2112A442) { from.add(rinfo.port); }
     });
-    u.bind(0, '127.0.0.1', () => ok({ url: 'turn:127.0.0.1:' + u.address().port, asked: () => from.size, close: () => u.close() }));
+    u.bind(0, host, () => ok({ url: 'turn:' + host + ':' + u.address().port, asked: () => from.size, close: () => u.close() }));
   });
 }
 

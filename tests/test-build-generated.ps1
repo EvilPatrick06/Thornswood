@@ -659,8 +659,9 @@ exit code $code"
     $buildCall = $shipText.IndexOf("'Build-Launcher.ps1') -Root")
     $installCall = $shipText.IndexOf("'Install-Launcher.ps1')")
     $publish = $shipText.IndexOf("Publish-Update.ps1", $at + 1)
-    Yes 'B: before the launcher is built or installed (#1692) and before anything is published' (
-        $buildCall -gt $at -and $installCall -gt $at -and ($publish -lt 0 -or $publish -gt $at))
+    # Ship builds and installs no launcher since #4825 (it ran before both, #1692).
+    Yes 'B: before anything is published, and Ship builds and installs no launcher' (
+        $buildCall -lt 0 -and $installCall -lt 0 -and ($publish -lt 0 -or $publish -gt $at))
     Yes 'B: and Ship no longer reads the record or the covered bodies itself' ($shipText -notmatch "Head 'Covered bodies'" -and $shipText -notmatch 'Get-GeneratedStaleSays')
 
     # ======================================================== C: in use
