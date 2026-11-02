@@ -1113,7 +1113,8 @@ public sealed class AgentTests : IDisposable
         var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-2\"}");
         await a.Pass("dev", default);
         var last = gh.Last(id)!;
-        Assert.Equal("failure", (string)last["state"]!);
+        // A state other than failure prints the deploy log (#5373).
+        HasStates(gh, s, id, "failure", last: true);
         Assert.Contains("previous gamemode is back", (string)last["description"]!);
         Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
         var log = s.Read(Path.Combine("data", $"deploy-{id}.log"));
@@ -1163,7 +1164,8 @@ public sealed class AgentTests : IDisposable
         server.Tick = TimeSpan.FromMilliseconds(20);
         await a.Pass("dev", default);
         var last = gh.Last(id)!;
-        Assert.Equal("failure", (string)last["state"]!);
+        // A state other than failure prints the deploy log (#5373).
+        HasStates(gh, s, id, "failure", last: true);
         Assert.Contains("health check failed", (string)last["description"]!);
         Assert.Equal("// old gamemode\r\n", s.Read("gamemode.js"));
     }
