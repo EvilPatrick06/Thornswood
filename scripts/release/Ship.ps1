@@ -670,8 +670,8 @@ function Set-ReleaseLauncherSignature([string]$exe, [string]$signer, [string]$ex
 }
 
 # WHAT THE LAUNCHER IS COMPILED FROM, as one sha256, issue #921. Every file
-# under launcher\ but the Markdown (the code, ui.xaml, the art, the video, the
-# MP3 decoder, the manifest), records\client-build.json and
+# under launcher\ but the Markdown (the code, the window's markup, the art, the
+# video, the voice's HRTF data, the icons), records\client-build.json and
 # records\ui-gone.json and records\generated.json (#3715), which are compiled
 # in, and Build-Launcher.ps1, which
 # writes the version resource and picks what goes in. Read off the working tree, not git, so a dev Ship of uncommitted

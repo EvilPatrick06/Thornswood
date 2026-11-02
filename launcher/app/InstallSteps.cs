@@ -87,7 +87,8 @@ namespace Thornswood
     ///
     /// WHAT THE SCRIPT DID THAT THIS DOES NOT, and why. The script had a
     /// second shape, for a payload built with every mod in it and no
-    /// collection.txt (Package-Thornswood.ps1 -NoVortex): a copy of the base
+    /// collection.txt (the old installer's builder made one with -NoVortex
+    /// until #4824): a copy of the base
     /// game under Root, the depot download to 1.6.1170, the SHA-1 check of the
     /// three files Steam's copy could have had patched, and taking the
     /// Creation Club files out of the copy. No package carries that shape

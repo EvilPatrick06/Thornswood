@@ -56,11 +56,11 @@ function read(p) { return fs.readFileSync(p, 'utf8'); }
 const NAMES = /po3_StartOnSave|Start ?On ?Save|\bStartIni\b|Thornswood-Nobody|bDisableMissingContentWarning/i;
 
 // ---- the launcher -------------------------------------------------------------
+// The window is compiled markup in launcher\app since #4823 (MainWindow.axaml,
+// App.axaml); launcher\ui.xaml went with WPF.
 const launcherFiles = fs.readdirSync(APP)
-  .filter(function (f) { return /\.(cs|md|xaml)$/i.test(f); })
-  .map(function (f) { return path.join(APP, f); })
-  .concat([path.join(ROOT, 'launcher', 'ui.xaml')])
-  .filter(function (f) { return fs.existsSync(f); });
+  .filter(function (f) { return /\.(cs|md|axaml)$/i.test(f); })
+  .map(function (f) { return path.join(APP, f); });
 
 const naming = [];
 for (const f of launcherFiles) {

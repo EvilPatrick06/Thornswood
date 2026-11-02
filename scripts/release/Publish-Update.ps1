@@ -288,8 +288,9 @@ function Get-SkyrimPath {
 # What never leaves a machine in a pack: runtime folders, one machine's own
 # files, other servers' files, sign in tokens, and the collection's files in a
 # Game folder the launcher made. The rules live in Ship-Rules.ps1, shared with
-# Package-Thornswood.ps1, so the installer follows exactly the same rules as
-# the packs (it did not, and shipped a token file).
+# Build-GameFiles.ps1, so the game files Velopack's package carries follow
+# exactly the same rules as the packs (the old installer, which had its own
+# list until 24 September, did not, and shipped a token file).
 . (Join-Path $Here 'Ship-Rules.ps1')
 # What a file of the repo ships as, from any machine (#2903).
 . (Join-Path $Here 'ShippedBytes.ps1')
@@ -727,7 +728,7 @@ if ($orderSrc -and (Test-Path $orderSrc)) {
 # so the news can at least name which parts of it moved.
 # launcher\ since the reorganisation (issue #440, phase 7); it read tools\ until
 # 25 September and found nothing there after the move. The keys are the paths
-# under that folder, app\Shell.cs and ui.xaml, the same as before, so a
+# under that folder, app\Shell.cs and the like, the same as before, so a
 # baseline written before the move still compares.
 $srcDir = Join-Path $RepoDir 'launcher'
 if (Test-Path $srcDir) {
