@@ -320,8 +320,7 @@
         "Title": "text",
         "Detail": "text",
         "Detail2": "text",
-        "Detail3": "text",
-        "ModsOnly": "switch"
+        "Detail3": "text"
       }
     },
     "Ship-Main": {
@@ -333,8 +332,7 @@
         "Title": "text",
         "Detail": "text",
         "Detail2": "text",
-        "Detail3": "text",
-        "ModsOnly": "switch"
+        "Detail3": "text"
       }
     },
     "Send-Backups": {
