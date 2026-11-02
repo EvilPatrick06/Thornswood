@@ -33,7 +33,7 @@ const ROOT = path.join(__dirname, '..');
 const SRC = process.env.GM || path.join(ROOT, 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const read = function (p) { return fs.readFileSync(p, 'utf8').split(CR).join(''); };
-const gm = read(SRC);
+const gm = require('./gamemode-tables.js').joined(read(SRC));
 const front = read(path.join(ROOT, 'game', 'plugins', 'thornswood-front.js'));
 const skills = read(path.join(ROOT, 'game', 'ui', 'thornswood-skills.js'));
 

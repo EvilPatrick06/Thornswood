@@ -23,10 +23,8 @@ let pass = 0, fail = 0;
 function yes(what, ok) {
   if (ok) { pass++; console.log('PASS  ' + what); } else { fail++; console.log('FAIL  ' + what); }
 }
-function table(name) {
-  const m = new RegExp('^const ' + name + ' = (\\{.*\\});$', 'm').exec(gm);
-  return m ? JSON.parse(m[1]) : null;
-}
+// From its file when the gamemode reads it from one (#5191), else its line.
+function table(name) { return require('./gamemode-tables.js').inGamemode(gm, name); }
 const a = gm.indexOf('// ==== thornswood needs: hunger, thirst and exhaustion ====');
 const b = gm.indexOf('// ==== end thornswood needs ====');
 const block = (a >= 0 && b > a) ? gm.slice(a, b) : null;

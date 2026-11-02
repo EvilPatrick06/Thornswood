@@ -291,6 +291,23 @@ try {
         $wf.Contains("`$dev = @(`$changed | Where-Object { `$_ -notin 'site', 'discord' })"))
     Yes 'the site and the bot each get a Deployment of their own with the part beside the tag' ($wf.Contains("`$where = @{ site = 'Site'; discord = 'Discord bot' }") -and
         $wf.Contains('payload = [ordered]@{ release = $env:TAG; part = $part }') -and $wf.Contains("if: `${{ steps.newest.outputs.release == 'yes' && steps.changed.outputs.apps != '' }}"))
+    # The tables the gamemode reads (#5191) ride the gamemode part.
+    Yes 'the gamemode part carries gamemode-tables.zip, zipped by App-Part.ps1, in the compare and the signed Release' ($wf.Contains('./scripts/release/App-Part.ps1 -Part tables -Out $tables') -and
+        $wf.Contains('-Part gamemode -Files $gm, $stamp, $tables -BotFiles') -and $wf.Contains('-Part gamemode -Files $env:GAMEMODE, $env:STAMP, $env:TABLES -BotFiles') -and
+        $wf.Contains('TABLES: ${{ steps.changed.outputs.tables }}'))
+    $tz1 = Join-Path $tmp 'tables1/gamemode-tables.zip'; $tz2 = Join-Path $tmp 'tables2/gamemode-tables.zip'
+    & pwsh -NoProfile -File (Join-Path $Repo 'scripts/release/App-Part.ps1') -Part tables -Out $tz1 -RepoDir $Repo *> $null; $e1 = $LASTEXITCODE
+    Start-Sleep -Milliseconds 1100
+    & pwsh -NoProfile -File (Join-Path $Repo 'scripts/release/App-Part.ps1') -Part tables -Out $tz2 -RepoDir $Repo *> $null; $e2 = $LASTEXITCODE
+    $want = @(Get-ChildItem -LiteralPath (Join-Path $Repo 'game/gamemode-tables') -File -Filter '*.json' | Where-Object { $_.Name -cmatch '^[A-Z][A-Z0-9_]*\.json$' } | ForEach-Object { $_.Name } | Sort-Object)
+    $got = @()
+    if ($e1 -eq 0 -and (Test-Path -LiteralPath $tz1)) {
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $z = [IO.Compression.ZipFile]::OpenRead($tz1); try { $got = @($z.Entries | ForEach-Object { $_.FullName } | Sort-Object) } finally { $z.Dispose() }
+    }
+    Yes ('  with every table at the top of the zip (' + $want.Count + ' tables)') ($e1 -eq 0 -and $want.Count -gt 0 -and (($got -join '|') -ceq ($want -join '|')))
+    Yes '  and the same tables give the same bytes, so a merge that changed none leaves the gamemode part unchanged' ($e2 -eq 0 -and (Test-Path -LiteralPath $tz2) -and
+        (Get-FileHash -LiteralPath $tz1).Hash -eq (Get-FileHash -LiteralPath $tz2).Hash)
     $wfs = @(Get-ChildItem -LiteralPath (Join-Path $Repo '.github/workflows') -Filter *.yml -File | Where-Object { [IO.File]::ReadAllText($_.FullName) -match 'Record-Deployment|gamemode-release' } | ForEach-Object { $_.Name })
     Yes ('no other workflow records a Deployment or names the old gamemode release' + $(if ($wfs) { ': ' + ($wfs -join ', ') } else { '' })) ($wfs.Count -eq 0 -or ($wfs.Count -eq 2 -and $wfs -contains 'merge-release.yml' -and $wfs -contains 'release-files.yml' -and
         -not ([IO.File]::ReadAllText((Join-Path $Repo '.github/workflows/release-files.yml'))).Contains('deployments: write')))

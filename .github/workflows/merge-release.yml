@@ -6,7 +6,9 @@
 #
 # WHAT A RELEASE CARRIES. Every Release carries every part, so any of them can
 # be put back by its tag:
-#   gamemode  game/gamemode.js and its stamp, thornswood-build.json
+#   gamemode  game/gamemode.js and its stamp, thornswood-build.json, and
+#             gamemode-tables.zip, the tables the gamemode reads (#5191),
+#             zipped by App-Part.ps1 so the same tables give the same bytes
 #   bot       the bot pass a dev Deployment waits on (#5196)
 #   server    the server build the commit records (records/server-build.json),
 #             CI's build of the pin as ServerArtifact.ps1 zips it (#5219)
@@ -339,12 +341,16 @@ jobs:
           $stamp = Join-Path $out 'thornswood-build.json'
           $s = Save-ThornswoodBuildStamp -Gamemode $gm -Channel dev -RepoDir . -Path $stamp
           Write-Host (Format-ThornswoodBuildStamp $s)
+          $tables = Join-Path $out 'gamemode-tables.zip'
+          ./scripts/release/App-Part.ps1 -Part tables -Out $tables
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Write-Host ('gamemode tables are git tree ' + (git rev-parse "$($env:GITHUB_SHA):game/gamemode-tables"))
           $bot = @(@('Bot-Pass.js', 'bot.js', 'character.js', 'relay.js') | ForEach-Object { Join-Path 'scripts\bot' $_ }) + @(@('voice-server.js', 'headlines.js') | ForEach-Object { Join-Path 'voice' $_ })
           $adds = @("launcher=$($env:LAUNCHER_EXE)", "game=$($env:GAME_ZIP)", "game=$($env:GAME_LIST)",
                     "site=$($env:SITE_ZIP)", "discord=$($env:DISCORD_ZIP)", "voice=$($env:VOICE_ZIP)")
           Set-Content -LiteralPath (Join-Path $env:RUNNER_TEMP 'parts.txt') -Value $adds
           $probe = Join-Path $env:RUNNER_TEMP 'probe'
-          ./scripts/release/New-SignedManifest.ps1 -Out $probe -Tag $env:TAG -Commit $env:GITHUB_SHA -Part gamemode -Files $gm, $stamp -BotFiles $bot -ServerZip $env:SERVER_ZIP -Add $adds -LauncherVersion $env:LAUNCHER_VERSION -NoCatalog
+          ./scripts/release/New-SignedManifest.ps1 -Out $probe -Tag $env:TAG -Commit $env:GITHUB_SHA -Part gamemode -Files $gm, $stamp, $tables -BotFiles $bot -ServerZip $env:SERVER_ZIP -Add $adds -LauncherVersion $env:LAUNCHER_VERSION -NoCatalog
           if ($LASTEXITCODE -ne 0) { exit 1 }
           $m = Get-Content -LiteralPath (Join-Path $probe 'files\manifest.json') -Raw | ConvertFrom-Json
           $prev = if ($env:PREVIOUS_MANIFEST) { Get-Content -LiteralPath $env:PREVIOUS_MANIFEST -Raw | ConvertFrom-Json } else { $null }
@@ -365,6 +371,7 @@ jobs:
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("apps=" + ($apps -join ','))
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("gamemode=" + $gm)
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("stamp=" + $stamp)
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("tables=" + $tables)
 
       # Velopack's programs are signed through Sign-OnRunner.ps1 one at a time;
       # the game files are never signed (their bytes are the ones the records
@@ -429,13 +436,14 @@ jobs:
           LAUNCHER_VERSION: ${{ steps.launcher.outputs.version }}
           GAMEMODE: ${{ steps.changed.outputs.gamemode }}
           STAMP: ${{ steps.changed.outputs.stamp }}
+          TABLES: ${{ steps.changed.outputs.tables }}
         run: |
           $rel = Join-Path $env:RUNNER_TEMP 'merge-release'
           $bot = @(@('Bot-Pass.js', 'bot.js', 'character.js', 'relay.js') | ForEach-Object { Join-Path 'scripts\bot' $_ }) + @(@('voice-server.js', 'headlines.js') | ForEach-Object { Join-Path 'voice' $_ })
           $adds = @(Get-Content -LiteralPath (Join-Path $env:RUNNER_TEMP 'parts.txt'))
           $vp = Join-Path $env:RUNNER_TEMP 'velopack.txt'
           if (Test-Path -LiteralPath $vp) { $adds += @(Get-Content -LiteralPath $vp) }
-          ./scripts/release/New-SignedManifest.ps1 -Out $rel -Tag $env:TAG -Commit $env:GITHUB_SHA -Version $env:VERSION -Part gamemode -Files $env:GAMEMODE, $env:STAMP -BotFiles $bot -ServerZip $env:SERVER_ZIP -Add $adds -LauncherVersion $env:LAUNCHER_VERSION
+          ./scripts/release/New-SignedManifest.ps1 -Out $rel -Tag $env:TAG -Commit $env:GITHUB_SHA -Version $env:VERSION -Part gamemode -Files $env:GAMEMODE, $env:STAMP, $env:TABLES -BotFiles $bot -ServerZip $env:SERVER_ZIP -Add $adds -LauncherVersion $env:LAUNCHER_VERSION
           if ($LASTEXITCODE -ne 0) { exit 1 }
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("dir=" + $rel)
           # The attestation's file pattern, in forward slashes, which the

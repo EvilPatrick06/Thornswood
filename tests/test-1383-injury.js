@@ -17,7 +17,7 @@ const REPO_DIR = require('path').join(__dirname, '..');
 const fs = require('fs');
 const path = require('path');
 const CR = String.fromCharCode(13);
-const src = fs.readFileSync(path.join(REPO_DIR, 'game', 'gamemode.js'), 'utf8').split(CR).join('');
+const src = require('./gamemode-tables.js').joined(fs.readFileSync(path.join(REPO_DIR, 'game', 'gamemode.js'), 'utf8')).split(CR).join('');
 const FRONT = fs.readFileSync(path.join(REPO_DIR, 'game', 'plugins', 'thornswood-front.js'), 'utf8').split(CR).join('');
 const FOOD = JSON.parse(fs.readFileSync(path.join(REPO_DIR, 'game', 'data', 'food.json'), 'utf8'));
 
@@ -37,10 +37,8 @@ const HURT_SRC = slice('// ==== thornswood injury and disease ====', '// ==== en
 const PROG_SRC = slice('// ==== thornswood progression ====', '// ==== end thornswood progression ====');
 yes('the needs, injury and progression blocks are in the gamemode', !!NEEDS_SRC && !!HURT_SRC && !!PROG_SRC);
 
-function table(name) {
-  const m = new RegExp('^const ' + name + ' = (\\{.*\\});$', 'm').exec(src);
-  return m ? JSON.parse(m[1]) : { items: {} };
-}
+// From its file when the gamemode reads it from one (#5191), else its line.
+function table(name) { return require('./gamemode-tables.js').inGamemode(src, name) || { items: {} }; }
 const WARMTH = table('WARMTH');
 const WEATHER = table('WEATHER');
 const WATERS = table('WATERS');

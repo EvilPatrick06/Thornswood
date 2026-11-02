@@ -45,12 +45,12 @@ yes('the needs block is in the gamemode', block !== null);
 
 // The installed table, lifted rather than re-read from warmth.json, because
 // what the server runs on is the line in gamemode.js.
-const warmLine = /^const WARMTH = (\{.*\});$/m.exec(src);
+const warmLine = require('./gamemode-tables.js').lineOf(src, 'WARMTH');
 yes('the warmth table is installed in the gamemode', !!warmLine);
 const WARMTH = warmLine ? JSON.parse(warmLine[1]) : { items: {} };
-const skyLine = /^const WEATHER = (\{.*\});$/m.exec(src);
+const skyLine = require('./gamemode-tables.js').lineOf(src, 'WEATHER');
 const WEATHER = skyLine ? JSON.parse(skyLine[1]) : { most: 0, mid: 0, items: {} };
-const wetLine = /^const WATERS = (\{.*\});$/m.exec(src);
+const wetLine = require('./gamemode-tables.js').lineOf(src, 'WATERS');
 const WATERS = wetLine ? JSON.parse(wetLine[1]) : { items: {} };
 
 /*
