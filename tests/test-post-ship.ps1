@@ -245,27 +245,16 @@ if ($mirrorCall.Count -eq 1) {
         $atNews -gt 0 -and $atAnnounce -gt $atNews -and $mirrorCall[0].Extent.StartOffset -lt $atNews)
 }
 
-# The launcher install Ship does is a mid-release one, before the publish,
-# into the root this release was built from: the launcher it built. The feed's
-# one a main Ship with -Package installed (Install-FeedLauncher, #2661) went
-# with -Package (#4824). No launcher step after the tip.
-#
-# The Join-Path inside the call is a CommandAst of its own and names the same
-# file, so the invocation is the one whose command is not Join-Path.
+# Ship installs no launcher (#4825): the launcher goes out through Velopack
+# (merge-release.yml, promote-main.yml), so neither the one it once built nor
+# the feed's (Install-FeedLauncher, #2661, gone with -Package in #4824) is put
+# in place by a release. The Join-Path inside a call is a CommandAst of its
+# own and names the same file, so the invocation is the one whose command is
+# not Join-Path.
 $installs = @($ship.Ast.FindAll({ param($n) $n -is $CmdAst -and $n.Extent.Text.Contains('Install-Launcher.ps1') -and
                                             $n.GetCommandName() -ne 'Join-Path' }, $true))
-Yes ("Ship calls Install-Launcher.ps1 once, the built launcher ({0})" -f $installs.Count) ($installs.Count -eq 1)
-$built = @($installs | Where-Object { $_.Extent.Text -match '@installArgs' })
-Yes '  it is the built launcher''s, and no Install-FeedLauncher is left (#4824)' ($built.Count -eq 1 -and $shipSrc -notmatch 'Install-FeedLauncher')
-Yes '  before the publisher, not after the tip' (
-    $installs.Count -eq 1 -and @($installs | Where-Object { $_.Extent.StartOffset -ge $atPublish }).Count -eq 0)
-if ($built.Count -eq 1) {
-    # Ship builds a hashtable and splats it (@installArgs), so the call site
-    # no longer spells -Root / -From on the same line as Install-Launcher.ps1.
-    Yes '  the built one with the root and the build output' (
-        $shipSrc -match '\$installArgs = @\{[^\}]*Root = \$Root' -and
-        $shipSrc -match '\$installArgs = @\{[^\}]*From = \$buildOut')
-}
+Yes ("Ship calls Install-Launcher.ps1 nowhere ({0})" -f $installs.Count) ($installs.Count -eq 0)
+Yes '  and no Install-FeedLauncher is left (#4824)' ($shipSrc -notmatch 'Install-FeedLauncher')
 
 # What happens when one of them does not happen. The tip is already published by
 # then, so nothing may be unpublished, and the website lane's rule is that even a
