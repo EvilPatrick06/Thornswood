@@ -1881,6 +1881,37 @@ public sealed class AgentTests : IDisposable
         Assert.Null(new BotPass(new EnvConfig { BotPassRoot = Temp() }, new FakeTasks(() => null)).KeepLast(_ => { }));
     }
 
+    /// <summary>A pass that ended is read as ended at once, though Task
+    /// Scheduler writes its run down before the agent's own reading of the
+    /// time (#5380: 15 s on the box, so every pass was waited on to the
+    /// limit and failed). A start that never runs is still told apart.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task APassIsReadByTaskSchedulersOwnRecordNotTheAgentsClock(bool neverRuns)
+    {
+        var (a, gh, s, bp) = MakeWithPass(bp => WriteResult(bp, true));
+        var tasks = (FakeTasks)a.Tasks;
+        tasks.WrittenEarlier = TimeSpan.FromSeconds(15);
+        tasks.NeverRuns = neverRuns;
+        BotRelease(gh, "build-1", "// new gamemode\n");
+        var id = gh.AddDeployment("Dev", Commit, "{\"release\":\"build-1\"}");
+        var took = System.Diagnostics.Stopwatch.StartNew();
+        await a.Pass("dev", default);
+        var log = s.Read(Path.Combine("data", $"deploy-{id}.log"));
+        if (!neverRuns)
+        {
+            HasStates(gh, s, id, "success", last: true);
+            Assert.True(took.Elapsed < TimeSpan.FromSeconds(4), $"the pass was waited on for {took.Elapsed}, past its end");
+            Assert.Contains("bot pass: ", log);
+            return;
+        }
+        Assert.Equal("failure", (string)gh.Last(id)!["state"]!);
+        Assert.Contains("did not end within 5 s", (string)gh.Last(id)!["description"]!);
+        Assert.Contains("Task Scheduler at the limit: Ready", log);
+        Assert.Contains("so this start never ran", log);
+    }
+
     /// <summary>The task takes one run at a time and Task Scheduler ignores a
     /// start while one runs (IgnoreNew), so a pass still running from before
     /// is not started over and waited on as if it were this one.</summary>
@@ -2041,12 +2072,20 @@ sealed class FakeTasks(Func<string?> work) : ITasks
     public string? LastName;
     volatile bool running;
     DateTime last = DateTime.MinValue;
+    /// <summary>How much earlier than the agent's clock the run is written
+    /// down. On the box Task Scheduler wrote each run 13 to 15 s before the
+    /// time the agent read just before starting it (#5380), so every test
+    /// runs with that.</summary>
+    public TimeSpan WrittenEarlier { get; set; } = TimeSpan.FromSeconds(15);
+    /// <summary>A start Task Scheduler takes and never runs.</summary>
+    public bool NeverRuns { get; set; }
     public void Start(string name)
     {
         Starts++;
         LastName = name;
+        if (NeverRuns) return;
         running = true;
-        last = DateTime.UtcNow;
+        last = DateTime.UtcNow - WrittenEarlier;
         Task.Run(() => { var w = work(); if (w != "hang") running = false; });
     }
     public TaskInfo Info(string name) => new(running ? "Running" : "Ready", last, 0);
