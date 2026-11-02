@@ -259,7 +259,7 @@ const tagSet = {
   name: 'release tags', target: 'tag', enforcement: 'active', why: 'a note of the record\'s own',
   conditions: { ref_name: { include: ['refs/tags/v*'], exclude: [] } },
   rules: [{ type: 'creation' }, { type: 'update' }, { type: 'deletion' }],
-  bypass_actors: [{ actor_id: 5, actor_type: 'RepositoryRole', bypass_mode: 'always' }, { actor_id: 15368, actor_type: 'Integration', bypass_mode: 'always' }],
+  bypass_actors: [{ actor_id: 5, actor_type: 'RepositoryRole', bypass_mode: 'always' }, { actor_id: 5547080, actor_type: 'Integration', bypass_mode: 'always' }],
 };
 const mainSet = {
   name: 'main', target: 'branch', enforcement: 'disabled',
@@ -280,11 +280,21 @@ yes('one with no rules, or a rule with no type, stops', /no rules/.test(rstops([
 yes('one that does not say who may bypass it stops', /bypass/.test(rstops([with_(mainSet, 'bypass_actors', undefined)])));
 // The redesign's part 20 (1 Nov 2026): an App or a deploy key bypasses a tag
 // ruleset only, never a branch one.
-const appBypass = { actor_id: 15368, actor_type: 'Integration', bypass_mode: 'always' };
+const appBypass = { actor_id: 5547080, actor_type: 'Integration', bypass_mode: 'always' };
+yes('GitHub Actions as a bypass stops, named, since GitHub refuses it (#5296)',
+  /lets GitHub Actions \(15368\) bypass it, which GitHub refuses/.test(rstops([with_(tagSet, 'bypass_actors', [{ actor_id: 15368, actor_type: 'Integration', bypass_mode: 'always' }])])));
 yes('an App may bypass a tag ruleset', rstops([with_(tagSet, 'bypass_actors', [appBypass])]) === '');
-yes('an App that may bypass a branch ruleset stops, named', /main lets the App 15368 bypass a branch ruleset; an App or a deploy key may bypass only a tag ruleset/.test(rstops([with_(mainSet, 'bypass_actors', [appBypass])])));
+yes('an App that may bypass a branch ruleset stops, named', /main lets the App 5547080 bypass a branch ruleset; an App or a deploy key may bypass only a tag ruleset/.test(rstops([with_(mainSet, 'bypass_actors', [appBypass])])));
 yes('  and so does a deploy key', /lets a deploy key bypass a branch ruleset/.test(rstops([with_(mainSet, 'bypass_actors', [{ actor_id: 7, actor_type: 'DeployKey', bypass_mode: 'always' }])])));
 yes('  while a role on a branch ruleset still passes', rstops([with_(mainSet, 'bypass_actors', [{ actor_id: 5, actor_type: 'RepositoryRole', bypass_mode: 'always' }])]) === '');
+// What GitHub answered keeps its reasons (#5296): a 422 says why only in errors.
+yes('a refusal names GitHub\'s reasons, strings or objects',
+  admin.said({ status: 422, body: { message: 'Validation Failed', errors: ['Actor GitHub Actions integration must be part of the ruleset source or owner organization'] } }) ===
+    'HTTP 422: Validation Failed (Actor GitHub Actions integration must be part of the ruleset source or owner organization)' &&
+  admin.said({ status: 422, body: { message: 'Validation Failed', errors: [{ resource: 'Ruleset', field: 'bypass_actors', code: 'invalid' }, { message: 'one more' }] } }) ===
+    'HTTP 422: Validation Failed (Ruleset bypass_actors invalid; one more)');
+yes('  and says only the status and message when there are none', admin.said({ status: 404, body: { message: 'Not Found' } }) === 'HTTP 404: Not Found' &&
+  admin.said({ status: 502, body: null }) === 'HTTP 502');
 yes('the body sent is the ruleset\'s own keys, never the record\'s note',
   JSON.stringify(Object.keys(admin.rulesetBody(tagSet))) === '["name","target","enforcement","conditions","rules","bypass_actors"]');
 // GitHub's copy, as it reads one back: ids, links and defaults of its own, lists in its own order.
@@ -1072,8 +1082,8 @@ function start(stateDir, ghPort, more) {
     const unesc = s => s.replace(/&quot;/g, '"').replace(/&#39;/g, '\'').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
     yes('the armed page, through Caddy, posts the manifest to GitHub with the state', r.status === 200 && form && unesc(form[1]) === 'http://127.0.0.1:' + ghPort + '/web/settings/apps/new?state=' + st);
     const mf = form ? JSON.parse(unesc(form[2])) : {};
-    yes('  the manifest: private, administration write, contents read, secrets read, environments write for a box key (ops-access.js), variables read, Actions write for the Ship verbs (#2841), Issues write for the Discord bot (#5184), no webhook, back to /github-app/setup/done',
-      mf.public === false && JSON.stringify(mf.default_permissions) === '{"administration":"write","contents":"read","secrets":"read","actions_variables":"read","environments":"write","actions":"write","issues":"write"}' && mf.hook_attributes.active === false &&
+    yes('  the manifest: private, administration write, contents read, secrets read, environments write for a box key (ops-access.js), variables read, Actions write for the Ship verbs (#2841), Issues write for the Discord bot (#5184), Deployments write for the deploy agent (#5180), no webhook, back to /github-app/setup/done',
+      mf.public === false && JSON.stringify(mf.default_permissions) === '{"administration":"write","contents":"read","secrets":"read","actions_variables":"read","environments":"write","actions":"write","issues":"write","deployments":"write"}' && mf.hook_attributes.active === false &&
       mf.redirect_url === 'https://thornswood.net/github-app/setup/done' && (mf.default_events || []).length === 0);
     yes('  and it asks for exactly what records/github-apps.json gives the box admin App (part 20)', (() => {
       const rec = JSON.parse(fs.readFileSync(path.join(REPO, 'records', 'github-apps.json'), 'utf8')).apps.find(a => a.slug === 'thornswood-box-admin');
@@ -1140,7 +1150,11 @@ function start(stateDir, ghPort, more) {
       const asked = gh.calls.filter(c => /access_tokens$/.test(c.path));
       yes('  asked of GitHub with only that', asked.length > 0 && asked.every(c => JSON.stringify(c.body) === '{"repositories":["Thornswood"],"permissions":{"issues":"write"}}'));
       yes('  and made again on the clock', await waitFor(() => gh.calls.filter(c => /access_tokens$/.test(c.path)).length >= 2, 5000));
-      yes('  no half-written file is left beside it', !fs.existsSync(file + '.part'));
+      // Every second the service writes github-token.json.part and renames it
+      // over the file, so a look at one instant can land inside that write
+      // (it did on GitHub's Windows runner, 1 Nov 2026). What must hold is
+      // that the part file goes: one that a failed rename left stays for good.
+      yes('  no half-written file is left beside it', await waitFor(() => !fs.existsSync(file + '.part'), 5000));
       yes('  the log says it once and never holds the token', (botSvc.log().match(/bot token: made for ThornswoodRP\/Thornswood issues/g) || []).length === 1 && !botSvc.log().includes(gh.botToken));
       gh.botGranted = false;
       fs.writeFileSync(file, JSON.stringify({ token: 'old', expires_at: '2026-11-01T04:00:00Z' }));

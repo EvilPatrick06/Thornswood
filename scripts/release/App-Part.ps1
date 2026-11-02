@@ -14,7 +14,7 @@
 
   WHAT EACH CARRIES, by the path it has in the app's folder on the box:
 
-    site     server.js, public\*, data\site\*   (C:\Thornswood-Docs)
+    site     server.js, lib\*, public\*, data\site\*   (C:\Thornswood-Docs)
              What Deploy-Docs.ps1 sends as the app, and the public pages
              (-Site), which nobody edits in the browser. The documents, the
              boards and everything the site writes are the site's own and
@@ -87,6 +87,7 @@ function Add-Tree([string]$src, [string]$at) {
 switch ($Part) {
   'site' {
     Add-One 'server.js' 'site/server.js'
+    Add-Tree 'site/lib' 'lib'
     Add-Tree 'site/public' 'public'
     Add-Tree 'site/data/site' 'data/site'
   }

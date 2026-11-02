@@ -24,7 +24,7 @@ namespace Thornswood
     /// that page (Patrick, 16 Oct 2026, #2616): nothing is asked on an update
     /// or a start when nothing changed.
     ///
-    /// tests\test-prior-acceptance.ps1 compiles this file and runs the decision
+    /// launcher\tests\test-prior-acceptance.ps1 compiles this file and runs the decision
     /// without a window, a Skyrim install, or C:\Thornswood.
     /// </summary>
     public static class Acceptance

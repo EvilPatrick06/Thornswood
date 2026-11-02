@@ -408,7 +408,7 @@ if (-not $PSBoundParameters.ContainsKey('Wait')) {
 # What the installer said, printed as it comes, and its last line read: it
 # ends with INSTALL OK, INSTALL REFUSED, INSTALL ROLLED BACK or INSTALL FAILED.
 function Invoke-Installer([string]$instArgs) {
-    $lines = @(Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Install-ThornswoodServer.ps1 $instArgs" } |
+    $lines = @(Invoke-ThornswoodNative { & ssh @ssh $target "pwsh -NoProfile -ExecutionPolicy Bypass -File C:\Install-ThornswoodServer.ps1 $instArgs" } |
                ForEach-Object { Say "  $_"; "$_".Trim() })
     $code = $LASTEXITCODE
     if ($lines -contains 'INSTALL OK' -and $code -eq 0) { return }
@@ -769,12 +769,9 @@ elseif (-not $SkipBuild) {
     Head 'Packing the payload'
     $export = Join-Path $Here 'Export-ServerPayload.ps1'
     if (-not (Test-Path -LiteralPath $export)) { Die "not found: $export" }
-    # The same PowerShell that is running this, not whichever one 'powershell'
-    # resolves to. Handing the job to 5.1 from a 7 session changes how files
-    # get written underneath it, which is how the payload picked up a byte
-    # order mark that only ever showed up as a parse error on the VPS.
-    $ps = (Get-Process -Id $PID).Path
-    if (-not $ps) { $ps = 'powershell' }
+    # The same pwsh that is running this (#5356), not whichever one is on
+    # PATH.
+    $ps = [Environment]::ProcessPath
     # The staging folder beside the zip (out\_payload beside
     # out\thornswood-server.zip, the same as its default).
     & $ps -NoProfile -ExecutionPolicy Bypass -File $export -Dist $Dist -Zip $Zip -VpsRoot $VpsRoot `
@@ -1083,7 +1080,7 @@ if ($why) {
 '@
     $seed = $seed.Replace('@@DEVROOT@@', $VpsRoot.TrimEnd('\'))
     $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($seed))
-    $out = @(Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -EncodedCommand $enc" } | ForEach-Object { "$_".Trim() })
+    $out = @(Invoke-ThornswoodNative { & ssh @ssh $target "pwsh -NoProfile -EncodedCommand $enc" } | ForEach-Object { "$_".Trim() })
     $carried = $out -contains 'DOOR CARRIED'
     foreach ($line in $out) { Say "  $line" $(if ($carried) { 'Green' } else { 'Red' }) }
     if (-not $carried) {

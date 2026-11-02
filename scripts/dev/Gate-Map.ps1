@@ -9,9 +9,10 @@
 
   .github\workflows\gate-map.yml traces the whole gate every night on
   GitHub's hosted Windows runner and keeps latest.json, <key>.map.json and
-  <key>.tree.gz as an artifact named gate-map. This reads the newest finished
+  <key>.tree.gz as an artifact named gate-map, and since #5293
+  <key>.platforms.json, which harnesses its Linux run ran as fully. This reads the newest finished
   runs of that workflow, newest first, and from the first that is main's own
-  (gate-map.yml on main, from the schedule or a run by hand, of this
+  (gate-map.yml on main, from the schedule, a push to main or a run by hand, of this
   repository) and still holds a gate-map artifact, writes those three files
   into <dir>, the shape scripts\dev\Run-Gate.ps1 and Check-Change.ps1 read.
   Exit 0 with a map in <dir>, 1 without, saying why.
@@ -20,7 +21,7 @@
   can upload anything; a pull request that changes the trace's own scripts
   runs gate-map.yml too, and keeps gate-map-trial, which this never reads.
   So a map counts only from a run GitHub says is gate-map.yml on main from
-  the schedule or workflow_dispatch, read back for each run, and only an
+  the schedule, a push to main or workflow_dispatch, read back for each run, and only an
   artifact named gate-map whose latest.json names that run's own key.
 
   BEFORE #5183. Until #4983 an administrator task on the box traced each
@@ -80,9 +81,9 @@ $runs = @($list.workflow_runs)
 if (-not $runs.Count) { Say ('GitHub lists no finished ' + $Workflow + ' run on main.'); exit 1 }
 foreach ($run in $runs) {
     $what = 'main''s gate trace, run ' + $run.id
-    if (@('schedule', 'workflow_dispatch') -notcontains [string]$run.event -or [string]$run.head_branch -ne 'main' -or
+    if (@('schedule', 'push', 'workflow_dispatch') -notcontains [string]$run.event -or [string]$run.head_branch -ne 'main' -or
         [string]$run.path -notmatch ('^\.github/workflows/' + [regex]::Escape($Workflow) + '(@|$)') -or [string]$run.head_repository.full_name -ne $Repository) {
-        Say ('Passed over run ' + $run.id + ': it is ' + $run.path + ' on ' + $run.event + ' to ' + $run.head_branch + ', not ' + $Workflow + ' on main from the schedule or by hand.')
+        Say ('Passed over run ' + $run.id + ': it is ' + $run.path + ' on ' + $run.event + ' to ' + $run.head_branch + ', not ' + $Workflow + ' on main from the schedule, a push or by hand.')
         continue
     }
     try {
@@ -117,6 +118,11 @@ foreach ($run in $runs) {
     if (Test-Path -LiteralPath $Fetch) { Remove-Item -LiteralPath $Fetch -Recurse -Force }
     $null = New-Item -ItemType Directory -Force -Path $Fetch
     foreach ($f in 'latest.json', ($key + '.map.json'), ($key + '.tree.gz')) { Copy-Item -LiteralPath (Join-Path $into $f) -Destination (Join-Path $Fetch $f) }
+    # Which harnesses Linux runs as fully as Windows (#5293), when that
+    # night's Linux run finished; without it every harness runs on Windows.
+    $pf = $key + '.platforms.json'
+    if (Test-Path -LiteralPath (Join-Path $into $pf)) { Copy-Item -LiteralPath (Join-Path $into $pf) -Destination (Join-Path $Fetch $pf) }
+    else { Say ('It holds no ' + $pf + ', so every harness runs on Windows.') }
     Remove-Item -LiteralPath $zip, $into -Recurse -Force -ErrorAction SilentlyContinue
     Say ('The map of ' + $what + ': the gate traced on main ' + $commit.Substring(0, 8) + ', read ' + $m.read + '.')
     exit 0

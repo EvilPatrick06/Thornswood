@@ -35,11 +35,11 @@
        a loop, the manifest is whole every time.
     3. OwnGame.WriteRecord's byte form (the news cache), lifted and compiled:
        the same bytes, and whole after 40 kills.
-    4. The feed store under Windows PowerShell 5.1, which is what the VPS
-       runs it with: the real swap op, built by New-FeedStoreScript, replaces
+    4. The feed store under PowerShell 7, which is what the VPS runs it with
+       since #5356: the real swap op, built by New-FeedStoreScript, replaces
        a store file (published.json; version.json is never replaced, it goes
-       up as a new generation, #2727) and keeps the old one in history; and a 5.1 process
-       swapping a feed file through Move-FeedStoreInto, killed 15 times,
+       up as a new generation, #2727) and keeps the old one in history; and a
+       PowerShell 7 process swapping a feed file through Move-FeedStoreInto, killed 15 times,
        leaves it whole every time.
 
   Nothing outside its own scratch folder is written.
@@ -205,9 +205,9 @@ __WRITERECORD__
     $r = KillTest 'record' (Join-Path $work 'killed-news\news.json') 37427 40
     Yes ('killed 40 times while WriteRecord swaps the news cache in: whole every time ({0} of 40{1})' -f $r.Whole, $(if ($r.Bad) { '; ' + ($r.Bad -join ', ') })) ($r.Whole -eq 40)
 
-    # ---- 4: the feed store, in Windows PowerShell 5.1 as the VPS runs it ---------
-    if (-not $OnWindows) { Write-Host 'SKIP  the feed store in Windows PowerShell 5.1, which the VPS runs it with: this is not Windows'; Done }
-    $ps51 = Get-WindowsPowerShell
+    # ---- 4: the feed store, in PowerShell 7 as the VPS runs it (#5356) ------------
+    if (-not $OnWindows) { Write-Host 'SKIP  the feed store killed mid-swap: on the VPS it renames through kernel32, which only Windows has'; Done }
+    $boxPs = Get-BoxPowerShell
     $storePs1 = Join-Path $Repo 'scripts\release\Feed-Store.ps1'
 
     # The real swap op on a store of its own.
@@ -227,9 +227,9 @@ $size = (Get-Item -LiteralPath (Join-Path $feed 'published.json.part')).Length
 $text = New-FeedStoreScript $root 'feed' 'swap' @('published.json') @{ 'published.json' = $was } @{ 'published.json' = $size }
 & ([scriptblock]::Create($text))
 '@)
-    $out = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -File $one $storePs1 $root 2>&1 | ForEach-Object { [string]$_ })
+    $out = @(& $boxPs -NoProfile -ExecutionPolicy Bypass -File $one $storePs1 $root 2>&1 | ForEach-Object { [string]$_ })
     $hist = @(Get-ChildItem -LiteralPath (Join-Path $feed 'history') -File -ErrorAction SilentlyContinue)
-    Yes ('the box''s swap op, run by Windows PowerShell 5.1, sends the new baseline (' + (($out | Select-Object -Last 2) -join ' ') + ')') (
+    Yes ('the box''s swap op, run by PowerShell 7, sends the new baseline (' + (($out | Select-Object -Last 2) -join ' ') + ')') (
         ($out -match '^SENT\|published\.json\|').Count -eq 1 -and ($out -contains 'DONE') -and
         [IO.File]::ReadAllText((Join-Path $feed 'published.json')) -eq '{"version":"new one"}' -and -not (Test-Path -LiteralPath (Join-Path $feed 'published.json.part')))
     Yes '...keeps the old one in history, and leaves no ~RF file beside it' ($hist.Count -eq 1 -and [IO.File]::ReadAllText($hist[0].FullName) -eq '{"version":"old"}' -and
@@ -256,7 +256,7 @@ for ($k = 0; ; $k++) {
     $whole = 0; $bad = @()
     $rand = New-Object Random 2591
     for ($i = 0; $i -lt 15; $i++) {
-        $psi = New-Object Diagnostics.ProcessStartInfo($ps51, ('-NoProfile -ExecutionPolicy Bypass -File "{0}" "{1}" "{2}" {3}' -f $loop, $storePs1, $vp, $size))
+        $psi = New-Object Diagnostics.ProcessStartInfo($boxPs, ('-NoProfile -ExecutionPolicy Bypass -File "{0}" "{1}" "{2}" {3}' -f $loop, $storePs1, $vp, $size))
         $psi.UseShellExecute = $false
         $psi.RedirectStandardOutput = $true
         $p = [Diagnostics.Process]::Start($psi)
@@ -266,7 +266,7 @@ for ($k = 0; ; $k++) {
         $l = Len $vp
         if ($l -eq $size -or $l -eq ($size + 7)) { $whole++ } else { $bad += $(if ($l -lt 0) { 'missing' } else { "$l bytes" }); [IO.File]::WriteAllBytes($vp, (New-Object byte[] $size)) }
     }
-    Yes ('killed 15 times while Windows PowerShell 5.1 swaps a feed file in through Move-FeedStoreInto: whole every time ({0} of 15{1})' -f $whole, $(if ($bad) { '; ' + ($bad -join ', ') })) ($whole -eq 15)
+    Yes ('killed 15 times while PowerShell 7 swaps a feed file in through Move-FeedStoreInto: whole every time ({0} of 15{1})' -f $whole, $(if ($bad) { '; ' + ($bad -join ', ') })) ($whole -eq 15)
 }
 finally {
     try { Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction Stop } catch { Write-Host "NOTE  $work could not be removed: $($_.Exception.Message)" }

@@ -10,6 +10,8 @@
 
       .\scripts\deploy\Install-DeployAgent.ps1            install, or move to the newest Release
       .\scripts\deploy\Install-DeployAgent.ps1 -Status    what is there, its check and its log
+      .\scripts\deploy\Install-DeployAgent.ps1 -Status -Pass <kept pass>
+                                                         one kept bot pass's logs (#5196)
       .\scripts\deploy\Install-DeployAgent.ps1 -Remove    take it off again (not a gate verb)
 
   From a cloud thread, which has no ssh, the deploy gate runs the first two
@@ -33,7 +35,7 @@
   GitHub token from the box admin App's key, which only SYSTEM,
   Administrators and the admin service can read (Install-AdminService.ps1,
   #4076). The token it asks for carries Deployments write and Contents read
-  on this repository and nothing else. Its folder takes nothing from C:\: SYSTEM
+  on this repository and nothing else, and Actions read once -Main is on. Its folder takes nothing from C:\: SYSTEM
   and Administrators only.
 
   WHEN IT ENDS. The service manager starts it again when it ends with an error
@@ -66,6 +68,14 @@
   Thornswood Dev Voice, Install-Voice.ps1), a Release's voice goes in with
   dev's Deployment, before the gamemode that pushes positions to it.
 
+  MAIN (#5181). -Main has agent.json name main too, so the agent applies the
+  Main environment's Deployments to the live server, each one only after
+  Patrick approved the promote-main.yml run that made it and only for a
+  Release dev ran (tools\DeployAgent\Agent.cs, NotApproved). Its token then
+  also asks Actions: read, to see who approved, which the box admin App
+  holds (Actions read and write since 30 Oct, #5006). -NoMain takes main
+  off again; with neither, what agent.json says is kept.
+
   WHAT IT CANNOT DO YET. Until the box admin App holds Deployments: Read and
   write (its permissions page, then Accept on its installation, an owner's
   step), the agent runs and every pass says GitHub gave it no token; -Status
@@ -86,6 +96,9 @@ param(
     # A Release to install instead of the newest, agent-v<a.b.c>.
     [string]$Tag     = '',
     [switch]$Status,
+    # With -Status: one bot pass the agent kept, by its folder's name under
+    # C:\Thornswood-BotPass\passes, which -Status lists.
+    [string]$Pass    = '',
     [switch]$Remove,
     # Leave the bot pass off (#5196): no task, and agent.json names no folder.
     [switch]$NoBotPass,
@@ -97,6 +110,9 @@ param(
     # while it is there. Without this switch the install refuses on a stuck
     # service and changes nothing.
     [switch]$EndHung,
+    # Look after the live server as well (#5181): approved Main Deployments only.
+    [switch]$Main,
+    [switch]$NoMain,
     [switch]$NoPause
 )
 
@@ -113,8 +129,11 @@ if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
 
+if ($Main -and $NoMain) { Die '-Main and -NoMain each do one thing, so pass one of them. Nothing was sent.' }
 if ($Status -and $Remove) { Die '-Status and -Remove each do one thing, so pass one of them. Nothing was sent.' }
 if ($Tag -and $Tag -notmatch '^agent-v\d+\.\d+\.\d+$') { Die "-Tag $Tag is not agent-v<a.b.c>. Nothing was sent." }
+if ($Pass -and -not $Status) { Die '-Pass names a kept bot pass for -Status to print, so it goes with -Status. Nothing was sent.' }
+if ($Pass -and $Pass -notmatch '^\d{8}-\d{6}-[A-Za-z0-9-]{1,64}$') { Die "-Pass $Pass is not a kept pass's name (<yyyyMMdd-HHmmss>-<deployment>), as -Status lists them. Nothing was sent." }
 if ($Root -notmatch '^[A-Za-z]:\\[A-Za-z0-9._\\-]+$') { Die "-Root $Root is not a plain folder on the box. Nothing was sent." }
 if (-not $Repo) {
     # The gate's checkout reads ssh://git@ssh.github.com:443/<owner>/<name>.git
@@ -132,6 +151,8 @@ if ($Repo -notmatch '^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$') { Die "-Repo $Repo is not
 $publicName = Get-ThornswoodVpsAddress
 if ($publicName -notmatch '^[A-Za-z0-9.-]+$') { Die "vps.json's address ($publicName) is not a plain host name. Nothing was sent." }
 $logBase = 'http://' + $publicName + ':7788/'
+# The live server's resources port, for main's log links.
+$mainLogBase = 'http://' + $publicName + ':3000/'
 
 $target = "$VpsUser@$VpsHost"
 $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
@@ -157,6 +178,21 @@ if (`$t) { `$i = `$t | Get-ScheduledTaskInfo; 'task $passTask is ' + `$t.State +
 else { 'no task ${passTask}: dev Deployments go in without a bot pass' }
 `$res = '$passRoot\run\result.json'
 if (Test-Path -LiteralPath `$res) { try { `$r = [IO.File]::ReadAllText(`$res) | ConvertFrom-Json; 'last pass ' + `$r.ended + ': ' + `$(if (`$r.ok) { 'OK' } else { 'FAILED' }); foreach (`$l in @(`$r.lines)) { '  ' + `$(if (`$l.ok) { 'PASS' } else { 'FAIL' }) + '  ' + `$l.step + ': ' + `$l.detail } } catch { 'its result.json does not read: ' + `$_.Exception.Message } }
+# Where a pass got to, as the agent says it in a Deployment's log when a
+# pass runs out (#5196): its own lines and the copy's server's. The last
+# pass's are in the run folder; the agent keeps each earlier one's under
+# passes\ when the next pass empties it (-Pass prints one of those).
+# Addresses never leave the box.
+`$from = if ('$Pass') { '$passRoot\passes\$Pass' } else { '$passRoot\run' }
+if ('$Pass' -and -not (Test-Path -LiteralPath `$from)) { 'no kept pass ' + `$from }
+foreach (`$tail in @(@((Join-Path `$from 'bot-pass.log'), 40), @((Join-Path `$from `$(if ('$Pass') { 'bot-pass-server.log' } else { 'server\bot-pass-server.log' })), 80))) {
+  if (Test-Path -LiteralPath `$tail[0]) {
+    '--- ' + `$tail[0] + ', last ' + `$tail[1] + ', written ' + (Get-Item -LiteralPath `$tail[0]).LastWriteTimeUtc.ToString('yyyy-MM-dd HH:mm:ss') + 'Z ---'
+    Get-Content -LiteralPath `$tail[0] -Tail `$tail[1] | ForEach-Object { `$_ -replace '\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?\b', '<address>' }
+  } else { 'no ' + `$tail[0] }
+}
+`$kept = @(Get-ChildItem -LiteralPath '$passRoot\passes' -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 10)
+if (`$kept.Count) { '--- kept passes, newest 10 (-Status -Pass <name> prints one) ---'; foreach (`$k in `$kept) { '  ' + `$k.Name } } else { 'no kept passes yet in $passRoot\passes' }
 '--- agent.log, last 30 ---'
 `$log = '$Root\logs\agent.log'
 if (Test-Path -LiteralPath `$log) { Get-Content -LiteralPath `$log -Tail 30 } else { 'no log yet' }
@@ -283,6 +319,14 @@ if (-not `$cfg.environments) { `$cfg | Add-Member -NotePropertyName environments
 if (-not `$cfg.environments.dev) { `$cfg.environments | Add-Member -NotePropertyName dev -NotePropertyValue (New-Object PSObject) -Force }
 `$cfg.environments.dev | Add-Member -NotePropertyName logBase -NotePropertyValue '$logBase' -Force
 'agent.json names $Repo'
+# Main (#5181): only on -Main, taken off on -NoMain, otherwise kept.
+if ([bool]$([int][bool]$Main)) {
+  `$cfg.environments | Add-Member -NotePropertyName main -NotePropertyValue ([pscustomobject]@{ logBase = '$mainLogBase' }) -Force
+  'main: approved Main Deployments go on the live server'
+} elseif ([bool]$([int][bool]$NoMain)) {
+  `$cfg.environments.PSObject.Properties.Remove('main')
+  'main: off; the live server takes nothing from the agent'
+} elseif (`$cfg.environments.main) { 'main: kept, as agent.json said' }
 
 # The site and the Discord bot (#5190, #5187): the agent swaps in each
 # Deployment to Site and to Discord bot. Their logs go in the dev server's

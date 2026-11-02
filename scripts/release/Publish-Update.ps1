@@ -1574,7 +1574,7 @@ if ($scanZips.Count -or $scanExes.Count) {
 
 if (-not $NoUpload) {
     # ==== thornswood site upload ====
-    # tests\test-site-assets.ps1 runs this block on its own. If the markers
+    # site\tests\test-site-assets.ps1 runs this block on its own. If the markers
     # move, it stops rather than quietly testing nothing.
     #
     # UPDATES COME FROM THE SITE (#897). Every asset this release adds goes to
@@ -1907,7 +1907,7 @@ if (-not $NoPush) {
 }
 # ==== end thornswood feed recheck ====
 # ==== thornswood move feed urls ====
-# tests\test-site-assets.ps1 runs this block on its own.
+# site\tests\test-site-assets.ps1 runs this block on its own.
 #
 # THE URLS ALREADY ON THE FEED MOVE TO THE SITE, a few at a time or all at
 # once, and only by a publish, never by editing the live feed by hand (#897).

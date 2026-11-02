@@ -31,7 +31,7 @@ namespace Thornswood
     /// each of the other classes owns on disk, and every step between the
     /// Play button and the game starting, with the file and line of each.
     /// Whoever changes one of those steps changes that page in the same pull
-    /// request; tests\test-architecture.js fails when the page names a step
+    /// request; launcher\tests\test-architecture.js fails when the page names a step
     /// that is gone or out of order.
     /// </summary>
     static partial class Shell

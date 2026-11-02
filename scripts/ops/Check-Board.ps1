@@ -1,7 +1,7 @@
 <#
   Check-Board.ps1
 
-  Holds the board's cards to the rules Developer-Guide.md gives them, from a
+  Holds the board's cards to the rules docs/guide/the-board.md gives them, from a
   board.json Read-Board.ps1 wrote, and names every card that breaks one. Run
   by the weekly reviews from a cloud thread (#3534):
 
@@ -16,7 +16,7 @@
   nothing then said what a right Order is. Read again at 11:41 AM on 26 Oct
   (run 40370916888): 315 of the 331 open issues had no Order at all.
 
-  WHAT IT HOLDS EACH CARD TO (Developer-Guide.md, "Everything we need to do
+  WHAT IT HOLDS EACH CARD TO (docs/guide/the-board.md, "Everything we need to do
   goes on the board"):
     no order      an open issue with no Order. "Order is the do-order. A new
                   issue gets the Order of where it belongs." Every open issue

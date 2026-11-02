@@ -60,29 +60,18 @@ Yes '  and nothing piped into git, whose bytes depend on the PowerShell' ($t -no
 $x = Text 'scripts\dev\Trace-Gate-Box.ps1'
 $e = $null; $null = [Management.Automation.Language.Parser]::ParseInput($x, [ref]$null, [ref]$e)
 Yes 'Trace-Gate-Box.ps1 parses' (-not $e.Count)
-$cs = [regex]::Match($x, "(?s)Add-Type -ReferencedAssemblies System\.Core -TypeDefinition @'\r?\n(.*?)\r?\n'@").Groups[1].Value
-# Stand-ins for the event log reader, which only Windows has, so the C# is
-# compiled everywhere, as C# 5, the language Windows PowerShell 5.1 builds.
-$stub = @'
-namespace TraceStub {
-  using System; using System.Collections.Generic;
-  public enum PathType { LogName, FilePath }
-  public class EventLogQuery { public EventLogQuery(string p, PathType t) {} }
-  public class EventProperty { public object Value { get { return null; } } }
-  public class EventRecord : IDisposable { public int Id { get { return 0; } } public byte? Version { get { return 0; } } public DateTime? TimeCreated { get { return null; } } public Guid? ProviderId { get { return null; } } public int? ProcessId { get { return null; } } public IList<EventProperty> Properties { get { return null; } } public void Dispose() {} }
-  public class EventLogReader : IDisposable { public EventLogReader(EventLogQuery q) {} public EventRecord ReadEvent() { return null; } public void Dispose() {} }
-  public class EventKeyword { public string Name { get { return null; } } public long Value { get { return 0; } } }
-  public class EventTaskInfo { public string Name { get { return null; } } }
-  public class EventMetadata { public long Id { get { return 0; } } public byte Version { get { return 0; } } public string Template { get { return null; } } public EventTaskInfo Task { get { return null; } } public IEnumerable<EventKeyword> Keywords { get { return null; } } }
-  public class ProviderMetadata { public ProviderMetadata(string n) {} public Guid Id { get { return Guid.Empty; } } public IList<EventKeyword> Keywords { get { return null; } } public IEnumerable<EventMetadata> Events { get { return null; } } }
-}
-'@
+$m = [regex]::Match($x, "(?s)Add-Type -ReferencedAssemblies ([\w., ]+?) -TypeDefinition @'\r?\n(.*?)\r?\n'@")
+$refs = @($m.Groups[1].Value -split ',\s*' | Where-Object { $_ })
+$cs = $m.Groups[2].Value
+# Built as the box builds it: PowerShell 7 with only the assemblies the
+# script names, which ship with PowerShell on every system, the event log
+# reader's included, so a missing one fails here and not on the box (#5356).
 $compiled = ''
 if ($cs) {
-    $src = $cs.Replace('using System.Diagnostics.Eventing.Reader;', 'using TraceStub;').Replace('public static class ThornswoodTrace', 'public static class ThornswoodTraceTest' + [Guid]::NewGuid().ToString('N')) + "`n" + $stub
-    try { Add-Type -TypeDefinition $src -CompilerOptions '-langversion:5' -ErrorAction Stop } catch { $compiled = $_.Exception.Message }
+    $src = $cs.Replace('public static class ThornswoodTrace', 'public static class ThornswoodTraceTest' + [Guid]::NewGuid().ToString('N'))
+    try { Add-Type -ReferencedAssemblies $refs -TypeDefinition $src -ErrorAction Stop } catch { $compiled = $_.Exception.Message + ' ' + (@($_.Exception.Errors | Select-Object -First 3 | ForEach-Object { "$_" }) -join ' ') }
 } else { $compiled = 'no C# found' }
-Yes ('  its C# compiles as C# 5' + $(if ($compiled) { ': ' + $compiled.Substring(0, [Math]::Min(300, $compiled.Length)) } else { '' })) (-not $compiled)
+Yes ('  its C# compiles with only the assemblies it names (' + ($refs -join ', ') + ')' + $(if ($compiled) { ': ' + $compiled.Substring(0, [Math]::Min(400, $compiled.Length)) } else { '' })) (-not $compiled)
 Yes '  the trace folder is closed to all but administrators and the system' ($x -match [regex]::Escape("icacls.exe `$traceRoot /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F'"))
 Yes '  a trace that lost events is refused' ($x -match "(?s)'stop' \{\s*Stop-TraceSession \`$sessionName\s*if \(\`$script:lost\) \{ 'REFUSED: '.*?exit 1 \}")
 Yes '  the trace is deleted once read, and only paths in the checkout leave' ($x -match "(?s)'END'\s*Remove-Item -LiteralPath \(Join-Path \`$traceRoot 'gate\.etl'\), \(Join-Path \`$traceRoot 'gate\.etl\.procs'\) -Force" -and $x -match 'if \(!inside\) \{ if \(objO != null\) objects\.Remove\(Address\(objO\)\); continue; \}')

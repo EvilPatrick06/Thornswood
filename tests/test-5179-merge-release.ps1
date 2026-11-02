@@ -7,9 +7,11 @@
   that changes what Thornswood ships, every part on it, and a Deployment to
   Dev for it (.github\workflows\merge-release.yml). This holds the pieces it
   runs, with no network:
-    - MergeRelease.ps1: the tag and the Velopack version from one time and
-      run number; the print of each part, leaving out the gamemode's stamp,
-      the server zip and the game files' list, which differ on every merge;
+    - MergeRelease.ps1: the tag and the Velopack version from the day and
+      the names it already has; where the notes start when the Release
+      before is from a rewritten history; the print of each part, leaving
+      out the gamemode's stamp, the server zip and the game files' list,
+      which differ on every merge;
       the parts that changed since the Release before (all of them when there
       is none, never velopack); and the Release before read from a planted
       list: drafts and other tags skipped, a manifest that names another tag
@@ -57,14 +59,33 @@ try {
     . (Join-Path $Repo 'scripts/release/MergeRelease.ps1')
 
     # ---- the names ----------------------------------------------------------------
-    $n = New-MergeReleaseNames -Utc ([DateTime]::new(2026, 11, 1, 23, 30, 0, [DateTimeKind]::Utc)) -Run 7
-    Yes 'the tag is build-<yyyyMMdd>.<run> and the Velopack version <yyyy>.<M*100+d>.<run>' ($n.Tag -eq 'build-20261101.7' -and $n.Velopack -eq '2026.1101.7')
-    $j = New-MergeReleaseNames -Utc ([DateTime]::new(2027, 1, 2, 0, 0, 0, [DateTimeKind]::Utc)) -Run 8
-    Yes '  with no leading zero, so 2 Jan is 102' ($j.Velopack -eq '2027.102.8')
-    $later = New-MergeReleaseNames -Utc ([DateTime]::new(2026, 12, 31, 0, 0, 0, [DateTimeKind]::Utc)) -Run 9
-    Yes '  and a later release in the year is the higher version' ([version]$later.Velopack -gt [version]$n.Velopack)
-    $threw = $false; try { New-MergeReleaseNames -Utc (Get-Date) -Run 0 | Out-Null } catch { $threw = $true }
-    Yes '  a run number under 1 is refused' $threw
+    $n = New-MergeReleaseNames -Utc ([DateTime]::new(2026, 11, 1, 23, 30, 0, [DateTimeKind]::Utc)) -Taken @('build-20261101.1', 'build-20261101.6', 'build-20261031.9', 'v1.2.16', 'agent-v1.0.30')
+    Yes 'the tag is build-<yyyyMMdd>.<n>, n one past the day''s highest, and the Velopack version <yyyy>.<M*100+d>.<n>' ($n.Tag -eq 'build-20261101.7' -and $n.Velopack -eq '2026.1101.7')
+    $f = New-MergeReleaseNames -Utc ([DateTime]::new(2026, 11, 2, 0, 0, 0, [DateTimeKind]::Utc)) -Taken @('build-20261101.6')
+    Yes '  and a new day starts at 1' ($f.Tag -eq 'build-20261102.1')
+    $j = New-MergeReleaseNames -Utc ([DateTime]::new(2027, 1, 2, 0, 0, 0, [DateTimeKind]::Utc))
+    Yes '  with no leading zero, so 2 Jan is 102' ($j.Velopack -eq '2027.102.1')
+    $later = New-MergeReleaseNames -Utc ([DateTime]::new(2026, 12, 31, 0, 0, 0, [DateTimeKind]::Utc))
+    Yes '  and a later day is the higher version' ([version]$later.Velopack -gt [version]$n.Velopack)
+
+    # ---- where the notes start, across a rewritten history ------------------------
+    $g = Join-Path $tmp 'hist'
+    New-Item -ItemType Directory -Force -Path $g | Out-Null
+    function G { & git -C $g -c user.name=t -c user.email=t@t -c commit.gpgsign=false @args 2>&1 | Out-Null }
+    G init -q -b main
+    G commit -q --allow-empty -m 'first (#10)'
+    G commit -q --allow-empty -m 'the Release before (#11)'
+    $here = "$(git -C $g rev-parse HEAD)".Trim()
+    G commit -q --allow-empty -m 'after it (#12)'
+    $none = { param($c) throw 'not asked' }
+    Yes 'the notes start at the Release before''s commit when this history holds it' ((Resolve-MergeReleaseSince -Commit $here -Subject $none -RepoDir $g) -eq $here)
+    $gone = 'f' * 40
+    $got = Resolve-MergeReleaseSince -Commit $gone -Subject { param($c) 'the Release before (#11)' } -RepoDir $g
+    Yes '  and at the same merge, by its pull request number, when the history was rewritten' ($got -eq $here)
+    $threw = $false; try { Resolve-MergeReleaseSince -Commit $gone -Subject { param($c) 'no number here' } -RepoDir $g | Out-Null } catch { $threw = $true }
+    Yes '  a commit not here whose title names no pull request stops it' $threw
+    $threw = $false; try { Resolve-MergeReleaseSince -Commit $gone -Subject { param($c) 'gone (#99)' } -RepoDir $g | Out-Null } catch { $threw = $_.Exception.Message -match '0 commits here end in \(#99\)' }
+    Yes '  and so does one whose merge is not in this history' $threw
 
     # ---- the prints and what changed ------------------------------------------------
     function M($parts) { [pscustomobject]@{ tag = 'build-1'; parts = [pscustomobject]$parts } }
@@ -193,9 +214,61 @@ try {
         $wf -match "(?m)^\s+- 'game/\*\*'\s*$" -and $wf -match "(?m)^\s+- 'launcher/\*\*'\s*$" -and $wf -match "(?m)^\s+- 'records/\*\*'\s*$" -and $wf -match "(?m)^\s+- 'scripts/bot/Bot-Pass\.js'\s*$")
     $self = @('Build-GameFiles.ps1', 'MergeRelease.ps1', 'New-SignedManifest.ps1', 'Build-Launcher.ps1', 'Go.ps1', 'Build-Front.ps1') | Where-Object { $wf -notmatch ("(?m)^\s+- 'scripts/release/" + [regex]::Escape($_) + "'\s*$") }
     Yes ('  and for the scripts it runs that decide what is built' + $(if ($self) { ': not ' + ($self -join ', ') } else { '' })) (-not $self)
-    Yes '  in the release environment, on main only, one run at a time' ($wf -match '(?m)^\s+environment: release\s*$' -and $wf.Contains("if: `${{ github.ref == 'refs/heads/main' }}") -and $wf -match '(?m)^\s+cancel-in-progress: false\s*$')
+    Yes '  in the release environment, on main only, one run at a time, a newer merge cancelling the run before (#5398)' ($wf -match '(?m)^\s+environment: release\s*$' -and $wf.Contains("if: `${{ github.ref == 'refs/heads/main' }}") -and $wf -match '(?m)^\s+group: merge-release\s*$' -and $wf -match '(?m)^\s+cancel-in-progress: true\s*$')
+    # GitHub refuses the run's token a tag on a commit whose workflow files
+    # differ from main's (probe runs 41375894899 and 41376016183, #5398), so
+    # only main's newest merge is published; the newer run carries the rest.
+    $newestAt = $wf.IndexOf('- name: Is this still main''s newest merge'); $publishAt = $wf.IndexOf('- name: Publish the Release')
+    Yes 'a merge main has moved past publishes nothing, and says the newer merge releases it' ($newestAt -gt 0 -and $publishAt -gt $newestAt -and
+        $wf.Contains('gh api "repos/$($env:GITHUB_REPOSITORY)/commits/main" --jq .sha') -and $wf.Contains("if ([string]`$head -eq `$env:GITHUB_SHA) { Add-Content -LiteralPath `$env:GITHUB_OUTPUT -Value 'release=yes'; exit 0 }") -and
+        ([regex]::Matches($wf, [regex]::Escape("if: `${{ steps.newest.outputs.release == 'yes'"))).Count -eq 3)
     $notes = $wf.IndexOf('Collect-ReleaseNotes.ps1'); $build = $wf.IndexOf('Build-Launcher.ps1 -Root')
     Yes 'the notes are written before anything is built, and "none" from every pull request is the one line' ($notes -gt 0 -and $build -gt $notes -and $wf.Contains('if ($rc -eq 3)') -and $wf.Contains("NOTHING_TO_TELL: 'Nothing people would notice: every change in this release says none.'"))
+    # The notes step itself, run the way GitHub runs a pwsh step: its text
+    # between "$ErrorActionPreference = 'stop'" and "exit $LASTEXITCODE",
+    # by pwsh -command, over a stand-in Collect-ReleaseNotes.ps1 that answers
+    # each exit code. Run 41362111729 (1 Nov 2026) stopped on exit 3, which
+    # the step had already taken as "nothing to tell".
+    $lines = $wf -split "`r?`n"
+    $at = [array]::IndexOf($lines, ($lines | Where-Object { $_ -match '^\s+- name: Write the notes from the merged pull requests\s*$' } | Select-Object -First 1))
+    $step = @()
+    if ($at -ge 0) {
+        $r = $at; while ($r -lt $lines.Count -and $lines[$r] -notmatch '^\s+run: \|\s*$') { $r++ }
+        $indent = $null
+        for ($i = $r + 1; $i -lt $lines.Count; $i++) {
+            if ($lines[$i] -match '^\s*$') { $step += ''; continue }
+            $lead = $lines[$i].Length - $lines[$i].TrimStart().Length
+            if ($null -eq $indent) { $indent = $lead }
+            if ($lead -lt $indent) { break }
+            $step += $lines[$i].Substring($indent)
+        }
+    }
+    Yes 'the notes step''s script is found in merge-release.yml' ($step.Count -gt 3 -and ($step -join "`n").Contains('Collect-ReleaseNotes.ps1'))
+    $pwsh = (Get-Process -Id $PID).Path
+    $stepEnv = 'RUNNER_TEMP', 'GITHUB_OUTPUT', 'GITHUB_SHA', 'GITHUB_REPOSITORY', 'SINCE', 'NOTHING_TO_TELL'
+    $before = @{}; foreach ($v in $stepEnv) { $before[$v] = [Environment]::GetEnvironmentVariable($v) }
+    foreach ($case in @(@{ Code = 0; Ok = $true; Says = 'a note' }, @{ Code = 3; Ok = $true; Says = 'nothing to tell' }, @{ Code = 2; Ok = $false; Says = 'a pull request with no line' }, @{ Code = 1; Ok = $false; Says = 'GitHub unread' })) {
+        $w = Join-Path $tmp ('notes-step-' + $case.Code)
+        Put (Join-Path $w 'scripts/release/Collect-ReleaseNotes.ps1') ("param([string]`$Since, [string]`$Until, [string]`$Repo, [string]`$OutFile)`nif (`$OutFile -and $($case.Code) -eq 0) { [IO.File]::WriteAllText(`$OutFile, 'a note') }`nexit $($case.Code)`n")
+        $rt = Join-Path $w 'runner-temp'; New-Item -ItemType Directory -Force -Path $rt | Out-Null
+        $out = Join-Path $w 'github-output'; Put $out ''
+        $file = Join-Path $w 'step.ps1'
+        Put $file ("`$ErrorActionPreference = 'stop'`n" + ($step -join "`n") + "`nif ((Test-Path -LiteralPath variable:\LASTEXITCODE)) { exit `$LASTEXITCODE }`n")
+        $env:RUNNER_TEMP = $rt; $env:GITHUB_OUTPUT = $out; $env:GITHUB_SHA = $commit; $env:GITHUB_REPOSITORY = 'ThornswoodRP/Thornswood'; $env:SINCE = ''
+        $env:NOTHING_TO_TELL = 'Nothing people would notice: every change in this release says none.'
+        Push-Location $w
+        try { $null = & $pwsh -NoProfile -command ". '$file'" 2>&1; $code = $LASTEXITCODE } finally { Pop-Location }
+        $said = [IO.File]::ReadAllText($out)
+        $notesFile = Join-Path $rt 'notes.md'
+        if ($case.Ok) {
+            $body = if (Test-Path -LiteralPath $notesFile) { [IO.File]::ReadAllText($notesFile) } else { '' }
+            $want = if ($case.Code -eq 3) { $env:NOTHING_TO_TELL } else { 'a note' }
+            Yes ("  the step goes on after $($case.Says) (exit $($case.Code)), with the notes file named (step exit $code)") ($code -eq 0 -and $said.Contains('file=' + $notesFile) -and $body.StartsWith($want))
+        } else {
+            Yes ("  the step stops on $($case.Says) (exit $($case.Code)) and names no notes file (step exit $code)") ($code -ne 0 -and -not $said.Contains('file='))
+        }
+    }
+    foreach ($v in $stepEnv) { [Environment]::SetEnvironmentVariable($v, $before[$v]) }
     Yes 'the launcher is carried when its number is unchanged, held to the manifest and the signature check' ($wf.Contains('launcherVersion') -and $wf.Contains('Get-PublishSignRefusal') -and $wf.Contains('Build-Launcher.ps1 -Root $root -NoSign -NoPause -Version $ver'))
     Yes '  and signed through Sign-OnRunner.ps1 when built' ($wf.Contains('./scripts/release/Sign-OnRunner.ps1 -Path $exe'))
     Yes 'Velopack is pinned, on the one dev channel, with no installer, and signs its programs only' ($wf -match "VPK_VERSION: '\d+\.\d+\.\d+'" -and $wf.Contains('--channel dev') -and $wf.Contains('--noInst') -and
@@ -211,13 +284,13 @@ try {
     Yes 'the site, the Discord bot and voice are zipped by App-Part.ps1 before the parts are compared' ($appsAt -gt 0 -and $stampAt -gt $appsAt -and
         $wf.Contains("foreach (`$p in 'site', 'discord', 'voice')") -and $wf.Contains('./scripts/release/App-Part.ps1 -Part $p -Out $zip'))
     Yes '  and each is a part of every Release' ($wf.Contains('"site=$($env:SITE_ZIP)", "discord=$($env:DISCORD_ZIP)", "voice=$($env:VOICE_ZIP)"'))
-    $appPaths = @(@('site/server.js', 'site/public/**', 'site/data/site/**', 'bot/bot.py', 'bot/dev-channel.txt', 'bot/staff-channel.txt', 'bot/requirements.txt', 'bot/assets/join-card.png',
+    $appPaths = @(@('site/server.js', 'site/lib/**', 'site/public/**', 'site/data/site/**', 'bot/bot.py', 'bot/dev-channel.txt', 'bot/staff-channel.txt', 'bot/requirements.txt', 'bot/assets/join-card.png',
         'voice/voice-server.js', 'voice/headlines.js', 'scripts/vps/Server-Log.js', 'scripts/release/App-Part.ps1') | Where-Object { $wf -notmatch ("(?m)^\s+- '" + [regex]::Escape($_) + "'\s*$") })
     Yes ('  and a merge that changes one of their files starts it' + $(if ($appPaths) { ': not ' + ($appPaths -join ', ') } else { '' })) ($appPaths.Count -eq 0)
-    Yes 'dev gets a Deployment only when a part dev runs changed' ($wf.Contains("if: `${{ steps.changed.outputs.release == 'yes' && steps.changed.outputs.dev == 'yes' }}") -and
+    Yes 'dev gets a Deployment only when a part dev runs changed' ($wf.Contains("if: `${{ steps.newest.outputs.release == 'yes' && steps.changed.outputs.dev == 'yes' }}") -and
         $wf.Contains("`$dev = @(`$changed | Where-Object { `$_ -notin 'site', 'discord' })"))
     Yes 'the site and the bot each get a Deployment of their own with the part beside the tag' ($wf.Contains("`$where = @{ site = 'Site'; discord = 'Discord bot' }") -and
-        $wf.Contains('payload = [ordered]@{ release = $env:TAG; part = $part }') -and $wf.Contains("if: `${{ steps.changed.outputs.release == 'yes' && steps.changed.outputs.apps != '' }}"))
+        $wf.Contains('payload = [ordered]@{ release = $env:TAG; part = $part }') -and $wf.Contains("if: `${{ steps.newest.outputs.release == 'yes' && steps.changed.outputs.apps != '' }}"))
     $wfs = @(Get-ChildItem -LiteralPath (Join-Path $Repo '.github/workflows') -Filter *.yml -File | Where-Object { [IO.File]::ReadAllText($_.FullName) -match 'Record-Deployment|gamemode-release' } | ForEach-Object { $_.Name })
     Yes ('no other workflow records a Deployment or names the old gamemode release' + $(if ($wfs) { ': ' + ($wfs -join ', ') } else { '' })) ($wfs.Count -eq 0 -or ($wfs.Count -eq 2 -and $wfs -contains 'merge-release.yml' -and $wfs -contains 'release-files.yml' -and
         -not ([IO.File]::ReadAllText((Join-Path $Repo '.github/workflows/release-files.yml'))).Contains('deployments: write')))

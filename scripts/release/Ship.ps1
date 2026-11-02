@@ -37,8 +37,8 @@
       Get-Help .\scripts\release\Ship.ps1 -Full
       Get-Help .\scripts\release\Ship.ps1 -Parameter Channel
 
-  AFTER A SUCCESSFUL TIP the host feed is remirrored, then the site news and
-  Discord / server countdown tell people to update. Publish-PostShip.ps1, keyed
+  AFTER A SUCCESSFUL TIP the host feed is remirrored, then Discord and the
+  server countdown tell people to update. Publish-PostShip.ps1, keyed
   off -Channel, owns the remirror and calls the website lane's script:
 
       1  the host feed remirror   scripts\deploy\Remirror-Site-Feed.ps1, the
@@ -47,9 +47,10 @@
                                   /feed-dev/). Since #907 the publisher has
                                   already sent version.json to the VPS store
                                   there, so this finds it in place.
-      2  the site news            Publish-News.ps1, then the #news post and the
-                                  server's countdown, all unchanged and the news
-                                  main only, as they always were.
+      2  the #news post and the server's countdown, main only, as they
+         always were. The site's News page is not sent any more: the site
+         writes it itself from the main feed and the news file on its
+         Release (#5187, site/server.js "news from the Release").
 
   VirusTotal is no longer part of publish (#802). Code signing covers trust
   (#390). Publish-VirusTotal.ps1 stays as an optional manual tool.
@@ -751,6 +752,8 @@ function Get-LauncherInputHash([string]$repoDir) {
         foreach ($f in @(Get-ChildItem -LiteralPath $launcherDir -Recurse -File -Force -EA SilentlyContinue |
                          Where-Object { $_.Extension -ne '.md' })) {
             $rel = 'launcher/' + $f.FullName.Substring($launcherDir.Length).TrimStart('\', '/').Replace('\', '/')
+            # Its harnesses are no part of it, as LauncherVersion.ps1 leaves them out.
+            if ($rel.StartsWith('launcher/tests/')) { continue }
             # As a Windows checkout holds it, so the fingerprint is the same from
             # any machine (ShippedBytes.ps1, #2903).
             $lines.Add($rel + "`t" + (Get-ThornswoodShippedSha256 $f.FullName))
@@ -1890,7 +1893,7 @@ if ($GameDir -and -not (Get-Command node -ErrorAction SilentlyContinue)) {
     Unbump 'node is not on this machine'
     Die ('node is not on this machine, and Ship reads SkyUI''s menus in the game folder with it (scripts\mods\Check-SkyUIMenus.js), ' +
          'so a release never gives everybody the SkyUI error box on the way in. Install it with ' +
-         'winget install --id OpenJS.NodeJS.LTS -e (Developer-Guide.md, "Install the tools"), open a new window, and Ship again. ' +
+         'winget install --id OpenJS.NodeJS.LTS -e (docs/guide/set-up-a-machine.md, "Install the tools"), open a new window, and Ship again. ' +
          'Nothing was built or published.')
 }
 
@@ -2716,8 +2719,7 @@ if ($published -ne 0 -and $published -ne 2) {
 # back rather than leaving a number that was never published.
 #
 # AND NOBODY IS TOLD. Everything after this block announces a release: the
-# remirror, the site news, the Discord post, the server's countdown and the
-# tag. A run that released nothing has nothing for any of them, so it stops
+# remirror, the Discord post, the server's countdown and the tag. A run that released nothing has nothing for any of them, so it stops
 # here and says what it did and did not do. A dev publish with nothing new
 # still brings the dev feed's DEV marks up to date with main (Dev-News.ps1);
 # it says how that went in $global:ThornswoodDevMarks, read back here.
@@ -2886,8 +2888,8 @@ else {
   Website has one command to run by hand, and the remirror asks before it acts,
   so running it again after a failure does nothing the first run already did.
 
-  ORDER, pinned by the website lane: the remirror, then the site news, the
-  Discord post and the server's countdown. Those tell people to update, and the
+  ORDER, pinned by the website lane: the remirror, then the Discord post and
+  the server's countdown. Those tell people to update, and the
   feed has to be serving the release before anybody is sent to fetch it.
 
   WHAT A FAILURE DOES. The tip is already on the feed by the time this runs, so
@@ -2953,16 +2955,11 @@ if (-not $DryRun) {
 }
 
 # ------------------------------------------------------------------- news
-# The site's News page reads the same feed the launcher does, so it is current
-# the moment a release goes out rather than whenever somebody remembers.
-if (-not $DryRun -and -not $Dev) {
-    $newsScript = Join-Path $Here '..\ops\Publish-News.ps1'
-    if (Test-Path -LiteralPath $newsScript) {
-        Head 'Telling the site'
-        try { & $newsScript }
-        catch { Say "  could not reach the site: $_" 'DarkGray' }
-    }
-}
+# Nothing to send the site (#5187). It reads the main feed it serves and that
+# feed's news file (its own copy, or the one on the release's GitHub Release),
+# and writes its News page itself within a minute of the feed reaching it.
+# Publish-News.ps1 sent the page over ssh here, and a Ship stopped before this
+# step left the page a release behind.
 
 # ----------------------------------------------------------------- discord
 # Publish-Discord.ps1 has said "called by Ship.ps1 at the end of every release"
@@ -2971,7 +2968,7 @@ if (-not $DryRun -and -not $Dev) {
 # It exits quietly on its own if no webhook is configured, so there is nothing
 # to guard here.
 # A dev release goes to the dev updates channel and nowhere else. Not #news,
-# not the website (the news step above is skipped for dev), and not the main
+# not the website (which reads main's feed only), and not the main
 # launcher, which reads main's feed. The dev launcher's News tab gets it from
 # the dev feed, as it always did; this is so the people testing it are told
 # without anybody having to watch a version number.

@@ -19,13 +19,13 @@
 //   Done         the issue is closed; or a merged pull request of this
 //                repository carries its test task ("Test task for #N:"),
 //                so its fix is on main and waits only for a main Ship
-//                (Developer-Guide.md, the board), unless another pull
+//                (docs/guide/the-board.md), unless another pull
 //                request naming it is open
 //   In Progress  an open pull request of this repository names it (Closes,
 //                Fixes, Resolves, Refs or Part of #N, or its test task), in
 //                its title or body, draft or not; or it carries a claimed:
 //                label, which is how a Bot or a person says they are on it
-//                and how a waiting issue keeps its place (Developer-Guide.md)
+//                and how a waiting issue keeps its place (docs/guide/the-board.md)
 //   Todo         anything else
 // A pull request names an issue only in its own title and body. A mention in
 // a comment, or a commit message, puts a cross-reference on the issue's

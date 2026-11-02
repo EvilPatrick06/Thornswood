@@ -29,7 +29,7 @@ what it does not is under "Checks on every download".
 - **Conditional, since #445.** `Updater.FromSite` keeps the last document it
   read with the `ETag` the site sent, sends `If-None-Match` on the next check,
   and reads a 304 as that same document. The site answers the tag it issued
-  with 304 and no body (`site/server.js`, the `/feed/version.json` route). The
+  with 304 and no body (`site/lib/serve.js`, the `/feed/version.json` route). The
   launcher asks every thirty seconds while the game runs, and the document is
   about ninety kilobytes, so that is roughly ten megabytes an hour per launcher
   saved without slowing the check down. The tag and the document are held in
@@ -58,7 +58,7 @@ Asked for by Patrick on 28 Sep: "let's get it so we don't need the repo and we
 use the website".
 
 - **Where the bytes are.** On the VPS, `C:\Thornswood-Docs\feed\assets\<sha256>`
-  and `C:\Thornswood-Docs\feed-dev\assets\<sha256>`, served by `site\server.js`
+  and `C:\Thornswood-Docs\feed-dev\assets\<sha256>`, served by `site\lib\serve.js`
   at the asset urls in the table above, with Range resume and immutable
   caching. Each channel has its own folder and holds its own copy: a file both
   feeds name is stored twice, once in each. The route answers only a name of
@@ -111,7 +111,7 @@ this repository's Releases. The addresses a launcher asks do not move.
   named by its sha256, plus `Thornswood-Setup.exe` on a main one. Once GitHub,
   asked without a token, lists that Release with a file under its sha256,
   with that sha256 as GitHub's own digest and the site's size, the site
-  answers the asset with a 302 to the Release's copy (`site/server.js`,
+  answers the asset with a 302 to the Release's copy (`site/lib/feed.js`,
   "release copies"); `/file/Thornswood-Setup.exe` does the same for the
   installer the site lists. The Downloads page, the bot's links and the
   installer keep their thornswood.net addresses and follow the same
@@ -150,7 +150,7 @@ this repository's Releases. The addresses a launcher asks do not move.
 - **What it never does.** It never changes a published Release: one that
   lacks a file stops the run. It publishes a Release only after GitHub's own
   digest of every file is right. It runs on GitHub's hosted runner, never on
-  the box. `tests\test-3686-release-files.ps1` and `tests\test-release-copies.js`
+  the box. `tests\test-3686-release-files.ps1` and `site\tests\test-release-copies.js`
   hold both halves.
 
 ### The feed store on the VPS (#907)
@@ -171,7 +171,7 @@ the VPS now, beside the feed the site already serves:
 | `C:\Thornswood-Docs\feed\history\<utc stamp>-<name>` | each of the other files as it was before it was replaced (version.json's history is `version\`) | no |
 | `C:\Thornswood-Docs\feed\assets\<sha256>` | the downloads | yes |
 
-and the same under `feed-dev` for dev. `site\server.js` answers only
+and the same under `feed-dev` for dev. `site\lib\serve.js` answers only
 `/feed[-dev]/version.json` and `/feed[-dev]/assets/<64 hex>`, so nothing else
 in those folders can be fetched: `tests\test-feed-store.ps1` asks a copy of
 the site for `published.json`, `launchers.txt`, `history\`, a `.part` and
@@ -208,7 +208,7 @@ process write to both folders (#923), so only a publisher over ssh writes them.
   often. The site opens the feed for every launcher's check, every `/watch`
   tick and every join pass, so a request in a Ship's swap found no feed.
   That is why version.json is never replaced: a generation's name only ever
-  appears, and the one before it stays (`feedFile` in `site\server.js`,
+  appears, and the one before it stays (`feedFile` in `site\lib\feed.js`,
   `tests\test-2727-feed-swap-readers.ps1`). If anything moved up there it
   replaces nothing and throws: that is two publishers at once, the push git
   used to refuse.
@@ -353,7 +353,7 @@ saved fields that come from elsewhere, as their rows say.
 | `releases` | array, newest first, at most 30, of `{ id, sha256, url, entries, lastPack, to? }` | Gone from the feed since #1050: the list is `releases.json` in the channel's store beside the feed (see "The feed store on the VPS"), written by `Publish-Update.ps1` on every release that names a `baseline` (the release list block, #442) and by `Rollback-Feed.ps1`, with `to` naming the release a rollback went back to. A feed that still carries the field (written before #1050, or by a Ship from a branch without it) is read too, merged by id, and the next write takes it out | No launcher. `Rollback-Feed.ps1`, `Scrub-Feed.ps1`, Ship's release tag check (`Get-StoreReleases`, `Release-Baseline.ps1`; `Read-ReleaseListFile`, `Release-Name.ps1`) | The record each release published, the same shape as `baseline`, plus `lastPack`, the last pack on the feed once that release was out, whose plugin list is the one it shipped ('' once the packs are gone: the record's own `:golden:` entries hold it). What a channel can be put back to; a release older than the newest thirty cannot be. The first release after #442 started the list with the `baseline` the feed already named. |
 | `release` | object `{ id, channel, launcherVersion, packs, baseline, commit, branch, uncommitted, tag }` | `Publish-Update.ps1` on every release (the release record block, #444) | No launcher. Ship, which tags `commit` as `tag` once the feed is out (`Add-ReleaseTag`, `Release-Name.ps1`); the store's `releases.txt` | The release's one name is `id`, the id its packs and its `baseline` carry (`20260928-1630`, dev `20260928-2324-dev`). The rest is what else it is known by: the launcher the feed offers with it (the same across Ships that keep their launcher, #921), the packs it added, its baseline id (empty on a `-NoUpload` run), the commit it was built from and how many tracked files differed from it, and the tag `release/main/<id>` or `release/dev/<id>` (empty when it was not built from a git checkout). `Get-ReleaseDisagreements` says whether they agree, with each other and with `releases`, whose newest entry is the same id ending on its last pack. After a main Ship the dev feed carries main's, `channel` main. `Rollback-Feed.ps1` does not rewrite it yet, so after a rollback it still names the last Ship until the next. |
 | `signedManifest` | object `{ url, sha256, catalogUrl, catalogSha256 }` | `Publish-Update.ps1` on every release that sends to the site (the signed manifest block, #2163 phase B); taken out by a `-NoUpload` run | No launcher yet (phase C of `docs\SIGNED-RELEASES.md`) | `release.json`, the sha256 of every asset of the release that carries code or names files (launcher, client runtime, packs, optional packs, the baseline record) with the commit it was built from, and a Windows catalog over it signed by ThornswoodRelease, both at `/feed[-dev]/assets/<sha256>`. Written only after the catalog was signed and passed the publish gate and `Signature.cs`; a signing failure stops the Ship before this file moves. Feed edits after a Ship carry it forward untouched. |
-| `news` | array, newest first, at most 40 | `Publish-Update.ps1:Set-Prop $doc 'news' $news`; `Publish-Server.ps1:$newsList`. On the dev feed each entry's `channel` is `"dev"` while main has not had it, set by `Dev-News.ps1:Update-DevNewsChannels` | News tab (`ShellNews.cs:BuildNews`); `Publish-News.ps1` copies it to the site | Cosmetic. Every launcher up to 1.2.3 reads the notes only here, so they stay here until the channel's minLauncher reads `newsFile` (#1050), and from then it is `[]`. Every script reads and writes the notes through `scripts\release\Feed-News.ps1` (`Get-FeedNewsList`, `Open-FeedNewsList`, `Set-FeedNewsList`), wherever the channel keeps them. |
+| `news` | array, newest first, at most 40 | `Publish-Update.ps1:Set-Prop $doc 'news' $news`; `Publish-Server.ps1:$newsList`. On the dev feed each entry's `channel` is `"dev"` while main has not had it, set by `Dev-News.ps1:Update-DevNewsChannels` | News tab (`ShellNews.cs:BuildNews`); the site's News page reads it from the main feed (`site/lib/news.js` "news from the Release", #5187) | Cosmetic. Every launcher up to 1.2.3 reads the notes only here, so they stay here until the channel's minLauncher reads `newsFile` (#1050), and from then it is `[]`. Every script reads and writes the notes through `scripts\release\Feed-News.ps1` (`Get-FeedNewsList`, `Open-FeedNewsList`, `Set-FeedNewsList`), wherever the channel keeps them. |
 | `newsFile` | object `{ url, sha256, count }` or absent | `Set-FeedNewsList` (`Feed-News.ps1`), called by Publish-Update (the news out block), Rollback-Feed, Publish-Server's news entry and a dev marks refresh (`Update-DevFeedMarks`), once the channel's minLauncher is at or above `$FeedNewsFileLauncher` (1.2.4, the first launcher with FeedNews.cs): every note, at most 40, as one asset at `/feed[-dev]/assets/<sha256>`, sent to the site before the feed names it. Absent before that. `Remirror-Site-Feed.ps1` checks it is on the site like any asset | The launcher from #1050 on (`Updater.FillNews`, `launcher\app\FeedNews.cs`): fetched once on the update check's thread, checked (https, the host list, stored under its own sha256, the bytes hash to it), kept in `Profile\news.json`, and its notes put after the ones `news` carries, each note once by date and title. Read apart from the rest of the feed (`NewsRef.FromFeed`), so one of another shape costs only itself | Cosmetic. A file that cannot be had or read leaves the notes `news` carries and one line in launcher.log; the update check goes on. |
 | `mainVersion` | string | `Dev-News.ps1:Set-DevFeedMarks`: the main feed's `launcherVersion`, read off the site, with the DEV marks, on every dev ship (one with nothing new included), after every main ship (`Refresh-DevNews.ps1`), and by `Refresh-DevNews.ps1` run by hand; `""` on a main ship (`Publish-Update.ps1:Set-Prop $doc 'mainVersion' ''`) | Dev News tab header (`ShellNews.cs:pendingDoc.mainVersion`) | Cosmetic. |
 | `serverPassword` | string | Nobody. Every ship deletes it (`Publish-Update.ps1:$doc.PSObject.Properties.Remove('serverPassword')`) | No longer declared in `Config.cs:VersionDoc`; read by nothing since 1.0.197 | Must never come back: the feed is public. |
@@ -587,7 +587,7 @@ seconds in a session, and almost none of it moves between releases.
 
 The store is unchanged: every generation on the VPS is the whole feed, and
 every script, backup and page reads it whole. The split is what the site
-answers (`site\server.js` `feedView`), once the feed's `minLauncher` is at or
+answers (`site\lib\feed.js` `feedView`), once the feed's `minLauncher` is at or
 above `FEED_SPLIT_LAUNCHER`, 1.2.6, the first launcher that reads it
 (`launcher\app\FeedSettings.cs`). Below that the generation is answered byte
 for byte, as before.
@@ -620,8 +620,8 @@ for byte, as before.
   `Copy-ReleaseAssets-ToSite.ps1`. The rest read the launcher fields alone.
 
 Projected from the 19 Oct main feed with the note's title, version.json is
-about 650 bytes. `tests\test-1050-feed-split.js` holds the site to this, and
-`tests\test-1050-feed-split.ps1` the launcher, `Join-FeedSettings`, and (with
+about 650 bytes. `launcher\tests\test-1050-feed-split.js` holds the site to this, and
+`launcher\tests\test-1050-feed-split.ps1` the launcher, `Join-FeedSettings`, and (with
 `-OldSrc`) every older launcher reading the split version.json as a feed that
 is behind and offers only the launcher update.
 

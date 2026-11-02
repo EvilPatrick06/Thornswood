@@ -35,7 +35,7 @@
   404, and that is a line too. Both are said in full, with the command that puts
   them right, and the release stays out and stays announced. Asked for by the
   website lane on 27 September: "Exit 1 = refused publish (do not fail the
-  release)", the same spirit as Ship's own try/catch around Publish-News.
+  release)", the same spirit as Ship's own try/catch around Publish-Discord.
 
   THERE IS NO THIRD STEP FOR THE LAUNCHER, and that is the launcher lane's
   answer rather than an omission. A launcher polls the feed and updates itself,
@@ -45,7 +45,7 @@
   re-running it after the tip would refresh that one install again.
 
   IT RUNS ON EVERY RELEASE, DEV AND MAIN. Everything goes to dev first
-  (Developer-Guide.md, decided 23 September), so the dev channel is where this is
+  (docs/guide/how-work-moves.md, decided 23 September), so the dev channel is where this is
   exercised several times a week rather than once a fortnight. -Only Remirror
   is how Ship names the half; -Only VirusTotal is a soft no-op pointing at the
   manual tool.

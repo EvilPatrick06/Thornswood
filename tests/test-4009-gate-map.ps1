@@ -23,7 +23,9 @@
     3. the gate's shares get the job's token for it, with actions: read, and
        Run-Gate.ps1 takes it out of the environment before any harness runs;
     4. gate-map.yml keeps gate-map only from main and gate-map-trial from a
-       pull request, traces on windows-2022 and needs no secret.
+       pull request, traces on windows-2022 and needs no secret; and since
+       #5293 runs the whole gate on Linux beside it and keeps the two runs'
+       comparison in the same map.
 
   Writes only its scratch folder, in the system's temp folder, and deletes it.
 #>
@@ -177,6 +179,24 @@ Yes 'Gate-Map.ps1 has no -Hand left' (-not $gm.Contains('[switch]$Hand'))
 # ---- 4. gate-map.yml
 $w = [IO.File]::ReadAllText((Join-Path (Join-Path (Join-Path $repo '.github') 'workflows') 'gate-map.yml')).Replace("`r`n", "`n")
 Yes 'gate-map.yml runs nightly, by hand, and on a pull request that changes the trace' ($w -match "(?m)^  schedule:\n    - cron: '[^']+'" -and $w -match '(?m)^  workflow_dispatch:' -and $w -match '(?m)^  pull_request:\n    paths:')
+# After a merge that changes what runs the gate (#5296): the push paths are
+# Affected-Harnesses.js FORCE's, so a merge that makes every pull request run
+# the whole gate traces a new map, and no other merge does.
+$pushPaths = @()
+if ($w -match "(?m)^  push:\n    branches: \[main\]\n    paths:\n((?:      - .+\n)+)") { $pushPaths = @($Matches[1].Trim() -split '\n' | ForEach-Object { $_.Trim().Substring(2).Trim("'") }) }
+$samples = @('.github/workflows/build.yml', '.github/workflows/build-pr.yml', '.github/workflows/nightly.yml', '.github/workflows/gate-map.yml',
+    'scripts/dev/Run-Gate.ps1', 'scripts/dev/Gate-Map.ps1', 'scripts/dev/Nightly-Harnesses.ps1', 'scripts/dev/Gate-Harnesses.ps1',
+    'scripts/dev/Affected-Harnesses.js', 'scripts/dev/Trace-HarnessReads.js', 'scripts/dev/Check-Change.ps1', 'tests/gate-excluded.txt',
+    'tests/Harness.psm1', 'tests/helper.ps1', 'tests/helper.js', 'tests/helper.cjs', 'tests/helper.mjs', 'tests/helper.py', 'tests/helper.c',
+    'tests/test-4009-gate-map.ps1', 'tests/test-3182-tested-tree.js', 'tests/test-x.py', 'tests/fixtures/a.ps1', 'tests/notes.md',
+    'records/build-runners.json', 'records/github-repo-settings.json', '.gitattributes', '.gitmodules', 'game/gamemode.js')
+# GitHub's filter: * is anything but /, a later ! pattern takes a path out.
+$byFilter = { param($f) $hit = $false; foreach ($p in $pushPaths) { $neg = $p.StartsWith('!'); $g = $p.TrimStart('!'); $re = '^' + ([regex]::Escape($g) -replace '\\\*', '[^/]*') + '$'; if ($f -match $re) { $hit = -not $neg } }; $hit }
+$forceJs = "const f=require(process.argv[1]).FORCE;for(const p of process.argv.slice(2))console.log(f.some(r=>r[0].test(p))?'1':'0')"
+$forced = @(node -e $forceJs (Join-Path (Join-Path (Join-Path $repo 'scripts') 'dev') 'Affected-Harnesses.js') @samples)
+$differ = @(for ($i = 0; $i -lt $samples.Count; $i++) { if (($forced[$i] -eq '1') -ne [bool](& $byFilter $samples[$i])) { $samples[$i] } })
+if ($differ.Count) { Write-Host ('  the push paths and FORCE differ for: ' + ($differ -join ', ')) }
+Yes 'gate-map.yml traces again on a push to main that changes what forces the whole gate, and on no other (#5296)' ($pushPaths.Count -gt 0 -and $forced.Count -eq $samples.Count -and -not $differ.Count)
 Yes '  its gate step ends 0 with the gate''s code kept, so the map is read whatever the gate did' ($w -match "(?m)^          Add-Content -LiteralPath \`$env:GITHUB_OUTPUT -Value \('code=' \+ \`$LASTEXITCODE\)\r?\n          exit 0\r?\n")
 Yes '  keeps gate-map only from main, and never from a pull request' ($w -match "(?ms)- name: Keep the map\n\s+if: github\.event_name != 'pull_request' && github\.ref == 'refs/heads/main'\n.*?name: gate-map\n")
 Yes '  keeps a pull request''s as gate-map-trial' ($w -match "(?ms)- name: Keep the trial map\n\s+if: github\.event_name == 'pull_request'\n.*?name: gate-map-trial\n")
@@ -186,6 +206,21 @@ Yes '  and needs no secret, and keeps no credentials on disk' ($w -notmatch 'sec
 $checkoutOf = { param($text) if ($text -match '(?m)^      - uses: actions/checkout@\S+ # v\d+\n        with:\n((?:          .+\n)+)') { @($Matches[1].Trim() -split '\n' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne 'persist-credentials: false' } | Sort-Object) -join ';' } else { '' } }
 $gateCo = & $checkoutOf $gateJob
 Yes '  checks out what the gate''s shares check out, so the trace runs the gate on the same history (#5179)' ($gateCo -ne '' -and $gateCo.Contains('fetch-depth: 0') -and $gateCo -eq (& $checkoutOf $w))
+
+# #5293: the whole gate on Linux beside the trace, and the two runs compared
+# into the same map.
+$at = $w.IndexOf("`n  linux:`n"); $pt = $w.IndexOf("`n  platforms:`n")
+$linuxJob = $(if ($at -gt 0 -and $pt -gt $at) { $w.Substring($at, $pt - $at) } else { '' })
+$platJob = $(if ($pt -gt 0) { $w.Substring($pt) } else { '' })
+Yes '  runs the whole gate on Linux too, with the start log, on the same history (#5293)' ($linuxJob -match '(?m)^    runs-on: ubuntu-latest$' -and
+    $linuxJob -match '(?m)^          \./scripts/dev/Run-Gate\.ps1 -Throttle \d+ -BudgetSeconds \d+ -StartLog ' -and (& $checkoutOf $linuxJob) -eq $gateCo)
+Yes '  where a harness that fails stays on Windows and leaves the job green, and no line at all is red' ($linuxJob -match '(?m)^          exit 0$' -and $linuxJob.Contains("wrote no line for any harness'; exit 1"))
+Yes '  both runs keep what each harness said' ($w -match '(?ms)name: gate-starts-windows\n\s+path: \$\{\{ runner\.temp \}\}/gate-trace/starts\.jsonl' -and $linuxJob -match 'name: gate-starts-linux\n\s+path: \$\{\{ runner\.temp \}\}/gate-linux/starts\.jsonl')
+Yes '  the job "platforms" waits for both, and runs unless cancelled or the trace never ran' ($platJob -match "(?m)^    needs: \[trace, linux\]\n    if: \`$\{\{ !cancelled\(\) && needs\.trace\.result != 'skipped' \}\}$")
+Yes '  compares them with Affected-Harnesses.js platforms into <key>.platforms.json, for the map''s commit' ($platJob.Contains("node scripts/dev/Affected-Harnesses.js platforms `$win `$lin (Join-Path `$map ([string]`$l.key + '.platforms.json')) ([string]`$l.commit)"))
+Yes '  and keeps no platforms file when either run or the map is missing' ($platJob.Contains("'keep=false'") -and $platJob.Contains('the Linux run kept nothing') -and $platJob.Contains('the trace kept no map'))
+Yes '  keeping the map again under its own name, gate-map only from main' ($platJob -match "(?ms)- name: Keep the map with it\n\s+if: steps\.compare\.outputs\.keep == 'true' && github\.event_name != 'pull_request' && github\.ref == 'refs/heads/main'\n.*?name: gate-map\n.*?overwrite: true\n" -and
+    $platJob -match "(?ms)- name: Keep the trial map with it\n\s+if: steps\.compare\.outputs\.keep == 'true' && github\.event_name == 'pull_request'\n.*?name: gate-map-trial\n.*?overwrite: true\n")
 
 Write-Host ''
 Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)

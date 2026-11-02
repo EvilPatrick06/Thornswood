@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  80,
-    "callCount":  318,
+    "callCount":  325,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -224,6 +224,15 @@
                   },
                   {
                       "script":  "scripts/deploy/Deploy-Docs.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$agentSaid = @(Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script @\"",
+                      "does":  "reads whether the deploy agent's agent.json names the site",
+                      "class":  "read-status",
+                      "reason":  "read only"
+                  },
+                  {
+                      "script":  "scripts/deploy/Deploy-Docs.ps1",
                       "scope":  "Remote",
                       "via":  "Invoke-ThornswoodRemote",
                       "anchor":  "return Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script $script",
@@ -244,7 +253,7 @@
                       "script":  "scripts/deploy/Deploy-Docs.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "foreach (`$d in @(\u0027$rootWin\u0027,\u0027$rootWin\\public\u0027,\u0027$rootWin\\data\u0027,\u0027$rootWin\\files\u0027,\u0027$rootWin\\uploads\u0027)) {",
+                      "anchor":  "foreach (`$d in @(\u0027$rootWin\u0027,\u0027$rootWin\\lib\u0027,\u0027$rootWin\\public\u0027,\u0027$rootWin\\data\u0027,\u0027$rootWin\\files\u0027,\u0027$rootWin\\uploads\u0027)) {",
                       "does":  "makes the site folders",
                       "class":  "stage",
                       "reason":  "folder create under the site root"
@@ -254,6 +263,15 @@
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
                       "anchor":  "$hashedServer = Remote @\"",
+                      "does":  "reads files, settings, logs or status",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/deploy/Deploy-Docs.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$hashedLib = Remote @\"",
                       "does":  "reads files, settings, logs or status",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
@@ -613,7 +631,7 @@
                       "script":  "scripts/deploy/Install-Backup.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "`$a = New-ScheduledTaskAction -Execute \u0027powershell.exe\u0027 -Argument \u0027-NoProfile -ExecutionPolicy Bypass -File \"$runner\"\u0027",
+                      "anchor":  "`$a = New-ScheduledTaskAction -Execute (Join-Path `$env:ProgramFiles \u0027PowerShell\\7\\pwsh.exe\u0027) -Argument \u0027-NoProfile -ExecutionPolicy Bypass -File \"$runner\"\u0027",
                       "does":  "install-time or outside-the-gate work",
                       "class":  "admin",
                       "reason":  "sends New-ScheduledTask"
@@ -1051,6 +1069,60 @@
                       "reason":  "sends lockAll"
                   },
                   {
+                      "script":  "scripts/deploy/Install-Tunnel.ps1",
+                      "scope":  "Remote",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "function Remote($script) { return Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $script }",
+                      "does":  "sends a script for its caller",
+                      "class":  "transport",
+                      "reason":  "carries what its caller hands it; each caller is mapped"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Tunnel.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "if (`$t) { `$i = Get-ScheduledTaskInfo -TaskName `$task;",
+                      "does":  "reads the tunnel task, cloudflared\u0027s version, /ready and its counters, whether token.txt is there and which way the names point",
+                      "class":  "read-status",
+                      "reason":  "reads only; the gate runs it as Install-Tunnel -Status"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Tunnel.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "if ((Get-State) -eq \u0027switched\u0027) { \u0027the names are on the tunnel, so taking it off",
+                      "does":  "stops and unregisters the tunnel task and deletes cloudflared and its token from the box",
+                      "class":  "admin",
+                      "reason":  "unregisters a task and deletes a secret; never a gate word"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Tunnel.ps1",
+                      "scope":  "Get-BoxSealKey",
+                      "via":  "Remote",
+                      "anchor":  "(Get-ThornswoodSealKeyBlock)",
+                      "does":  "makes the box\u0027s seal key in C:\\Thornswood-Seal if it has none, locks the folder, prints the public half",
+                      "class":  "admin",
+                      "reason":  "writes a private key and an ACL; the gate runs it as Install-Tunnel -SealKey"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Tunnel.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$out = @(Remote ($common + $opened + $cfApi + @\"",
+                      "does":  "opens the sealed API token with the box\u0027s key and moves thornswood.net and www onto the tunnel or back, checking they answer through it",
+                      "class":  "admin",
+                      "reason":  "reads a private key and changes DNS at Cloudflare; the gate runs it as Install-Tunnel -Switch or -Back"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Tunnel.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$out = @(Remote $install | ForEach-Object { Say \"  $_\"; \"$_\".Trim() })",
+                      "does":  "opens the sealed API token, makes the tunnel and its routes, writes its token to a locked token.txt, installs the recorded cloudflared and registers and starts its task as LOCAL SERVICE",
+                      "class":  "admin",
+                      "reason":  "installs a program, writes a secret and an ACL, registers a task; the gate runs it as Install-Tunnel"
+                  },
+                  {
                       "script":  "scripts/deploy/Install-Voice.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
@@ -1414,7 +1486,7 @@
                       "script":  "scripts/oneoff/Fix-Voice.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "ssh",
-                      "anchor":  "$out = Invoke-ThornswoodNative { \u0026 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \"$User@$Vps\" \"powershell -NoProfile -EncodedCommand $enc\" } 2\u003e\u00261",
+                      "anchor":  "$out = Invoke-ThornswoodNative { \u0026 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \"$User@$Vps\" \"pwsh -NoProfile -EncodedCommand $enc\" } 2\u003e\u00261",
                       "does":  "reinstalls the voice task",
                       "class":  "admin",
                       "reason":  "Register-ScheduledTask"
@@ -1423,7 +1495,7 @@
                       "script":  "scripts/ops/Chargen-Log.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "ssh",
-                      "anchor":  "Invoke-ThornswoodNative { \u0026 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \"$User@$Vps\" \"powershell -NoProfile -EncodedCommand $enc\" }",
+                      "anchor":  "Invoke-ThornswoodNative { \u0026 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \"$User@$Vps\" \"pwsh -NoProfile -EncodedCommand $enc\" }",
                       "does":  "reads files, settings, logs or status",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
@@ -1432,7 +1504,7 @@
                       "script":  "scripts/ops/Check-Chargen.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "ssh",
-                      "anchor":  "$text = Invoke-ThornswoodNative { \u0026 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \"$User@$Vps\" \"powershell -NoProfile -EncodedCommand $enc\" } 2\u003e\u00261",
+                      "anchor":  "$text = Invoke-ThornswoodNative { \u0026 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \"$User@$Vps\" \"pwsh -NoProfile -EncodedCommand $enc\" } 2\u003e\u00261",
                       "does":  "reads files, settings, logs or status",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
@@ -1441,19 +1513,10 @@
                       "script":  "scripts/ops/Check-Roster.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "ssh",
-                      "anchor":  "$out = Invoke-ThornswoodNative { \u0026 ssh @ssh \"$User@$Vps\" \"powershell -NoProfile -EncodedCommand $enc\" } 2\u003e\u00261",
+                      "anchor":  "$out = Invoke-ThornswoodNative { \u0026 ssh @ssh \"$User@$Vps\" \"pwsh -NoProfile -EncodedCommand $enc\" } 2\u003e\u00261",
                       "does":  "reads files, settings, logs or status",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
-                  },
-                  {
-                      "script":  "scripts/ops/Publish-News.ps1",
-                      "scope":  "\u003ctop\u003e",
-                      "via":  "scp",
-                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $tmp \"$User@${Vps}:$Root/data/news.json\" }",
-                      "does":  "writes the feed, news or files store",
-                      "class":  "feed-send",
-                      "reason":  "writes the feed, news or files store"
                   },
                   {
                       "script":  "scripts/ops/Reset-Character.ps1",
@@ -1657,7 +1720,7 @@
                       "script":  "scripts/release/Go.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "ssh",
-                      "anchor":  "$r = Invoke-ThornswoodNative { \u0026 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \"$User@$Vps\" \"powershell -NoProfile -EncodedCommand $e\" } 2\u003e\u00261",
+                      "anchor":  "$r = Invoke-ThornswoodNative { \u0026 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \"$User@$Vps\" \"pwsh -NoProfile -EncodedCommand $e\" } 2\u003e\u00261",
                       "does":  "restarts voice",
                       "class":  "admin",
                       "reason":  "Stop-Process on the voice node process"
@@ -1666,7 +1729,7 @@
                       "script":  "scripts/release/Go.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "ssh",
-                      "anchor":  "$out = Invoke-ThornswoodNative { \u0026 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \"$User@$Vps\" \"powershell -NoProfile -EncodedCommand $enc\" } 2\u003e\u00261",
+                      "anchor":  "$out = Invoke-ThornswoodNative { \u0026 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \"$User@$Vps\" \"pwsh -NoProfile -EncodedCommand $enc\" } 2\u003e\u00261",
                       "does":  "reads files, settings, logs or status",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
@@ -1756,7 +1819,7 @@
                       "script":  "scripts/release/Publish-Server.ps1",
                       "scope":  "Invoke-Installer",
                       "via":  "ssh",
-                      "anchor":  "$lines = @(Invoke-ThornswoodNative { \u0026 ssh @ssh $target \"powershell -NoProfile -ExecutionPolicy Bypass -File C:\\Install-ThornswoodServer.ps1 $instArgs\" } |",
+                      "anchor":  "$lines = @(Invoke-ThornswoodNative { \u0026 ssh @ssh $target \"pwsh -NoProfile -ExecutionPolicy Bypass -File C:\\Install-ThornswoodServer.ps1 $instArgs\" } |",
                       "does":  "runs Install-ThornswoodServer.ps1",
                       "class":  "admin",
                       "reason":  "registers the SYSTEM task"
@@ -1864,7 +1927,7 @@
                       "script":  "scripts/release/Publish-Server.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "ssh",
-                      "anchor":  "$out = @(Invoke-ThornswoodNative { \u0026 ssh @ssh $target \"powershell -NoProfile -EncodedCommand $enc\" } | ForEach-Object { \"$_\".Trim() })",
+                      "anchor":  "$out = @(Invoke-ThornswoodNative { \u0026 ssh @ssh $target \"pwsh -NoProfile -EncodedCommand $enc\" } | ForEach-Object { \"$_\".Trim() })",
                       "does":  "seeds the server root",
                       "class":  "admin",
                       "reason":  "first install, writes outside any stage"
@@ -1936,7 +1999,7 @@
                       "script":  "scripts/vps/Check-LiveGamemode.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "ssh",
-                      "anchor":  "$answer = (Invoke-ThornswoodNative { \u0026 ssh @ssh \"$User@$Vps\" \"powershell -NoProfile -EncodedCommand $enc\" } 2\u003e\u00261) -join \u0027\u0027",
+                      "anchor":  "$answer = (Invoke-ThornswoodNative { \u0026 ssh @ssh \"$User@$Vps\" \"pwsh -NoProfile -EncodedCommand $enc\" } 2\u003e\u00261) -join \u0027\u0027",
                       "does":  "reads files, settings, logs or status",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
@@ -2035,7 +2098,7 @@
                       "script":  "scripts/vps/Fetch-Backups.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "ssh",
-                      "anchor":  "$listing = Invoke-ThornswoodNative { \u0026 ssh @ssh $target \"powershell -NoProfile -EncodedCommand $e\" } 2\u003e\u00261",
+                      "anchor":  "$listing = Invoke-ThornswoodNative { \u0026 ssh @ssh $target \"pwsh -NoProfile -EncodedCommand $e\" } 2\u003e\u00261",
                       "does":  "reads files, settings, logs or status",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
@@ -2053,7 +2116,7 @@
                       "script":  "scripts/vps/Fetch-Backups.ps1",
                       "scope":  "Send-OffBoxMark",
                       "via":  "ssh",
-                      "anchor":  "$said = @(Invoke-ThornswoodNative { \u0026 ssh @ssh $target \"powershell -NoProfile -EncodedCommand $enc\" }",
+                      "anchor":  "$said = @(Invoke-ThornswoodNative { \u0026 ssh @ssh $target \"pwsh -NoProfile -EncodedCommand $enc\" }",
                       "does":  "writes the newest checked copy\u0027s name into C:\\Thornswood-Watch\\offbox.txt, which the SYSTEM watchdog reads (#2755)",
                       "class":  "admin",
                       "reason":  "writes into the watchdog\u0027s locked folder, outside the gate verbs"
@@ -2089,7 +2152,7 @@
                       "script":  "scripts/vps/Get-Logs.ps1",
                       "scope":  "Read-Box",
                       "via":  "ssh",
-                      "anchor":  "$said = @(Invoke-ThornswoodNative { \u0026 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes $target \"powershell -NoProfile -EncodedCommand $enc\" } 2\u003e\u00261)",
+                      "anchor":  "$said = @(Invoke-ThornswoodNative { \u0026 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes $target \"pwsh -NoProfile -EncodedCommand $enc\" } 2\u003e\u00261)",
                       "does":  "reads logs",
                       "class":  "read-status",
                       "reason":  "read only"
@@ -2125,7 +2188,7 @@
                       "script":  "scripts/vps/Harden-VPS.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "ssh",
-                      "anchor":  "$said = (@(Invoke-ThornswoodNative { \u0026 ssh @ssh \"$User@$Vps\" \"powershell -NoProfile -EncodedCommand $enc\" } 2\u003e\u00261 | ForEach-Object { [string]$_ }) -join \u0027 \u0027)",
+                      "anchor":  "$said = (@(Invoke-ThornswoodNative { \u0026 ssh @ssh \"$User@$Vps\" \"pwsh -NoProfile -EncodedCommand $enc\" } 2\u003e\u00261 | ForEach-Object { [string]$_ }) -join \u0027 \u0027)",
                       "does":  "cancels a pending hardening step",
                       "class":  "admin",
                       "reason":  "hardening"
@@ -2170,7 +2233,7 @@
                       "script":  "scripts/vps/Request-Restart.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "ssh",
-                      "anchor":  "$out = Invoke-ThornswoodNative { \u0026 ssh @ssh \"$User@$Vps\" \"powershell -NoProfile -EncodedCommand $enc\" } 2\u003e\u00261",
+                      "anchor":  "$out = Invoke-ThornswoodNative { \u0026 ssh @ssh \"$User@$Vps\" \"pwsh -NoProfile -EncodedCommand $enc\" } 2\u003e\u00261",
                       "does":  "drops a restart request json into the server data folder",
                       "class":  "stage",
                       "reason":  "file write in a Thornswood folder; the gamemode reads it, warns, and deletes it"
@@ -2224,7 +2287,7 @@
                       "script":  "scripts/vps/Restore-Box.ps1",
                       "scope":  "OnBox",
                       "via":  "ssh",
-                      "anchor":  "Invoke-ThornswoodNative { \u0026 ssh @ssh $target \"powershell -NoProfile -ExecutionPolicy Bypass -File $far\\scripts\\vps\\$file $argLine\" } 2\u003e\u00261 |",
+                      "anchor":  "Invoke-ThornswoodNative { \u0026 ssh @ssh $target \"pwsh -NoProfile -ExecutionPolicy Bypass -File $far\\scripts\\vps\\$file $argLine\" } 2\u003e\u00261 |",
                       "does":  "runs a restore script on the box",
                       "class":  "admin",
                       "reason":  "restore"
@@ -2377,7 +2440,7 @@
                       "script":  "scripts/vps/Set-SshScope.ps1",
                       "scope":  "Invoke-Encoded",
                       "via":  "ssh",
-                      "anchor":  "$out = Clean @(Invoke-ThornswoodNative { \u0026 ssh @ssh \"$User@$Vps\" \"powershell -NoProfile -EncodedCommand $enc\" } 2\u003e\u00261)",
+                      "anchor":  "$out = Clean @(Invoke-ThornswoodNative { \u0026 ssh @ssh \"$User@$Vps\" \"pwsh -NoProfile -EncodedCommand $enc\" } 2\u003e\u00261)",
                       "does":  "cancels the ssh scope put back task, or reads the port 22 rules back",
                       "class":  "admin",
                       "reason":  "unregisters a SYSTEM task"
@@ -2395,7 +2458,7 @@
                       "script":  "scripts/vps/Set-TimeWait.ps1",
                       "scope":  "Invoke-Encoded",
                       "via":  "ssh",
-                      "anchor":  "$out = Clean @(Invoke-ThornswoodNative { \u0026 ssh @ssh \"$User@$Vps\" \"powershell -NoProfile -EncodedCommand $enc\" } 2\u003e\u00261)",
+                      "anchor":  "$out = Clean @(Invoke-ThornswoodNative { \u0026 ssh @ssh \"$User@$Vps\" \"pwsh -NoProfile -EncodedCommand $enc\" } 2\u003e\u00261)",
                       "does":  "reads when the box last started, or the startup tasks, the bot and the ports after the restart",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
@@ -2449,7 +2512,7 @@
                       "script":  "scripts/vps/Show-BotLog.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "ssh",
-                      "anchor":  "$out = Invoke-ThornswoodNative { \u0026 ssh @ssh \"$User@$Vps\" \"powershell -NoProfile -EncodedCommand $e\" } 2\u003e\u00261",
+                      "anchor":  "$out = Invoke-ThornswoodNative { \u0026 ssh @ssh \"$User@$Vps\" \"pwsh -NoProfile -EncodedCommand $e\" } 2\u003e\u00261",
                       "does":  "reads the bot log",
                       "class":  "read-status",
                       "reason":  "read only"
@@ -2620,7 +2683,7 @@
                       "script":  "scripts/vps/Watch-Services.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "ssh",
-                      "anchor":  "$out = $url | Invoke-ThornswoodNative { $input | \u0026 ssh @ssh \"$User@$Vps\" \"powershell -NoProfile -EncodedCommand $e\" } 2\u003e\u00261",
+                      "anchor":  "$out = $url | Invoke-ThornswoodNative { $input | \u0026 ssh @ssh \"$User@$Vps\" \"pwsh -NoProfile -EncodedCommand $e\" } 2\u003e\u00261",
                       "does":  "writes the watch script into its locked folder",
                       "class":  "admin",
                       "reason":  "install of a SYSTEM task script"

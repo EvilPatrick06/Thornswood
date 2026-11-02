@@ -147,7 +147,7 @@ try {
     $dll = Join-Path $tmp 'Signature.dll'
     # At C# 5, not the project's version: Assert-PublishSigned.ps1 compiles
     # this file with Add-Type, which in Windows PowerShell is the .NET
-    # Framework compiler and stops at C# 5 (Developer-Guide.md, Settled design).
+    # Framework compiler and stops at C# 5 (docs/guide/settled-design.md).
     $ok = Compile @('/noconfig', '/nologo', '/langversion:5', '/target:library', '/platform:anycpu',
                     "/reference:$(Join-Path $LauncherRefDir 'System.dll')", "/out:$dll", $sigCs)
     Yes 'Signature.cs compiles on its own at C# 5, for Add-Type in Assert-PublishSigned.ps1' $ok
