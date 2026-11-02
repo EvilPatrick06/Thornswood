@@ -13,8 +13,8 @@
   this nothing ran any of them outside a live launcher. The To Do List entry
   put it as "the easiest thing in the codebase to test and the most expensive
   to get wrong, because it decides what gets downloaded and where it is allowed
-  to be written". test-dev-version.ps1 carries a PowerShell copy of IsNewer,
-  which answers for the copy and not for the launcher.
+  to be written". test-dev-version.ps1 carried a PowerShell copy of IsNewer
+  until #4825, which answered for the copy and not for the launcher.
 
   HOW. It builds the launcher project itself with the .NET 10 SDK, as the
   build does (Add-LauncherAssembly, tests\Launcher-Csc.ps1), loads it into
@@ -120,7 +120,7 @@ function Run {
     Yes 'IsNewer: a missing part counts as 0, 1.1.92.0 over 1.1.92 is not an update' ((Newer '1.1.92.0' '1.1.92') -eq $false)
     Yes 'IsNewer: nor is 1.1.92 over 1.1.92.0' ((Newer '1.1.92' '1.1.92.0') -eq $false)
 
-    # The dev channel's four part numbers, from test-dev-version.ps1 and the
+    # The dev channel's four part numbers, from the old test-dev-version.ps1 and the
     # build of 21 September that nobody already on dev could take.
     Yes 'IsNewer: a dev build 1.1.77.1 is an update over main 1.1.77' ((Newer '1.1.77.1' '1.1.77') -eq $true)
     Yes 'IsNewer: 1.1.76.1 over 1.1.77 is not, the dev build of 21 September' ((Newer '1.1.76.1' '1.1.77') -eq $false)

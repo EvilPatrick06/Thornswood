@@ -390,76 +390,13 @@ try {
         }
     }
 
-    # ---- 6. Ship's build block, lifted out and run against stand-ins -----------
+    # ---- 6. Ship builds and installs no launcher (#4825) -------------------------
+    # The launcher goes out only through Velopack (merge-release.yml), so the
+    # build block this section used to lift out of Ship.ps1 and run is gone.
     $shipPath = Join-Path $Here 'scripts\release\Ship.ps1'
-    $sAst = Get-Ast $shipPath
-    $ifs = @($sAst.FindAll({ param($n)
-        $n -is [System.Management.Automation.Language.IfStatementAst] -and
-        $n.Clauses[0].Item1.Extent.Text -eq '-not $ModsOnly' -and
-        $n.Clauses[0].Item2.Extent.Text -match 'Build-Launcher\.ps1' }, $true))
-    $getExe = @($sAst.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Get-LauncherExe' }, $true))
-    Yes "Ship's build block and Get-LauncherExe are where this expects them" (($ifs.Count -eq 1) -and ($getExe.Count -eq 1))
-    if (($ifs.Count -eq 1) -and ($getExe.Count -eq 1)) {
-        $body = $ifs[0].Clauses[0].Item2.Extent.Text
-        $body = $body.Substring(1, $body.Length - 2)
-        $shipTools = Join-Path $work 'ship\scripts\release'
-        New-Item -ItemType Directory -Force -Path $shipTools | Out-Null
-        Set-Content -LiteralPath (Join-Path $shipTools 'Build-Launcher.ps1') -Value $stubBuild -Encoding ASCII
-        Set-Content -LiteralPath (Join-Path $shipTools 'Install-Launcher.ps1') -Value $stubInstall -Encoding ASCII
-        Copy-Item -LiteralPath (Join-Path $Here 'scripts\release\Get-ScratchDir.ps1') -Destination $shipTools
-        $sb = [scriptblock]::Create(
-            'param($Root, $Here) ' +
-            '$ModsOnly = $false; $FromFeed = $false; $Dev = $true; $DryRun = $false; $target = "1.0.0"; $current = "1.0.0"; $updaterCs = ""; ' +
-            'function Say($m, $c) { }; function Head($m) { }; ' +
-            'function Die($m) { throw ("DIE: " + $m) }; ' +
-            'function Unbump([string]$why) { Add-Content -LiteralPath $env:TS_TEST_CALLS -Value ("unbump|" + $why) }; ' +
-            'function Save-ShipSymbols($FromDir, $Version) { @() }; function Get-ShipSymbolDir($Version) { "symbols" }; ' +
-            $getExe[0].Extent.Text + "`n" + $body)
-
-        # The root's leaf is unique, so the staging folder Ship names after it
-        # can be found and removed afterwards wherever the temp path points.
-        function Invoke-ShipBuild([string]$buildExit, [string]$installExit) {
-            $root = Join-Path $work ('tsship-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
-            New-Item -ItemType Directory -Force -Path (Join-Path $root 'Launcher') | Out-Null
-            $old = Join-Path $root 'Launcher\Thornswood.exe'
-            Set-Content -LiteralPath $old -Value 'old' -Encoding ASCII
-            (Get-Item -LiteralPath $old).LastWriteTimeUtc = [datetime]::new(2020, 1, 1, 0, 0, 0, [DateTimeKind]::Utc)
-            Remove-Item -LiteralPath $callLog -Force -ErrorAction SilentlyContinue
-            $env:TS_TEST_BUILD_EXIT = $buildExit
-            $env:TS_TEST_INSTALL_EXIT = $installExit
-            $result = 'ok'
-            try { & $sb $root $shipTools | Out-Null } catch { $result = $_.Exception.Message }
-            $calls = @(Read-Log $callLog | ForEach-Object { Split-Call $_ })
-            foreach ($c in $calls) {
-                if ($c.What -eq 'build' -and $c.Dir -and ((Split-Path -Leaf $c.Dir) -like 'Thornswood-launcher-tsship-*')) {
-                    Remove-Item -LiteralPath $c.Dir -Recurse -Force -ErrorAction SilentlyContinue
-                }
-            }
-            return [pscustomobject]@{ Root = $root; Result = $result; Calls = $calls }
-        }
-
-        $s = Invoke-ShipBuild '0' '0'
-        $b = @($s.Calls | Where-Object { $_.What -eq 'build' })
-        $i = @($s.Calls | Where-Object { $_.What -eq 'install' })
-        Yes "S1 Ship's build block runs to the end when both halves work ($($s.Result))" ($s.Result -eq 'ok')
-        Yes 'S2 it builds once, for its own root, with -NoPause' (($b.Count -eq 1) -and ($b[0].Root -eq $s.Root) -and ($b[0].NoPause -eq 'True'))
-        Yes 'S2b and gives the build the number it worked out, which goes in as -p:Version (#4825)' (($b.Count -eq 1) -and ($b[0].Version -eq '1.0.0'))
-        Yes 'S3 into a folder of its own, not the install it is about to replace' (($b.Count -eq 1) -and $b[0].Dir -and ($b[0].Dir.TrimEnd('\') -ne (Join-Path $s.Root 'Launcher')))
-        Yes 'S4 then installs once, into the same root, from that folder, with -NoPause' (($i.Count -eq 1) -and ($i[0].Root -eq $s.Root) -and ($b.Count -eq 1) -and ($i[0].Dir -eq $b[0].Dir) -and ($i[0].NoPause -eq 'True'))
-        Yes 'S5 build first, install second' (($s.Calls.Count -ge 2) -and ($s.Calls[0].What -eq 'build') -and ($s.Calls[1].What -eq 'install'))
-        Yes 'S6 and nothing was put back' (@($s.Calls | Where-Object { $_.What -eq 'unbump' }).Count -eq 0)
-
-        $s = Invoke-ShipBuild '1' '0'
-        Yes "S7 a failed build stops the release ($($s.Result))" ($s.Result -like 'DIE: The launcher build stopped*')
-        Yes 'S8 and nothing is installed after it' (@($s.Calls | Where-Object { $_.What -eq 'install' }).Count -eq 0)
-        # Since #4825 the number goes into the build as -p:Version and no source
-        # file holds it, so a stop has nothing to put back (Unbump went).
-        Yes 'S9 and there is nothing to put back: no source file holds the number' (@($s.Calls | Where-Object { $_.What -eq 'unbump' }).Count -eq 0)
-
-        $s = Invoke-ShipBuild '0' '1'
-        Yes "S10 a failed install stops the release ($($s.Result))" ($s.Result -like 'DIE: Putting the new launcher*')
-        Yes 'S11 and there is nothing to put back here either' (@($s.Calls | Where-Object { $_.What -eq 'unbump' }).Count -eq 0)
-    }
+    $shipText = Get-Content -LiteralPath $shipPath -Raw
+    Yes 'Ship.ps1 calls neither Build-Launcher.ps1 nor Install-Launcher.ps1' (
+        $shipText -notmatch "'Build-Launcher\.ps1'" -and $shipText -notmatch "'Install-Launcher\.ps1'")
 
     # ---- 7. Install-Thornswood's launcher step ----------------------------------
     # It refuses to run beside a game run from its own root, which is the right
@@ -583,7 +520,7 @@ try {
         if ((Get-Content -LiteralPath $f.FullName -Raw) -match 'Install-Launcher\.ps1') { $callers += $f.Name }
     }
     $callers = @($callers | Sort-Object)
-    Yes ('W1 only Ship.ps1 and Install-Thornswood.ps1 run the install, found: ' + ($callers -join ', ')) (($callers -join ',') -eq 'Install-Thornswood.ps1,Ship.ps1')
+    Yes ('W1 only Install-Thornswood.ps1 runs the install (Ship sends no launcher since #4825), found: ' + ($callers -join ', ')) (($callers -join ',') -eq 'Install-Thornswood.ps1')
 
     # Last, so it covers every run above.
     Yes 'D1 the Desktop shortcuts were not touched by any of it' ((Get-DesktopState) -eq $deskBefore)
