@@ -24,6 +24,7 @@
 #>
 $ErrorActionPreference = 'Stop'
 $Repo = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 $script:pass = 0; $script:fail = 0
 function Yes([string]$what, [bool]$ok) {
     if ($ok) { $script:pass++; Write-Host "PASS  $what" } else { $script:fail++; Write-Host "FAIL  $what" -ForegroundColor Red }
@@ -80,7 +81,7 @@ Yes 'Send-Backups -Install says the drop key after the lock and before it reads 
     $lock -ge 0 -and $drop -gt $lock -and $scan -gt $drop)
 
 # ---- the call, for real -----------------------------------------------------------
-if (-not $IsWindows) {
+if (-not $OnWindows) {
     Write-Host 'SKIP  the lock on a scratch folder (Windows only)'
 } else {
     $dir = Join-Path ([IO.Path]::GetTempPath()) ('tw-2862-acl-' + [guid]::NewGuid().ToString('N'))
